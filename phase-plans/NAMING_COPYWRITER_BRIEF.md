@@ -146,7 +146,7 @@ For each name provide:
 - **Publication-ready**: suitable for research papers and industry reports
 
 ### Current Situation
-- Originally called "fraiseql-performance-assessment"
+- Originally called "velocitybench"
 - Has evolved beyond single-framework context
 - Needs rebranding for broader appeal
 - Will be published/shared widely

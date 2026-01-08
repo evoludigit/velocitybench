@@ -2,7 +2,7 @@ services:
   postgres:
     image: postgres:15-alpine
     environment:
-      POSTGRES_DB: fraiseql_benchmark
+      POSTGRES_DB: velocitybench_benchmark
       POSTGRES_USER: benchmark
       POSTGRES_PASSWORD: benchmark123
       # Data volume selector: small, medium, large, xlarge
@@ -13,7 +13,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/01-extensions.sql:/docker-entrypoint-initdb.d/01-extensions.sql
-      - ./database/fraiseql_cqrs_schema.sql:/docker-entrypoint-initdb.d/02-fraiseql-cqrs.sql
+      - ./database/velocitybench_cqrs_schema.sql:/docker-entrypoint-initdb.d/02-velocitybench-cqrs.sql
       - ./database/04-cqrs-extensions.sql:/docker-entrypoint-initdb.d/03-cqrs-extensions.sql
       # Large dataset loaded conditionally via startup script
       - ./database/05-large-dataset.sql:/scripts/05-large-dataset.sql:ro
@@ -27,7 +27,7 @@ services:
     #   retries: 3
     #   start_period: 10s
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
     command: >
       postgres
       -c shared_preload_libraries=pg_stat_statements,pg_buffercache
@@ -56,7 +56,7 @@ services:
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_NAME=fraiseql_benchmark
+      - DB_NAME=velocitybench_benchmark
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
       - DB_POOL_MIN=20
@@ -68,7 +68,7 @@ services:
       timeout: 15s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   strawberry:
     build: ./frameworks/strawberry
@@ -80,7 +80,7 @@ services:
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_NAME=fraiseql_benchmark
+      - DB_NAME=velocitybench_benchmark
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
       - DB_POOL_MIN=10
@@ -92,7 +92,7 @@ services:
       timeout: 15s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   graphene:
     build: ./frameworks/graphene
@@ -104,7 +104,7 @@ services:
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_NAME=fraiseql_benchmark
+      - DB_NAME=velocitybench_benchmark
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
       - DB_POOL_MIN=10
@@ -116,7 +116,7 @@ services:
       timeout: 15s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   spring-boot:
     build: ./frameworks/java-spring-boot
@@ -127,7 +127,7 @@ services:
         condition: service_started
     environment:
       - SPRING_PROFILES_ACTIVE=prod
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/fraiseql_benchmark
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/velocitybench_benchmark
       - SPRING_DATASOURCE_USERNAME=benchmark
       - SPRING_DATASOURCE_PASSWORD=benchmark123
     healthcheck:
@@ -136,7 +136,7 @@ services:
       timeout: 15s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   spring-boot-orm:
     build: ./frameworks/spring-boot-orm
@@ -147,7 +147,7 @@ services:
         condition: service_started
     environment:
       - SPRING_PROFILES_ACTIVE=prod
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/fraiseql_benchmark
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/velocitybench_benchmark
       - SPRING_DATASOURCE_USERNAME=benchmark
       - SPRING_DATASOURCE_PASSWORD=benchmark123
     healthcheck:
@@ -156,7 +156,7 @@ services:
       timeout: 15s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   spring-boot-orm-naive:
     build: ./frameworks/spring-boot-orm-naive
@@ -167,7 +167,7 @@ services:
          condition: service_started
     environment:
       - SPRING_PROFILES_ACTIVE=prod
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/fraiseql_benchmark
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/velocitybench_benchmark
       - SPRING_DATASOURCE_USERNAME=benchmark
       - SPRING_DATASOURCE_PASSWORD=benchmark123
     healthcheck:
@@ -176,7 +176,7 @@ services:
       timeout: 15s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   apollo:
     build: ./frameworks/apollo-server
@@ -187,14 +187,14 @@ services:
       postgres:
         condition: service_started
     environment:
-      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/fraiseql_benchmark
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4002/health"]
       interval: 30s
       timeout: 15s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   apollo-orm:
     build: ./frameworks/apollo-orm
@@ -205,14 +205,14 @@ services:
       postgres:
         condition: service_started
     environment:
-      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/fraiseql_benchmark
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4005/health"]
       interval: 30s
       timeout: 15s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   hasura:
     image: hasura/graphql-engine:v2.36.0
@@ -222,7 +222,7 @@ services:
       postgres:
         condition: service_started
     environment:
-      - HASURA_GRAPHQL_DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/fraiseql_benchmark
+      - HASURA_GRAPHQL_DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
       - HASURA_GRAPHQL_ENABLE_CONSOLE=true
       - HASURA_GRAPHQL_DEV_MODE=true
       - HASURA_GRAPHQL_ADMIN_SECRET=admin_secret_key
@@ -233,7 +233,7 @@ services:
       timeout: 15s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   fastapi-rest:
     build: ./frameworks/fastapi-rest
@@ -245,7 +245,7 @@ services:
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_NAME=fraiseql_benchmark
+      - DB_NAME=velocitybench_benchmark
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
     healthcheck:
@@ -254,7 +254,7 @@ services:
       timeout: 15s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   actix-web-rest:
     build: ./frameworks/actix-web-rest
@@ -266,7 +266,7 @@ services:
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_NAME=fraiseql_benchmark
+      - DB_NAME=velocitybench_benchmark
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
     healthcheck:
@@ -275,7 +275,7 @@ services:
       timeout: 15s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   async-graphql:
     build: ./frameworks/async-graphql
@@ -285,14 +285,14 @@ services:
       postgres:
         condition: service_started
     environment:
-      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/fraiseql_benchmark
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/health"]
       interval: 30s
       timeout: 15s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   express-rest:
     build: ./frameworks/express-rest
@@ -302,7 +302,7 @@ services:
       postgres:
         condition: service_started
     environment:
-      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/fraiseql_benchmark
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
       - PORT=8005
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8005/health"]
@@ -310,7 +310,7 @@ services:
       timeout: 15s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   express-orm:
     build: ./frameworks/express-orm
@@ -320,7 +320,7 @@ services:
       postgres:
         condition: service_started
     environment:
-      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/fraiseql_benchmark
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
       - PORT=8007
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8001/health"]
@@ -328,7 +328,7 @@ services:
       timeout: 15s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   # Naive ORM Implementations (Educational - N+1 Query Demonstrations)
   strawberry-orm-naive:
@@ -341,7 +341,7 @@ services:
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_NAME=fraiseql_benchmark
+      - DB_NAME=velocitybench_benchmark
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
     healthcheck:
@@ -350,7 +350,7 @@ services:
       timeout: 15s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   fastapi-orm-naive:
     build: ./frameworks-orm/fastapi-orm-naive
@@ -362,7 +362,7 @@ services:
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_NAME=fraiseql_benchmark
+      - DB_NAME=velocitybench_benchmark
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
     healthcheck:
@@ -371,7 +371,7 @@ services:
       timeout: 15s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   apollo-orm-naive:
     build: ./frameworks-orm/apollo-orm-naive
@@ -381,14 +381,14 @@ services:
       postgres:
         condition: service_started
     environment:
-      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/fraiseql_benchmark
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4000/health"]
       interval: 30s
       timeout: 15s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   express-orm-naive:
     build: ./frameworks-orm/express-orm-naive
@@ -398,7 +398,7 @@ services:
       postgres:
         condition: service_started
     environment:
-      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/fraiseql_benchmark
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
       - PORT=8000
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/health"]
@@ -406,7 +406,7 @@ services:
       timeout: 15s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   gqlgen-orm-naive:
     build: ./frameworks-orm/gqlgen-orm-naive
@@ -418,7 +418,7 @@ services:
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_NAME=fraiseql_benchmark
+      - DB_NAME=velocitybench_benchmark
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
     healthcheck:
@@ -427,7 +427,7 @@ services:
       timeout: 15s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   gin-orm-naive:
     build: ./frameworks-orm/gin-orm-naive
@@ -439,7 +439,7 @@ services:
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_NAME=fraiseql_benchmark
+      - DB_NAME=velocitybench_benchmark
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
     healthcheck:
@@ -448,7 +448,7 @@ services:
       timeout: 15s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   flask-rest:
     build: ./frameworks/flask-rest
@@ -460,7 +460,7 @@ services:
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_NAME=fraiseql_benchmark
+      - DB_NAME=velocitybench_benchmark
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
     healthcheck:
@@ -469,7 +469,7 @@ services:
       timeout: 10s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   go-graphql-go:
     build: ./frameworks/go-graphql-go
@@ -481,7 +481,7 @@ services:
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_NAME=fraiseql_benchmark
+      - DB_NAME=velocitybench_benchmark
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
     healthcheck:
@@ -490,7 +490,7 @@ services:
       timeout: 10s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   gin-rest:
     build: ./frameworks/gin-rest
@@ -502,7 +502,7 @@ services:
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_NAME=fraiseql_benchmark
+      - DB_NAME=velocitybench_benchmark
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
     healthcheck:
@@ -511,7 +511,7 @@ services:
       timeout: 10s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   php-laravel:
     build: ./frameworks/php-laravel
@@ -523,7 +523,7 @@ services:
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_NAME=fraiseql_benchmark
+      - DB_NAME=velocitybench_benchmark
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
       - APP_ENV=production
@@ -533,7 +533,7 @@ services:
       timeout: 15s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   ruby-rails:
     build: ./frameworks/ruby-rails
@@ -543,7 +543,7 @@ services:
       postgres:
         condition: service_started
     environment:
-      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/fraiseql_benchmark
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
       - RAILS_ENV=production
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
@@ -551,7 +551,7 @@ services:
       timeout: 15s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   csharp-dotnet:
     build: ./frameworks/csharp-dotnet
@@ -561,7 +561,7 @@ services:
       postgres:
         condition: service_started
     environment:
-      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=fraiseql_benchmark;Username=benchmark;Password=benchmark123
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=velocitybench_benchmark;Username=benchmark;Password=benchmark123
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
     healthcheck:
@@ -570,7 +570,7 @@ services:
       timeout: 15s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   go-gqlgen-alt:
     build: ./frameworks/go-gqlgen.broken
@@ -582,7 +582,7 @@ services:
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_NAME=fraiseql_benchmark
+      - DB_NAME=velocitybench_benchmark
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
       - PORT=4009
@@ -592,7 +592,7 @@ services:
       timeout: 10s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   go-gqlgen:
     build: ./frameworks/go-gqlgen
@@ -604,7 +604,7 @@ services:
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_NAME=fraiseql_benchmark
+      - DB_NAME=velocitybench_benchmark
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
       - PORT=4009
@@ -614,7 +614,7 @@ services:
       timeout: 10s
       retries: 3
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
   prometheus:
     image: prom/prometheus:latest
@@ -656,7 +656,7 @@ services:
     environment:
       - JMETER_HOME=/opt/jmeter
     networks:
-      - fraiseql-benchmark
+      - velocitybench-benchmark
 
 volumes:
   postgres_data:
@@ -664,6 +664,6 @@ volumes:
   grafana_data:
 
 networks:
-  fraiseql-benchmark:
+  velocitybench-benchmark:
     external: true
-    name: fraiseql-benchmark
+    name: velocitybench-benchmark

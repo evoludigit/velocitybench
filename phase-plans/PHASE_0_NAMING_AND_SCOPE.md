@@ -11,7 +11,7 @@
 
 Before launching Phase 9+ quality improvements, FraiseQL should consider transitioning to a more neutral, ecosystem-agnostic name that reflects its true purpose: **a comprehensive, framework-agnostic GraphQL/REST performance benchmarking suite**.
 
-Current name `fraiseql-performance-assessment` is:
+Current name `velocitybench` is:
 - ✅ Descriptive of current work
 - ✅ Technically accurate (for FraiseQL context)
 - ❌ Implies FraiseQL is primary focus (only 1 of 28 frameworks)
@@ -133,9 +133,9 @@ This positions the project as:
 
 **Option A: Fork/Clone** (Recommended for publications)
 ```bash
-# Keep original fraiseql-performance-assessment for history
+# Keep original velocitybench for history
 git clone --mirror \
-  https://github.com/user/fraiseql-performance-assessment.git \
+  https://github.com/user/velocitybench.git \
   graphql-rest-benchmark.git
 
 # Create new repo with clean history or fresh start
@@ -291,7 +291,7 @@ git tag v1.0-old-name
 ## v1.0: Transition to Framework-Neutral Benchmarking Suite
 
 ### What Changed
-- Repository renamed from `fraiseql-performance-assessment`
+- Repository renamed from `velocitybench`
   to `graphql-rest-performance-benchmark`
 - Project scope clarified (tests 28+ frameworks, not just FraiseQL)
 - Documentation expanded with comprehensive scope/limitations
@@ -378,7 +378,7 @@ GitHub:
   Repository: graphql-rest-performance-benchmark
   Description: "Comprehensive GraphQL/REST framework performance benchmarking suite"
   Topics: benchmark, graphql, rest, performance, framework-comparison
-  Redirects: fraiseql-performance-assessment → graphql-rest-performance-benchmark
+  Redirects: velocitybench → graphql-rest-performance-benchmark
 ```
 
 ### Documentation Changes

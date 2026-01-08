@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="../buildMultiTargeting/FraiseQL.Benchmark.props" />
-</Project>

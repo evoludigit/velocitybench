@@ -1,6 +1,6 @@
 # FraiseQL Performance Assessment - Complete Quality Improvement Plan
 
-**Location**: `/tmp/fraiseql-performance-assessment/`  
+**Location**: `/tmp/velocitybench/`  
 **Status**: Ready for Immediate Execution  
 **Created**: 2026-01-08
 
@@ -85,7 +85,7 @@
 
 ```bash
 # Navigate to the directory
-cd /tmp/fraiseql-performance-assessment/
+cd /tmp/velocitybench/
 
 # Read the overview
 cat README.md
