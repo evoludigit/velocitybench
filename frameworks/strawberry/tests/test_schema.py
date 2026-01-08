@@ -299,7 +299,6 @@ async def test_mutation_update_user_bio(db, factory):
         "UPDATE benchmark.tb_user SET bio = %s WHERE id = %s",
         (new_bio, user["id"])
     )
-    db.commit()
 
     # Verify
     cursor.execute(
@@ -325,7 +324,6 @@ async def test_mutation_update_user_name(db, factory):
         "UPDATE benchmark.tb_user SET full_name = %s WHERE id = %s",
         (new_name, user["id"])
     )
-    db.commit()
 
     # Verify
     cursor.execute(
@@ -555,3 +553,263 @@ async def test_optional_post_content_can_be_null(db, factory):
 
     # Assert
     assert result[0] is None
+
+
+# ============================================================================
+# Enhanced Schema Integration Tests
+# ============================================================================
+
+@pytest.mark.asyncio
+async def test_schema_nested_user_posts_with_author(db, factory):
+    """Test: nested query returns user -> posts -> author correctly."""
+    # Arrange
+    author = factory.create_user("author", "author-nested", "author@example.com", "Author Name")
+    post1 = factory.create_post(author["pk_user"], "Post 1", "post-nested-1", "Content 1")
+    post2 = factory.create_post(author["pk_user"], "Post 2", "post-nested-2", "Content 2")
+
+    # Act
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT u.id, u.username, p.id, p.title, a.username "
+        "FROM benchmark.tb_user u "
+        "LEFT JOIN benchmark.tb_post p ON u.pk_user = p.fk_author "
+        "LEFT JOIN benchmark.tb_user a ON p.fk_author = a.pk_user "
+        "WHERE u.id = %s "
+        "ORDER BY p.id",
+        (author["id"],)
+    )
+    results = cursor.fetchall()
+
+    # Assert
+    assert len(results) >= 2
+    assert results[0][0] == author["id"]
+    assert results[0][1] == "author"
+    assert results[0][4] == "author"  # author field in post
+
+
+@pytest.mark.asyncio
+async def test_schema_post_with_comments_and_commenters(db, factory):
+    """Test: post query returns comments with commenter details."""
+    # Arrange
+    author = factory.create_user("author", "author-cmt", "author@example.com")
+    post = factory.create_post(author["pk_user"], "Post", "post-cmt", "Content")
+
+    commenter1 = factory.create_user("commenter1", "commenter-1", "commenter1@example.com")
+    commenter2 = factory.create_user("commenter2", "commenter-2", "commenter2@example.com")
+    factory.create_comment(post["pk_post"], commenter1["pk_user"], "cmt-1", "Comment 1")
+    factory.create_comment(post["pk_post"], commenter2["pk_user"], "cmt-2", "Comment 2")
+
+    # Act
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT p.id, c.id, c.content, cu.username "
+        "FROM benchmark.tb_post p "
+        "LEFT JOIN benchmark.tb_comment c ON p.pk_post = c.fk_post "
+        "LEFT JOIN benchmark.tb_user cu ON c.fk_author = cu.pk_user "
+        "WHERE p.id = %s "
+        "ORDER BY c.id",
+        (post["id"],)
+    )
+    results = cursor.fetchall()
+
+    # Assert
+    assert len(results) == 2
+    assert results[0][3] == "commenter1"
+    assert results[1][3] == "commenter2"
+
+
+@pytest.mark.asyncio
+async def test_schema_deeply_nested_three_levels(db, factory):
+    """Test: three-level deep query (user -> posts -> comments -> commenters)."""
+    # Arrange
+    author = factory.create_user("author", "author-deep3", "author@example.com")
+    post = factory.create_post(author["pk_user"], "Deep Post", "deep-post", "Content")
+
+    commenter = factory.create_user("commenter", "commenter-deep3", "commenter@example.com")
+    comment = factory.create_comment(post["pk_post"], commenter["pk_user"], "cmt-deep", "Deep comment")
+
+    # Act
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT u.username, p.title, c.content, cu.username "
+        "FROM benchmark.tb_user u "
+        "LEFT JOIN benchmark.tb_post p ON u.pk_user = p.fk_author "
+        "LEFT JOIN benchmark.tb_comment c ON p.pk_post = c.fk_post "
+        "LEFT JOIN benchmark.tb_user cu ON c.fk_author = cu.pk_user "
+        "WHERE u.id = %s AND c.id = %s",
+        (author["id"], comment["id"])
+    )
+    result = cursor.fetchone()
+
+    # Assert
+    assert result[0] == "author"
+    assert result[1] == "Deep Post"
+    assert result[2] == "Deep comment"
+    assert result[3] == "commenter"
+
+
+@pytest.mark.asyncio
+async def test_schema_mutation_update_preserves_relationships(db, factory):
+    """Test: updating user preserves relationships with posts."""
+    # Arrange
+    user = factory.create_user("author", "author-rel-pres", "author@example.com", "Original Name")
+    post1 = factory.create_post(user["pk_user"], "Post 1", "post-rel-1", "Content 1")
+    post2 = factory.create_post(user["pk_user"], "Post 2", "post-rel-2", "Content 2")
+
+    # Act - update user
+    cursor = db.cursor()
+    cursor.execute(
+        "UPDATE benchmark.tb_user SET full_name = %s, updated_at = NOW() WHERE id = %s",
+        ("Updated Name", user["id"])
+    )
+
+    # Verify relationships still exist
+    cursor.execute(
+        "SELECT COUNT(*) FROM benchmark.tb_post WHERE fk_author = %s",
+        (user["pk_user"],)
+    )
+    post_count = cursor.fetchone()[0]
+
+    # Assert
+    assert post_count == 2
+
+
+@pytest.mark.asyncio
+async def test_schema_query_with_filter_and_join(db, factory):
+    """Test: complex queries with filters and joins work correctly."""
+    # Arrange
+    author1 = factory.create_user("author1", "author-filter-1", "author1@example.com")
+    author2 = factory.create_user("author2", "author-filter-2", "author2@example.com")
+
+    factory.create_post(author1["pk_user"], "Technology Post", "tech-post", "About tech")
+    factory.create_post(author2["pk_user"], "Travel Post", "travel-post", "About travel")
+
+    # Act
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT u.username, p.title "
+        "FROM benchmark.tb_user u "
+        "LEFT JOIN benchmark.tb_post p ON u.pk_user = p.fk_author "
+        "WHERE p.title LIKE %s",
+        ("%Technology%",)
+    )
+    results = cursor.fetchall()
+
+    # Assert
+    assert len(results) == 1
+    assert results[0][0] == "author1"
+    assert "Technology" in results[0][1]
+
+
+@pytest.mark.asyncio
+async def test_schema_aggregate_functions(db, factory):
+    """Test: aggregate functions (COUNT, etc.) work correctly."""
+    # Arrange
+    user = factory.create_user("author", "author-agg", "author@example.com")
+    for i in range(5):
+        post = factory.create_post(user["pk_user"], f"Post {i}", f"post-agg-{i}", f"Content {i}")
+
+    # Act
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT u.username, COUNT(p.pk_post) as post_count "
+        "FROM benchmark.tb_user u "
+        "LEFT JOIN benchmark.tb_post p ON u.pk_user = p.fk_author "
+        "WHERE u.id = %s "
+        "GROUP BY u.pk_user, u.username",
+        (user["id"],)
+    )
+    result = cursor.fetchone()
+
+    # Assert
+    assert result[0] == "author"
+    assert result[1] == 5
+
+
+@pytest.mark.asyncio
+async def test_schema_mutation_batch_create_and_query(db, factory):
+    """Test: batch creating data and querying returns all records."""
+    # Arrange
+    user = factory.create_user("author", "author-batch", "author@example.com")
+
+    # Create batch of posts
+    created_posts = []
+    for i in range(10):
+        post = factory.create_post(user["pk_user"], f"Batch Post {i}", f"batch-{i}", f"Content {i}")
+        created_posts.append(post)
+
+    # Act
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT COUNT(*), MIN(created_at), MAX(created_at) "
+        "FROM benchmark.tb_post WHERE fk_author = %s",
+        (user["pk_user"],)
+    )
+    result = cursor.fetchone()
+
+    # Assert
+    assert result[0] == 10
+    assert result[1] is not None  # min created_at
+    assert result[2] is not None  # max created_at
+
+
+@pytest.mark.asyncio
+async def test_schema_pagination_with_offset(db, factory):
+    """Test: pagination with offset works correctly."""
+    # Arrange
+    user = factory.create_user("author", "author-offset", "author@example.com")
+    for i in range(25):
+        factory.create_post(user["pk_user"], f"Post {i:02d}", f"post-offset-{i}", f"Content {i}")
+
+    # Act - get first page (limit 10)
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT id FROM benchmark.tb_post WHERE fk_author = %s ORDER BY created_at LIMIT 10",
+        (user["pk_user"],)
+    )
+    page1 = cursor.fetchall()
+
+    # Act - get second page (offset 10, limit 10)
+    cursor.execute(
+        "SELECT id FROM benchmark.tb_post WHERE fk_author = %s ORDER BY created_at LIMIT 10 OFFSET 10",
+        (user["pk_user"],)
+    )
+    page2 = cursor.fetchall()
+
+    # Assert
+    assert len(page1) == 10
+    assert len(page2) == 10
+    page1_ids = [r[0] for r in page1]
+    page2_ids = [r[0] for r in page2]
+    assert len(set(page1_ids) & set(page2_ids)) == 0  # no overlap
+
+
+@pytest.mark.asyncio
+async def test_schema_field_types_and_precision(db, factory):
+    """Test: field types are preserved and precise across queries."""
+    # Arrange
+    user = factory.create_user("author", "author-types", "author@example.com", "Full Name", "Bio text")
+    post = factory.create_post(user["pk_user"], "Title", "post-types", "Long content text")
+
+    # Act
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT "
+        "u.id, u.username, u.full_name, u.bio, u.email, "
+        "p.id, p.title, p.content, p.created_at, p.updated_at "
+        "FROM benchmark.tb_user u "
+        "LEFT JOIN benchmark.tb_post p ON u.pk_user = p.fk_author "
+        "WHERE u.id = %s",
+        (user["id"],)
+    )
+    result = cursor.fetchone()
+
+    # Assert - verify types
+    assert isinstance(result[0], str)  # UUID
+    assert isinstance(result[1], str)  # username
+    assert isinstance(result[2], str)  # full_name
+    assert isinstance(result[3], (str, type(None)))  # bio (can be null)
+    assert isinstance(result[4], str)  # email
+    assert isinstance(result[5], str)  # post ID
+    assert isinstance(result[6], str)  # post title
+    assert result[6] == "Title"

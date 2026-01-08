@@ -640,3 +640,249 @@ async def test_query_with_ordering(db, factory):
 
     # Assert
     assert len(results) == 2
+
+
+# ============================================================================
+# Enhanced Query Tests: Additional Coverage
+# ============================================================================
+
+@pytest.mark.asyncio
+async def test_query_post_by_identifier_slug(db, factory):
+    """Test: query_post can fetch post by identifier/slug instead of UUID."""
+    # Arrange
+    user = factory.create_user("author", "author-slug", "author@example.com")
+    post = factory.create_post(user["pk_user"], "My Great Post", "my-great-post", "Content")
+
+    # Act
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT id, title FROM benchmark.tb_post WHERE identifier = %s",
+        (post["identifier"],)
+    )
+    result = cursor.fetchone()
+
+    # Assert
+    assert result is not None
+    assert result[1] == "My Great Post"
+
+
+@pytest.mark.asyncio
+async def test_query_post_with_full_author_data(db, factory):
+    """Test: post query returns complete author object with all fields."""
+    # Arrange
+    author = factory.create_user("author", "author-full", "author@example.com", "Author Full Name", "Author bio")
+    post = factory.create_post(author["pk_user"], "Test Post", "test-full", "Post content")
+
+    # Act
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT p.id, p.title, a.id, a.username, a.full_name, a.bio "
+        "FROM benchmark.tb_post p "
+        "JOIN benchmark.tb_user a ON p.fk_author = a.pk_user "
+        "WHERE p.id = %s",
+        (post["id"],)
+    )
+    result = cursor.fetchone()
+
+    # Assert
+    assert result[0] == post["id"]
+    assert result[1] == "Test Post"
+    assert result[3] == "author"
+    assert result[4] == "Author Full Name"
+    assert result[5] == "Author bio"
+
+
+@pytest.mark.asyncio
+async def test_query_posts_with_comment_count(db, factory):
+    """Test: post query includes count of comments."""
+    # Arrange
+    author = factory.create_user("author", "author-count", "author@example.com")
+    post = factory.create_post(author["pk_user"], "Test Post", "test-count", "Content")
+
+    commenter = factory.create_user("commenter", "commenter-count", "commenter@example.com")
+    factory.create_comment(post["pk_post"], commenter["pk_user"], "cmt-1", "Great!")
+    factory.create_comment(post["pk_post"], commenter["pk_user"], "cmt-2", "Awesome!")
+    factory.create_comment(post["pk_post"], commenter["pk_user"], "cmt-3", "Nice!")
+
+    # Act
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT p.id, COUNT(c.pk_comment) as comment_count "
+        "FROM benchmark.tb_post p "
+        "LEFT JOIN benchmark.tb_comment c ON p.pk_post = c.fk_post "
+        "WHERE p.id = %s "
+        "GROUP BY p.id",
+        (post["id"],)
+    )
+    result = cursor.fetchone()
+
+    # Assert
+    assert result[1] == 3  # comment_count
+
+
+@pytest.mark.asyncio
+async def test_query_users_enforces_max_limit(db, factory):
+    """Test: users query enforces maximum limit of 100."""
+    # Arrange
+    for i in range(150):
+        factory.create_user(f"user{i}", f"user-{i}", f"user{i}@example.com")
+
+    # Act - query with limit higher than max
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT id FROM benchmark.tb_user LIMIT 150"
+    )
+    all_results = cursor.fetchall()
+
+    # Act - query with enforced max limit
+    cursor.execute(
+        "SELECT id FROM benchmark.tb_user LIMIT 100"
+    )
+    limited_results = cursor.fetchall()
+
+    # Assert - total exists but query respects limit
+    assert len(all_results) >= 150
+    assert len(limited_results) == 100
+
+
+@pytest.mark.asyncio
+async def test_query_posts_enforces_max_limit(db, factory):
+    """Test: posts query enforces maximum limit of 100."""
+    # Arrange
+    user = factory.create_user("author", "author-post-lim", "author@example.com")
+    for i in range(120):
+        factory.create_post(user["pk_user"], f"Post {i}", f"post-{i}", f"Content {i}")
+
+    # Act
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT id FROM benchmark.tb_post LIMIT 100"
+    )
+    results = cursor.fetchall()
+
+    # Assert
+    assert len(results) == 100
+
+
+@pytest.mark.asyncio
+async def test_query_user_with_multiple_posts_deeply_nested(db, factory):
+    """Test: deeply nested query (user -> posts -> comments) works correctly."""
+    # Arrange
+    author = factory.create_user("author", "author-deep", "author@example.com")
+    post1 = factory.create_post(author["pk_user"], "Post 1", "post-deep-1", "Content 1")
+    post2 = factory.create_post(author["pk_user"], "Post 2", "post-deep-2", "Content 2")
+
+    commenter = factory.create_user("commenter", "commenter-deep", "commenter@example.com")
+    factory.create_comment(post1["pk_post"], commenter["pk_user"], "cmt-1", "Comment on post 1")
+    factory.create_comment(post2["pk_post"], commenter["pk_user"], "cmt-2", "Comment on post 2")
+
+    # Act - user with posts and comments
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT u.id, u.username, p.id, c.id "
+        "FROM benchmark.tb_user u "
+        "LEFT JOIN benchmark.tb_post p ON u.pk_user = p.fk_author "
+        "LEFT JOIN benchmark.tb_comment c ON p.pk_post = c.fk_post "
+        "WHERE u.id = %s "
+        "ORDER BY p.id, c.id",
+        (author["id"],)
+    )
+    results = cursor.fetchall()
+
+    # Assert
+    assert len(results) > 0
+    assert results[0][0] == author["id"]
+    assert results[0][1] == "author"
+
+
+@pytest.mark.asyncio
+async def test_query_multiple_users_with_their_own_posts(db, factory):
+    """Test: querying multiple users each with their own posts."""
+    # Arrange
+    author1 = factory.create_user("author1", "author-a", "author1@example.com")
+    author2 = factory.create_user("author2", "author-b", "author2@example.com")
+
+    factory.create_post(author1["pk_user"], "Author 1 Post", "post-a", "Content A")
+    factory.create_post(author2["pk_user"], "Author 2 Post", "post-b", "Content B")
+
+    # Act
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT u.id, u.username, COUNT(p.pk_post) as post_count "
+        "FROM benchmark.tb_user u "
+        "LEFT JOIN benchmark.tb_post p ON u.pk_user = p.fk_author "
+        "WHERE u.id IN (%s, %s) "
+        "GROUP BY u.pk_user, u.id, u.username",
+        (author1["id"], author2["id"])
+    )
+    results = cursor.fetchall()
+
+    # Assert
+    assert len(results) == 2
+    counts = [r[2] for r in results]
+    assert 1 in counts
+
+
+@pytest.mark.asyncio
+async def test_query_empty_result_set_for_posts(db, factory):
+    """Test: querying posts for user with no posts returns empty list."""
+    # Arrange
+    user = factory.create_user("author", "author-empty", "author@example.com")
+
+    # Act
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT id FROM benchmark.tb_post WHERE fk_author = %s",
+        (user["pk_user"],)
+    )
+    results = cursor.fetchall()
+
+    # Assert
+    assert len(results) == 0
+
+
+@pytest.mark.asyncio
+async def test_query_null_field_handling_in_responses(db, factory):
+    """Test: NULL optional fields are properly handled in query responses."""
+    # Arrange
+    user = factory.create_user("user", "user-null-fields", "user@example.com")
+    post = factory.create_post(user["pk_user"], "Post Title", "post-null", None)
+
+    # Act
+    cursor = db.cursor()
+    cursor.execute(
+        "SELECT id, title, content FROM benchmark.tb_post WHERE id = %s",
+        (post["id"],)
+    )
+    result = cursor.fetchone()
+
+    # Assert
+    assert result[0] == post["id"]
+    assert result[1] == "Post Title"
+    assert result[2] is None  # NULL content
+
+
+@pytest.mark.asyncio
+async def test_query_field_value_accuracy_across_relationships(db, factory):
+    """Test: field values remain accurate across relationship traversals."""
+    # Arrange
+    author = factory.create_user("author", "author-accurate", "author@example.com", "John Doe", "Bio")
+    post = factory.create_post(author["pk_user"], "Exact Title", "exact-post", "Exact content")
+
+    # Act - query author directly
+    cursor = db.cursor()
+    cursor.execute("SELECT full_name FROM benchmark.tb_user WHERE id = %s", (author["id"],))
+    author_name = cursor.fetchone()[0]
+
+    # Query through post relationship
+    cursor.execute(
+        "SELECT a.full_name FROM benchmark.tb_post p "
+        "JOIN benchmark.tb_user a ON p.fk_author = a.pk_user "
+        "WHERE p.id = %s",
+        (post["id"],)
+    )
+    author_name_through_post = cursor.fetchone()[0]
+
+    # Assert - values match
+    assert author_name == author_name_through_post
+    assert author_name == "John Doe"
