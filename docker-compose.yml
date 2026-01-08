@@ -1,0 +1,669 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: fraiseql_benchmark
+      POSTGRES_USER: benchmark
+      POSTGRES_PASSWORD: benchmark123
+      # Data volume selector: small, medium, large, xlarge
+      DATA_VOLUME: ${DATA_VOLUME:-small}
+      TMPDIR: /data/tmp
+    ports:
+      - "${POSTGRES_PORT:-5434}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/01-extensions.sql:/docker-entrypoint-initdb.d/01-extensions.sql
+      - ./database/fraiseql_cqrs_schema.sql:/docker-entrypoint-initdb.d/02-fraiseql-cqrs.sql
+      - ./database/04-cqrs-extensions.sql:/docker-entrypoint-initdb.d/03-cqrs-extensions.sql
+      # Large dataset loaded conditionally via startup script
+      - ./database/05-large-dataset.sql:/scripts/05-large-dataset.sql:ro
+      # Mount /data/tmp to avoid filling /tmp
+      - /data/tmp:/data/tmp
+    # Temporarily disable health check - PostgreSQL is working
+    # healthcheck:
+    #   test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/5432 && echo 'PostgreSQL is listening'"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 10s
+    networks:
+      - fraiseql-benchmark
+    command: >
+      postgres
+      -c shared_preload_libraries=pg_stat_statements,pg_buffercache
+      -c pg_stat_statements.max=10000
+      -c pg_stat_statements.track=all
+      -c shared_buffers=${DB_SHARED_BUFFERS:-8GB}
+      -c effective_cache_size=${DB_EFFECTIVE_CACHE_SIZE:-24GB}
+      -c work_mem=${DB_WORK_MEM:-64MB}
+      -c maintenance_work_mem=${DB_MAINTENANCE_WORK_MEM:-2GB}
+      -c max_connections=${DB_MAX_CONNECTIONS:-300}
+      -c max_worker_processes=${DB_MAX_WORKER_PROCESSES:-8}
+      -c max_parallel_workers_per_gather=${DB_MAX_PARALLEL_WORKERS_PER_GATHER:-4}
+      -c max_parallel_workers=${DB_MAX_PARALLEL_WORKERS:-8}
+      -c max_wal_size=${DB_MAX_WAL_SIZE:-4GB}
+      -c wal_buffers=${DB_WAL_BUFFERS:-16MB}
+      -c random_page_cost=${DB_RANDOM_PAGE_COST:-1.1}
+
+  # Framework containers
+  fraiseql:
+    build: ./frameworks/fraiseql
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=fraiseql_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+      - DB_POOL_MIN=20
+      - DB_POOL_MAX=100
+      - DB_STATEMENT_CACHE_SIZE=100
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8007/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  strawberry:
+    build: ./frameworks/strawberry
+    ports:
+      - "8011:8000"
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=fraiseql_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+      - DB_POOL_MIN=10
+      - DB_POOL_MAX=50
+      - DB_STATEMENT_CACHE_SIZE=100
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  graphene:
+    build: ./frameworks/graphene
+    ports:
+      - "8002:8000"
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=fraiseql_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+      - DB_POOL_MIN=10
+      - DB_POOL_MAX=50
+      - DB_STATEMENT_CACHE_SIZE=100
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  spring-boot:
+    build: ./frameworks/java-spring-boot
+    ports:
+      - "8010:8010"
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/fraiseql_benchmark
+      - SPRING_DATASOURCE_USERNAME=benchmark
+      - SPRING_DATASOURCE_PASSWORD=benchmark123
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8010/actuator/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  spring-boot-orm:
+    build: ./frameworks/spring-boot-orm
+    ports:
+      - "8013:8010"
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/fraiseql_benchmark
+      - SPRING_DATASOURCE_USERNAME=benchmark
+      - SPRING_DATASOURCE_PASSWORD=benchmark123
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8010/actuator/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  spring-boot-orm-naive:
+    build: ./frameworks/spring-boot-orm-naive
+    ports:
+      - "8014:8010"
+    depends_on:
+      postgres:
+         condition: service_started
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/fraiseql_benchmark
+      - SPRING_DATASOURCE_USERNAME=benchmark
+      - SPRING_DATASOURCE_PASSWORD=benchmark123
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8010/actuator/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  apollo:
+    build: ./frameworks/apollo-server
+    ports:
+      - "4001:4001"
+      - "4002:4002"
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/fraiseql_benchmark
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4002/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  apollo-orm:
+    build: ./frameworks/apollo-orm
+    ports:
+      - "4004:4004"
+      - "4005:4005"
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/fraiseql_benchmark
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4005/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  hasura:
+    image: hasura/graphql-engine:v2.36.0
+    ports:
+      - "8081:8080"
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - HASURA_GRAPHQL_DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/fraiseql_benchmark
+      - HASURA_GRAPHQL_ENABLE_CONSOLE=true
+      - HASURA_GRAPHQL_DEV_MODE=true
+      - HASURA_GRAPHQL_ADMIN_SECRET=admin_secret_key
+      - HASURA_GRAPHQL_JWT_SECRET={"type":"HS256","key":"this_is_a_longer_secret_key_for_hasura_jwt"}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  fastapi-rest:
+    build: ./frameworks/fastapi-rest
+    ports:
+      - "8003:8003"
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=fraiseql_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8003/health')"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  actix-web-rest:
+    build: ./frameworks/actix-web-rest
+    ports:
+      - "8015:8002"
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=fraiseql_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  async-graphql:
+    build: ./frameworks/async-graphql
+    ports:
+      - "8016:8000"
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/fraiseql_benchmark
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  express-rest:
+    build: ./frameworks/express-rest
+    ports:
+      - "8005:8005"
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/fraiseql_benchmark
+      - PORT=8005
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8005/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  express-orm:
+    build: ./frameworks/express-orm
+    ports:
+      - "8007:8007"
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/fraiseql_benchmark
+      - PORT=8007
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  # Naive ORM Implementations (Educational - N+1 Query Demonstrations)
+  strawberry-orm-naive:
+    build: ./frameworks-orm/strawberry-orm-naive
+    ports:
+      - "8019:8000"
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=fraiseql_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  fastapi-orm-naive:
+    build: ./frameworks-orm/fastapi-orm-naive
+    ports:
+      - "8020:8000"
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=fraiseql_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  apollo-orm-naive:
+    build: ./frameworks-orm/apollo-orm-naive
+    ports:
+      - "8021:4000"
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/fraiseql_benchmark
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  express-orm-naive:
+    build: ./frameworks-orm/express-orm-naive
+    ports:
+      - "8022:8000"
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/fraiseql_benchmark
+      - PORT=8000
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  gqlgen-orm-naive:
+    build: ./frameworks-orm/gqlgen-orm-naive
+    ports:
+      - "8023:8080"
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=fraiseql_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  gin-orm-naive:
+    build: ./frameworks-orm/gin-orm-naive
+    ports:
+      - "8024:8080"
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=fraiseql_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  flask-rest:
+    build: ./frameworks/flask-rest
+    ports:
+      - "8004:8004"
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=fraiseql_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  go-graphql-go:
+    build: ./frameworks/go-graphql-go
+    ports:
+      - "8008:8007"
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=fraiseql_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8007/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  gin-rest:
+    build: ./frameworks/gin-rest
+    ports:
+      - "8006:8006"
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=fraiseql_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8006/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  php-laravel:
+    build: ./frameworks/php-laravel
+    ports:
+      - "8009:8009"
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=fraiseql_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+      - APP_ENV=production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8009/api/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  ruby-rails:
+    build: ./frameworks/ruby-rails
+    ports:
+      - "8012:8000"
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/fraiseql_benchmark
+      - RAILS_ENV=production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  csharp-dotnet:
+    build: ./frameworks/csharp-dotnet
+    ports:
+      - "8025:8080"
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=fraiseql_benchmark;Username=benchmark;Password=benchmark123
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  go-gqlgen-alt:
+    build: ./frameworks/go-gqlgen.broken
+    ports:
+      - "4003:4009"
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=fraiseql_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+      - PORT=4009
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4009/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  go-gqlgen:
+    build: ./frameworks/go-gqlgen
+    ports:
+      - "4010:4009"
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=fraiseql_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+      - PORT=4009
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4009/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - fraiseql-benchmark
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - prometheus
+
+  jmeter-master:
+    image: jmeter:5.6-jdk11-alpine
+    ports:
+      - "1099:1099"
+      - "50500:50500"
+    volumes:
+      - ./tests/perf/jmeter:/tests
+      - ./tests/perf/results:/results
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - JMETER_HOME=/opt/jmeter
+    networks:
+      - fraiseql-benchmark
+
+volumes:
+  postgres_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  fraiseql-benchmark:
+    external: true
+    name: fraiseql-benchmark

@@ -1,0 +1,241 @@
+{
+  "frameworks": {
+    "fraiseql": {
+      "port": 4000,
+      "type": "graphql",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "language": "python",
+      "category": "graphql-framework"
+    },
+    "strawberry": {
+      "port": 8011,
+      "type": "graphql",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "language": "python",
+      "category": "graphql-library"
+    },
+    "graphene": {
+      "port": 8002,
+      "type": "graphql",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "language": "python",
+      "category": "graphql-library"
+    },
+    "apollo-server": {
+      "port": 4002,
+      "type": "graphql",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "language": "typescript",
+      "category": "graphql-library"
+    },
+    "apollo-orm": {
+      "port": 4004,
+      "type": "graphql",
+      "health": "/graphql",
+      "endpoint": "/graphql",
+      "language": "typescript",
+      "category": "graphql-orm",
+      "note": "Uses GraphQL endpoint for health checks (CSRF protection on /health)"
+    },
+    "async-graphql": {
+      "port": 8016,
+      "type": "graphql",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "language": "rust",
+      "category": "graphql-library"
+    },
+    "go-gqlgen": {
+      "port": 4003,
+      "type": "graphql",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "language": "go",
+      "category": "graphql-library"
+    },
+    "express-rest": {
+      "port": 8005,
+      "type": "rest",
+      "health": "/health",
+      "endpoint": "/users",
+      "language": "typescript",
+      "category": "rest-library"
+    },
+    "express-orm": {
+      "port": 8007,
+      "type": "rest",
+      "health": "/health",
+      "endpoint": "/users",
+      "language": "typescript",
+      "category": "rest-orm"
+    },
+    "fastapi-rest": {
+      "port": 8003,
+      "type": "rest",
+      "health": "/health",
+      "endpoint": "/users",
+      "language": "python",
+      "category": "rest-library"
+    },
+    "flask-rest": {
+      "port": 8004,
+      "type": "rest",
+      "health": "/health",
+      "endpoint": "/users",
+      "language": "python",
+      "category": "rest-library"
+    },
+    "actix-web-rest": {
+      "port": 8015,
+      "type": "rest",
+      "health": "/health",
+      "endpoint": "/users",
+      "language": "rust",
+      "category": "rest-library"
+    },
+    "gin-rest": {
+      "port": 8006,
+      "type": "rest",
+      "health": "/health",
+      "endpoint": "/users",
+      "language": "go",
+      "category": "rest-library"
+    },
+    "java-spring-boot": {
+      "port": 8018,
+      "type": "hybrid",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "rest_endpoint": "/api/users",
+      "language": "java",
+      "category": "graphql-framework"
+    },
+    "csharp-dotnet": {
+      "port": 8012,
+      "type": "graphql",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "language": "csharp",
+      "category": "graphql-library"
+    },
+    "go-graphql-go": {
+      "port": 8014,
+      "type": "graphql",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "language": "go",
+      "category": "graphql-library"
+    },
+    "rails": {
+      "port": 8013,
+      "type": "rest",
+      "health": "/api/health",
+      "endpoint": "/api/users",
+      "language": "ruby",
+      "category": "rest-framework"
+    },
+    "laravel": {
+      "port": 8009,
+      "type": "rest",
+      "health": "/api/health",
+      "endpoint": "/api/users",
+      "language": "php",
+      "category": "rest-framework"
+    },
+    "hasura": {
+      "port": 8081,
+      "type": "graphql",
+      "health": "/healthz",
+      "endpoint": "/v1/graphql",
+      "language": "haskell",
+      "category": "graphql-engine"
+    },
+    "spring-boot-orm": {
+      "port": 8010,
+      "type": "hybrid",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "rest_endpoint": "/api/users",
+      "language": "java",
+      "category": "graphql-orm"
+    },
+    "spring-boot-orm-naive": {
+      "port": 8017,
+      "type": "hybrid",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "rest_endpoint": "/api/users",
+      "language": "java",
+      "category": "graphql-orm-naive"
+    },
+    "strawberry-orm-naive": {
+      "port": 8019,
+      "type": "graphql",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "language": "python",
+      "category": "graphql-orm-naive",
+      "note": "Naive implementation with N+1 query problems (lazy loading)"
+    },
+    "fastapi-orm-naive": {
+      "port": 8020,
+      "type": "rest",
+      "health": "/health",
+      "endpoint": "/users",
+      "language": "python",
+      "category": "rest-orm-naive",
+      "note": "Naive implementation with N+1 query problems (lazy loading)"
+    },
+    "apollo-orm-naive": {
+      "port": 8021,
+      "type": "graphql",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "language": "typescript",
+      "category": "graphql-orm-naive",
+      "note": "Naive implementation with N+1 query problems (lazy loading)"
+    },
+    "express-orm-naive": {
+      "port": 8022,
+      "type": "rest",
+      "health": "/health",
+      "endpoint": "/users",
+      "language": "typescript",
+      "category": "rest-orm-naive",
+      "note": "Naive implementation with N+1 query problems (lazy loading)"
+    },
+    "gqlgen-orm-naive": {
+      "port": 8023,
+      "type": "graphql",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "language": "go",
+      "category": "graphql-orm-naive",
+      "note": "Naive implementation with N+1 query problems (lazy loading)"
+    },
+    "gin-orm-naive": {
+      "port": 8024,
+      "type": "rest",
+      "health": "/health",
+      "endpoint": "/users",
+      "language": "go",
+      "category": "rest-orm-naive",
+      "note": "Naive implementation with N+1 query problems (lazy loading)"
+    }
+  },
+  "test_queries": {
+    "graphql": {
+      "health_query": "{ __typename }",
+      "user_query": "query { user(id: \"test-id\") { id username } }",
+      "users_query": "query { users(first: 5) { id username } }"
+    },
+    "rest": {
+      "users_list": "GET /users?limit=5",
+      "user_detail": "GET /users/{id}"
+    }
+  }
+}

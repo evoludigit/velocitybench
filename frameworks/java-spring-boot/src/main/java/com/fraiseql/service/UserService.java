@@ -1,0 +1,50 @@
+package com.fraiseql.service;
+
+import com.fraiseql.dto.UserDTO;
+import com.fraiseql.models.User;
+import com.fraiseql.repository.UserRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+@Service
+@Transactional(readOnly = true)
+public class UserService {
+
+    private final UserRepository userRepository;
+
+    public UserService(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
+
+    public Optional<UserDTO> getUserById(String id) {
+        return userRepository.findById(id)
+                .map(this::toDTO);
+    }
+
+    public List<UserDTO> getAllUsers(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<User> userPage = userRepository.findAll(pageable);
+        return userPage.getContent().stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    private UserDTO toDTO(User user) {
+        if (user == null) {
+            return null;
+        }
+        UserDTO dto = new UserDTO();
+        dto.setId(user.getId());
+        dto.setUsername(user.getUsername());
+        dto.setFullName(user.getFullName());
+        dto.setBio(user.getBio());
+        return dto;
+    }
+}

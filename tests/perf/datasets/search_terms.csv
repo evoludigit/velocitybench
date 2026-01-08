@@ -1,0 +1,21 @@
+term,type
+programming,single_word
+python,single_word
+javascript,single_word
+database,single_word
+performance,single_word
+graphql,single_word
+api,single_word
+testing,single_word
+machine learning,phrase
+web development,phrase
+system design,phrase
+code review,phrase
+python OR javascript,boolean
+database AND performance,boolean
+graphql AND api,boolean
+testing OR benchmarking,boolean
+exact phrase search,quoted
+advanced optimization,quoted
+user experience,quoted
+data structure,quoted

@@ -1,0 +1,6 @@
+framework_name,framework_port
+fraiseql,4000
+strawberry,8001
+graphene,8002
+fastapi-rest,8003
+flask-rest,8004

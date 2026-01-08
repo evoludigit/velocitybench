@@ -1,0 +1,21 @@
+# Performance optimizations for benchmarking
+
+# Enable query caching
+Rails.application.config.after_initialize do
+  ActiveRecord::Base.connection.enable_query_cache! if ActiveRecord::Base.connection.respond_to?(:enable_query_cache!)
+end
+
+# Optimize JSON serialization
+ActiveSupport::JSON::Encoding.use_standard_json_time_format = true
+ActiveSupport::JSON::Encoding.time_precision = 0
+
+# Configure garbage collection for better performance
+if GC.respond_to?(:compact)
+  # Periodic GC compaction to reduce memory fragmentation
+  Thread.new do
+    loop do
+      sleep 300 # Every 5 minutes
+      GC.compact
+    end
+  end
+end

@@ -1,0 +1,60 @@
+# Validation configuration and thresholds
+
+database:
+  url: postgresql://benchmark:benchmark123@localhost:5434/fraiseql_benchmark
+  test_user_id: "{{WILL_BE_FETCHED}}"  # Fetch first user from database
+  test_post_id: "{{WILL_BE_FETCHED}}"
+  test_comment_id: "{{WILL_BE_FETCHED}}"
+
+thresholds:
+  performance:
+    ping_query_max_ms: 100
+    simple_query_max_ms: 500
+    complex_query_max_ms: 2000
+    max_timeout_rate: 0.01  # 1%
+
+  n1_queries:
+    max_query_multiplier: 1.5  # Actual queries should be ≤ 1.5x expected
+
+  data_consistency:
+    allow_field_name_variations: true  # Allow camelCase vs snake_case
+    require_identical_values: true
+
+validation_steps:
+  - name: schema_validation
+    enabled: true
+    critical: true
+
+  - name: config_validation
+    enabled: true
+    critical: true
+
+  - name: query_validation
+    enabled: true
+    critical: true
+
+  - name: n1_detection
+    enabled: true
+    critical: false  # Warning only, not blocking
+
+  - name: data_consistency
+    enabled: true
+    critical: false  # Warning only
+
+  - name: performance_sanity
+    enabled: true
+    critical: false  # Warning only
+
+reporting:
+  output_formats:
+    - markdown
+    - json
+  output_directory: .phases/qa-framework-verification
+
+  include_sections:
+    - summary
+    - individual_results
+    - recommendations
+    - schema_documentation
+
+baseline_framework: fraiseql  # Use as baseline for data consistency

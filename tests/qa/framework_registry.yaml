@@ -1,0 +1,335 @@
+# Framework Registry
+# Comprehensive list of all frameworks with metadata for validation
+
+frameworks:
+  # Python GraphQL Frameworks
+  - name: fraiseql
+    language: python
+    type: graphql
+    port: 4000
+    endpoint: /graphql
+    health_check: /health
+    metrics_endpoint: /metrics
+    expected_tables:
+      - benchmark.tv_user
+      - benchmark.tv_post
+      - benchmark.tv_comment
+    pool_config:
+      min: 20
+      max: 30
+    features:
+      dataloader: native
+      statement_caching: true
+      metrics: prometheus
+
+  - name: strawberry
+    language: python
+    type: graphql
+    port: 8011
+    endpoint: /graphql
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    pool_config:
+      min: 10
+      max: 50
+    features:
+      dataloader: strawberry.DataLoader
+      statement_caching: true
+
+  - name: graphene
+    language: python
+    type: graphql
+    port: 8002
+    endpoint: /graphql
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    pool_config:
+      min: 10
+      max: 50
+    features:
+      dataloader: promise.DataLoader
+      statement_caching: true
+
+  # Python REST Frameworks
+  - name: fastapi-rest
+    language: python
+    type: rest
+    port: 8003
+    endpoint: /api
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    pool_config:
+      min: 10
+      max: 50
+    features:
+      statement_caching: true
+
+  - name: flask-rest
+    language: python
+    type: rest
+    port: 8004
+    endpoint: /api
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    pool_config:
+      min: 10
+      max: 50
+    features:
+      statement_caching: true
+
+  # Node.js GraphQL Frameworks
+  - name: apollo-server
+    language: nodejs
+    type: graphql
+    port: 4002
+    endpoint: /graphql
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    pool_config:
+      min: 10
+      max: 30
+    features:
+      dataloader: dataloader
+      statement_caching: false
+
+  - name: apollo-orm
+    language: nodejs
+    type: graphql
+    port: 4004
+    endpoint: /graphql
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    pool_config:
+      min: 10
+      max: 30
+    features:
+      dataloader: dataloader
+      orm: prisma
+
+  # Node.js REST Frameworks
+  - name: express-rest
+    language: nodejs
+    type: rest
+    port: 3010
+    endpoint: /api
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    pool_config:
+      min: 10
+      max: 30
+    features:
+      statement_caching: false
+
+  - name: express-orm
+    language: nodejs
+    type: rest
+    port: 3011
+    endpoint: /api
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    pool_config:
+      min: 10
+      max: 30
+    features:
+      orm: prisma
+
+  # Go Frameworks
+  - name: go-gqlgen
+    language: go
+    type: graphql
+    port: 8080
+    endpoint: /query
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    pool_config:
+      min: 10
+      max: 30
+    features:
+      dataloader: graph-gophers/dataloader
+
+  - name: go-graphql-go
+    language: go
+    type: graphql
+    port: 8081
+    endpoint: /graphql
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    pool_config:
+      min: 10
+      max: 30
+    features:
+      dataloader: custom
+
+  - name: gin-rest
+    language: go
+    type: rest
+    port: 8082
+    endpoint: /api
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    pool_config:
+      min: 10
+      max: 30
+
+  # Rust Frameworks
+  - name: async-graphql
+    language: rust
+    type: graphql
+    port: 8016
+    endpoint: /graphql
+    health_check: /health
+    status: broken
+    known_issues:
+      - "All resolvers return empty TODO implementations"
+      - "No database queries implemented"
+      - "Only placeholder code exists"
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+
+  - name: actix-web-rest
+    language: rust
+    type: rest
+    port: 8005
+    endpoint: /api
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    pool_config:
+      min: 10
+      max: 30
+
+  # PHP Frameworks
+  - name: php-laravel
+    language: php
+    type: rest
+    port: 8006
+    endpoint: /api
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    features:
+      orm: eloquent
+
+  # Ruby Frameworks
+  - name: ruby-rails
+    language: ruby
+    type: rest
+    port: 3002
+    endpoint: /api
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    features:
+      orm: activerecord
+
+  # C# .NET Frameworks
+  - name: csharp-dotnet
+    language: csharp
+    type: graphql
+    port: 5000
+    endpoint: /graphql
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    features:
+      dataloader: greendonut
+
+  # Java Spring Boot Frameworks
+  - name: java-spring-boot
+    language: java
+    type: graphql
+    port: 8083
+    endpoint: /graphql
+    health_check: /actuator/health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    features:
+      dataloader: java-dataloader
+
+  - name: spring-boot-orm
+    language: java
+    type: rest
+    port: 8084
+    endpoint: /api
+    health_check: /actuator/health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    features:
+      orm: jpa
+
+  - name: spring-boot-orm-naive
+    language: java
+    type: rest
+    port: 8085
+    endpoint: /api
+    health_check: /actuator/health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    features:
+      orm: jpa
+      note: naive implementation without optimizations
+
+  # Hasura (Database-first GraphQL)
+  - name: hasura
+    language: haskell
+    type: graphql
+    port: 8086
+    endpoint: /v1/graphql
+    health_check: /healthz
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    features:
+      auto_generated: true
+      dataloader: native
+      note: automatically generated from database schema

@@ -1,0 +1,141 @@
+{
+  "graphql_queries": {
+    "ping": {
+      "query": "query { ping }",
+      "variables": {},
+      "expected_response": {
+        "data": {
+          "ping": "pong"
+        }
+      }
+    },
+    "user": {
+      "query": "query($id: ID!) { user(id: $id) { id username fullName bio } }",
+      "variables": {
+        "id": "{{TEST_USER_ID}}"
+      },
+      "expected_fields": ["id", "username", "fullName", "bio"]
+    },
+    "users": {
+      "query": "query($limit: Int!) { users(limit: $limit) { id username } }",
+      "variables": {
+        "limit": 5
+      },
+      "expected_min_count": 1,
+      "expected_fields": ["id", "username"]
+    },
+    "user_with_posts": {
+      "query": "query($id: ID!) { user(id: $id) { id username posts(limit: 5) { id title content } } }",
+      "variables": {
+        "id": "{{TEST_USER_ID}}"
+      },
+      "expected_relationships": ["posts"],
+      "n1_test": true,
+      "expected_query_count": 2
+    },
+    "posts": {
+      "query": "query($limit: Int!) { posts(limit: $limit) { id title content } }",
+      "variables": {
+        "limit": 10
+      },
+      "expected_min_count": 1,
+      "expected_fields": ["id", "title", "content"]
+    },
+    "post_with_author": {
+      "query": "query($id: ID!) { post(id: $id) { id title author { id username } } }",
+      "variables": {
+        "id": "{{TEST_POST_ID}}"
+      },
+      "expected_relationships": ["author"],
+      "expected_fields": ["id", "title", "author"]
+    },
+    "posts_with_author": {
+      "query": "query($limit: Int!) { posts(limit: $limit) { id title author { id username } } }",
+      "variables": {
+        "limit": 10
+      },
+      "expected_relationships": ["author"],
+      "n1_test": true,
+      "expected_query_count": 2
+    },
+    "posts_with_author_and_comments": {
+      "query": "query($limit: Int!) { posts(limit: $limit) { id title author { id username } comments(limit: 5) { id content author { username } } } }",
+      "variables": {
+        "limit": 10
+      },
+      "expected_relationships": ["author", "comments", "comments.author"],
+      "n1_test": true,
+      "expected_query_count": 3
+    },
+    "user_with_posts_and_followers": {
+      "query": "query($id: ID!) { user(id: $id) { id username posts(limit: 5) { id title } followerCount } }",
+      "variables": {
+        "id": "{{TEST_USER_ID}}"
+      },
+      "expected_relationships": ["posts"],
+      "expected_fields": ["id", "username", "posts", "followerCount"]
+    }
+  },
+  "rest_queries": {
+    "ping": {
+      "method": "GET",
+      "path": "/ping",
+      "expected_response": {
+        "message": "pong"
+      }
+    },
+    "health": {
+      "method": "GET",
+      "path": "/health",
+      "expected_fields": ["status"]
+    },
+    "user": {
+      "method": "GET",
+      "path": "/users/{{TEST_USER_ID}}",
+      "expected_fields": ["id", "username", "full_name", "bio"]
+    },
+    "users": {
+      "method": "GET",
+      "path": "/users?limit=5",
+      "expected_min_count": 1,
+      "expected_fields": ["id", "username"]
+    },
+    "user_with_posts": {
+      "method": "GET",
+      "path": "/users/{{TEST_USER_ID}}?include=posts&limit=5",
+      "expected_fields": ["id", "username", "posts"],
+      "n1_test": true
+    },
+    "post": {
+      "method": "GET",
+      "path": "/posts/{{TEST_POST_ID}}",
+      "expected_fields": ["id", "title", "content"]
+    },
+    "posts": {
+      "method": "GET",
+      "path": "/posts?limit=10",
+      "expected_min_count": 1,
+      "expected_fields": ["id", "title", "content"]
+    },
+    "posts_with_author": {
+      "method": "GET",
+      "path": "/posts?limit=10&include=author",
+      "expected_fields": ["id", "title", "author"],
+      "n1_test": true
+    }
+  },
+  "mutations": {
+    "update_user": {
+      "query": "mutation($id: ID!, $bio: String) { updateUser(id: $id, bio: $bio) { id bio } }",
+      "variables": {
+        "id": "{{TEST_USER_ID}}",
+        "bio": "Updated bio for QA testing"
+      },
+      "cleanup_query": "mutation($id: ID!, $bio: String) { updateUser(id: $id, bio: $bio) { id bio } }",
+      "cleanup_variables": {
+        "id": "{{TEST_USER_ID}}",
+        "bio": "{{ORIGINAL_BIO}}"
+      }
+    }
+  }
+}

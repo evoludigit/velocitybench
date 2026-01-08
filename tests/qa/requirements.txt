@@ -1,0 +1,13 @@
+# QA Framework Validator Dependencies
+
+# Database
+asyncpg>=0.29.0
+
+# HTTP client
+httpx>=0.27.0
+
+# YAML parsing
+PyYAML>=6.0.1
+
+# Deep comparison (optional, for advanced data consistency checks)
+# deepdiff>=6.7.0

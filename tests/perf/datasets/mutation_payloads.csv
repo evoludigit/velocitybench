@@ -1,0 +1,11 @@
+operation,title,content
+create,New Post Title 001,Content for post 001 with test data
+create,New Post Title 002,Content for post 002 with test data
+create,New Post Title 003,Content for post 003 with test data
+create,New Post Title 004,Content for post 004 with test data
+create,New Post Title 005,Content for post 005 with test data
+update,Updated Title 001,Updated content for post 001
+update,Updated Title 002,Updated content for post 002
+update,Updated Title 003,Updated content for post 003
+update,Updated Title 004,Updated content for post 004
+update,Updated Title 005,Updated content for post 005
