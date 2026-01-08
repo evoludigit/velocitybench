@@ -32,11 +32,11 @@ def test_list_users_default_limit(db, factory):
 
     # Act
     cursor = db.cursor()
-    cursor.execute("SELECT COUNT(*) FROM benchmark.tb_user LIMIT 10")
-    count = cursor.fetchone()[0]
+    cursor.execute("SELECT id FROM benchmark.tb_user ORDER BY created_at LIMIT 10")
+    results = cursor.fetchall()
 
     # Assert
-    assert count == 10
+    assert len(results) == 10  # Should be limited to 10
 
 
 def test_list_users_custom_limit(db, factory):
@@ -90,7 +90,7 @@ def test_get_user_endpoint_response_structure(db, factory):
     assert result is not None
     assert result[0] == user["id"]  # id
     assert result[1] == "alice"  # username
-    assert result[3] == "Alice"  # full_name
+    assert result[2] == "Alice"  # full_name (index 2, not 3)
 
 
 def test_get_user_includes_posts_when_requested(db, factory):
@@ -147,7 +147,6 @@ def test_update_user_endpoint_returns_updated_user(db, factory):
         "UPDATE benchmark.tb_user SET bio = %s, updated_at = NOW() WHERE id = %s",
         (new_bio, user_id)
     )
-    db.commit()
 
     # Verify updated user is returned
     cursor.execute(
@@ -173,7 +172,6 @@ def test_update_user_can_include_posts(db, factory):
         "UPDATE benchmark.tb_user SET bio = %s, updated_at = NOW() WHERE id = %s",
         (new_bio, user["id"])
     )
-    db.commit()
 
     # Verify posts are still accessible
     cursor.execute(
@@ -481,7 +479,6 @@ def test_update_user_updates_timestamp(db, factory):
         "UPDATE benchmark.tb_user SET bio = %s, updated_at = NOW() WHERE id = %s",
         ("new bio", user["id"])
     )
-    db.commit()
 
     # Get updated timestamp
     cursor.execute(

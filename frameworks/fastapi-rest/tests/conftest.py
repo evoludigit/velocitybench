@@ -72,7 +72,7 @@ def factory(db):
                 username: Username
                 email_or_identifier: Email or identifier (auto-detects based on context)
                 email: Email address (optional, only if called with 3+ args)
-                full_name: Full name (optional)
+                full_name: Full name (required for schema, defaults to capitalized username)
                 bio: Biography (optional)
 
             Returns:
@@ -84,6 +84,10 @@ def factory(db):
                 identifier = username  # Use username as identifier
             else:
                 identifier = email_or_identifier if email_or_identifier else username
+
+            # full_name is required by schema, default to capitalized username if not provided
+            if full_name is None:
+                full_name = username.capitalize()
 
             with db.cursor() as cursor:
                 cursor.execute(

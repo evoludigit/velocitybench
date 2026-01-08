@@ -94,7 +94,7 @@ def test_get_user_by_id_returns_user(db, factory):
     assert result is not None
     assert result[0] == user_id
     assert result[1] == "alice"
-    assert result[3] == "Alice"
+    assert result[2] == "Alice"  # full_name is index 2
 
 
 def test_get_user_nonexistent_returns_404(db):
@@ -184,7 +184,6 @@ def test_update_user_bio(db, factory):
         "UPDATE benchmark.tb_user SET bio = %s, updated_at = NOW() WHERE id = %s",
         (new_bio, user_id)
     )
-    db.commit()
 
     # Verify
     cursor.execute(
@@ -210,7 +209,6 @@ def test_update_user_full_name(db, factory):
         "UPDATE benchmark.tb_user SET full_name = %s, updated_at = NOW() WHERE id = %s",
         (new_name, user_id)
     )
-    db.commit()
 
     # Verify
     cursor.execute(
@@ -237,7 +235,6 @@ def test_update_user_multiple_fields(db, factory):
         "UPDATE benchmark.tb_user SET bio = %s, full_name = %s, updated_at = NOW() WHERE id = %s",
         (new_bio, new_name, user_id)
     )
-    db.commit()
 
     # Verify
     cursor.execute(
@@ -262,7 +259,6 @@ def test_update_nonexistent_user_is_no_op(db):
         "UPDATE benchmark.tb_user SET bio = %s WHERE id = %s",
         ("test", nonexistent_id)
     )
-    db.commit()
 
     # Verify - no user was created or updated
     cursor.execute(
@@ -551,7 +547,7 @@ def test_special_characters_in_content(db, factory):
 
 
 def test_null_optional_fields(db, factory):
-    """Test: optional fields can be null."""
+    """Test: optional bio field can be null."""
     # Arrange
     user = factory.create_user("user", "user-null", "user@example.com")
 
@@ -564,5 +560,5 @@ def test_null_optional_fields(db, factory):
     result = cursor.fetchone()
 
     # Assert
-    assert result[0] is None  # bio is null
-    assert result[1] is None  # full_name is null
+    assert result[0] is None  # bio is null (optional)
+    assert result[1] is not None  # full_name is required and has default value
