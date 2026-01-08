@@ -93,7 +93,17 @@ def factory(db):
                     (username, identifier, email, full_name, bio),
                 )
                 row = cursor.fetchone()
-                return dict(row) if row else {}
+                if row:
+                    return {
+                        'pk_user': row[0],
+                        'id': row[1],
+                        'username': row[2],
+                        'identifier': row[3],
+                        'email': row[4],
+                        'full_name': row[5],
+                        'bio': row[6]
+                    }
+                return {}
 
         @staticmethod
         def create_post(fk_author: int, title: str, identifier: str, content: str = None) -> dict:
@@ -116,7 +126,16 @@ def factory(db):
                     (fk_author, title, identifier, content),
                 )
                 row = cursor.fetchone()
-                return dict(row) if row else {}
+                if row:
+                    return {
+                        'pk_post': row[0],
+                        'id': row[1],
+                        'title': row[2],
+                        'identifier': row[3],
+                        'content': row[4],
+                        'fk_author': row[5]
+                    }
+                return {}
 
         @staticmethod
         def create_comment(fk_post: int, fk_author: int, identifier: str, content: str) -> dict:
@@ -139,7 +158,16 @@ def factory(db):
                     (fk_post, fk_author, identifier, content),
                 )
                 row = cursor.fetchone()
-                return dict(row) if row else {}
+                if row:
+                    return {
+                        'pk_comment': row[0],
+                        'id': row[1],
+                        'identifier': row[2],
+                        'content': row[3],
+                        'fk_post': row[4],
+                        'fk_author': row[5]
+                    }
+                return {}
 
     return TestFactory()
 
