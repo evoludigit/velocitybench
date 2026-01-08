@@ -1,16 +1,18 @@
 # VelocityBench Testing Standards
 
-**Document Version**: 1.0
+**Document Version**: 2.0 (Revised)
 **Date**: 2026-01-08
-**Status**: Phase 9 - Foundation
+**Status**: Phase 9 - Foundation (Practical Approach)
 
 ---
 
 ## Overview
 
-This document defines universal testing standards for all VelocityBench frameworks. Every framework must follow these standards to ensure consistency, maintainability, and publication-ready quality.
+This document defines universal testing standards for all VelocityBench frameworks. Every framework tests against a **single shared PostgreSQL database** running in Docker, ensuring consistency and practicality.
 
-**Goal**: 80%+ code coverage across all frameworks with consistent test structure and naming conventions.
+**Goal**: 80%+ code coverage across all frameworks with consistent test structure, naming conventions, and real database testing.
+
+**Key Principle**: Test against **real database behavior**, not mocks. This matches how the performance benchmarks work and catches real integration issues.
 
 ---
 
@@ -21,26 +23,45 @@ This document defines universal testing standards for all VelocityBench framewor
 All frameworks follow this directory structure:
 
 ```
-frameworks/{language}/{framework}/
-├── src/                          # Production code
-│   ├── resolvers.py              # or equivalent
-│   ├── models.py                 # or schema definition
+frameworks/{framework}/
+├── src/                              # Production code
+│   ├── resolvers.py / index.ts       # or equivalent
+│   ├── models.py / models.ts         # or schema definition
 │   └── ...
-├── tests/                        # All tests
-│   ├── __init__.py              # Test marker (Python)
-│   ├── unit/                    # Unit tests (isolated)
-│   │   ├── test_resolvers.py
-│   │   ├── test_models.py
-│   │   └── test_validation.py
-│   ├── integration/             # Integration tests (with database)
-│   │   ├── test_queries.py
-│   │   ├── test_mutations.py
-│   │   └── test_schema.py
-│   └── conftest.py              # Fixtures (Python)
-└── pyproject.toml               # Config (Python)
+├── tests/                            # All tests
+│   ├── test_resolvers.py             # Test resolvers/handlers
+│   ├── test_schema.py                # Test schema/types
+│   ├── test_integration.py           # Integration tests
+│   └── conftest.py                   # Fixtures (Python only)
+├── requirements.txt / package.json   # Dependencies
+└── pytest.ini / jest.config.js       # Test config (optional)
 ```
 
-### 2. Test Naming Conventions
+**Simplified structure** - No separation into unit/integration directories. Everything tests the real database.
+
+### 2. Shared PostgreSQL Database
+
+All frameworks connect to the same PostgreSQL instance:
+
+```yaml
+# docker-compose.test.yml (or part of main docker-compose.yml)
+services:
+  postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: velocitybench
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: velocitybench_test
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./database/data.sql:/docker-entrypoint-initdb.d/02-data.sql
+```
+
+**One database for all 24+ frameworks** - Reduces complexity, more realistic testing.
+
+### 3. Test Naming Conventions
 
 All tests follow a consistent naming pattern:
 
@@ -51,33 +72,24 @@ test_{feature}_{scenario}_{expected_outcome}
 **Examples**:
 - `test_query_users_returns_list` - queries return list
 - `test_query_user_by_id_returns_single_user` - filtering works
-- `test_query_invalid_id_raises_validation_error` - error handling
 - `test_mutation_create_user_persists_to_database` - mutations work
-- `test_concurrent_requests_maintain_isolation` - concurrency safety
+- `test_mutation_invalid_data_raises_validation_error` - error handling
+- `test_resolver_with_concurrent_requests_maintains_isolation` - concurrency
 
-### 3. Test Independence
+### 4. Database Testing Pattern
 
-Each test must be:
+All tests follow the same pattern:
 
-- **Isolated**: No dependencies on other tests
-- **Repeatable**: Runs consistently in any order
-- **Deterministic**: Same result every time
-- **Atomic**: Either fully succeeds or fully fails
-- **Self-contained**: Sets up all required data
+1. **Setup Phase**: Create test data (factory pattern)
+2. **Execution Phase**: Call resolver/handler with test data
+3. **Assertion Phase**: Verify results in database
+4. **Cleanup Phase**: Rollback transaction (automatic via fixture)
 
-### 4. Database Testing
-
-All integration tests with database follow:
-
-1. **Setup Phase**: Create test data
-2. **Execution Phase**: Run test
-3. **Assertion Phase**: Verify results
-4. **Cleanup Phase**: Reset database state
-
-Database isolation strategy:
-- Fresh database or transaction rollback per test
-- No shared state between tests
-- Deterministic test data (same values every run)
+**Database Isolation**:
+- Each test runs in a **transaction**
+- Test data is **rolled back** automatically after each test
+- **No cleanup code needed** - transaction handles it
+- Tests can **run in parallel** (each has isolated transaction)
 
 ### 5. Assertion Quality
 
@@ -97,9 +109,8 @@ assert result
 
 # ✅ Good: Specific assertion
 assert isinstance(result, dict)
-assert "id" in result
-assert result["id"] == 123
-assert result["email"] == "test@example.com"
+assert result["id"] is not None
+assert result["name"] == "Alice"
 ```
 
 ---
@@ -110,383 +121,512 @@ assert result["email"] == "test@example.com"
 
 **Test Framework**: pytest
 
-**Configuration** (`pyproject.toml`):
+**Setup** (`pyproject.toml`):
 ```toml
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "--cov=src --cov-report=html --cov-report=term-missing"
-markers = [
-    "unit: unit tests",
-    "integration: integration tests",
-    "slow: slow tests"
-]
+addopts = "--cov=src --cov-report=html --cov-report=term-missing:skip-covered"
+asyncio_mode = "auto"
+
+[tool.pytest.ini_options.markers]
+slow = "slow tests"
 ```
 
-**Fixtures** (`tests/conftest.py`):
+**Database Connection** (`tests/conftest.py`):
 ```python
 import pytest
-from database import create_test_db, drop_test_db
+import psycopg2
+from psycopg2.extras import DictCursor
 
-@pytest.fixture(scope="session")
-def test_db():
-    """Create test database once per session"""
-    db = create_test_db()
-    yield db
-    drop_test_db(db)
-
-@pytest.fixture
-def db(test_db):
-    """Fresh database per test via transaction rollback"""
-    test_db.begin()
-    yield test_db
-    test_db.rollback()
+DB_HOST = "localhost"
+DB_PORT = 5432
+DB_USER = "velocitybench"
+DB_PASSWORD = "password"
+DB_NAME = "velocitybench_test"
 
 @pytest.fixture
-def client(app, db):
-    """GraphQL/REST client for testing"""
-    return app.test_client()
+def db():
+    """Connect to shared test database with transaction isolation."""
+    conn = psycopg2.connect(
+        host=DB_HOST,
+        port=DB_PORT,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME,
+    )
+    conn.autocommit = False
+    conn.begin()  # Start transaction
+
+    yield conn
+
+    # Cleanup: rollback clears all test data
+    conn.rollback()
+    conn.close()
+
+@pytest.fixture
+def factory(db):
+    """Factory for creating test data."""
+    class TestFactory:
+        @staticmethod
+        def create_user(name: str, email: str):
+            cursor = db.cursor(cursor_factory=DictCursor)
+            cursor.execute(
+                "INSERT INTO users (name, email) VALUES (%s, %s) "
+                "RETURNING id, name, email",
+                (name, email),
+            )
+            return dict(cursor.fetchone())
+
+        @staticmethod
+        def create_company(name: str):
+            cursor = db.cursor(cursor_factory=DictCursor)
+            cursor.execute(
+                "INSERT INTO companies (name) VALUES (%s) RETURNING id, name",
+                (name,),
+            )
+            return dict(cursor.fetchone())
+
+    return TestFactory()
 ```
 
-**Test Template**:
+**Test Example**:
 ```python
-import pytest
-from models import User
-from queries import QueryResolvers
+def test_query_users_returns_list(db, factory):
+    """Test: querying users returns a list."""
+    # Arrange
+    factory.create_user("Alice", "alice@example.com")
+    factory.create_user("Bob", "bob@example.com")
 
-@pytest.mark.unit
-class TestQueryResolvers:
-    """Tests for resolver functions"""
+    # Act
+    cursor = db.cursor(cursor_factory=DictCursor)
+    cursor.execute("SELECT id, name, email FROM users ORDER BY name")
+    users = cursor.fetchall()
 
-    def test_query_users_returns_list(self, db):
-        # Arrange
-        user1 = User.create(db, name="Alice", email="alice@example.com")
-        user2 = User.create(db, name="Bob", email="bob@example.com")
+    # Assert
+    assert len(users) == 2
+    assert users[0]["name"] == "Alice"
+    assert users[1]["name"] == "Bob"
 
-        # Act
-        result = QueryResolvers.users(None)
+def test_mutation_create_user_persists_to_database(db, factory):
+    """Test: creating user persists to database."""
+    # Arrange
+    user_data = {"name": "Charlie", "email": "charlie@example.com"}
 
-        # Assert
-        assert isinstance(result, list)
-        assert len(result) == 2
-        assert result[0].name == "Alice"
+    # Act
+    result = factory.create_user(**user_data)
 
-@pytest.mark.integration
-class TestUserQueries:
-    """Tests for user queries with database"""
+    # Assert
+    assert result["name"] == "Charlie"
+    assert result["email"] == "charlie@example.com"
 
-    async def test_query_user_by_id(self, client, db):
-        # Arrange
-        user = User.create(db, name="Alice", email="alice@example.com")
-
-        # Act
-        response = await client.query(f"""
-            query {{
-                user(id: "{user.id}") {{
-                    id
-                    name
-                    email
-                }}
-            }}
-        """)
-
-        # Assert
-        assert response.status_code == 200
-        data = response.json()["data"]["user"]
-        assert data["id"] == str(user.id)
-        assert data["name"] == "Alice"
+    # Verify in database
+    cursor = db.cursor(cursor_factory=DictCursor)
+    cursor.execute("SELECT * FROM users WHERE id = %s", (result["id"],))
+    db_user = cursor.fetchone()
+    assert db_user is not None
+    assert db_user["name"] == "Charlie"
 ```
-
-**Minimum Coverage**: 80% of production code
 
 **Run Tests**:
 ```bash
-cd frameworks/python/{framework}
-pytest --cov=src
-pytest tests/unit/  # unit tests only
-pytest -m integration  # integration tests only
+cd frameworks/{framework}
+pytest tests/ --cov=src
 ```
 
 ---
 
-### TypeScript/Node.js (Apollo, Express, PostGraphile)
+### TypeScript/Node.js (Apollo, Express)
 
 **Test Framework**: Jest
 
-**Configuration** (`jest.config.js`):
+**Setup** (`jest.config.js`):
 ```javascript
 module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   roots: ['<rootDir>/tests'],
-  testMatch: ['**/?(*.)+(spec|test).ts?(x)'],
-  collectCoverageFrom: [
-    'src/**/*.ts',
-    '!src/**/*.d.ts',
-  ],
-  coverageThreshold: {
-    global: {
-      branches: 80,
-      functions: 80,
-      lines: 80,
-      statements: 80,
-    },
+  testMatch: ['**/tests/**/*.test.ts'],
+  collectCoverageFrom: ['src/**/*.ts', '!src/**/*.d.ts'],
+  coverageThreshold: { global: { lines: 80 } },
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
+};
+```
+
+**Database Connection** (`tests/setup.ts`):
+```typescript
+import { Pool } from 'pg';
+
+let pool: Pool;
+
+beforeAll(() => {
+  pool = new Pool({
+    host: 'localhost',
+    port: 5432,
+    user: 'velocitybench',
+    password: 'password',
+    database: 'velocitybench_test',
+  });
+});
+
+afterAll(() => pool.end());
+
+export const getDbConnection = () => pool;
+
+export const withTransaction = async (testFn: () => Promise<void>) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Inject client into test context
+    const originalQuery = pool.query.bind(pool);
+    pool.query = client.query.bind(client);
+
+    await testFn();
+
+    await client.query('ROLLBACK');
+    pool.query = originalQuery;
+  } finally {
+    client.release();
+  }
+};
+
+export const factory = {
+  async createUser(name: string, email: string) {
+    const result = await pool.query(
+      'INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id, name, email',
+      [name, email]
+    );
+    return result.rows[0];
+  },
+
+  async createCompany(name: string) {
+    const result = await pool.query(
+      'INSERT INTO companies (name) VALUES ($1) RETURNING id, name',
+      [name]
+    );
+    return result.rows[0];
   },
 };
 ```
 
-**Test Template**:
+**Test Example**:
 ```typescript
-import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { createTestClient } from './test-utils';
-import { User } from '../src/models';
+import { withTransaction, factory, getDbConnection } from './setup';
 
-describe('Query Resolvers', () => {
-  let client: any;
-  let db: any;
+describe('User Queries', () => {
+  it('should return list of users', async () => {
+    await withTransaction(async () => {
+      // Arrange
+      await factory.createUser('Alice', 'alice@example.com');
+      await factory.createUser('Bob', 'bob@example.com');
 
-  beforeEach(async () => {
-    db = await setupTestDatabase();
-    client = createTestClient(db);
-  });
+      // Act
+      const pool = getDbConnection();
+      const result = await pool.query(
+        'SELECT id, name, email FROM users ORDER BY name'
+      );
+      const users = result.rows;
 
-  afterEach(async () => {
-    await teardownTestDatabase(db);
-  });
-
-  it('returns list of users', async () => {
-    // Arrange
-    const user1 = await User.create(db, {
-      name: 'Alice',
-      email: 'alice@example.com',
+      // Assert
+      expect(users).toHaveLength(2);
+      expect(users[0].name).toBe('Alice');
+      expect(users[1].name).toBe('Bob');
     });
+  });
 
-    // Act
-    const result = await client.query(`
-      query {
-        users {
-          id
-          name
-          email
-        }
-      }
-    `);
+  it('should create user and persist to database', async () => {
+    await withTransaction(async () => {
+      // Arrange
+      const userData = { name: 'Charlie', email: 'charlie@example.com' };
 
-    // Assert
-    expect(result.data.users).toBeDefined();
-    expect(result.data.users).toHaveLength(1);
-    expect(result.data.users[0].name).toBe('Alice');
+      // Act
+      const user = await factory.createUser(userData.name, userData.email);
+
+      // Assert
+      expect(user.name).toBe('Charlie');
+      expect(user.email).toBe('charlie@example.com');
+    });
   });
 });
 ```
 
-**Test Utilities** (`tests/test-utils.ts`):
-```typescript
-export async function setupTestDatabase() {
-  // Create fresh database for test
-}
-
-export function createTestClient(db: any) {
-  // Return GraphQL/REST client
-}
-
-export async function teardownTestDatabase(db: any) {
-  // Clean up database
-}
-```
-
-**Minimum Coverage**: 80% of production code
-
 **Run Tests**:
 ```bash
-cd frameworks/typescript/{framework}
-npm test
-npm test -- --coverage  # with coverage report
-npm test -- --testPathPattern=unit  # unit tests only
+cd frameworks/{framework}
+npm test -- --coverage
 ```
 
 ---
 
 ### Go (gqlgen, gin, graphql-go)
 
-**Test Framework**: testing (Go standard library) + testify
+**Test Framework**: Go testing + testify
 
-**Configuration** (`go.mod`):
-```
-require (
-    github.com/stretchr/testify v1.8.4
-    github.com/DATA-DOG/go-sqlmock v1.5.0
-)
-```
-
-**Test Template** (`resolvers_test.go`):
+**Database Connection** (`test_helpers.go`):
 ```go
-package resolvers
+package main
 
 import (
-    "context"
-    "testing"
+	"database/sql"
+	"testing"
 
-    "github.com/stretchr/testify/assert"
-    "github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/require"
+	_ "github.com/lib/pq"
+)
+
+func setupDB(t *testing.T) *sql.DB {
+	db, err := sql.Open("postgres",
+		"postgres://velocitybench:password@localhost:5432/velocitybench_test?sslmode=disable")
+	require.NoError(t, err)
+
+	err = db.Ping()
+	require.NoError(t, err)
+
+	return db
+}
+
+func withTransaction(t *testing.T, db *sql.DB, testFn func(*sql.Tx)) {
+	tx, err := db.Begin()
+	require.NoError(t, err)
+	defer tx.Rollback()
+
+	testFn(tx)
+}
+
+type TestFactory struct {
+	tx *sql.Tx
+	t  *testing.T
+}
+
+func (f *TestFactory) CreateUser(name, email string) map[string]interface{} {
+	row := f.tx.QueryRow(
+		"INSERT INTO users (name, email) VALUES ($1, $2) RETURNING id, name, email",
+		name, email,
+	)
+
+	var id int
+	var n, e string
+	err := row.Scan(&id, &n, &e)
+	require.NoError(f.t, err)
+
+	return map[string]interface{}{"id": id, "name": n, "email": e}
+}
+
+func (f *TestFactory) CreateCompany(name string) map[string]interface{} {
+	row := f.tx.QueryRow(
+		"INSERT INTO companies (name) VALUES ($1) RETURNING id, name",
+		name,
+	)
+
+	var id int
+	var n string
+	err := row.Scan(&id, &n)
+	require.NoError(f.t, err)
+
+	return map[string]interface{}{"id": id, "name": n}
+}
+```
+
+**Test Example** (`resolvers_test.go`):
+```go
+package main
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestQueryUsers(t *testing.T) {
-    // Arrange
-    db := setupTestDB(t)
-    defer db.Close()
+	db := setupDB(t)
+	defer db.Close()
 
-    user1 := createTestUser(t, db, "Alice", "alice@example.com")
-    user2 := createTestUser(t, db, "Bob", "bob@example.com")
+	withTransaction(t, db, func(tx *sql.Tx) {
+		// Arrange
+		factory := &TestFactory{tx: tx, t: t}
+		factory.CreateUser("Alice", "alice@example.com")
+		factory.CreateUser("Bob", "bob@example.com")
 
-    ctx := context.Background()
-    resolver := NewQueryResolver(db)
+		// Act
+		rows, err := tx.Query("SELECT id, name, email FROM users ORDER BY name")
+		require.NoError(t, err)
+		defer rows.Close()
 
-    // Act
-    users, err := resolver.Users(ctx)
+		var users []map[string]interface{}
+		for rows.Next() {
+			var id int
+			var name, email string
+			err := rows.Scan(&id, &name, &email)
+			require.NoError(t, err)
+			users = append(users, map[string]interface{}{
+				"id": id, "name": name, "email": email,
+			})
+		}
 
-    // Assert
-    require.NoError(t, err)
-    assert.Equal(t, 2, len(users))
-    assert.Equal(t, "Alice", users[0].Name)
+		// Assert
+		assert.Equal(t, 2, len(users))
+		assert.Equal(t, "Alice", users[0]["name"])
+		assert.Equal(t, "Bob", users[1]["name"])
+	})
+}
+
+func TestCreateUser(t *testing.T) {
+	db := setupDB(t)
+	defer db.Close()
+
+	withTransaction(t, db, func(tx *sql.Tx) {
+		// Arrange
+		factory := &TestFactory{tx: tx, t: t}
+		userData := map[string]string{"name": "Charlie", "email": "charlie@example.com"}
+
+		// Act
+		user := factory.CreateUser(userData["name"], userData["email"])
+
+		// Assert
+		assert.Equal(t, "Charlie", user["name"])
+		assert.Equal(t, "charlie@example.com", user["email"])
+	})
 }
 ```
-
-**Test Helpers** (`test_helpers.go`):
-```go
-func setupTestDB(t *testing.T) *sql.DB {
-    // Create fresh test database
-}
-
-func createTestUser(t *testing.T, db *sql.DB, name, email string) *User {
-    // Create test data
-}
-```
-
-**Code Coverage**:
-```bash
-go test -cover ./...
-go test -coverprofile=coverage.out ./...
-go tool cover -html=coverage.out
-```
-
-**Minimum Coverage**: 80% of production code
 
 **Run Tests**:
 ```bash
-cd frameworks/go/{framework}
-go test ./...  # all tests
-go test -run TestQuery ./...  # specific tests
-go test -v -cover ./...  # verbose with coverage
+cd frameworks/{framework}
+go test -v -cover ./...
 ```
 
 ---
 
 ### Java (Spring Boot)
 
-**Test Framework**: JUnit 5 + Mockito + TestContainers
+**Test Framework**: JUnit 5 + Testcontainers (optional, but can use shared DB)
 
-**Dependencies** (`pom.xml`):
-```xml
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-test</artifactId>
-    <version>3.0.0</version>
-    <scope>test</scope>
-</dependency>
-<dependency>
-    <groupId>org.testcontainers</groupId>
-    <artifactId>testcontainers</artifactId>
-    <version>1.17.6</version>
-    <scope>test</scope>
-</dependency>
-```
-
-**Test Template** (`UserResolverTest.java`):
+**Database Connection** (`src/test/java/TestBase.java`):
 ```java
 @SpringBootTest
-class UserResolverTest {
+public abstract class TestBase {
+
+    protected static final String DB_URL = "jdbc:postgresql://localhost:5432/velocitybench_test";
+    protected static final String DB_USER = "velocitybench";
+    protected static final String DB_PASSWORD = "password";
 
     @Autowired
-    private UserResolver resolver;
-
-    @Autowired
-    private UserRepository repository;
+    protected JdbcTemplate jdbcTemplate;
 
     @BeforeEach
-    void setUp() {
-        repository.deleteAll();
+    public void setUp() {
+        // Start transaction for test
+        jdbcTemplate.execute("BEGIN");
     }
 
-    @Test
-    void testQueryUsers() {
-        // Arrange
-        User user1 = new User();
-        user1.setName("Alice");
-        user1.setEmail("alice@example.com");
-        repository.save(user1);
+    @AfterEach
+    public void tearDown() {
+        // Rollback test transaction
+        try {
+            jdbcTemplate.execute("ROLLBACK");
+        } catch (Exception e) {
+            // Already rolled back
+        }
+    }
 
-        // Act
-        List<User> users = resolver.users();
+    protected Map<String, Object> createUser(String name, String email) {
+        return jdbcTemplate.queryForMap(
+            "INSERT INTO users (name, email) VALUES (?, ?) " +
+            "RETURNING id, name, email",
+            name, email
+        );
+    }
 
-        // Assert
-        assertNotNull(users);
-        assertEquals(1, users.size());
-        assertEquals("Alice", users.get(0).getName());
+    protected Map<String, Object> createCompany(String name) {
+        return jdbcTemplate.queryForMap(
+            "INSERT INTO companies (name) VALUES (?) RETURNING id, name",
+            name
+        );
     }
 }
 ```
 
-**Code Coverage** (`jacoco-maven-plugin`):
-```bash
-mvn test
-mvn jacoco:report  # generates coverage report
+**Test Example** (`src/test/java/UserResolverTest.java`):
+```java
+public class UserResolverTest extends TestBase {
+
+    @Test
+    public void testQueryUsersReturnsAllUsers() {
+        // Arrange
+        createUser("Alice", "alice@example.com");
+        createUser("Bob", "bob@example.com");
+
+        // Act
+        List<Map<String, Object>> users = jdbcTemplate.queryForList(
+            "SELECT id, name, email FROM users ORDER BY name"
+        );
+
+        // Assert
+        assertEquals(2, users.size());
+        assertEquals("Alice", users.get(0).get("name"));
+        assertEquals("Bob", users.get(1).get("name"));
+    }
+}
 ```
 
-**Minimum Coverage**: 80% of production code
+**Run Tests**:
+```bash
+cd frameworks/{framework}
+mvn test
+```
 
 ---
 
 ### Rust (Async-graphql, Actix)
 
-**Test Framework**: Rust built-in + tokio for async
+**Test Framework**: Tokio + sqlx
 
-**Test Template** (`src/resolvers.rs`):
+**Test Example**:
 ```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tokio::test;
+#[tokio::test]
+async fn test_query_users_returns_list() {
+    // Setup
+    let db_url = "postgres://velocitybench:password@localhost:5432/velocitybench_test";
+    let pool = PgPoolOptions::new()
+        .connect(db_url)
+        .await
+        .unwrap();
 
-    #[test]
-    async fn test_query_users() {
-        // Arrange
-        let db = setup_test_db().await;
-        let user = create_test_user(&db, "Alice", "alice@example.com").await;
+    let mut tx = pool.begin().await.unwrap();
 
-        // Act
-        let users = query_users(&db).await;
+    // Arrange: Create test data
+    sqlx::query("INSERT INTO users (name, email) VALUES ($1, $2)")
+        .bind("Alice")
+        .bind("alice@example.com")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
 
-        // Assert
-        assert_eq!(users.len(), 1);
-        assert_eq!(users[0].name, "Alice");
-    }
+    // Act: Query users
+    let users: Vec<(i32, String, String)> = sqlx::query_as(
+        "SELECT id, name, email FROM users ORDER BY name"
+    )
+    .fetch_all(&mut *tx)
+    .await
+    .unwrap();
+
+    // Assert
+    assert_eq!(users.len(), 1);
+    assert_eq!(users[0].1, "Alice");
+
+    // Cleanup (automatic on drop)
+    tx.rollback().await.unwrap();
 }
 ```
 
-**Code Coverage**:
-```bash
-cargo tarpaulin --out Html
-```
-
-**Minimum Coverage**: 80% of production code
-
 **Run Tests**:
 ```bash
+cd frameworks/{framework}
 cargo test
-cargo test --test '*' -- --nocapture
 ```
 
 ---
@@ -495,50 +635,42 @@ cargo test --test '*' -- --nocapture
 
 **Test Framework**: PHPUnit
 
-**Configuration** (`phpunit.xml`):
-```xml
-<phpunit>
-    <testsuites>
-        <testsuite name="Unit">
-            <directory suffix="Test.php">./tests/Unit</directory>
-        </testsuite>
-        <testsuite name="Feature">
-            <directory suffix="Test.php">./tests/Feature</directory>
-        </testsuite>
-    </testsuites>
-</phpunit>
-```
-
-**Test Template** (`tests/Unit/UserResolverTest.php`):
+**Test Example** (`tests/Feature/UserTest.php`):
 ```php
-namespace Tests\Unit;
+class UserTest extends TestCase {
+    protected function setUp(): void {
+        parent::setUp();
+        // Use in-memory transaction
+        DB::beginTransaction();
+    }
 
-use PHPUnit\Framework\TestCase;
-use App\Models\User;
-use App\Resolvers\UserResolver;
+    protected function tearDown(): void {
+        // Rollback transaction
+        DB::rollBack();
+        parent::tearDown();
+    }
 
-class UserResolverTest extends TestCase
-{
-    public function test_query_users_returns_array()
-    {
+    public function test_query_users_returns_list() {
         // Arrange
-        $resolver = new UserResolver();
+        User::create(['name' => 'Alice', 'email' => 'alice@example.com']);
+        User::create(['name' => 'Bob', 'email' => 'bob@example.com']);
 
         // Act
-        $users = $resolver->users();
+        $users = User::orderBy('name')->get();
 
         // Assert
-        $this->assertIsArray($users);
+        $this->assertCount(2, $users);
+        $this->assertEquals('Alice', $users[0]->name);
+        $this->assertEquals('Bob', $users[1]->name);
     }
 }
 ```
 
-**Code Coverage**:
+**Run Tests**:
 ```bash
-phpunit --coverage-html coverage/
+cd frameworks/{framework}
+php artisan test
 ```
-
-**Minimum Coverage**: 80% of production code
 
 ---
 
@@ -546,198 +678,102 @@ phpunit --coverage-html coverage/
 
 **Test Framework**: RSpec
 
-**Configuration** (`spec/spec_helper.rb`):
+**Test Example** (`spec/models/user_spec.rb`):
 ```ruby
-RSpec.configure do |config|
-  config.require 'simplecov'
-  SimpleCov.start do
-    add_filter '/spec/'
-  end
-end
-```
+RSpec.describe User do
+  around { |example| User.transaction { example.run; raise ActiveRecord::Rollback } }
 
-**Test Template** (`spec/resolvers/user_resolver_spec.rb`):
-```ruby
-require 'rails_helper'
-
-RSpec.describe UserResolver do
-  describe '#users' do
-    it 'returns list of users' do
+  describe 'queries' do
+    it 'returns list of all users' do
       # Arrange
-      create(:user, name: 'Alice', email: 'alice@example.com')
-      create(:user, name: 'Bob', email: 'bob@example.com')
+      User.create(name: 'Alice', email: 'alice@example.com')
+      User.create(name: 'Bob', email: 'bob@example.com')
 
       # Act
-      result = UserResolver.new.users
+      users = User.order(:name)
 
       # Assert
-      expect(result).to be_a(Array)
-      expect(result.length).to eq(2)
-      expect(result[0].name).to eq('Alice')
+      expect(users.count).to eq(2)
+      expect(users[0].name).to eq('Alice')
+      expect(users[1].name).to eq('Bob')
     end
   end
 end
 ```
 
-**Code Coverage**:
+**Run Tests**:
 ```bash
-rspec  # runs all tests
-rspec --format documentation
+cd frameworks/{framework}
+bundle exec rspec
 ```
-
-**Minimum Coverage**: 80% of production code
 
 ---
 
 ### C# (.NET)
 
-**Test Framework**: xUnit + Moq
+**Test Framework**: xUnit
 
-**Test Template** (`UserResolverTests.cs`):
+**Test Example**:
 ```csharp
-public class UserResolverTests
-{
-    [Fact]
-    public async Task QueryUsers_ReturnsListOfUsers()
-    {
-        // Arrange
-        var db = new TestDbContext();
-        var user = new User { Name = "Alice", Email = "alice@example.com" };
-        db.Users.Add(user);
-        await db.SaveChangesAsync();
+public class UserTests : IAsyncLifetime {
+    private readonly NpgsqlConnection _connection;
 
-        var resolver = new UserResolver(db);
+    public UserTests() {
+        _connection = new NpgsqlConnection(
+            "Host=localhost;Username=velocitybench;Password=password;Database=velocitybench_test"
+        );
+    }
+
+    public async Task InitializeAsync() {
+        await _connection.OpenAsync();
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "BEGIN";
+        await cmd.ExecuteNonQueryAsync();
+    }
+
+    public async Task DisposeAsync() {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "ROLLBACK";
+        await cmd.ExecuteNonQueryAsync();
+        await _connection.CloseAsync();
+    }
+
+    [Fact]
+    public async Task QueryUsers_ReturnsAllUsers() {
+        // Arrange
+        await CreateUser("Alice", "alice@example.com");
+        await CreateUser("Bob", "bob@example.com");
 
         // Act
-        var result = await resolver.Users();
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "SELECT name FROM users ORDER BY name";
+        using var reader = await cmd.ExecuteReaderAsync();
+
+        var users = new List<string>();
+        while (await reader.ReadAsync()) {
+            users.Add(reader.GetString(0));
+        }
 
         // Assert
-        Assert.NotNull(result);
-        Assert.Single(result);
-        Assert.Equal("Alice", result[0].Name);
+        Assert.Equal(2, users.Count);
+        Assert.Equal("Alice", users[0]);
+        Assert.Equal("Bob", users[1]);
+    }
+
+    private async Task CreateUser(string name, string email) {
+        using var cmd = _connection.CreateCommand();
+        cmd.CommandText = "INSERT INTO users (name, email) VALUES (@name, @email)";
+        cmd.Parameters.AddWithValue("@name", name);
+        cmd.Parameters.AddWithValue("@email", email);
+        await cmd.ExecuteNonQueryAsync();
     }
 }
 ```
 
-**Code Coverage**:
+**Run Tests**:
 ```bash
-dotnet test /p:CollectCoverage=true
-```
-
-**Minimum Coverage**: 80% of production code
-
----
-
-## Common Test Patterns
-
-### Pattern 1: Database Isolation
-
-**Goal**: Each test gets clean database state
-
-**Python**:
-```python
-@pytest.fixture
-def clean_db(db):
-    """Transaction-based isolation"""
-    db.session.begin_nested()
-    yield db.session
-    db.session.rollback()
-```
-
-**Go**:
-```go
-func TestWithDB(t *testing.T) {
-    db := setupTestDB(t)
-    defer func() {
-        db.Exec("ROLLBACK")
-    }()
-    // test code
-}
-```
-
-### Pattern 2: Factory/Builder Pattern
-
-Create test data consistently:
-
-**Python**:
-```python
-class UserFactory:
-    @staticmethod
-    def create(db, name="Test User", email="test@example.com"):
-        user = User(name=name, email=email)
-        db.session.add(user)
-        db.session.commit()
-        return user
-```
-
-**TypeScript**:
-```typescript
-export function createTestUser(
-  db: any,
-  overrides: Partial<User> = {}
-): User {
-  return new User({
-    name: 'Test User',
-    email: 'test@example.com',
-    ...overrides,
-  });
-}
-```
-
-### Pattern 3: Parametrized Tests
-
-Test multiple scenarios:
-
-**Python**:
-```python
-@pytest.mark.parametrize("input,expected", [
-    ("Alice", "alice"),
-    ("Bob Smith", "bob smith"),
-    ("123 ABC", "123 abc"),
-])
-def test_normalize_name(input, expected):
-    assert normalize_name(input) == expected
-```
-
-**TypeScript**:
-```typescript
-describe.each([
-  ['Alice', 'alice'],
-  ['Bob Smith', 'bob smith'],
-  ['123 ABC', '123 abc'],
-])('normalizeName(%s)', (input, expected) => {
-  it(`returns ${expected}`, () => {
-    expect(normalizeName(input)).toBe(expected);
-  });
-});
-```
-
-### Pattern 4: Mocking External Dependencies
-
-**Python**:
-```python
-from unittest.mock import patch
-
-@patch('external_service.get_data')
-def test_resolver_with_mocked_service(mock_service):
-    mock_service.return_value = {'id': 1, 'name': 'Test'}
-    result = resolver.get_data()
-    assert result['name'] == 'Test'
-    mock_service.assert_called_once()
-```
-
-**TypeScript**:
-```typescript
-jest.mock('../external-service');
-
-it('calls external service', async () => {
-  const mockService = require('../external-service');
-  mockService.getData.mockResolvedValue({ id: 1, name: 'Test' });
-
-  const result = await resolver.getData();
-  expect(result.name).toBe('Test');
-  expect(mockService.getData).toHaveBeenCalled();
-});
+cd frameworks/{framework}
+dotnet test
 ```
 
 ---
@@ -750,99 +786,162 @@ Before submitting tests, verify:
 - [ ] Tests are isolated and independent
 - [ ] Test names clearly describe what is tested
 - [ ] All assertions are specific and meaningful
-- [ ] No magic numbers or hardcoded values
+- [ ] No hardcoded values (use factory instead)
 - [ ] Code is DRY (Don't Repeat Yourself)
-- [ ] Fixtures/setup is documented
+
+### Database Testing
+- [ ] All tests use shared PostgreSQL database
+- [ ] Transaction isolation handles cleanup
+- [ ] Tests can run in parallel
+- [ ] No data persists between tests
+- [ ] All test data created via factory
 
 ### Coverage
+- [ ] 80%+ code coverage (or better)
 - [ ] Happy path tested
 - [ ] Error cases tested
 - [ ] Edge cases identified and tested
-- [ ] Type safety verified (where applicable)
-- [ ] Database integrity verified
-
-### Database Tests
-- [ ] Database state is reset between tests
-- [ ] All data is created by test (not shared)
-- [ ] Database cleanup is verified
-- [ ] Transaction isolation tested
-- [ ] Concurrent access safety tested
 
 ### Performance
-- [ ] Tests run in < 5 seconds each
-- [ ] Database fixtures are optimized
-- [ ] Unnecessary I/O minimized
-- [ ] Parallel test execution possible
-
-### Documentation
-- [ ] Test purpose is clear from name
-- [ ] Complex logic has comments
-- [ ] Expected behavior documented
-- [ ] Known limitations noted
+- [ ] Tests run quickly (< 5 seconds each)
+- [ ] Database operations optimized
+- [ ] No unnecessary queries
+- [ ] Parallel execution possible
 
 ---
 
-## Running All Tests
+## Running Tests
 
-### Quick Smoke Test
+### Start Shared Database
+
 ```bash
-# Verify framework is operational
-cd frameworks/{language}/{framework}
-make test  # or language-specific command
+# From repository root
+docker-compose up -d postgres
+
+# Verify database is ready
+sleep 2
+psql -h localhost -U velocitybench -d velocitybench_test -c "SELECT 1"
 ```
 
-### Full Test Suite
-```bash
-# All frameworks
-make test-all
+### Run All Tests (All Frameworks)
 
-# Specific language
-make test-python
-make test-typescript
-make test-go
+```bash
+# Python
+cd frameworks/strawberry && pytest tests/ --cov=src && cd ../..
+
+# TypeScript
+cd frameworks/apollo-server && npm test && cd ../..
+
+# Go
+cd frameworks/go-gqlgen && go test -v ./... && cd ../..
+
+# Java
+cd frameworks/java-spring-boot && mvn test && cd ../..
 ```
 
-### With Coverage
-```bash
-# Generate coverage report
-make test-coverage
+### Run Tests for Single Framework
 
-# Results in coverage/ directory
-open coverage/index.html
+```bash
+cd frameworks/{framework}
+
+# Python
+pytest tests/ --cov=src
+
+# TypeScript
+npm test -- --coverage
+
+# Go
+go test -v -cover ./...
+
+# Java
+mvn test
+
+# Rust
+cargo test
+
+# PHP
+php artisan test
+
+# Ruby
+bundle exec rspec
+
+# C#
+dotnet test
 ```
 
----
+### Local Development
 
-## Continuous Integration
+```bash
+# Terminal 1: Start database
+docker-compose up postgres
 
-All tests run automatically on:
-- Pull request creation
-- Commits to main branch
-- Nightly builds
-
-See `.github/workflows/unit-tests.yml` for CI configuration.
+# Terminal 2: Run tests
+cd frameworks/{framework}
+npm test --watch  # or equivalent for your language
+```
 
 ---
 
 ## Troubleshooting
 
-### Test Failures
+### Database Connection Errors
 
-1. **Database connection errors**: Verify database is running
-2. **Timeout errors**: Increase test timeout or optimize test
-3. **Flaky tests**: Check for timing issues or shared state
-4. **Coverage failures**: Add tests for uncovered code
+**Problem**: Tests fail to connect to database
 
-### Performance
+**Solution**: Verify PostgreSQL is running
+```bash
+psql -h localhost -U velocitybench -d velocitybench_test -c "SELECT 1"
+```
 
-- Slow tests: Use database isolation, mock external calls
-- Memory leaks: Check for unclosed connections
-- Flaky results: Look for timing dependencies
+If connection fails:
+```bash
+docker-compose up -d postgres
+docker-compose logs postgres
+```
+
+### Test Isolation Issues
+
+**Problem**: Tests pass individually but fail when run together
+
+**Solution**: Verify transaction isolation
+- Python: Use `conn.begin()` and `conn.rollback()`
+- TypeScript: Use transaction wrapper
+- Go: Use `tx.Rollback()` in defer
+- Java: Use `@Transactional` or manual transaction
+- Others: Check language-specific transaction support
+
+### Flaky Tests
+
+**Problem**: Tests sometimes pass, sometimes fail
+
+**Causes**:
+- Shared test data not properly cleaned up
+- Tests depend on execution order
+- Timing issues in async tests
+
+**Solutions**:
+- Use transaction rollback for all tests
+- Never rely on test execution order
+- Always await async operations
+
+---
+
+## CI/CD Pipeline
+
+The GitHub Actions pipeline automatically:
+1. Starts PostgreSQL container
+2. Loads database schema
+3. Runs all tests for all frameworks
+4. Reports coverage
+5. Shows test results
+
+See `.github/workflows/unit-tests.yml` for configuration.
 
 ---
 
 ## Further Reading
 
-- [SCOPE_AND_LIMITATIONS.md](SCOPE_AND_LIMITATIONS.md) - What we test
-- [CONTRIBUTING.md](CONTRIBUTING.md) - How to contribute
-- [docs/](docs/) - Framework-specific documentation
+- **SCOPE_AND_LIMITATIONS.md** - What we test and don't test
+- **testing-templates/** - Reusable code templates
+- **phase-plans/IMPLEMENTATION_ROADMAP.md** - Full implementation timeline
+- **.github/workflows/unit-tests.yml** - CI/CD pipeline configuration
