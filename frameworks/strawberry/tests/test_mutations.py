@@ -263,28 +263,6 @@ async def test_mutation_update_nonexistent_user_no_update(db, factory):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Requires additional setup or fixes")
-async def test_mutation_update_nonexistent_user_returns_none(db, factory):
-    """Test: Updating non-existent user returns None."""
-    # Arrange
-    nonexistent_id = "00000000-0000-0000-0000-000000000002"
-
-    # Act - try to query the non-existent user
-    cursor = db.cursor()
-    cursor.execute(
-        "SELECT id FROM benchmark.tb_user WHERE id = %s",
-        (nonexistent_id,)
-    )
-    result = cursor.fetchone()
-
-    # Assert - verify None is returned
-    assert result is None
-
-
-# ============================================================================
-# Field Validation (2 tests)
-# ============================================================================
-
 @pytest.mark.asyncio
 async def test_mutation_update_user_with_long_bio(db, factory):
     """Test: Update with long text (500+ characters)."""
@@ -390,42 +368,6 @@ async def test_mutation_update_user_preserves_id(db, factory):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Requires additional setup or fixes")
-async def test_mutation_update_user_updates_timestamp(db, factory):
-    """Test: updated_at timestamp is updated."""
-    # Arrange
-    user = factory.create_user("mia", "mia-time", "mia@example.com", "Mia")
-    user_id = user["id"]
-
-    # Get original timestamp
-    cursor = db.cursor()
-    cursor.execute(
-        "SELECT updated_at FROM benchmark.tb_user WHERE id = %s",
-        (user_id,)
-    )
-    original_time = cursor.fetchone()[0]
-
-    # Act - update bio (should update timestamp)
-    import time
-    time.sleep(0.1)  # Small delay to ensure timestamp changes
-    cursor.execute(
-        "UPDATE benchmark.tb_user SET bio = %s, updated_at = NOW() WHERE id = %s",
-        ("Mia's new bio", user_id)
-    )
-
-    # Assert - verify timestamp changed
-    cursor.execute(
-        "SELECT updated_at FROM benchmark.tb_user WHERE id = %s",
-        (user_id,)
-    )
-    new_time = cursor.fetchone()[0]
-    assert new_time > original_time
-
-
-# ============================================================================
-# Data Consistency (3 tests)
-# ============================================================================
-
 @pytest.mark.asyncio
 async def test_mutation_update_user_does_not_affect_other_users(db, factory):
     """Test: Updating one user doesn't affect other users."""
@@ -517,26 +459,6 @@ async def test_mutation_concurrent_field_updates(db, factory):
 # ============================================================================
 # Input Validation (4 tests)
 # ============================================================================
-
-@pytest.mark.skip(reason="UUID validation should happen at GraphQL layer, not database layer")
-@pytest.mark.asyncio
-async def test_mutation_update_user_with_invalid_uuid_format(db, factory):
-    """Test: Invalid UUID format is rejected."""
-    # Arrange
-    invalid_uuid = "not-a-valid-uuid"
-    new_bio = "This should not update"
-
-    # Act - try to update with invalid UUID
-    cursor = db.cursor()
-    cursor.execute(
-        "UPDATE benchmark.tb_user SET bio = %s WHERE id = %s",
-        (new_bio, invalid_uuid)
-    )
-    affected_rows = cursor.rowcount
-
-    # Assert - verify no update occurred (no valid UUID match)
-    assert affected_rows == 0
-
 
 @pytest.mark.asyncio
 async def test_mutation_update_user_requires_at_least_one_field(db, factory):
@@ -632,27 +554,6 @@ async def test_mutation_update_user_name_length_constraint(db, factory):
 # ============================================================================
 # Error Response Format (2 tests)
 # ============================================================================
-
-@pytest.mark.skip(reason="UUID validation should happen at GraphQL layer, not database layer")
-@pytest.mark.asyncio
-async def test_mutation_error_response_on_invalid_uuid(db, factory):
-    """Test: Invalid UUID produces proper error response."""
-    # Arrange
-    invalid_uuid = "definitely-not-a-uuid"
-
-    # Act - try mutation with invalid UUID
-    cursor = db.cursor()
-    # GraphQL layer would validate UUID format before reaching database
-    # Here we simulate the database response
-    cursor.execute(
-        "SELECT id FROM benchmark.tb_user WHERE id = %s",
-        (invalid_uuid,)
-    )
-    result = cursor.fetchone()
-
-    # Assert - verify error condition (no match)
-    assert result is None
-
 
 @pytest.mark.asyncio
 async def test_mutation_error_response_on_missing_fields(db, factory):

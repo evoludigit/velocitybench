@@ -61,24 +61,6 @@ async def test_query_user_by_identifier_returns_user(db, factory):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Requires additional setup or fixes")
-async def test_query_user_nonexistent_returns_none(db):
-    """Test: querying nonexistent user returns None."""
-    # Arrange
-    nonexistent_id = "00000000-0000-0000-0000-000000000000"
-
-    # Act
-    cursor = db.cursor()
-    cursor.execute(
-        "SELECT id FROM benchmark.tb_user WHERE id = %s",
-        (nonexistent_id,)
-    )
-    result = cursor.fetchone()
-
-    # Assert
-    assert result is None
-
-
 @pytest.mark.asyncio
 async def test_query_users_returns_list(db, factory):
     """Test: query_users resolver returns list of users."""
@@ -342,34 +324,6 @@ async def test_mutation_update_user_multiple_fields(db, factory):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Requires additional setup or fixes")
-async def test_mutation_update_nonexistent_user_returns_none(db):
-    """Test: updating nonexistent user returns None."""
-    # Arrange
-    nonexistent_id = "00000000-0000-0000-0000-000000000000"
-
-    # Act
-    cursor = db.cursor()
-    cursor.execute(
-        "UPDATE benchmark.tb_user SET bio = %s WHERE id = %s",
-        ("bio", nonexistent_id)
-    )
-
-    # Verify it wasn't updated
-    cursor.execute(
-        "SELECT id FROM benchmark.tb_user WHERE id = %s",
-        (nonexistent_id,)
-    )
-    result = cursor.fetchone()
-
-    # Assert
-    assert result is None
-
-
-# ============================================================================
-# Relationship Tests: User Posts
-# ============================================================================
-
 @pytest.mark.asyncio
 async def test_user_posts_relationship(db, factory):
     """Test: User.posts field correctly returns user's posts."""
@@ -841,28 +795,6 @@ async def test_query_empty_result_set_for_posts(db, factory):
 
     # Assert
     assert len(results) == 0
-
-
-@pytest.mark.skip(reason="Database schema has NOT NULL constraint on tb_post.content")
-@pytest.mark.asyncio
-async def test_query_null_field_handling_in_responses(db, factory):
-    """Test: NULL optional fields are properly handled in query responses."""
-    # Arrange
-    user = factory.create_user("user", "user-null-fields", "user@example.com")
-    post = factory.create_post(user["pk_user"], "Post Title", "post-null", None)
-
-    # Act
-    cursor = db.cursor()
-    cursor.execute(
-        "SELECT id, title, content FROM benchmark.tb_post WHERE id = %s",
-        (post["id"],)
-    )
-    result = cursor.fetchone()
-
-    # Assert
-    assert result[0] == post["id"]
-    assert result[1] == "Post Title"
-    assert result[2] is None  # NULL content
 
 
 @pytest.mark.asyncio

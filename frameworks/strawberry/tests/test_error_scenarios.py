@@ -22,44 +22,6 @@ from uuid import UUID
 # Invalid Input Tests (4 tests)
 # ============================================================================
 
-@pytest.mark.skip(reason="UUID validation should happen at GraphQL layer, not database layer")
-@pytest.mark.asyncio
-async def test_error_update_mutation_with_invalid_uuid_format(db, factory):
-    """Test: Update mutation rejects invalid UUID format."""
-    # Arrange
-    invalid_uuid = "not-a-valid-uuid-format"
-
-    # Act - try to update with invalid UUID
-    cursor = db.cursor()
-    cursor.execute(
-        "UPDATE benchmark.tb_user SET bio = %s WHERE id = %s",
-        ("bio", invalid_uuid)
-    )
-    affected = cursor.rowcount
-
-    # Assert - no update should occur
-    assert affected == 0
-
-
-@pytest.mark.skip(reason="UUID validation should happen at GraphQL layer, not database layer")
-@pytest.mark.asyncio
-async def test_error_query_with_empty_uuid(db, factory):
-    """Test: Query with empty UUID returns no results."""
-    # Arrange
-    empty_uuid = ""
-
-    # Act - try to query with empty UUID
-    cursor = db.cursor()
-    cursor.execute(
-        "SELECT id FROM benchmark.tb_user WHERE id = %s",
-        (empty_uuid,)
-    )
-    result = cursor.fetchone()
-
-    # Assert - no result
-    assert result is None
-
-
 @pytest.mark.asyncio
 async def test_error_mutation_with_empty_string_inputs(db, factory):
     """Test: Mutation with empty string values handled correctly."""
@@ -82,29 +44,6 @@ async def test_error_mutation_with_empty_string_inputs(db, factory):
     assert result[0] == ""
 
 
-@pytest.mark.skip(reason="UUID validation should happen at GraphQL layer, not database layer")
-@pytest.mark.asyncio
-async def test_error_query_with_non_uuid_format(db, factory):
-    """Test: Query with completely non-UUID format."""
-    # Arrange
-    malformed_id = "12345-abcde-xyz"
-
-    # Act
-    cursor = db.cursor()
-    cursor.execute(
-        "SELECT id FROM benchmark.tb_user WHERE id = %s",
-        (malformed_id,)
-    )
-    result = cursor.fetchone()
-
-    # Assert
-    assert result is None
-
-
-# ============================================================================
-# NULL/Missing Field Tests (3 tests)
-# ============================================================================
-
 @pytest.mark.asyncio
 async def test_error_user_without_bio_returns_null_bio(db, factory):
     """Test: User without bio field returns NULL correctly."""
@@ -121,27 +60,6 @@ async def test_error_user_without_bio_returns_null_bio(db, factory):
 
     # Assert
     assert result[0] == user["id"]
-    assert result[1] is None
-
-
-@pytest.mark.skip(reason="Database schema has NOT NULL constraint on tb_post.content")
-@pytest.mark.asyncio
-async def test_error_post_without_content_returns_null_content(db, factory):
-    """Test: Post without content field returns NULL correctly."""
-    # Arrange
-    author = factory.create_user("author", "author-nocontent", "author@example.com")
-    post = factory.create_post(author["pk_user"], "Title", "post-nocontent", None)
-
-    # Act
-    cursor = db.cursor()
-    cursor.execute(
-        "SELECT id, content FROM benchmark.tb_post WHERE id = %s",
-        (post["id"],)
-    )
-    result = cursor.fetchone()
-
-    # Assert
-    assert result[0] == post["id"]
     assert result[1] is None
 
 
