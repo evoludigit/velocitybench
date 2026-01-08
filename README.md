@@ -33,10 +33,12 @@ make perf
 
 ## Documentation
 
-- **[SCOPE_AND_LIMITATIONS.md](SCOPE_AND_LIMITATIONS.md)** - What we test and what we don't
-- **[TESTING_STANDARDS.md](TESTING_STANDARDS.md)** - Universal testing standards
-- **[docs/](docs/)** - Complete documentation
+- **[SCOPE_AND_LIMITATIONS.md](SCOPE_AND_LIMITATIONS.md)** - What we test and what we don't (benchmark methodology)
+- **[TESTING_STANDARDS.md](TESTING_STANDARDS.md)** - Universal testing standards and best practices
+- **[testing-templates/](testing-templates/)** - Reusable test templates for all languages
+- **[docs/](docs/)** - Complete framework documentation
 - **[phase-plans/](phase-plans/)** - Implementation phases and roadmaps
+- **[.github/workflows/](​.github/workflows/)** - CI/CD pipeline configuration
 
 ## Frameworks Included
 
