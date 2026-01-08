@@ -66,13 +66,13 @@ def factory(db):
         def create_user(username: str, email_or_identifier: str = None, email: str = None, full_name: str = None, bio: str = None) -> dict:
             """Create a test user in the command side (tb_user).
 
-            Supports flexible calling: create_user(username, email) or create_user(username, identifier, email)
+            Supports flexible calling: create_user(username, email) or create_user(username, identifier, email, full_name)
 
             Args:
-                username: Username
+                username: Username (required)
                 email_or_identifier: Email or identifier (auto-detects based on context)
                 email: Email address (optional, only if called with 3+ args)
-                full_name: Full name (optional)
+                full_name: Full name (required for schema, defaults to capitalized username)
                 bio: Biography (optional)
 
             Returns:
@@ -84,6 +84,10 @@ def factory(db):
                 identifier = username  # Use username as identifier
             else:
                 identifier = email_or_identifier if email_or_identifier else username
+
+            # full_name is required by schema, default to capitalized username if not provided
+            if full_name is None:
+                full_name = username.capitalize()
 
             with db.cursor() as cursor:
                 cursor.execute(
