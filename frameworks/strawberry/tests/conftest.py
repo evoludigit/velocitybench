@@ -9,9 +9,9 @@ import pytest
 import psycopg
 from psycopg import sql
 
-# Database configuration
+# Database configuration - matches docker-compose postgres service
 DB_HOST = os.getenv('DB_HOST', 'localhost')
-DB_PORT = int(os.getenv('DB_PORT', '5434'))
+DB_PORT = int(os.getenv('DB_PORT', '5434'))  # Docker maps 5434:5432
 DB_USER = os.getenv('DB_USER', 'benchmark')
 DB_PASSWORD = os.getenv('DB_PASSWORD', 'benchmark123')
 DB_NAME = os.getenv('DB_NAME', 'velocitybench_benchmark')
@@ -72,7 +72,7 @@ def factory(db):
                 username: Username
                 email_or_identifier: Email or identifier (auto-detects based on context)
                 email: Email address (optional, only if called with 3+ args)
-                full_name: Full name (optional)
+                full_name: Full name (optional, defaults to empty string)
                 bio: Biography (optional)
 
             Returns:
@@ -84,6 +84,10 @@ def factory(db):
                 identifier = username  # Use username as identifier
             else:
                 identifier = email_or_identifier if email_or_identifier else username
+
+            # full_name is NOT NULL in schema, so use empty string as default
+            if full_name is None:
+                full_name = ""
 
             with db.cursor() as cursor:
                 cursor.execute(

@@ -205,8 +205,8 @@ async def test_schema_query_posts_list(db, factory):
     """Test: querying posts list returns all posts."""
     # Arrange
     author = factory.create_user("author", "author@example.com")
-    factory.create_post(author["id"], "Post 1", "Content 1")
-    factory.create_post(author["id"], "Post 2", "Content 2")
+    factory.create_post(author["pk_user"], "Post 1", "Content 1")
+    factory.create_post(author["pk_user"], "Post 2", "Content 2")
 
     # Act
     cursor = db.cursor()
@@ -226,7 +226,7 @@ async def test_schema_query_post_with_author(db, factory):
     """Test: querying post includes author information."""
     # Arrange
     author = factory.create_user("author", "author@example.com")
-    post = factory.create_post(author["id"], "Test Post", "Content")
+    post = factory.create_post(author["pk_user"], "Test Post", "Content")
 
     # Act
     cursor = db.cursor()
@@ -245,8 +245,8 @@ async def test_schema_query_user_posts(db, factory):
     """Test: querying user includes their posts."""
     # Arrange
     author = factory.create_user("author", "author@example.com")
-    post1 = factory.create_post(author["id"], "Post 1", "Content 1")
-    post2 = factory.create_post(author["id"], "Post 2", "Content 2")
+    post1 = factory.create_post(author["pk_user"], "Post 1", "Content 1")
+    post2 = factory.create_post(author["pk_user"], "Post 2", "Content 2")
 
     # Act
     cursor = db.cursor()
@@ -265,7 +265,7 @@ async def test_schema_query_post_comments(db, factory):
     """Test: querying post includes its comments."""
     # Arrange
     author = factory.create_user("author", "author@example.com")
-    post = factory.create_post(author["id"], "Test Post", "Content")
+    post = factory.create_post(author["pk_user"], "Test Post", "Content")
     commenter = factory.create_user("commenter", "commenter@example.com")
     comment1 = factory.create_comment(post["id"], commenter["id"], "Comment 1")
     comment2 = factory.create_comment(post["id"], commenter["id"], "Comment 2")
@@ -366,7 +366,7 @@ async def test_deeply_nested_query_user_posts_with_comments(db, factory):
     """Test: querying user -> posts -> comments works correctly."""
     # Arrange
     author = factory.create_user("author", "author@example.com")
-    post = factory.create_post(author["id"], "Test Post", "Content")
+    post = factory.create_post(author["pk_user"], "Test Post", "Content")
     commenter = factory.create_user("commenter", "commenter@example.com")
     comment = factory.create_comment(post["id"], commenter["id"], "Nice post!")
 
@@ -400,10 +400,10 @@ async def test_multiple_users_multiple_posts(db, factory):
     author1 = factory.create_user("author1", "author1@example.com")
     author2 = factory.create_user("author2", "author2@example.com")
 
-    factory.create_post(author1["id"], "Author1 Post1", "Content")
-    factory.create_post(author1["id"], "Author1 Post2", "Content")
-    factory.create_post(author2["id"], "Author2 Post1", "Content")
-    factory.create_post(author2["id"], "Author2 Post2", "Content")
+    factory.create_post(author1["pk_user"], "Author1 Post1", "Content")
+    factory.create_post(author1["pk_user"], "Author1 Post2", "Content")
+    factory.create_post(author2["pk_user"], "Author2 Post1", "Content")
+    factory.create_post(author2["pk_user"], "Author2 Post2", "Content")
 
     # Act - verify count
     cursor = db.cursor()
@@ -447,7 +447,7 @@ async def test_post_field_values_are_correct(db, factory):
     """Test: post field values match expected values."""
     # Arrange
     author = factory.create_user("author", "author@example.com")
-    post = factory.create_post(author["id"], "Test Title", "Test Content")
+    post = factory.create_post(author["pk_user"], "Test Title", "Test Content")
 
     # Act
     cursor = db.cursor()
@@ -491,7 +491,7 @@ async def test_posts_query_respects_limit(db, factory):
     # Arrange
     author = factory.create_user("author", "author@example.com")
     for i in range(30):
-        factory.create_post(author["id"], f"Post {i}", f"Content {i}")
+        factory.create_post(author["pk_user"], f"Post {i}", f"Content {i}")
 
     # Act
     cursor = db.cursor()
@@ -507,7 +507,7 @@ async def test_comments_query_respects_limit(db, factory):
     """Test: post comments respects limit (50 per post)."""
     # Arrange
     author = factory.create_user("author", "author@example.com")
-    post = factory.create_post(author["id"], "Test Post", "Content")
+    post = factory.create_post(author["pk_user"], "Test Post", "Content")
     commenter = factory.create_user("commenter", "commenter@example.com")
 
     for i in range(100):
@@ -546,7 +546,7 @@ async def test_optional_post_content_can_be_null(db, factory):
     """Test: optional content field in posts can be null."""
     # Arrange
     author = factory.create_user("author", "author@example.com")
-    post = factory.create_post(author["id"], "Title", None)
+    post = factory.create_post(author["pk_user"], "Title", None)
 
     # Act
     cursor = db.cursor()

@@ -274,7 +274,6 @@ async def test_mutation_update_user_bio(db, factory):
         "UPDATE benchmark.tb_user SET bio = %s, updated_at = NOW() WHERE id = %s",
         (new_bio, user_id)
     )
-    db.commit()
 
     # Verify update
     cursor.execute(
@@ -301,7 +300,6 @@ async def test_mutation_update_user_full_name(db, factory):
         "UPDATE benchmark.tb_user SET full_name = %s, updated_at = NOW() WHERE id = %s",
         (new_name, user_id)
     )
-    db.commit()
 
     # Verify
     cursor.execute(
@@ -329,7 +327,6 @@ async def test_mutation_update_user_multiple_fields(db, factory):
         "UPDATE benchmark.tb_user SET bio = %s, full_name = %s, updated_at = NOW() WHERE id = %s",
         (new_bio, new_name, user_id)
     )
-    db.commit()
 
     # Verify
     cursor.execute(
@@ -355,7 +352,6 @@ async def test_mutation_update_nonexistent_user_returns_none(db):
         "UPDATE benchmark.tb_user SET bio = %s WHERE id = %s",
         ("bio", nonexistent_id)
     )
-    db.commit()
 
     # Verify it wasn't updated
     cursor.execute(
