@@ -171,7 +171,6 @@ def test_mutation_update_user_bio(db, factory):
         "UPDATE benchmark.tb_user SET bio = %s, updated_at = NOW() WHERE id = %s",
         (new_bio, user["id"])
     )
-    db.commit()
 
     # Verify
     cursor.execute(
@@ -196,7 +195,6 @@ def test_mutation_update_user_name(db, factory):
         "UPDATE benchmark.tb_user SET full_name = %s, updated_at = NOW() WHERE id = %s",
         (new_name, user["id"])
     )
-    db.commit()
 
     # Verify
     cursor.execute(
@@ -222,7 +220,6 @@ def test_mutation_update_both_fields(db, factory):
         "UPDATE benchmark.tb_user SET bio = %s, full_name = %s, updated_at = NOW() WHERE id = %s",
         (new_bio, new_name, user["id"])
     )
-    db.commit()
 
     # Verify
     cursor.execute(
@@ -411,11 +408,13 @@ def test_optional_fields_can_be_null(db, factory):
     assert result[0] is None
 
 
-def test_optional_post_content_can_be_null(db, factory):
-    """Test: optional content field in posts can be null."""
+def test_post_content_is_required(db, factory):
+    """Test: post content field is required by schema."""
     # Arrange
-    author = factory.create_user("author", "author-null-content", "author@example.com")
-    post = factory.create_post(author["pk_user"], "Title", "title-null-cmt", None)
+    author = factory.create_user("author", "author-required-content", "author@example.com")
+
+    # Create post with content (content is NOT NULL)
+    post = factory.create_post(author["pk_user"], "Title", "title-required", "Post content")
 
     # Act
     cursor = db.cursor()
@@ -423,7 +422,8 @@ def test_optional_post_content_can_be_null(db, factory):
     result = cursor.fetchone()
 
     # Assert
-    assert result[0] is None
+    assert result[0] == "Post content"
+    assert result[0] is not None
 
 
 # ============================================================================
@@ -537,7 +537,6 @@ def test_mutation_on_nonexistent_user(db):
         "UPDATE benchmark.tb_user SET bio = %s WHERE id = %s",
         ("test", nonexistent_id)
     )
-    db.commit()
 
     # Verify no user was updated
     cursor.execute("SELECT id FROM benchmark.tb_user WHERE id = %s", (nonexistent_id,))
