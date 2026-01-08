@@ -113,18 +113,26 @@ def factory(db):
                 return {}
 
         @staticmethod
-        def create_post(fk_author: int, title: str, identifier: str, content: str = None) -> dict:
+        def create_post(fk_author: int, title: str, identifier: str = None, content: str = None) -> dict:
             """Create a test post in the command side (tb_post).
 
             Args:
                 fk_author: Foreign key to tb_user.pk_user
                 title: Post title
-                identifier: Human-readable identifier/slug
-                content: Post content (optional)
+                identifier: Human-readable identifier/slug (auto-generated if not provided)
+                content: Post content (auto-generated if not provided)
 
             Returns:
                 dict with pk_post, id (UUID), title, identifier, content, fk_author
             """
+            # Auto-generate identifier from title if not provided
+            if identifier is None:
+                identifier = title.lower().replace(' ', '-')
+
+            # Auto-generate content if not provided (required by schema)
+            if content is None:
+                content = f"Content for {title}"
+
             with db.cursor() as cursor:
                 cursor.execute(
                     "INSERT INTO benchmark.tb_post (fk_author, title, identifier, content) "
