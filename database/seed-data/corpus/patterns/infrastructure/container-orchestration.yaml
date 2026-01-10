@@ -1,0 +1,364 @@
+# Container Orchestration: Docker and Kubernetes
+# VelocityBench Knowledge Corpus
+
+id: container-orchestration
+name: "Container Orchestration with Docker and Kubernetes"
+category: infrastructure
+type: pattern
+severity: high
+tags:
+  - docker
+  - kubernetes
+  - containers
+  - orchestration
+  - devops
+
+summary:
+  short: "Automate container deployment, scaling, and management"
+  long: |
+    Docker containerizes applications for portability. Kubernetes (K8s) orchestrates
+    containers across clusters, handling deployment, scaling, networking, and self-healing.
+    Docker Compose works for development and simple deployments. Kubernetes powers
+    production microservices at scale. The choice depends on complexity, team expertise,
+    and operational requirements.
+
+problem:
+  description: |
+    Managing containers manually creates problems:
+    - Deploying containers consistently across environments
+    - Scaling containers as traffic changes
+    - Restarting failed containers
+    - Managing networking and service discovery
+    - Rolling updates without downtime
+    - Resource allocation and bin-packing
+
+  symptoms:
+    - name: "Manual deployment"
+      description: "Deploying containers requires SSH and scripts"
+      detection: "Deployment takes hours, error-prone"
+
+    - name: "Scaling complexity"
+      description: "Adding capacity requires manual intervention"
+      detection: "Can't respond quickly to traffic spikes"
+
+    - name: "Service discovery issues"
+      description: "Services can't find each other reliably"
+      detection: "Connection errors, hardcoded IPs"
+
+solution:
+  principle: "Declare desired state, let orchestrator maintain it"
+
+tooling_levels:
+  - name: "Docker (Single Host)"
+    purpose: "Containerize applications"
+    scale: "Single machine"
+    use_case: "Development, simple apps"
+    ops_burden: "Low"
+
+    commands: |
+      docker run -d -p 8080:3000 \
+        -e DATABASE_URL=postgres://... \
+        --name api \
+        myregistry/api:latest
+
+      docker ps           # List running containers
+      docker logs api     # View logs
+      docker restart api  # Restart container
+
+  - name: "Docker Compose"
+    purpose: "Multi-container development"
+    scale: "Single host (3-5 services)"
+    use_case: "Local development, docker-compose.yml"
+    ops_burden: "Very low"
+
+    example: |
+      version: '3.8'
+      services:
+        api:
+          image: myapp:latest
+          ports:
+            - "3000:3000"
+          environment:
+            DATABASE_URL: postgres://db/myapp
+          depends_on:
+            - db
+
+        db:
+          image: postgres:15
+          environment:
+            POSTGRES_PASSWORD: password
+
+  - name: "Kubernetes"
+    purpose: "Production container orchestration"
+    scale: "Hundreds of machines, thousands of containers"
+    use_case: "Microservices, high availability, auto-scaling"
+    ops_burden: "High (but worth it at scale)"
+
+    components: |
+      - Deployment: Desired container state
+      - Service: Network abstraction, load balancing
+      - Ingress: HTTP routing
+      - StatefulSet: Ordered, named replicas
+      - DaemonSet: Run on every node
+      - ConfigMap/Secret: Configuration management
+      - PersistentVolume: Storage
+
+implementation:
+  docker_basics:
+    dockerfile: |
+      FROM node:18-alpine
+
+      WORKDIR /app
+
+      # Copy package files
+      COPY package*.json ./
+
+      # Install dependencies
+      RUN npm install
+
+      # Copy source code
+      COPY . .
+
+      # Expose port
+      EXPOSE 3000
+
+      # Start application
+      CMD ["node", "server.js"]
+
+    build_and_run: |
+      # Build image
+      docker build -t myapp:1.0 .
+
+      # Run container
+      docker run -d -p 8080:3000 \
+        -e NODE_ENV=production \
+        --name api \
+        myapp:1.0
+
+      # Push to registry
+      docker tag myapp:1.0 myregistry/myapp:1.0
+      docker push myregistry/myapp:1.0
+
+  kubernetes_basics:
+    deployment: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: api-server
+        labels:
+          app: api
+      spec:
+        replicas: 3  # Run 3 copies
+        selector:
+          matchLabels:
+            app: api
+        template:
+          metadata:
+            labels:
+              app: api
+          spec:
+            containers:
+            - name: api
+              image: myregistry/api:1.0
+              ports:
+              - containerPort: 3000
+              env:
+              - name: DATABASE_URL
+                valueFrom:
+                  secretKeyRef:
+                    name: db-credentials
+                    key: connection-string
+              resources:
+                requests:
+                  memory: "256Mi"
+                  cpu: "250m"
+                limits:
+                  memory: "512Mi"
+                  cpu: "500m"
+              livenessProbe:
+                httpGet:
+                  path: /health
+                  port: 3000
+                initialDelaySeconds: 30
+                periodSeconds: 10
+
+    service: |
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: api-service
+      spec:
+        selector:
+          app: api
+        ports:
+        - protocol: TCP
+          port: 80        # External port
+          targetPort: 3000  # Container port
+        type: LoadBalancer
+
+    autoscaling: |
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: api-hpa
+      spec:
+        scaleTargetRef:
+          apiVersion: apps/v1
+          kind: Deployment
+          name: api-server
+        minReplicas: 3
+        maxReplicas: 20
+        metrics:
+        - type: Resource
+          resource:
+            name: cpu
+            target:
+              type: Utilization
+              averageUtilization: 70
+        - type: Resource
+          resource:
+            name: memory
+            target:
+              type: Utilization
+              averageUtilization: 80
+
+    ingress: |
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: api-ingress
+      spec:
+        ingressClassName: nginx
+        rules:
+        - host: api.example.com
+          http:
+            paths:
+            - path: /
+              pathType: Prefix
+              backend:
+                service:
+                  name: api-service
+                  port:
+                    number: 80
+
+  deployment_workflow:
+    deploy: |
+      # 1. Build image
+      docker build -t myregistry/api:v1.2.0 .
+
+      # 2. Push to registry
+      docker push myregistry/api:v1.2.0
+
+      # 3. Update Kubernetes deployment
+      kubectl set image deployment/api-server \
+        api=myregistry/api:v1.2.0
+
+      # 4. K8s gradually rolls out new version
+      # - New pods start with new image
+      # - Old pods terminate
+      # - Service routes to both during transition
+
+    rolling_update: |
+      # Kubernetes automatically:
+      # 1. Spins up new pod with new image
+      # 2. Waits for readiness probe to pass
+      # 3. Routes traffic to new pod
+      # 4. Terminates old pod
+      # 5. Repeats until all updated
+
+      # Zero downtime deployment!
+
+kubernetes_features:
+  - name: "Self-Healing"
+    description: "Automatically restart failed containers"
+    example: |
+      Container crashes? Kubelet restarts it.
+      Too many failures? Pod is recreated.
+
+  - name: "Load Balancing"
+    description: "Distribute traffic across pod replicas"
+    example: |
+      3 replicas of api-server
+      Service distributes traffic to all 3
+
+  - name: "Auto-Scaling"
+    description: "Add/remove replicas based on load"
+    example: |
+      HPA monitors CPU
+      If CPU > 70%, adds more pods
+      If CPU < 30%, removes pods
+
+  - name: "Rolling Updates"
+    description: "Deploy new version without downtime"
+    example: |
+      Old and new versions run simultaneously
+      Traffic gradually shifts
+      Automatic rollback if issues
+
+  - name: "Service Discovery"
+    description: "Services find each other automatically"
+    example: |
+      dns-name: api-service.default.svc.cluster.local
+      No hardcoding IPs needed
+
+best_practices:
+  - name: "Use resource requests and limits"
+    description: "Prevent resource hogging"
+    example: |
+      requests: Memory for allocation, CPU for scheduling
+      limits: Maximum resource usage
+
+  - name: "Implement health checks"
+    description: "Tell K8s when pod is healthy"
+    types:
+      - "livenessProbe: Is container alive?"
+      - "readinessProbe: Can container handle traffic?"
+      - "startupProbe: Has app finished starting?"
+
+  - name: "Use init containers"
+    description: "Run setup tasks before app starts"
+    example: |
+      - Wait for database to be ready
+      - Run migrations
+      - Download configuration
+
+  - name: "Separate config from code"
+    description: "Use ConfigMap and Secret"
+    example: |
+      ConfigMap: Non-sensitive config (staging vs prod)
+      Secret: Sensitive data (passwords, keys)
+
+comparison: |
+  | Feature | Docker | Docker Compose | Kubernetes |
+  |---------|--------|----------------|-----------|
+  | Hosts | 1 | 1 | Many |
+  | Replicas | Manual | Manual | Auto-scaled |
+  | Load balancing | Manual | Manual | Built-in |
+  | Self-healing | No | No | Yes |
+  | Updates | Manual | Manual | Rolling |
+  | Learning curve | Low | Low | High |
+  | Best for | Dev | Dev/small | Production |
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Kubernetes is like an airline operations:
+      - Docker: A single airplane (container)
+      - K8s: Airport management system for many planes
+      K8s ensures planes are flying, lands damaged ones, adds planes for holidays!
+
+  intermediate:
+    focus: "Kubernetes deployments and autoscaling"
+    key_points:
+      - "Deployment manifests and services"
+      - "Rolling updates and rollbacks"
+      - "HorizontalPodAutoscaler configuration"
+      - "Ingress for HTTP routing"
+
+  advanced:
+    focus: "Production K8s and advanced patterns"
+    key_points:
+      - "Network policies and security"
+      - "Resource management and QoS"
+      - "Custom resource definitions (CRDs)"
+      - "Operators and GitOps deployment"

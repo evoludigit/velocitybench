@@ -1,0 +1,360 @@
+# Message Queues and Event Streaming
+# VelocityBench Knowledge Corpus
+
+id: message-queues
+name: "Message Queues and Event Streaming"
+category: infrastructure
+type: pattern
+severity: high
+tags:
+  - messaging
+  - kafka
+  - rabbitmq
+  - sqs
+  - event-streaming
+
+summary:
+  short: "Decouple services with asynchronous messaging and event streaming"
+  long: |
+    Message queues enable asynchronous communication between services. Kafka provides
+    high-throughput event streaming with replay capability. RabbitMQ offers traditional
+    message queuing with flexible routing. Cloud queues (SQS, PubSub) require minimal ops.
+    Each has different semantics, durability guarantees, and scaling characteristics.
+    Choose based on throughput, ordering guarantees, replay needs, and operational complexity.
+
+problem:
+  description: |
+    Synchronous communication creates tight coupling:
+    - Service calls must wait for responses (slow)
+    - Service unavailability breaks callers
+    - Scaling one service requires scaling others
+    - Hard to add new consumers
+    - No audit trail of events
+
+  symptoms:
+    - name: "Cascade failures"
+      description: "One service down brings down callers"
+      detection: "Correlated failures across services"
+
+    - name: "Tight coupling"
+      description: "Services know too much about each other"
+      detection: "Deployment order dependencies"
+
+    - name: "Throughput limits"
+      description: "Can't process events fast enough"
+      detection: "Events queue up, latency increases"
+
+solution:
+  principle: "Decouple via asynchronous events flowing through a queue"
+
+  components:
+    - name: "Producer"
+      purpose: "Creates and sends messages"
+
+    - name: "Queue/Topic"
+      purpose: "Stores and distributes messages"
+
+    - name: "Consumer"
+      purpose: "Receives and processes messages"
+
+    - name: "Broker"
+      purpose: "Manages queue/topic storage and routing"
+
+message_queue_types:
+  - name: "Traditional Message Queue (RabbitMQ, ActiveMQ)"
+    semantics: "At-least-once delivery"
+    ordering: "FIFO per queue"
+    throughput: "Moderate (100K msg/sec typical)"
+    replay: "No (messages consumed, deleted)"
+    use_case: "Task queues, job processing"
+    complexity: "Moderate ops"
+
+    pros:
+      - "Simple producer/consumer model"
+      - "Flexible routing (exchanges, bindings)"
+      - "Durable queues"
+      - "Good for work distribution"
+
+    cons:
+      - "No message replay"
+      - "Lower throughput than Kafka"
+      - "Requires cluster management"
+
+  - name: "Event Stream (Kafka, Pulsar)"
+    semantics: "At-least-once (configurable)"
+    ordering: "Per partition"
+    throughput: "Very high (1M+ msg/sec)"
+    replay: "Yes (messages retained)"
+    use_case: "Event sourcing, analytics, streaming"
+    complexity: "Higher ops"
+
+    pros:
+      - "Very high throughput"
+      - "Replay capability"
+      - "Distributed, scalable"
+      - "Exactly-once semantics available"
+
+    cons:
+      - "More operational overhead"
+      - "Learning curve steeper"
+      - "Overkill for low-volume tasks"
+
+  - name: "Cloud Queue (SQS, PubSub)"
+    semantics: "At-least-once"
+    ordering: "FIFO queues available"
+    throughput: "High (scaling automatic)"
+    replay: "Limited"
+    use_case: "Serverless, event processing, decoupling"
+    complexity: "Low ops (fully managed)"
+
+    pros:
+      - "Zero ops (managed service)"
+      - "Automatic scaling"
+      - "Pay per message"
+      - "Built-in reliability"
+
+    cons:
+      - "Vendor lock-in"
+      - "No replay"
+      - "Higher cost at scale"
+      - "Network latency"
+
+implementation:
+  rabbitmq_example:
+    python_producer: |
+      import pika
+
+      # Connect to RabbitMQ
+      connection = pika.BlockingConnection(
+          pika.ConnectionParameters('localhost')
+      )
+      channel = connection.channel()
+
+      # Declare queue
+      channel.queue_declare(queue='order_events', durable=True)
+
+      # Publish message
+      channel.basic_publish(
+          exchange='',
+          routing_key='order_events',
+          body='{"order_id": "123", "total": 99.99}',
+          properties=pika.BasicProperties(
+              delivery_mode=2  # Persistent
+          )
+      )
+      connection.close()
+
+    python_consumer: |
+      import pika
+      import json
+
+      def on_message(ch, method, properties, body):
+          message = json.loads(body)
+          print(f"Processing order {message['order_id']}")
+
+          # Process message
+          process_order(message)
+
+          # Acknowledge after processing
+          ch.basic_ack(delivery_tag=method.delivery_tag)
+
+      connection = pika.BlockingConnection(
+          pika.ConnectionParameters('localhost')
+      )
+      channel = connection.channel()
+      channel.queue_declare(queue='order_events', durable=True)
+
+      # Set QoS (prefetch 1 message at a time)
+      channel.basic_qos(prefetch_count=1)
+
+      # Start consuming
+      channel.basic_consume(
+          queue='order_events',
+          on_message_callback=on_message
+      )
+      print('Waiting for messages...')
+      channel.start_consuming()
+
+  kafka_example:
+    python_producer: |
+      from kafka import KafkaProducer
+      import json
+
+      producer = KafkaProducer(
+          bootstrap_servers=['localhost:9092'],
+          value_serializer=lambda v: json.dumps(v).encode('utf-8')
+      )
+
+      # Send message to topic
+      producer.send('user-events', {
+          'event_type': 'user_registered',
+          'user_id': '123',
+          'email': 'alice@example.com',
+          'timestamp': '2024-01-15T10:30:00Z'
+      })
+
+      producer.flush()
+      producer.close()
+
+    python_consumer: |
+      from kafka import KafkaConsumer
+      import json
+
+      consumer = KafkaConsumer(
+          'user-events',
+          bootstrap_servers=['localhost:9092'],
+          group_id='email-service',
+          auto_offset_reset='earliest',
+          value_deserializer=lambda m: json.loads(m.decode('utf-8'))
+      )
+
+      for message in consumer:
+          event = message.value
+          if event['event_type'] == 'user_registered':
+              send_welcome_email(event['email'])
+
+    consumer_group: |
+      # Multiple consumers = parallel processing
+      # Each partition is handled by one consumer
+
+      # Topic: user-events (3 partitions)
+      # Consumer group: email-service (3 consumers)
+      # Result: Each partition processed by 1 consumer
+
+      consumer_1 → partition_0
+      consumer_2 → partition_1
+      consumer_3 → partition_2
+
+  sqs_example:
+    python_producer: |
+      import boto3
+      import json
+
+      sqs = boto3.client('sqs')
+
+      response = sqs.send_message(
+          QueueUrl='https://sqs.us-east-1.amazonaws.com/123456789/orders',
+          MessageBody=json.dumps({
+              'order_id': '123',
+              'user_id': 'alice',
+              'total': 99.99
+          })
+      )
+
+    python_consumer: |
+      import boto3
+      import json
+      import time
+
+      sqs = boto3.client('sqs')
+      queue_url = 'https://sqs.us-east-1.amazonaws.com/123456789/orders'
+
+      while True:
+          # Receive up to 10 messages
+          response = sqs.receive_message(
+              QueueUrl=queue_url,
+              MaxNumberOfMessages=10,
+              WaitTimeSeconds=20  # Long polling
+          )
+
+          if 'Messages' in response:
+              for message in response['Messages']:
+                  body = json.loads(message['Body'])
+                  process_order(body)
+
+                  # Delete message after processing
+                  sqs.delete_message(
+                      QueueUrl=queue_url,
+                      ReceiptHandle=message['ReceiptHandle']
+                  )
+
+comparison_table: |
+  | Feature | RabbitMQ | Kafka | SQS |
+  |---------|----------|-------|-----|
+  | Throughput | 100K/sec | 1M+/sec | Unlimited (scaled) |
+  | Replay | No | Yes | Limited (14 days) |
+  | Ordering | Per queue | Per partition | FIFO queues |
+  | Ops | Moderate | High | None |
+  | Cost | Self-hosted | Self-hosted | Pay per message |
+  | Latency | Low | Low | Medium (network) |
+  | Use case | Tasks | Streaming | Serverless |
+
+best_practices:
+  - name: "Design for idempotence"
+    description: "Handle duplicate message processing"
+    example: |
+      # If same message processed twice, no side effects
+      # Use idempotency key (user_id + order_id)
+      idempotency_key = f"{user_id}:{order_id}"
+      if cache.exists(idempotency_key):
+          return  # Already processed
+
+  - name: "Use schema validation"
+    description: "Validate messages match expected format"
+    approach: |
+      - Schema Registry (Confluent)
+      - Message versioning
+      - Backward compatibility
+
+  - name: "Monitor queue depth"
+    description: "Alert if messages accumulate"
+    metrics:
+      - "Messages in queue"
+      - "Consumer lag (Kafka)"
+      - "Processing latency"
+
+  - name: "Plan for consumer scaling"
+    description: "Add consumers when queue grows"
+    kafka: "Add consumers to partition group"
+    rabbitmq: "Add workers to competing consumers"
+
+performance_patterns:
+  - name: "Batch Processing"
+    description: "Process multiple messages together"
+    example: |
+      # Process 100 messages in one batch
+      batch = []
+      for message in consumer:
+          batch.append(message)
+          if len(batch) == 100:
+              bulk_insert_to_database(batch)
+              batch = []
+
+  - name: "Parallel Processing"
+    description: "Multiple threads/processes per consumer"
+    example: |
+      # ThreadPoolExecutor for parallelism
+      with ThreadPoolExecutor(max_workers=5) as executor:
+          for message in consumer:
+              executor.submit(process_message, message)
+
+  - name: "Partitioning Strategy"
+    description: "Route messages to specific partitions"
+    example: |
+      # Messages for same user go to same partition
+      # Ensures order for user
+      partition_key = message['user_id']
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Message queues are like postal mail:
+      - No queue: Call recipient directly (must be available)
+      - Message queue: Drop in mailbox, mail carrier delivers later
+      Recipient doesn't need to be home - mail waits!
+
+  intermediate:
+    focus: "Choosing between RabbitMQ and Kafka"
+    key_points:
+      - "RabbitMQ: Task queues, work distribution"
+      - "Kafka: Event streaming, replay, analytics"
+      - "Consumer groups and parallel processing"
+      - "Exactly-once delivery guarantees"
+
+  advanced:
+    focus: "High-throughput streaming and consumer scaling"
+    key_points:
+      - "Kafka partitioning strategy"
+      - "Exactly-once vs at-least-once semantics"
+      - "Dead letter queues for failures"
+      - "Stream processing (Kafka Streams, Flink)"

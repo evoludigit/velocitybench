@@ -1,0 +1,398 @@
+# Compute Infrastructure: Bare Metal vs VPS vs Serverless
+# VelocityBench Knowledge Corpus
+
+id: compute-infrastructure
+name: "Compute Infrastructure: Bare Metal vs VPS vs Serverless"
+category: infrastructure
+type: pattern
+severity: high
+tags:
+  - infrastructure
+  - compute
+  - serverless
+  - containers
+  - vps
+
+summary:
+  short: "Choose between bare metal, VPS, containers, and serverless compute"
+  long: |
+    Different workloads benefit from different compute models. Bare metal offers maximum
+    performance for compute-intensive work. VPS provides cost-effective virtualization.
+    Containers add portability. Serverless (functions-as-a-service) eliminates server
+    management. The right choice depends on workload characteristics, cost sensitivity,
+    scaling needs, and operational complexity tolerance.
+
+problem:
+  description: |
+    Wrong compute choice creates problems:
+    - Bare metal for web app wastes money and introduces complexity
+    - VPS inadequate for bursty workloads (can't scale quickly)
+    - Serverless with long-running processes becomes expensive
+    - Over-provisioned infrastructure costs multiply
+    - Under-provisioned systems cause outages
+
+  symptoms:
+    - name: "Insufficient scaling speed"
+      description: "Can't handle traffic spikes"
+      detection: "503 errors during peaks, slow startup"
+
+    - name: "Over-provisioned infrastructure"
+      description: "Paying for unused capacity"
+      detection: "Low CPU/memory utilization, high costs"
+
+    - name: "Cold start latency"
+      description: "Functions take seconds to start"
+      detection: "High p99 latencies in serverless"
+
+solution:
+  principle: "Match compute model to workload characteristics"
+
+compute_models:
+  - name: "Bare Metal"
+    provider: "Physical servers"
+    isolation: "None (single tenant)"
+    startup: "Minutes"
+    scaling: "Manual (days/weeks)"
+    cost: "Highest upfront"
+    overhead: "Highest"
+
+    characteristics:
+      - "No hypervisor overhead"
+      - "Predictable performance"
+      - "Full control of hardware"
+
+    best_for:
+      - "High-performance computing (HPC)"
+      - "Batch processing (ML training)"
+      - "Databases (large data sets)"
+      - "Dedicated infrastructure"
+
+    providers:
+      - "Equinix Metal (formerly Packet)"
+      - "OVH"
+      - "Vultr Bare Metal"
+
+    pros:
+      - "Maximum performance"
+      - "No noisy neighbors"
+      - "Full hardware control"
+
+    cons:
+      - "High cost"
+      - "Manual scaling"
+      - "Operational burden"
+      - "Space and power needed"
+
+  - name: "Virtual Private Server (VPS)"
+    provider: "Virtualized instances"
+    isolation: "Process-level (shared hardware)"
+    startup: "Seconds"
+    scaling: "Manual (minutes)"
+    cost: "Moderate"
+    overhead: "Moderate"
+
+    characteristics:
+      - "Hypervisor overhead (5-10%)"
+      - "Some performance variability"
+      - "Full root access"
+
+    best_for:
+      - "Web applications"
+      - "API servers"
+      - "General-purpose workloads"
+      - "Predictable load"
+
+    providers:
+      - "AWS EC2"
+      - "DigitalOcean"
+      - "Linode"
+      - "Hetzner"
+
+    pros:
+      - "Good price/performance"
+      - "Full OS access"
+      - "Mature ecosystem"
+
+    cons:
+      - "Manual scaling"
+      - "Pay whether busy or idle"
+      - "Operational overhead"
+
+  - name: "Containers (Docker)"
+    provider: "Containerized applications"
+    isolation: "Process-level + namespace"
+    startup: "Sub-seconds"
+    scaling: "Automatic (seconds)"
+    cost: "Moderate"
+    overhead: "Low"
+
+    characteristics:
+      - "Lightweight vs VMs"
+      - "Portable across environments"
+      - "Orchestrated (Kubernetes, Docker Swarm)"
+
+    best_for:
+      - "Microservices"
+      - "Variable workloads"
+      - "Multi-tenant platforms"
+      - "CI/CD integration"
+
+    providers:
+      - "Kubernetes (self-hosted)"
+      - "AWS ECS/EKS"
+      - "Google GKE"
+      - "Azure AKS"
+
+    pros:
+      - "Fast startup"
+      - "Easy scaling"
+      - "Portable"
+      - "Resource efficient"
+
+    cons:
+      - "Orchestration complexity"
+      - "Still paying for idle time"
+      - "Debugging more complex"
+
+  - name: "Serverless (Functions-as-a-Service)"
+    provider: "Managed functions"
+    isolation: "Function-level"
+    startup: "Milliseconds (cold start: 100-1000ms)"
+    scaling: "Automatic (instant)"
+    cost: "Pay-per-execution"
+    overhead: "None"
+
+    characteristics:
+      - "No server management"
+      - "Auto-scaling"
+      - "Event-driven"
+      - "Short-lived (5-15 min typical)"
+
+    best_for:
+      - "Event processing (webhooks, streams)"
+      - "Scheduled jobs"
+      - "API endpoints"
+      - "Bursty workloads"
+      - "Background jobs"
+
+    providers:
+      - "AWS Lambda"
+      - "Google Cloud Functions"
+      - "Azure Functions"
+      - "Vercel"
+
+    pros:
+      - "Zero operational overhead"
+      - "Perfect for bursty load"
+      - "Pay only for execution"
+      - "Automatic scaling"
+
+    cons:
+      - "Expensive for continuous work"
+      - "Cold start latency"
+      - "Function timeout limits"
+      - "Vendor lock-in"
+
+comparison_table: |
+  | Model | Cost (idle) | Startup | Scaling | Perf | Control | Use Case |
+  |-------|-----------|---------|---------|------|---------|----------|
+  | Bare Metal | Very High | Minutes | Manual | Best | Full | HPC, DB |
+  | VPS | High | Seconds | Manual | Good | Full | Web apps |
+  | Container | Moderate | Sub-sec | Auto | Good | Most | Microservices |
+  | Serverless | $0 (idle) | Cold: 100ms | Instant | Good | None | Events |
+
+implementation:
+  vps_example:
+    deployment: |
+      # DigitalOcean droplet
+      1. Create $5/month droplet (512MB RAM)
+      2. SSH to server
+      3. Install Node.js
+      4. Upload application code
+      5. Start application with PM2 or systemd
+
+      # Static costs regardless of traffic
+      # Manual: upgrade droplet size if traffic increases
+
+  container_example:
+    dockerfile: |
+      FROM node:18
+      WORKDIR /app
+      COPY package*.json ./
+      RUN npm install
+      COPY . .
+      EXPOSE 3000
+      CMD ["node", "server.js"]
+
+    kubernetes: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: api-server
+      spec:
+        replicas: 3  # Start with 3 copies
+        selector:
+          matchLabels:
+            app: api-server
+        template:
+          metadata:
+            labels:
+              app: api-server
+          spec:
+            containers:
+            - name: api-server
+              image: myregistry/api-server:latest
+              resources:
+                requests:
+                  memory: "256Mi"
+                  cpu: "250m"
+                limits:
+                  memory: "512Mi"
+                  cpu: "500m"
+
+      ---
+      # Auto-scaling policy
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: api-server-hpa
+      spec:
+        scaleTargetRef:
+          apiVersion: apps/v1
+          kind: Deployment
+          name: api-server
+        minReplicas: 3
+        maxReplicas: 20
+        metrics:
+        - type: Resource
+          resource:
+            name: cpu
+            target:
+              type: Utilization
+              averageUtilization: 70  # Scale up if CPU > 70%
+
+  serverless_example:
+    aws_lambda: |
+      # AWS Lambda function
+      import json
+      import boto3
+
+      dynamodb = boto3.resource('dynamodb')
+      table = dynamodb.Table('UserData')
+
+      def lambda_handler(event, context):
+          # event = HTTP request (API Gateway)
+          user_id = event['pathParameters']['userId']
+
+          # Process request
+          response = table.get_item(Key={'id': user_id})
+
+          return {
+              'statusCode': 200,
+              'body': json.dumps(response.get('Item', {}))
+          }
+
+      # AWS automatically:
+      # - Scales from 0 to 1000s of concurrent executions
+      # - Runs only when invoked (cold start first time)
+      # - Bills per 100ms of execution
+
+    cost_calculation: |
+      Serverless cost example:
+      - 1 million requests/month
+      - Average execution time: 500ms
+      - Free tier: 1 million requests + 400,000 GB-seconds
+      - Charged: 0 (within free tier!)
+
+      VPS cost example:
+      - $5/month VPS, always running
+      - Total: $60/year
+      - Even 1 request/day = $60 annual cost
+
+cost_analysis:
+    continuous_workload: |
+      Running web API with 10,000 requests/hour (always active):
+
+      VPS approach:
+      - 1 t3.medium instance: $30/month
+      - Annual: $360
+
+      Serverless approach:
+      - 10,000 req/hour × 24h × 30 days = 7.2M requests/month
+      - 7.2M × $0.0000002 = $1.44
+      - 7.2M × 500ms execution = 3.6M GB-seconds
+      - 3.6M × $0.0000166 = $59.76
+      - Annual: ~$735 (2x more expensive!)
+
+      → VPS wins for continuous workloads
+
+    bursty_workload: |
+      Webhook processor: 1000 requests/day (highly bursty):
+
+      VPS approach:
+      - t3.micro instance: $8/month
+      - Annual: $96
+
+      Serverless approach:
+      - 1000 × 30 = 30K requests/month
+      - 30K × $0.0000002 = $0.006
+      - 30K × 100ms = 3M GB-seconds
+      - 3M × $0.0000166 = $0.05
+      - Annual: ~$0.62 (negligible!)
+
+      → Serverless wins for bursty workloads
+
+decision_framework: |
+  Use BARE METAL if:
+  ✓ Compute-intensive workloads (ML, HPC)
+  ✓ Database with heavy queries
+  ✓ Require maximum performance
+  ✓ Predictable, consistent load
+  ✓ Can commit to long-term investment
+
+  Use VPS if:
+  ✓ Web applications
+  ✓ API servers
+  ✓ Relatively steady traffic
+  ✓ Need full OS control
+  ✓ Traditional LAMP/MEAN stack
+
+  Use CONTAINERS if:
+  ✓ Microservices architecture
+  ✓ Multiple environment deployment
+  ✓ Variable traffic (auto-scaling)
+  ✓ CI/CD pipeline integration
+  ✓ Team familiar with Kubernetes
+
+  Use SERVERLESS if:
+  ✓ Event-driven workloads
+  ✓ Highly variable/bursty traffic
+  ✓ Scheduled jobs
+  ✓ Want zero ops overhead
+  ✓ Cost per-execution is acceptable
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Compute models are like transportation:
+      - Bare metal: Buy a truck (high cost, full control)
+      - VPS: Rent a car (flexible, daily cost)
+      - Container: Ride-share (share resources, automatic scaling)
+      - Serverless: Taxi (pay per trip, zero prep)
+      Choose based on your journey patterns!
+
+  intermediate:
+    focus: "Cost analysis and scaling characteristics"
+    key_points:
+      - "Total cost of ownership calculations"
+      - "Startup and scaling latency trade-offs"
+      - "Resource utilization patterns"
+      - "Vendor lock-in considerations"
+
+  advanced:
+    focus: "Hybrid approaches and optimization"
+    key_points:
+      - "Spot instances and reserved capacity"
+      - "Containerized serverless (Fargate)"
+      - "Multi-region and multi-cloud strategies"
+      - "FinOps and cost optimization"
