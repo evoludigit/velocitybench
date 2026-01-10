@@ -43,11 +43,11 @@ export class TestFactory {
 
   /**
    * Create a test post with author relationship
-   * Trinity Pattern: fk_user references tb_user(pk_user)
+   * Trinity Pattern: fk_author references tb_user(pk_user)
    */
   async createPost(overrides?: Partial<{
     title: string;
-    content: string;
+    content: string | null;
     fk_author?: number; // pk_user of the author
     status?: string;
   }>) {
@@ -124,15 +124,17 @@ export class TestFactory {
 
   /**
    * Clean up all test data (respecting foreign key order)
+   * Note: Only truncate base tables (tb_*), not views (v_* or tv_*)
    */
   async cleanup() {
     const client = await this.pool.connect();
     try {
       // Truncate in correct order (respecting foreign keys)
-      await client.query('TRUNCATE TABLE benchmark.tv_user CASCADE');
-      await client.query('TRUNCATE TABLE benchmark.tv_post CASCADE');
+      // Comments must be deleted first (they reference posts and users)
       await client.query('TRUNCATE TABLE benchmark.tb_comment CASCADE');
+      // Posts must be deleted second (they reference users)
       await client.query('TRUNCATE TABLE benchmark.tb_post CASCADE');
+      // Users can be deleted last
       await client.query('TRUNCATE TABLE benchmark.tb_user CASCADE');
     } finally {
       client.release();

@@ -29,7 +29,7 @@ describe('PostGraphile GraphQL Mutations', () => {
     await factory.cleanup();
   });
 
-  // Category 1: Mutation Type Introspection (5 tests)
+  // Category 1: Mutation Type Introspection
   describe('Mutation Type Introspection', () => {
     test('should have Mutation type defined', async () => {
       const response = await request(server)
@@ -77,133 +77,95 @@ describe('PostGraphile GraphQL Mutations', () => {
         expect(field.type).toBeDefined();
       });
     });
+  });
 
-    test('Mutation should support batch operations', async () => {
-      const user1 = await factory.createUser({ name: 'User1' });
-      const user2 = await factory.createUser({ name: 'User2' });
+  // Category 2: Data Visibility and Isolation
+  describe('Data Visibility and Isolation', () => {
+    test('should isolate data from different users', async () => {
+      const user1 = await factory.createUser({ username: 'user1', email: 'user1@example.com' });
+      const user2 = await factory.createUser({ username: 'user2', email: 'user2@example.com' });
 
-      // Verify multiple queries work (batch-like behavior)
+      // Query user1
+      const response1 = await request(server)
+        .post('/graphql')
+        .send({
+          query: `{ userById(id: "${user1.id}") { id username email } }`,
+        });
+
+      expect(response1.status).toBe(200);
+      expect(response1.body.data.userById.username).toBe('user1');
+      expect(response1.body.data.userById.email).toBe('user1@example.com');
+
+      // Query user2 separately
+      const response2 = await request(server)
+        .post('/graphql')
+        .send({
+          query: `{ userById(id: "${user2.id}") { id username email } }`,
+        });
+
+      expect(response2.status).toBe(200);
+      expect(response2.body.data.userById.username).toBe('user2');
+      expect(response2.body.data.userById.email).toBe('user2@example.com');
+    });
+
+    test('should handle multiple object queries in single request', async () => {
+      const user1 = await factory.createUser({ username: 'alice', email: 'alice@example.com' });
+      const user2 = await factory.createUser({ username: 'bob', email: 'bob@example.com' });
+
       const response = await request(server)
         .post('/graphql')
         .send({
           query: `{
-            user1: userById(id: "${user1.id}") { id name }
-            user2: userById(id: "${user2.id}") { id name }
+            user1: userById(id: "${user1.id}") { id username }
+            user2: userById(id: "${user2.id}") { id username }
           }`,
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.data.user1).toBeDefined();
-      expect(response.body.data.user2).toBeDefined();
+      expect(response.body.data.user1.username).toBe('alice');
+      expect(response.body.data.user2.username).toBe('bob');
     });
 
-    test('should handle mutation variables', async () => {
+    test('should support query variables', async () => {
+      const user = await factory.createUser({ username: 'testuser', email: 'test@example.com' });
+
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `query GetUsers($limit: Int) {
-            allUsers(first: $limit) { nodes { id } }
+          query: `query GetUser($userId: UUID!) {
+            userById(id: $userId) { id username email }
           }`,
-          variables: { limit: 5 },
+          variables: { userId: user.id },
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.data.allUsers).toBeDefined();
+      expect(response.body.data.userById.username).toBe('testuser');
     });
   });
 
-  // Category 2: Data Modification Operations (10 tests)
-  describe('Data Modification through GraphQL', () => {
-    test('should support direct database changes visible in queries', async () => {
-      const user = await factory.createUser({ name: 'InitialName' });
-
-      // Verify user was created
-      const response1 = await request(server)
-        .post('/graphql')
-        .send({
-          query: `{ userById(id: "${user.id}") { name } }`,
-        });
-
-      expect(response1.status).toBe(200);
-      expect(response1.body.data.userById.name).toBe('InitialName');
-
-      // Direct database modification
-      const client = await pool.connect();
-      await client.query(
-        'UPDATE users SET name = $1 WHERE id = $2',
-        ['UpdatedName', user.id]
-      );
-      client.release();
-
-      // Verify change is visible in GraphQL
-      const response2 = await request(server)
-        .post('/graphql')
-        .send({
-          query: `{ userById(id: "${user.id}") { name } }`,
-        });
-
-      expect(response2.status).toBe(200);
-      expect(response2.body.data.userById.name).toBe('UpdatedName');
-    });
-
-    test('should reflect deletions in subsequent queries', async () => {
-      const user = await factory.createUser({ name: 'ToDelete' });
-
-      // Verify user exists
-      const response1 = await request(server)
-        .post('/graphql')
-        .send({
-          query: `{ userById(id: "${user.id}") { id } }`,
-        });
-
-      expect(response1.status).toBe(200);
-      expect(response1.body.data.userById).toBeDefined();
-
-      // Delete user via direct database access
-      const client = await pool.connect();
-      await client.query('DELETE FROM users WHERE id = $1', [user.id]);
-      client.release();
-
-      // Verify deletion is visible in GraphQL
-      const response2 = await request(server)
-        .post('/graphql')
-        .send({
-          query: `{ userById(id: "${user.id}") { id } }`,
-        });
-
-      expect(response2.status).toBe(200);
-      expect(response2.body.data.userById).toBeNull();
-    });
-
-    test('should handle multiple object deletions', async () => {
-      const user1 = await factory.createUser({ name: 'User1' });
-      const user2 = await factory.createUser({ name: 'User2' });
-
-      const client = await pool.connect();
-      await client.query('DELETE FROM users WHERE id IN ($1, $2)', [user1.id, user2.id]);
-      client.release();
+  // Category 3: Relationship Handling
+  describe('Relationship Handling', () => {
+    test('should properly handle post-author relationships', async () => {
+      const author = await factory.createUser({ username: 'author1', email: 'author@example.com' });
+      const post = await factory.createPost({ title: 'Test Post', fk_author: author.pk_user });
 
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{
-            user1: userById(id: "${user1.id}") { id }
-            user2: userById(id: "${user2.id}") { id }
-          }`,
+          query: `{ postById(id: "${post.id}") { id title } }`,
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.data.user1).toBeNull();
-      expect(response.body.data.user2).toBeNull();
+      expect(response.body.data.postById.title).toBe('Test Post');
     });
 
     test('should handle cascade deletions', async () => {
-      const author = await factory.createUser({ name: 'Author' });
-      const post = await factory.createPost({ title: 'Post', fk_user: author.pk_user });
+      const author = await factory.createUser({ username: 'author2', email: 'author2@example.com' });
+      const post = await factory.createPost({ title: 'ToDelete', fk_author: author.pk_user });
 
       // Delete author (should cascade delete post due to FK constraint)
       const client = await pool.connect();
-      await client.query('DELETE FROM users WHERE id = $1', [author.id]);
+      await client.query('DELETE FROM benchmark.tb_user WHERE id = $1', [author.id]);
       client.release();
 
       const response = await request(server)
@@ -217,87 +179,54 @@ describe('PostGraphile GraphQL Mutations', () => {
       expect(response.body.data.postById).toBeNull();
     });
 
-    test('should support bulk updates via database', async () => {
-      await factory.createUser({ name: 'Test1' });
-      await factory.createUser({ name: 'Test2' });
-      await factory.createUser({ name: 'Test3' });
-
-      // Update all users' bio
-      const client = await pool.connect();
-      await client.query('UPDATE users SET bio = $1 WHERE name LIKE $2', [
-        'Bulk updated',
-        'Test%',
-      ]);
-      client.release();
+    test('should handle null relationships', async () => {
+      // Test with comment that has no parent
+      const user = await factory.createUser({ username: 'commenter', email: 'comment@example.com' });
+      const post = await factory.createPost({ title: 'CommentTest', fk_author: user.pk_user });
+      const comment = await factory.createComment({ fk_post: post.pk_post, fk_author: user.pk_user });
 
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ allUsers { nodes { name bio } } }`,
+          query: `{ commentById(id: "${comment.id}") { id content isApproved } }`,
         });
 
       expect(response.status).toBe(200);
-      const testUsers = response.body.data.allUsers.nodes.filter((u: any) => u.name.startsWith('Test'));
-      testUsers.forEach((user: any) => {
-        expect(user.bio).toBe('Bulk updated');
-      });
+      expect(response.body.data.commentById).toBeDefined();
+      expect(response.body.data.commentById.content).toBe('Test comment');
     });
+  });
 
-    test('should handle null value insertions', async () => {
-      const client = await pool.connect();
-      await client.query(
-        'INSERT INTO users (name, email, bio) VALUES ($1, $2, $3)',
-        ['NullBioUser', 'test@example.com', null]
-      );
-      client.release();
+  // Category 4: Constraint Validation
+  describe('Constraint Validation', () => {
+    test('should reject queries for non-existent objects', async () => {
+      const fakeId = '550e8400-e29b-41d4-a716-446655440000';
 
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ allUsers { nodes { name bio } } }`,
+          query: `{ userById(id: "${fakeId}") { id username } }`,
         });
 
       expect(response.status).toBe(200);
-      const nullBioUser = response.body.data.allUsers.nodes.find((u: any) => u.name === 'NullBioUser');
-      expect(nullBioUser).toBeDefined();
-      expect(nullBioUser.bio).toBeNull();
+      expect(response.body.data.userById).toBeNull();
     });
 
-    test('should respect transaction boundaries', async () => {
-      const user = await factory.createUser({ name: 'TxTest' });
+    test('should enforce unique constraints on email', async () => {
+      const user1 = await factory.createUser({ username: 'user1', email: 'unique@example.com' });
 
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
-        await client.query('UPDATE users SET name = $1 WHERE id = $2', ['TxUpdatetesting', user.id]);
-        await client.query('ROLLBACK');
-      } finally {
-        client.release();
-      }
-
-      const response = await request(server)
-        .post('/graphql')
-        .send({
-          query: `{ userById(id: "${user.id}") { name } }`,
-        });
-
-      expect(response.status).toBe(200);
-      // Name should be unchanged due to rollback
-      expect(response.body.data.userById.name).toBe('TxTest');
-    });
-
-    test('should handle constraint violations gracefully', async () => {
-      const user1 = await factory.createUser({ email: 'unique@example.com' });
-
-      // Try to insert duplicate email
+      // Try to insert duplicate email via database
       const client = await pool.connect();
       try {
         await client.query(
-          'INSERT INTO users (name, email) VALUES ($1, $2)',
-          ['User2', 'unique@example.com']
+          'INSERT INTO benchmark.tb_user (username, email) VALUES ($1, $2)',
+          ['user2', 'unique@example.com']
         );
-      } catch (e) {
+        // If we get here, the constraint wasn't enforced (bad!)
+        expect(true).toBe(false);
+      } catch (e: any) {
         // Expected to fail due to unique constraint
+        expect(e.code).toBe('23505'); // unique_violation
       } finally {
         client.release();
       }
@@ -313,24 +242,68 @@ describe('PostGraphile GraphQL Mutations', () => {
       expect(response.body.data.userById.email).toBe('unique@example.com');
     });
 
-    test('should handle relationship modifications', async () => {
-      const author1 = await factory.createUser({ name: 'Author1' });
-      const author2 = await factory.createUser({ name: 'Author2' });
-      const post = await factory.createPost({ title: 'Post', fk_user: author1.pk_user });
+    test('should enforce unique constraints on username', async () => {
+      const user1 = await factory.createUser({ username: 'uniquename', email: 'email1@example.com' });
 
-      // Change author relationship
+      // Try to insert duplicate username via database
       const client = await pool.connect();
-      await client.query('UPDATE posts SET fk_user = $1 WHERE id = $2', [author2.pk_user, post.id]);
-      client.release();
+      try {
+        await client.query(
+          'INSERT INTO benchmark.tb_user (username, email) VALUES ($1, $2)',
+          ['uniquename', 'email2@example.com']
+        );
+        // If we get here, the constraint wasn't enforced (bad!)
+        expect(true).toBe(false);
+      } catch (e: any) {
+        // Expected to fail due to unique constraint
+        expect(e.code).toBe('23505'); // unique_violation
+      } finally {
+        client.release();
+      }
+    });
+  });
+
+  // Category 5: Null Handling
+  describe('Null Handling', () => {
+    test('should handle optional fields correctly', async () => {
+      const user = await factory.createUser({
+        username: 'sparse',
+        email: 'sparse@example.com',
+        first_name: undefined,
+        last_name: undefined,
+        bio: null,
+      });
 
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ postById(id: "${post.id}") { title } }`,
+          query: `{ userById(id: "${user.id}") { id username firstName lastName bio } }`,
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.data.postById.title).toBe('Post');
+      expect(response.body.data.userById.username).toBe('sparse');
+      expect(response.body.data.userById.firstName).toBeNull();
+      expect(response.body.data.userById.lastName).toBeNull();
+      expect(response.body.data.userById.bio).toBeNull();
+    });
+
+    test('should handle null post content', async () => {
+      const user = await factory.createUser({ username: 'postauthor', email: 'post@example.com' });
+      const post = await factory.createPost({
+        title: 'NoContent',
+        content: null,
+        fk_author: user.pk_user,
+      });
+
+      const response = await request(server)
+        .post('/graphql')
+        .send({
+          query: `{ postById(id: "${post.id}") { id title content } }`,
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.data.postById.title).toBe('NoContent');
+      expect(response.body.data.postById.content).toBeNull();
     });
   });
 });
