@@ -1,0 +1,310 @@
+id: query-optimization
+name: "Query Optimization Techniques"
+category: queries
+type: standard
+tags:
+  - queries
+  - performance
+  - database
+  - optimization
+
+summary:
+  short: "Writing and optimizing SQL queries to execute efficiently"
+  long: |
+    Query optimization is both art and science - understanding how databases execute queries, identifying bottlenecks, and rewriting queries for performance. Small query optimizations can produce massive performance gains, especially on large datasets.
+
+problem:
+  description: "Queries are slow; unclear why or how to optimize"
+  symptoms:
+    - "SELECT takes 10 seconds on 1 million rows"
+    - "JOINing 3 tables is slow"
+    - "Subqueries cause performance drop"
+    - "IN clause with 1000 values hangs"
+    - "EXISTS vs IN - which is faster?"
+  impact: "Slow application, frustrated users, database overload, cascading failures"
+
+solution:
+  description: "Analyze queries with EXPLAIN, optimize systematically"
+
+query_analysis:
+  explain_plan: |
+    EXPLAIN ANALYZE shows how database executes query
+
+    EXPLAIN ANALYZE
+    SELECT * FROM users WHERE email = 'test@example.com';
+
+    Output:
+    Seq Scan on users (cost=0.00..35.50 rows=1)
+      Filter: email = 'test@example.com'
+      Planning Time: 0.100 ms
+      Execution Time: 5000.000 ms
+
+    Key metrics:
+    - Seq Scan: Sequential scan (slow) vs Index Scan (fast)
+    - cost=0.00..35.50: 0 startup cost, 35.50 total cost
+    - rows=1: Estimated 1 row returned
+    - Execution Time: 5 seconds (actual)
+
+  understanding_costs: |
+    Cost numbers are relative, not milliseconds
+
+    Seq Scan: cost=0..35.50
+    Index Scan: cost=0..5.20
+
+    Index Scan is 7x cheaper (faster)
+
+  row_estimates: |
+    rows=1000 (estimate) vs actual 1000 (correct)
+    Good: Estimate matches reality
+
+    rows=1000 (estimate) vs actual 1 (wrong)
+    Bad: Optimizer chose wrong plan for underestimated rows
+
+    rows=1 (estimate) vs actual 1000 (wrong)
+    Bad: Optimizer chose expensive plan for overestimated rows
+
+common_optimization_techniques:
+  add_indexes: |
+    Slowest common queries can be accelerated 100-1000x with indexes
+
+    EXPLAIN ANALYZE
+    SELECT * FROM users WHERE email = 'test@example.com';
+
+    Seq Scan (no index): 5000ms
+    Index Scan (with index): 5ms
+    1000x faster!
+
+    Always profile before indexing:
+    CREATE INDEX idx_users_email ON users(email);
+
+  use_joins_not_subqueries: |
+    SLOW: Subquery
+    SELECT * FROM users WHERE id IN (
+        SELECT user_id FROM posts WHERE created_at > now() - interval '7 days'
+    );
+    # Subquery executes first (slow), then IN clause checks each user
+
+    FAST: JOIN
+    SELECT DISTINCT u.* FROM users u
+    INNER JOIN posts p ON p.user_id = u.id
+    WHERE p.created_at > now() - interval '7 days';
+    # Database optimizes together
+
+  limit_columns_selected: |
+    SLOW: SELECT *
+    SELECT * FROM users WHERE email = 'test@example.com';
+    # Gets all columns (id, email, name, phone, address, etc.)
+
+    FAST: SELECT needed columns
+    SELECT id, email FROM users WHERE email = 'test@example.com';
+    # Gets only needed columns (smaller data transfer)
+
+  filter_early: |
+    SLOW: Filter after aggregation
+    SELECT user_id, COUNT(*) as post_count
+    FROM posts
+    GROUP BY user_id
+    HAVING post_count > 10;
+    # Creates aggregate for ALL users, then filters
+
+    FAST: Filter before aggregation
+    SELECT user_id, COUNT(*) as post_count
+    FROM posts
+    WHERE created_at > now() - interval '30 days'
+    GROUP BY user_id
+    HAVING COUNT(*) > 10;
+    # Filters rows first (fewer to aggregate)
+
+  avoid_functions_in_where: |
+    SLOW: Function in WHERE clause
+    SELECT * FROM users
+    WHERE YEAR(created_at) = 2025;
+    # Cannot use index (function result not pre-computed)
+
+    FAST: Date range
+    SELECT * FROM users
+    WHERE created_at >= '2025-01-01' AND created_at < '2026-01-01';
+    # Can use index on created_at
+
+  batch_operations: |
+    SLOW: Individual updates
+    for user_id in user_ids:
+        db.execute("UPDATE users SET active = true WHERE id = ?", [user_id])
+    # N queries
+
+    FAST: Single batch update
+    db.execute("UPDATE users SET active = true WHERE id = ANY(?)", [user_ids])
+    # 1 query
+
+specific_query_patterns:
+  count_optimization: |
+    SLOW: COUNT entire table
+    SELECT COUNT(*) FROM users;
+    # Scans all rows
+
+    FAST: Use statistics
+    SELECT reltuples FROM pg_class WHERE relname = 'users';
+    # Estimated count (very fast, approximate)
+
+    Better: If need exact count and it's frequently accessed
+    Create count tracking table (updated on insert/delete)
+
+  pagination_offset: |
+    SLOW: OFFSET with large numbers
+    SELECT * FROM users ORDER BY id LIMIT 10 OFFSET 1000000;
+    # Skips 1 million rows, then returns 10 (wastes time skipping)
+
+    FAST: Cursor-based pagination
+    SELECT * FROM users WHERE id > :last_id ORDER BY id LIMIT 10;
+    # Starts from :last_id (skip is O(1) with index)
+
+  distinct_vs_group_by: |
+    SLOW: DISTINCT
+    SELECT DISTINCT user_id FROM posts;
+
+    FAST: GROUP BY
+    SELECT user_id FROM posts GROUP BY user_id;
+    # GROUP BY more efficient for database optimizer
+
+  exists_vs_in: |
+    SLOW: IN with subquery
+    SELECT * FROM users
+    WHERE id IN (SELECT user_id FROM posts);
+
+    FAST: EXISTS
+    SELECT * FROM users u
+    WHERE EXISTS (SELECT 1 FROM posts p WHERE p.user_id = u.id);
+    # EXISTS stops after finding one match; IN must get all
+
+  union_optimization: |
+    SLOW: UNION (removes duplicates)
+    SELECT email FROM users
+    UNION
+    SELECT email FROM archived_users;
+    # Deduplicates results
+
+    FAST: UNION ALL (if duplicates impossible)
+    SELECT email FROM users
+    UNION ALL
+    SELECT email FROM archived_users;
+    # Skips deduplication step
+
+denormalization_tradeoffs:
+  cache_aggregates: |
+    Problem: COUNT(posts) query is slow
+
+    Normalized solution:
+    SELECT COUNT(*) FROM posts WHERE user_id = 1;
+
+    Denormalized solution:
+    Maintain user.post_count (updated when posts added)
+    SELECT post_count FROM users WHERE id = 1;
+
+    Trade-off:
+    Pro: Fast read
+    Con: Must update on every post add (write amplification)
+
+  duplicate_data: |
+    Problem: Joining user and post author repeatedly
+
+    Normalized:
+    SELECT u.name FROM users u
+    INNER JOIN posts p ON p.user_id = u.id;
+
+    Denormalized:
+    Store author_name in posts table
+    SELECT author_name FROM posts;
+
+    Trade-off:
+    Pro: No JOIN needed
+    Con: Must update posts if author name changes
+
+testing_query_performance:
+  baseline_measurements: |
+    BEFORE optimization:
+    EXPLAIN ANALYZE query_v1;
+    Execution Time: 5000 ms
+
+    AFTER optimization:
+    EXPLAIN ANALYZE query_v2;
+    Execution Time: 50 ms
+
+    Improvement: 100x faster!
+
+  load_testing: |
+    def test_user_lookup_performance():
+        # Create index first
+        create_index()
+
+        start = time.time()
+        for i in range(10000):
+            user = db.query("SELECT * FROM users WHERE email = ?", [f"user{i}@example.com"])
+        duration = time.time() - start
+
+        # 10k queries in < 1 second (> 10k queries/sec)
+        assert duration < 1.0
+
+best_practices:
+  - name: "Profile before optimizing"
+    description: "Use EXPLAIN to identify actual bottlenecks"
+
+  - name: "Optimize at scale"
+    description: "Test with realistic data volumes"
+
+  - name: "Index strategically"
+    description: "Only on columns in WHERE, JOIN, ORDER BY"
+
+  - name: "Avoid functions in WHERE"
+    description: "Functions prevent index usage"
+
+  - name: "Filter early"
+    description: "WHERE before GROUP BY before HAVING"
+
+  - name: "Test query changes"
+    description: "Verify optimization actually helps"
+
+  - name: "Monitor in production"
+    description: "Slow queries may only appear under load"
+
+anti_patterns:
+  - name: "Optimizing without EXPLAIN"
+    consequence: "Guess which optimization helps; waste time"
+    fix: "Use EXPLAIN ANALYZE to guide optimization"
+
+  - name: "Optimizing with wrong data volume"
+    consequence: "Optimization helps with 100 rows, hurts with 1 million"
+    fix: "Test with realistic data sizes"
+
+  - name: "Premature optimization"
+    consequence: "Optimize queries that aren't slow"
+    fix: "Profile first; optimize hot paths"
+
+  - name: "Assuming index always helps"
+    consequence: "Index actually slower than scan for 10% of data"
+    fix: "Test; databases skip index if cost higher"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Query optimization is like finding fastest route:
+      - No planning: Try all roads, take 1 hour
+      - With planning: Find shortcut, take 5 minutes
+      - EXPLAIN is your map
+
+      Understand the route before optimizing!
+
+  intermediate:
+    focus: "Query optimization techniques"
+    key_points:
+      - "Using EXPLAIN ANALYZE to understand query plans"
+      - "Common optimization patterns (indexes, joins, filtering)"
+      - "Denormalization trade-offs"
+      - "Testing and measuring query performance"
+
+  advanced:
+    focus: "Advanced optimization scenarios"
+    key_points:
+      - "Query plan hints and forcing indexes"
+      - "Statistics and cost estimation"
+      - "Optimization at distributed scale"
+      - "Real-time query optimization"

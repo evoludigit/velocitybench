@@ -1,0 +1,305 @@
+id: database-indexing
+name: "Database Indexing Strategies"
+category: data
+type: standard
+tags:
+  - database
+  - indexing
+  - performance
+  - query-optimization
+
+summary:
+  short: "Creating and maintaining indexes to accelerate database queries"
+  long: |
+    Database indexes are data structures that enable fast lookups similar to a book's index. Without indexes, databases perform full table scans which are slow for large tables. Proper indexing can make queries 100-1000x faster but requires understanding query patterns and maintenance trade-offs.
+
+problem:
+  description: "Queries on large tables are slow; sequential scans take too long"
+  symptoms:
+    - "SELECT * FROM users WHERE email = 'user@example.com' takes 5 seconds"
+    - "Table has 1 million rows; search returns 1 result but scans all rows"
+    - "Adding indexes solves query performance but slows inserts/updates"
+    - "Don't know which columns to index"
+  impact: "Slow application performance, poor user experience, high database load"
+
+solution:
+  description: "Create indexes on frequently queried columns"
+
+index_types:
+  b_tree_index:
+    description: "Most common; ordered structure for range and equality queries"
+    use_for: |
+      - Equality: WHERE id = 5
+      - Range: WHERE age > 18 AND age < 65
+      - Sorting: ORDER BY name
+
+    example: |
+      CREATE INDEX idx_users_email ON users(email);
+
+      # Query without index: Table scan, 1000ms
+      SELECT * FROM users WHERE email = 'user@example.com';
+
+      # Query with index: Index lookup, 1ms (1000x faster!)
+
+  hash_index:
+    description: "Fast equality lookups; cannot do range queries"
+    use_for: |
+      - Fast equality: WHERE user_id = 123
+      - Cannot do: WHERE age > 18 (range queries)
+
+    trade_off: |
+      Pros: Very fast equality
+      Cons: No range queries, no sorting
+
+  bitmap_index:
+    description: "Efficient for low-cardinality columns (few unique values)"
+    use_for: |
+      - Boolean: is_active, is_deleted
+      - Status: 'active', 'pending', 'completed'
+      - Gender: 'M', 'F'
+
+    advantage: |
+      status column with 3 values needs 2 bits per row
+      vs 4 bytes for regular index
+
+  full_text_index:
+    description: "Search within text content"
+    use_for: |
+      - Full text search: CONTAINS('database')
+      - Fuzzy matching: typo-tolerant search
+
+    example: |
+      CREATE FULLTEXT INDEX idx_posts_content ON posts(content);
+
+      # Find posts mentioning 'database'
+      SELECT * FROM posts WHERE MATCH(content) AGAINST('database');
+
+composite_index:
+  definition: |
+    Index on multiple columns (left-most prefix rule)
+
+  example: |
+    CREATE INDEX idx_posts_user_date ON posts(user_id, created_at);
+
+    # Supports:
+    WHERE user_id = 1                    # Uses index
+    WHERE user_id = 1 AND created_at > '2025-01-01'  # Uses index
+    WHERE user_id = 1 ORDER BY created_at             # Uses index
+
+    # Does NOT use index:
+    WHERE created_at > '2025-01-01'      # Missing user_id prefix
+    WHERE user_id = 1 AND id = 5         # id not in composite index
+
+  column_order: |
+    # Equality columns first, range columns last
+    Good:   (status, created_at)  # status = 'active' AND created_at > '2025-01-01'
+    Bad:    (created_at, status)  # Doesn't optimize as well
+
+  index_size: |
+    Single column:    10 bytes per row
+    2 columns:        20 bytes per row
+    3 columns:        30 bytes per row
+
+    Trade-off: Wider indexes use more memory but support more queries
+
+covering_index:
+  definition: |
+    Include all columns needed for a query (no table lookup required)
+
+  example: |
+    Query: SELECT user_id, created_at FROM posts WHERE user_id = 1
+
+    Without covering index:
+    1. Index lookup: Find rows with user_id = 1
+    2. Table lookup: Get created_at from each row
+
+    Covering index:
+    CREATE INDEX idx_posts_covering ON posts(user_id) INCLUDE (created_at);
+    1. Index lookup: Find row with user_id = 1 AND get created_at directly
+    No table lookup needed!
+
+  when_to_use: |
+    - Frequently executed queries
+    - Large tables (covering index size matters)
+    - Slow queries you've optimized
+
+  space_tradeoff: |
+    Covering index is larger but eliminates table lookups
+    Worth it for: Frequently executed queries on large tables
+
+partial_index:
+  definition: |
+    Index only subset of rows matching a condition
+
+  example: |
+    # Only index active users (ignore inactive)
+    CREATE INDEX idx_active_users ON users(email) WHERE is_active = true;
+
+    # Query on active users uses index
+    SELECT * FROM users WHERE email = 'user@example.com' AND is_active = true;
+    # Uses index (matches WHERE condition)
+
+    # Query on inactive users doesn't use index
+    SELECT * FROM users WHERE email = 'user@example.com' AND is_active = false;
+    # Doesn't use index (doesn't match WHERE condition)
+
+  advantages: |
+    - Smaller index (less memory, faster updates)
+    - Faster index updates
+    - Useful when filtering is common
+
+indexing_strategies:
+  query_driven: |
+    1. Identify slow queries (query logs, monitoring)
+    2. Analyze: What WHERE/ORDER BY columns?
+    3. Create index on those columns
+    4. Measure improvement
+
+    Example:
+    Slow query: SELECT * FROM orders WHERE status = 'pending' AND created_at > now() - interval '7 days'
+    Create index: CREATE INDEX idx_orders_status_date ON orders(status, created_at)
+
+  column_selection: |
+    Good candidates for indexing:
+    - Foreign key columns (used in JOINs)
+    - WHERE clause columns (filtering)
+    - ORDER BY columns (sorting)
+    - JOIN ON columns (matching)
+
+    Skip indexing:
+    - Low cardinality (< 10 unique values usually not worth it)
+    - Rarely queried columns
+    - Columns in UPDATE statements (slow writes)
+
+  maintenance: |
+    # Monitor unused indexes
+    SELECT * FROM sys.dm_db_index_usage_stats
+    WHERE user_updates > 0 AND user_seeks = 0;
+
+    # Drop unused indexes
+    DROP INDEX idx_users_unused ON users;
+
+    # Rebuild fragmented indexes
+    ALTER INDEX idx_users_email ON users REBUILD;
+
+write_performance_impact:
+  index_overhead: |
+    Without index:
+    INSERT: 1ms (write 1 row)
+
+    With 1 index:
+    INSERT: 2ms (write 1 row + update 1 index)
+
+    With 5 indexes:
+    INSERT: 6ms (write 1 row + update 5 indexes)
+
+  when_writes_dominate: |
+    Problem: Heavy insert/update workload with few reads
+    Solution: Fewer indexes, accept slower reads
+
+    Example: Logging table (mostly inserts)
+    One index on timestamp for retention cleanup
+    But not indexes on every column
+
+  write_optimization: |
+    Batch inserts to amortize index cost:
+
+    # Slow (100 inserts, 100 index updates)
+    for item in items:
+        db.insert('table', item)
+
+    # Fast (1 batch insert, optimize bulk update)
+    db.insert_batch('table', items)
+
+monitoring_indexes:
+  query_performance: |
+    # Identify slow queries
+    EXPLAIN ANALYZE
+    SELECT * FROM users WHERE email = 'test@example.com';
+
+    Output shows:
+    Seq Scan on users (cost=0.00..35.50)  # Full table scan (slow)
+    Filter: email = 'test@example.com'
+
+    After adding index:
+    Index Scan (cost=0.29..8.30)          # Index lookup (fast)
+
+  index_statistics: |
+    # Check index usage
+    SELECT index_name, seq_scan, idx_scan
+    FROM pg_stat_user_indexes;
+
+    seq_scan > 0: Not using index (table scan)
+    idx_scan = 0: Index not used (consider dropping)
+
+  fragmentation: |
+    Over time, indexes become fragmented (scattered)
+    Fragmentation > 30%: Rebuild index
+    Fragmentation 10-30%: Reorganize
+    Fragmentation < 10%: OK
+
+best_practices:
+  - name: "Index columns in WHERE and JOINs"
+    description: "Columns used for filtering and joining are best candidates"
+
+  - name: "Use composite indexes for multi-column queries"
+    description: "More efficient than multiple single-column indexes"
+
+  - name: "Put equality columns first in composite indexes"
+    description: "Then range/sort columns"
+
+  - name: "Monitor index usage"
+    description: "Drop unused indexes; rebuild fragmented ones"
+
+  - name: "Consider write performance"
+    description: "Indexes slow down inserts/updates"
+
+  - name: "Use covering indexes for frequently accessed queries"
+    description: "Eliminates table lookups"
+
+  - name: "Avoid over-indexing"
+    description: "Each index costs memory and write performance"
+
+anti_patterns:
+  - name: "Indexing every column"
+    consequence: "Inserts/updates slow; memory wasted; no performance gain"
+    fix: "Index only frequently queried columns"
+
+  - name: "Wrong column order in composite index"
+    consequence: "Index not used for some queries"
+    fix: "Equality columns first, then range/sort"
+
+  - name: "Not monitoring index usage"
+    consequence: "Unused indexes waste space and slow writes"
+    fix: "Regularly check index usage statistics"
+
+  - name: "Indexing low-cardinality columns"
+    consequence: "Index reads more data than table scan"
+    fix: "Index only high-cardinality columns"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Database index is like a book's index:
+      - Book: 500 pages (table)
+      - Find "database" → read all 500 pages (table scan)
+      - Book index: "database, pages 142, 156, 298"
+      - Find "database" → go to 3 pages (index lookup)
+
+      Faster!
+
+  intermediate:
+    focus: "Index creation and optimization"
+    key_points:
+      - "B-tree indexes for equality and range queries"
+      - "Composite indexes for multi-column queries"
+      - "Covering indexes to eliminate table lookups"
+      - "Monitoring and maintaining indexes"
+
+  advanced:
+    focus: "Advanced indexing strategies"
+    key_points:
+      - "Partial indexes for conditional queries"
+      - "Bitmap indexes for low-cardinality columns"
+      - "Full-text indexes for text search"
+      - "Index fragmentation and rebuilding"
