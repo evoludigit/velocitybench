@@ -1,0 +1,341 @@
+id: database-migrations
+name: "Database Schema Migrations & Forward Compatibility"
+category: deployment
+type: standard
+tags:
+  - database
+  - migrations
+  - deployment
+  - zero-downtime
+
+summary:
+  short: "Evolving database schema safely without downtime or breaking running applications"
+  long: |
+    Database schema changes are among the most complex deployment challenges. Unlike code deployments where old and new versions can coexist, database schema changes affect all running instances. Forward-compatible migrations allow schema evolution without service interruption.
+
+problem:
+  description: "Schema changes often require downtime, database locks, or risk data loss"
+  symptoms:
+    - "Adding NOT NULL column requires backfill; blocks application during migration"
+    - "Renaming columns breaks old code; cannot do staged rollout"
+    - "Dropping columns is irreversible; cannot rollback if needed"
+    - "Large table migrations lock table; causes downtime"
+    - "Cannot coordinate schema and code deployment safely"
+  impact: "Service downtime, data loss risk, deployment delays, rollback complications"
+
+solution:
+  description: "Separate schema migration from code deployment; make changes backward and forward compatible"
+  key_principle: "Schema must be compatible with both old and new code during transition period"
+
+migration_phases:
+  phase_1_add_column:
+    description: "Add new column to table with default value"
+    when_safe: "At any time; non-breaking change"
+    code_compatibility: "Old code ignores new column; new code ignores NULL values"
+    example: |
+      -- Phase 1: Add column with default
+      ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT false;
+
+  phase_2_deploy_code:
+    description: "Deploy code that reads/writes the new column"
+    code_changes: |
+      # Old code: doesn't touch email_verified
+      # New code: reads email_verified, handles NULL as false
+
+      def get_user(user_id):
+        user = db.query("SELECT * FROM users WHERE id = ?", [user_id])
+        verified = user['email_verified'] if user['email_verified'] is not None else False
+        return user
+
+    safety: "Both old and new code work with partial data"
+
+  phase_3_backfill_data:
+    description: "Populate NULL values with proper data (without locking)"
+    approach_batch: |
+      -- Backfill in batches to avoid locking
+      UPDATE users
+      SET email_verified = false
+      WHERE email_verified IS NULL
+      LIMIT 10000;
+
+    approach_online: |
+      -- Or use online tools (pt-online-schema-change for MySQL)
+      pt-online-schema-change \
+        --alter "ADD COLUMN email_verified BOOLEAN DEFAULT false" \
+        D=mydb,t=users
+
+  phase_4_add_constraint:
+    description: "Make column NOT NULL after all values populated"
+    when_safe: "Only after backfill complete; no more NULLs"
+    sql: |
+      ALTER TABLE users ALTER COLUMN email_verified SET NOT NULL;
+
+  phase_5_remove_old_code:
+    description: "Stop handling NULL values; assume column always populated"
+    when_safe: "After running with new code for stability period (2+ weeks)"
+
+dropping_columns:
+  challenge: |
+    Cannot drop columns immediately; old code might need them
+    Example: remove 'mobile_app_version' column
+    But old mobile app might read it to decide features
+
+  strategy_safe_drop:
+    step_1: "Stop writing to column (code no longer populates it)"
+    step_2: "Wait for old clients to upgrade (if applicable)"
+    step_3: "Verify no code reads column (grep codebase)"
+    step_4: "Drop column"
+    timeline: "Usually 2-4 weeks after code stops writing"
+
+  marking_obsolete: |
+    -- Instead of dropping immediately, mark as deprecated
+    CREATE TABLE schema_changes (
+      column_name TEXT,
+      table_name TEXT,
+      deprecated_date TIMESTAMP,
+      dropped_date TIMESTAMP
+    );
+
+    -- Insert when column stops being written
+    INSERT INTO schema_changes VALUES (
+      'mobile_app_version', 'users', NOW(), NULL
+    );
+
+    -- Update when column can be dropped
+    UPDATE schema_changes
+    SET dropped_date = NOW()
+    WHERE column_name = 'mobile_app_version';
+
+renaming_columns:
+  challenge: |
+    Old code reads old column name
+    New code expects new column name
+    Cannot rename directly
+
+  strategy_safe_rename:
+    step_1_add_new: |
+      ALTER TABLE users ADD COLUMN email_address_new VARCHAR(255);
+
+    step_2_sync: |
+      -- Sync data continuously
+      UPDATE users
+      SET email_address_new = email_address
+      WHERE email_address_new IS NULL;
+
+    step_3_dual_write: |
+      -- New code writes to both columns
+      UPDATE users SET email_address = ?, email_address_new = ?
+      WHERE id = ?;
+
+    step_4_dual_read: |
+      -- New code reads from new column, fallback to old
+      email = row['email_address_new'] or row['email_address']
+
+    step_5_stop_write_old: |
+      -- Stop writing to old column
+
+    step_6_backfill_remaining: |
+      -- Sync any remaining rows
+      UPDATE users
+      SET email_address_new = email_address
+      WHERE email_address_new IS NULL;
+
+    step_7_drop_old: |
+      -- Drop old column after stability period
+      ALTER TABLE users DROP COLUMN email_address;
+
+    step_8_rename: |
+      -- Rename new column to original name
+      ALTER TABLE users RENAME COLUMN email_address_new TO email_address;
+
+    total_timeline: "3-4 weeks for safe rename"
+
+changing_column_type:
+  challenge: "Changing type (INT to BIGINT, VARCHAR to TEXT) can lock table or lose data"
+
+  strategy_varchar_to_text: |
+    -- Safe: data already compatible
+    ALTER TABLE logs MODIFY COLUMN message TEXT;
+
+  strategy_int_to_bigint:
+    step_1: "Add new BIGINT column"
+    step_2: "Sync data (and new inserts)"
+    step_3: "Switch reads to new column"
+    step_4: "Drop old column"
+
+  strategy_string_to_uuid:
+    step_1: "Add new UUID column"
+    step_2: |
+      -- Sync with conversion
+      UPDATE users
+      SET user_id_new = UUID(user_id)
+      WHERE user_id_new IS NULL;
+    step_3: "Migrate all references (foreign keys)"
+    step_4: "Drop old column"
+    note: "Most complex; may take months for large tables"
+
+large_table_migrations:
+  challenge: "Locking entire table for migration causes downtime"
+
+  solution_pt_online_schema_change: |
+    # MySQL: use percona-toolkit
+    pt-online-schema-change \
+      --alter "ADD INDEX idx_status (status)" \
+      D=mydb,t=users \
+      --execute
+
+  solution_gh_ost: |
+    # GitHub's tool for large migrations
+    gh-ost \
+      --max-load=Threads_running=50 \
+      --critical-load=Threads_running=100 \
+      --chunk-size=1000 \
+      --execute
+
+  solution_manual_shadow_table: |
+    -- Create shadow table with new schema
+    CREATE TABLE users_new LIKE users;
+    ALTER TABLE users_new ADD INDEX idx_status (status);
+
+    -- Copy data in batches
+    INSERT INTO users_new
+    SELECT * FROM users
+    WHERE id > @last_id
+    LIMIT 100000;
+
+    -- Pause application
+    LOCK TABLES users WRITE;
+
+    -- Final sync
+    INSERT INTO users_new
+    SELECT * FROM users
+    WHERE id > @last_id;
+
+    -- Swap tables
+    RENAME TABLE users TO users_old, users_new TO users;
+
+    UNLOCK TABLES;
+
+backward_compatible_defaults:
+  principle: |
+    Defaults must satisfy both old and new code
+
+  example_good: |
+    -- Old code writes: INSERT INTO users (name) VALUES (?)
+    -- Old code expects: profile_type = NULL
+    -- New code expects: profile_type = 'basic'
+
+    -- GOOD: Default to what new code expects
+    ALTER TABLE users ADD COLUMN profile_type VARCHAR(20) DEFAULT 'basic';
+
+    -- Now both work:
+    -- Old code: inserts NULL, new code converts to 'basic'
+    -- New code: reads 'basic' directly
+
+  example_bad: |
+    -- BAD: Default to NULL, but new code requires non-NULL
+    ALTER TABLE users ADD COLUMN profile_type VARCHAR(20) DEFAULT NULL;
+
+    -- New code:
+    if not user.profile_type:
+      return error  # Breaks for old code's inserts
+
+testing_migrations:
+  before_production: |
+    - Run migration in staging environment
+    - Verify both old and new code work with migrated schema
+    - Test rollback: can you undo migration?
+    - Measure migration time on production-like data
+
+  monitoring_during: |
+    - Table lock time
+    - Query latency
+    - Replication lag (if applicable)
+    - Disk space (migration may need extra space)
+
+rollback_strategies:
+  reversible: |
+    Adding columns, adding indexes (usually safe to rollback)
+
+  irreversible: |
+    Dropping columns, losing data (cannot rollback)
+
+  strategy: |
+    Keep old column for 2+ weeks before dropping
+    Backup before migrations
+    Test rollback process beforehand
+
+best_practices:
+  - name: "Separate schema and code changes"
+    description: "Deploy schema first; code changes follow after verification"
+
+  - name: "Maintain backward/forward compatibility"
+    description: "Each migration must work with old and new code simultaneously"
+
+  - name: "Test rollbacks"
+    description: "Know how to undo each migration quickly"
+
+  - name: "Use online migration tools for large tables"
+    description: "pt-online-schema-change, gh-ost, or native tools"
+
+  - name: "Batch large data changes"
+    description: "Backfills should happen in chunks to avoid locking"
+
+  - name: "Monitor migration impact"
+    description: "Watch replication lag, query latency, disk space"
+
+  - name: "Have explicit rollback plan"
+    description: "Document how to rollback at each phase"
+
+  - name: "Automate migration deployment"
+    description: "Migrations should run automatically; not manual steps"
+
+anti_patterns:
+  - name: "Blocking migrations (lock entire table)"
+    consequence: "Service downtime; unacceptable for production"
+
+  - name: "Unsafe column drops"
+    description: "Dropping without verifying no code needs it"
+    consequence: "Data loss, application errors"
+
+  - name: "Migrations without rollback plan"
+    consequence: "Cannot recover if migration causes issues"
+
+  - name: "Large data migrations in single transaction"
+    consequence: "Locks table, runs out of memory, causes timeout"
+
+  - name: "Defaults incompatible with both code versions"
+    consequence: "One version of code broken during transition"
+
+comparison:
+  online_tools_vs_manual:
+    online_tools: "Slower, minimal locking, safer"
+    manual: "Faster, requires careful scheduling, higher risk"
+    tradeoff: "Use online tools for production; manual for small changes"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Database migrations are like renovating a house while people live in it:
+      - Cannot just tear down walls (service unavailable)
+      - Add new room first (new column)
+      - Gradually move furniture (migrate data)
+      - Finally remove old room (drop column)
+
+      Each step must keep the house livable.
+
+  intermediate:
+    focus: "Safe migration patterns"
+    key_points:
+      - "Forward/backward compatibility principles"
+      - "Schema vs code deployment timing"
+      - "Large table migration strategies"
+      - "Testing and rollback planning"
+
+  advanced:
+    focus: "Complex migration coordination"
+    key_points:
+      - "Multi-step migrations spanning weeks"
+      - "Replication lag management"
+      - "Type conversions and data transformation"
+      - "Coordinating across multiple services"

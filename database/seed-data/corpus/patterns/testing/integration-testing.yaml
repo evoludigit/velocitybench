@@ -1,0 +1,298 @@
+id: integration-testing
+name: "Integration Testing Patterns"
+category: testing
+type: standard
+tags:
+  - testing
+  - integration-tests
+  - quality-assurance
+
+summary:
+  short: "Testing interactions between multiple components and services to catch integration bugs"
+  long: |
+    Integration tests verify that components work together correctly. Unlike unit tests that test in isolation, integration tests use real or near-real dependencies (databases, APIs, messaging). They catch bugs unit tests miss and provide confidence that the system works end-to-end.
+
+problem:
+  description: "Unit tests pass but system fails when components interact; integration bugs go undetected"
+  symptoms:
+    - "Unit tests all pass; system crashes when deployed"
+    - "API works in isolation; fails when calling another service"
+    - "Database queries work; transactions fail with multiple queries"
+    - "Caching layer breaks when integrated with application logic"
+  impact: "Production failures, undetected regressions, low deployment confidence"
+
+solution:
+  description: "Write tests that verify real component interactions"
+
+test_scope:
+  unit_tests:
+    description: "Test single function/class in isolation"
+    dependencies: "Mocked/stubbed"
+    speed: "Fast (< 1 second per test)"
+    count: "Many (80% of tests)"
+
+  integration_tests:
+    description: "Test interaction between 2-3 components"
+    dependencies: "Real (or containerized)"
+    speed: "Medium (1-10 seconds per test)"
+    count: "Moderate (15% of tests)"
+
+  end_to_end_tests:
+    description: "Test full user workflow through entire system"
+    dependencies: "All real"
+    speed: "Slow (10+ seconds per test)"
+    count: "Few (5% of tests)"
+
+  ratio_recommendation: |
+    - Unit: 70-80% of tests (fast feedback)
+    - Integration: 15-20% of tests (confidence in interactions)
+    - E2E: 5-10% of tests (user workflows)
+
+    Inverted pyramid: many fast tests, few slow tests
+
+test_isolation_with_databases:
+  problem: |
+    Integration tests using shared database interfere with each other
+    - Test A inserts data; Test B sees that data (pollution)
+    - Tests run in parallel; data corruption
+    - Tests cannot be repeated reliably
+
+  solution_transactions: |
+    Wrap each test in transaction that rolls back
+    - Insert test data
+    - Run test
+    - Rollback transaction (cleans up)
+    - No test data persists
+
+    limitation: |
+      - Some systems don't allow rollback in tests
+      - Nested transactions have limitations
+      - Not possible for distributed databases
+
+  solution_fixtures: |
+    # Create clean database for each test
+    @pytest.fixture
+    def db_session():
+      db = setup_test_database()
+      yield db
+      teardown_test_database(db)
+
+    def test_create_user(db_session):
+      user = db_session.create_user(email='test@example.com')
+      assert user.id > 0
+
+  solution_factories: |
+    # Create test data programmatically
+    class UserFactory:
+      @staticmethod
+      def create(email='test@example.com'):
+        return User(email=email, created_at=now())
+
+    def test_user_email_validation():
+      user = UserFactory.create(email='invalid')
+      assert not user.is_valid()
+
+  solution_docker_containers: |
+    # Spin up fresh database per test (slow but reliable)
+    @pytest.fixture
+    def db():
+      container = start_postgres_container()
+      yield container
+      stop_postgres_container(container)
+
+testing_service_interactions:
+  mocking_external_services: |
+    def test_create_order_with_payment():
+      payment_service = Mock()
+      payment_service.charge = Mock(return_value=True)
+
+      order_service = OrderService(payment_service)
+      order = order_service.create(amount=100)
+
+      assert order.status == 'paid'
+      payment_service.charge.assert_called_once_with(100)
+
+  testing_with_real_services: |
+    def test_create_order_with_real_payment():
+      payment_service = PaymentService(api_key='test-key')
+
+      order_service = OrderService(payment_service)
+      order = order_service.create(amount=100)
+
+      assert order.status == 'paid'
+      # Verifies real API call works
+      # Slower; requires test account with payment provider
+
+  test_containers: |
+    # Spin up services in containers for test
+    @pytest.fixture
+    def services():
+      with docker_compose_up('./docker-compose.test.yml'):
+        yield Services(
+          api='http://localhost:3000',
+          db='localhost:5432',
+          cache='localhost:6379'
+        )
+
+    def test_order_flow(services):
+      # Real services running; tests real interactions
+      response = requests.post(
+        f'{services.api}/orders',
+        json={'amount': 100}
+      )
+      assert response.status_code == 201
+
+testing_database_interactions:
+  queries: |
+    def test_get_active_users():
+      # Setup
+      user1 = create_user(status='active')
+      user2 = create_user(status='inactive')
+      user3 = create_user(status='active')
+
+      # Execute
+      active = get_active_users()
+
+      # Assert
+      assert len(active) == 2
+      assert user1 in active
+      assert user3 in active
+      assert user2 not in active
+
+  transactions: |
+    def test_transfer_money():
+      account_a = create_account(balance=100)
+      account_b = create_account(balance=50)
+
+      # Both succeed or both fail (atomicity)
+      transfer(account_a, account_b, amount=30)
+
+      assert account_a.balance == 70
+      assert account_b.balance == 80
+
+  constraints: |
+    def test_email_uniqueness():
+      create_user(email='test@example.com')
+
+      with pytest.raises(IntegrityError):
+        # Should fail: duplicate email
+        create_user(email='test@example.com')
+
+  indexes: |
+    def test_user_lookup_uses_index():
+      # Create 100k users
+      for i in range(100000):
+        create_user(id=i, email=f'user{i}@example.com')
+
+      # Query should be fast (uses index on email)
+      start = time.time()
+      user = get_user_by_email('user50000@example.com')
+      elapsed = time.time() - start
+
+      assert elapsed < 0.1  # Should be quick with index
+      assert user.id == 50000
+
+testing_async_interactions:
+  problem: |
+    Tests complete before async operations finish
+    Race conditions not detected
+
+  solution_async_await: |
+    async def test_send_notification():
+      notification_sent = asyncio.Event()
+
+      async def send():
+        await send_notification(user_id=123)
+        notification_sent.set()
+
+      await asyncio.wait_for(send(), timeout=5)
+      assert notification_sent.is_set()
+
+  solution_callbacks: |
+    def test_webhook_called():
+      webhook_called = threading.Event()
+
+      def webhook_handler(event):
+        webhook_called.set()
+
+      subscribe_to_events(webhook_handler)
+      trigger_event('user_created')
+
+      webhook_called.wait(timeout=5)
+      assert webhook_called.is_set()
+
+common_pitfalls:
+  - name: "Test order dependencies"
+    problem: "Test A creates data; Test B relies on that data"
+    solution: "Each test must work independently; can run in any order"
+
+  - name: "Shared test database"
+    problem: "All tests use same database; pollution and flakiness"
+    solution: "Transactions, fixtures, or separate database per test"
+
+  - name: "Testing implementation instead of behavior"
+    problem: "Test verifies internal method calls, not actual behavior"
+    solution: "Test what function does; not how it does it"
+
+  - name: "Slow tests"
+    problem: "Integration tests too slow; developers skip running them"
+    solution: "Parallelize; use mocks where possible; optimize"
+
+  - name: "Flaky tests"
+    problem: "Test sometimes passes, sometimes fails (timing issues)"
+    solution: "Eliminate randomness; use explicit waits, not sleeps"
+
+  - name: "Incomplete test data"
+    problem: "Test misses required fields; production has different data"
+    solution: "Use factories or realistic fixtures"
+
+best_practices:
+  - name: "Test one interaction per test"
+    description: "Focus test on single component interaction"
+
+  - name: "Use test isolation techniques"
+    description: "Transactions, fixtures, or containers to isolate tests"
+
+  - name: "Test both success and failure paths"
+    description: "Not just happy path; test errors, edge cases"
+
+  - name: "Use realistic test data"
+    description: "Test data should match production shapes"
+
+  - name: "Parallelize test execution"
+    description: "Run independent tests concurrently"
+
+  - name: "Keep tests fast"
+    description: "Slow tests are run less frequently"
+
+  - name: "Mock external services"
+    description: "Use real database; mock third-party APIs"
+
+  - name: "Document test purpose"
+    description: "Why test exists; what it validates"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Integration tests are like testing a car's systems together:
+      - Unit tests: Test engine isolated (engine runs)
+      - Integration tests: Test engine + transmission (power transfers)
+      - E2E tests: Drive full car (everything works together)
+
+      Integration tests catch problems unit tests miss.
+
+  intermediate:
+    focus: "Integration test implementation"
+    key_points:
+      - "Test scope: what to integrate"
+      - "Test isolation with databases"
+      - "Mocking external services vs testing real ones"
+      - "Managing test data and fixtures"
+
+  advanced:
+    focus: "Complex integration scenarios"
+    key_points:
+      - "Testing distributed systems"
+      - "Async/event-driven testing"
+      - "Contract testing between services"
+      - "Scaling integration tests in CI/CD"

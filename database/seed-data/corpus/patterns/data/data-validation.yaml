@@ -1,0 +1,341 @@
+id: data-validation
+name: "Data Validation & Consistency Patterns"
+category: data
+type: standard
+tags:
+  - data-validation
+  - data-quality
+  - integrity
+  - constraints
+
+summary:
+  short: "Ensuring data integrity and consistency through validation at multiple layers"
+  long: |
+    Data validation prevents invalid, incomplete, or malicious data from entering the system. Validation happens at multiple layers: client-side (UX), application (business logic), database (constraints). Each layer serves a different purpose; all are needed for comprehensive data quality.
+
+problem:
+  description: "Invalid data causes bugs, crashes, or security vulnerabilities"
+  symptoms:
+    - "Invalid email stored in database; emails fail"
+    - "Negative price entered; order calculations fail"
+    - "Duplicate email allowed; authentication breaks"
+    - "Missing required field; application crashes"
+    - "SQL injection via unvalidated input"
+  impact: "Data corruption, security vulnerabilities, cascading failures, poor user experience"
+
+solution:
+  description: "Validate at multiple layers: client, application, database"
+
+validation_layers:
+  client_side:
+    purpose: "Immediate feedback to user; better UX"
+    where: "Browser JavaScript, mobile app"
+    examples:
+      - "Email format validation (regex)"
+      - "Required field checking"
+      - "Min/max length validation"
+      - "Type checking (numeric, date)"
+
+    benefits:
+      - "Instant feedback (no server roundtrip)"
+      - "Reduces server load"
+      - "Better user experience"
+
+    limitation: |
+      "Can be bypassed by attacker"
+      - Disabled JavaScript
+      - Modified request
+      - Direct API calls
+
+    example: |
+      <input type="email" required>
+      <!-- Browser validates email format -->
+
+  application_layer:
+    purpose: "Business logic validation; security boundary"
+    where: "API endpoints, application code"
+    examples:
+      - "Email uniqueness check (query database)"
+      - "Price >= 0 and <= max_price"
+      - "User has permission for action"
+      - "Discount code is valid and not expired"
+
+    benefits:
+      - "Validates complex business rules"
+      - "Security boundary (don't trust client)"
+      - "Detects tampering and attacks"
+
+    limitation: |
+      "Cannot prevent all database constraints"
+      - Race conditions
+      - Concurrent modifications
+      - Bulk operations
+
+    example: |
+      def create_order(user_id, items, coupon_code):
+        # Validate user exists
+        user = db.get_user(user_id)
+        if not user:
+          raise ValueError("User not found")
+
+        # Validate items
+        for item in items:
+          if item.quantity <= 0:
+            raise ValueError("Quantity must be positive")
+
+        # Validate coupon
+        coupon = db.get_coupon(coupon_code)
+        if not coupon or coupon.expired:
+          raise ValueError("Invalid coupon")
+
+        return db.create_order(user_id, items, coupon)
+
+  database_layer:
+    purpose: "Final safety net; enforces constraints"
+    where: "Database schema, constraints, triggers"
+    examples:
+      - "NOT NULL constraint"
+      - "UNIQUE constraint (no duplicates)"
+      - "CHECK constraint (price >= 0)"
+      - "FOREIGN KEY (referential integrity)"
+      - "Data type constraints (numeric, date)"
+
+    benefits:
+      - "Prevents invalid data even from buggy app"
+      - "Protects against race conditions"
+      - "Enforces constraints even for direct SQL"
+
+    limitation: |
+      "Cannot validate complex business rules"
+      - Cannot check coupon expiration without code
+      - Cannot verify user permissions
+
+    example: |
+      CREATE TABLE orders (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        total DECIMAL(10, 2) NOT NULL CHECK (total > 0),
+        coupon_code VARCHAR(50),
+        created_at TIMESTAMP DEFAULT NOW(),
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        UNIQUE (coupon_code, user_id)
+      );
+
+validation_types:
+  format_validation:
+    description: "Check format matches expected pattern"
+    examples:
+      - "Email: user@domain.com (regex match)"
+      - "Phone: 10 digits"
+      - "ZIP code: 5 digits"
+      - "Date: YYYY-MM-DD format"
+
+    implementation: |
+      import re
+
+      def validate_email(email):
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        return re.match(pattern, email) is not None
+
+  range_validation:
+    description: "Check value is within allowed range"
+    examples:
+      - "Age: 0-150"
+      - "Price: 0-999999.99"
+      - "Quantity: 1-1000"
+      - "Discount: 0-100%"
+
+    implementation: |
+      def validate_age(age):
+        if not isinstance(age, int):
+          raise ValueError("Age must be integer")
+        if age < 0 or age > 150:
+          raise ValueError("Age must be 0-150")
+        return True
+
+  uniqueness_validation:
+    description: "Check value is unique in table"
+    examples:
+      - "Email (no duplicate accounts)"
+      - "Username"
+      - "Product SKU"
+
+    implementation: |
+      def validate_email_unique(email):
+        existing = db.query("SELECT id FROM users WHERE email = ?", [email])
+        if existing:
+          raise ValueError("Email already in use")
+        return True
+
+    race_condition: |
+      # This check can fail with concurrent requests
+      # Check: email not in DB
+      # But: other request also checking
+      # Both insert: duplicate created
+      # Solution: Database UNIQUE constraint catches it
+
+  referential_integrity:
+    description: "Check referenced records exist"
+    examples:
+      - "Order references existing user"
+      - "Comment references existing post"
+      - "Shipment references existing order"
+
+    implementation: |
+      def validate_user_exists(user_id):
+        user = db.get_user(user_id)
+        if not user:
+          raise ValueError("User not found")
+        return True
+
+      # Or let database handle it:
+      # FOREIGN KEY (user_id) REFERENCES users(id)
+
+  conditional_validation:
+    description: "Validation depends on other fields"
+    examples:
+      - "If status=shipped, tracking_number is required"
+      - "If payment_method=credit_card, card_number is required"
+      - "If country=US, zip_code is required"
+
+    implementation: |
+      def validate_order(order):
+        if order.status == 'shipped':
+          if not order.tracking_number:
+            raise ValueError("Tracking number required for shipped orders")
+
+        if order.payment_method == 'credit_card':
+          if not order.card_number:
+            raise ValueError("Card number required for credit card payment")
+
+custom_validation:
+  business_rules: |
+    def validate_discount_code(code, user_id):
+      coupon = db.get_coupon(code)
+
+      # Coupon exists
+      if not coupon:
+        raise ValueError("Invalid coupon")
+
+      # Not expired
+      if coupon.expiry_date < now():
+        raise ValueError("Coupon expired")
+
+      # User eligibility
+      if coupon.min_order_amount and order_total < coupon.min_order_amount:
+        raise ValueError(f"Minimum order ${coupon.min_order_amount} required")
+
+      # User has not already used this coupon
+      usage = db.query(
+        "SELECT COUNT(*) FROM coupon_usage WHERE user_id=? AND code=?",
+        [user_id, code]
+      )
+      if usage and coupon.limit_per_user and usage >= coupon.limit_per_user:
+        raise ValueError("You've already used this coupon")
+
+      return True
+
+error_handling:
+  feedback_to_user: |
+    # BAD: Generic error
+    raise ValueError("Invalid input")
+
+    # GOOD: Specific error
+    raise ValueError("Email format invalid (example@domain.com)")
+
+  logging_for_debugging: |
+    try:
+      validate_order(order)
+    except ValueError as e:
+      logger.error(f"Order validation failed: {e}, order={order}")
+      raise
+
+testing_validation:
+  happy_path: |
+    def test_valid_email():
+      assert validate_email("user@example.com") == True
+
+  invalid_format: |
+    def test_invalid_email_format():
+      with pytest.raises(ValueError):
+        validate_email("not-an-email")
+
+  boundary_cases: |
+    def test_price_boundary():
+      assert validate_price(0) == False      # Price must be > 0
+      assert validate_price(0.01) == True    # Smallest valid
+      assert validate_price(999999.99) == True
+      assert validate_price(1000000) == False # Too large
+
+  conditional_rules: |
+    def test_shipped_order_requires_tracking():
+      order = Order(status='shipped', tracking_number=None)
+      with pytest.raises(ValueError):
+        validate_order(order)
+
+best_practices:
+  - name: "Validate at multiple layers"
+    description: "Client (UX) + Application (security) + Database (integrity)"
+
+  - name: "Be specific with error messages"
+    description: "Tell user what's wrong and how to fix it"
+
+  - name: "Validate at system boundary"
+    description: "API endpoints should validate all input"
+
+  - name: "Use database constraints"
+    description: "NOT NULL, UNIQUE, CHECK, FOREIGN KEY"
+
+  - name: "Don't trust client-side validation"
+    description: "Always validate on server"
+
+  - name: "Test validation"
+    description: "Include happy path, error cases, boundary conditions"
+
+  - name: "Log validation failures"
+    description: "Helps debug data quality issues"
+
+  - name: "Make validation messages actionable"
+    description: "User should know exactly what's wrong"
+
+anti_patterns:
+  - name: "Only client-side validation"
+    consequence: "Attacker bypasses validation; invalid data reaches server"
+
+  - name: "Silent validation failures"
+    consequence: "User doesn't know why request failed"
+
+  - name: "Validation at wrong layer"
+    consequence: "Business rule validation in database layer (too late)"
+
+  - name: "No database constraints"
+    consequence: "Buggy code can corrupt database"
+
+  - name: "Overly strict validation"
+    consequence: "Legitimate data rejected"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Data validation is like airport security with multiple checkpoints:
+      - Check-in: basic ID check (client-side)
+      - Security line: detailed screening (application)
+      - Gate: final verification (database)
+
+      Each layer catches different problems; all needed.
+
+  intermediate:
+    focus: "Validation implementation"
+    key_points:
+      - "Multi-layer validation strategy"
+      - "Database constraints (NOT NULL, UNIQUE, CHECK)"
+      - "Custom business rule validation"
+      - "Error handling and user feedback"
+
+  advanced:
+    focus: "Complex validation scenarios"
+    key_points:
+      - "Conditional validation and state machines"
+      - "Race condition prevention"
+      - "Testing validation comprehensively"
+      - "Validation at scale"
