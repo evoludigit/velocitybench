@@ -151,9 +151,10 @@ SELECT refresh_post_popularity();
 
 -- Populate denormalized tv_ tables for FraiseQL performance testing
 -- These will be automatically populated by triggers, but we do an initial sync
+-- NOTE: These sync functions are FraiseQL-specific and only run if fraiseql_cqrs_schema.sql was applied
 
 -- Sync all users to tv_user first (tv_post depends on tv_user)
-SELECT sync_tv_user(id) FROM tb_user;
+-- SELECT sync_tv_user(id) FROM tb_user;
 
 -- Sync all posts to tv_post (now that tv_user data is available)
-SELECT sync_tv_post(id) FROM tb_post;
+-- SELECT sync_tv_post(id) FROM tb_post;
