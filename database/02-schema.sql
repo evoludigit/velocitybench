@@ -20,11 +20,11 @@ CREATE TABLE tb_user (
 );
 
 -- tb_post: Posts table (content with relationships, write-side)
--- Trinity Pattern: pk_post (integer PK) + id (UUID for API) + fk_user (integer FK)
+-- Trinity Pattern: pk_post (integer PK) + id (UUID for API) + fk_author (integer FK to author)
 CREATE TABLE tb_post (
     pk_post SERIAL PRIMARY KEY,
     id UUID UNIQUE NOT NULL DEFAULT uuid_generate_v4(),
-    fk_user INTEGER NOT NULL REFERENCES tb_user(pk_user) ON DELETE CASCADE,
+    fk_author INTEGER NOT NULL REFERENCES tb_user(pk_user) ON DELETE CASCADE,
     title VARCHAR(500) NOT NULL,
     content TEXT,
     excerpt VARCHAR(500),
@@ -35,12 +35,12 @@ CREATE TABLE tb_post (
 );
 
 -- tb_comment: Comments table (nested relationships, write-side)
--- Trinity Pattern: pk_comment (integer PK) + id (UUID for API) + fk_post/fk_user (integer FKs)
+-- Trinity Pattern: pk_comment (integer PK) + id (UUID for API) + fk_post/fk_author (integer FKs)
 CREATE TABLE tb_comment (
     pk_comment SERIAL PRIMARY KEY,
     id UUID UNIQUE NOT NULL DEFAULT uuid_generate_v4(),
     fk_post INTEGER NOT NULL REFERENCES tb_post(pk_post) ON DELETE CASCADE,
-    fk_user INTEGER NOT NULL REFERENCES tb_user(pk_user) ON DELETE CASCADE,
+    fk_author INTEGER NOT NULL REFERENCES tb_user(pk_user) ON DELETE CASCADE,
     fk_parent INTEGER REFERENCES tb_comment(pk_comment) ON DELETE CASCADE,
     content TEXT NOT NULL,
     is_approved BOOLEAN DEFAULT true,

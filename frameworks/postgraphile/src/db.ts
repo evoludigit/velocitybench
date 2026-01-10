@@ -49,14 +49,14 @@ async function applyPostGraphileSchema(client: any) {
 
     -- tb_post table smart tags
     COMMENT ON COLUMN benchmark.tb_post.pk_post IS E'@omit all\\nInternal primary key for database performance.';
-    COMMENT ON COLUMN benchmark.tb_post.fk_user IS E'@omit all\\nInternal foreign key - use "author" relation instead.';
+    COMMENT ON COLUMN benchmark.tb_post.fk_author IS E'@omit all\\nInternal foreign key - use "author" relation instead.';
     COMMENT ON COLUMN benchmark.tb_post.created_at IS E'@omit create,update\\nTimestamp when post was created (read-only, server-managed).';
     COMMENT ON COLUMN benchmark.tb_post.updated_at IS E'@omit create,update\\nTimestamp when post was last updated (read-only, server-managed).';
 
     -- tb_comment table smart tags
     COMMENT ON COLUMN benchmark.tb_comment.pk_comment IS E'@omit all\\nInternal primary key for database performance.';
     COMMENT ON COLUMN benchmark.tb_comment.fk_post IS E'@omit all\\nInternal foreign key - use "post" relation instead.';
-    COMMENT ON COLUMN benchmark.tb_comment.fk_user IS E'@omit all\\nInternal foreign key - use "author" relation instead.';
+    COMMENT ON COLUMN benchmark.tb_comment.fk_author IS E'@omit all\\nInternal foreign key - use "author" relation instead.';
     COMMENT ON COLUMN benchmark.tb_comment.fk_parent IS E'@omit all\\nInternal foreign key - use "parentComment" relation instead.';
     COMMENT ON COLUMN benchmark.tb_comment.created_at IS E'@omit create,update\\nTimestamp when comment was created (read-only, server-managed).';
     COMMENT ON COLUMN benchmark.tb_comment.updated_at IS E'@omit create,update\\nTimestamp when comment was last updated (read-only, server-managed).';

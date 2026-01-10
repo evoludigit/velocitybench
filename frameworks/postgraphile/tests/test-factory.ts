@@ -48,16 +48,16 @@ export class TestFactory {
   async createPost(overrides?: Partial<{
     title: string;
     content: string;
-    fk_user?: number; // pk_user of the author
+    fk_author?: number; // pk_user of the author
     status?: string;
   }>) {
     // Create author if not provided
-    let fkUser: number;
-    if (overrides?.fk_user) {
-      fkUser = overrides.fk_user;
+    let fkAuthor: number;
+    if (overrides?.fk_author) {
+      fkAuthor = overrides.fk_author;
     } else {
       const user = await this.createUser();
-      fkUser = user.pk_user;
+      fkAuthor = user.pk_user;
     }
 
     const {
@@ -69,10 +69,10 @@ export class TestFactory {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
-        `INSERT INTO benchmark.tb_post (fk_user, title, content, status)
+        `INSERT INTO benchmark.tb_post (fk_author, title, content, status)
          VALUES ($1, $2, $3, $4)
          RETURNING *`,
-        [fkUser, title, content, status]
+        [fkAuthor, title, content, status]
       );
       return result.rows[0];
     } finally {
@@ -86,11 +86,11 @@ export class TestFactory {
    */
   async createComment(overrides?: Partial<{
     fk_post?: number;
-    fk_user?: number;
+    fk_author?: number;
     content?: string;
   }>) {
     let fkPost: number;
-    let fkUser: number;
+    let fkAuthor: number;
 
     if (overrides?.fk_post) {
       fkPost = overrides.fk_post;
@@ -99,11 +99,11 @@ export class TestFactory {
       fkPost = post.pk_post;
     }
 
-    if (overrides?.fk_user) {
-      fkUser = overrides.fk_user;
+    if (overrides?.fk_author) {
+      fkAuthor = overrides.fk_author;
     } else {
       const user = await this.createUser();
-      fkUser = user.pk_user;
+      fkAuthor = user.pk_user;
     }
 
     const content = overrides?.content || 'Test comment';
@@ -111,10 +111,10 @@ export class TestFactory {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
-        `INSERT INTO benchmark.tb_comment (fk_post, fk_user, content)
+        `INSERT INTO benchmark.tb_comment (fk_post, fk_author, content)
          VALUES ($1, $2, $3)
          RETURNING *`,
-        [fkPost, fkUser, content]
+        [fkPost, fkAuthor, content]
       );
       return result.rows[0];
     } finally {
