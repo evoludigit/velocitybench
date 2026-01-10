@@ -38,11 +38,99 @@ def load_yaml(path: Path) -> dict:
 
 def find_pattern(pattern_id: str) -> dict | None:
     """Find pattern in corpus."""
-    for category in ["identifiers", "queries", "architecture", "relationships", "performance"]:
+    for category in ["identifiers", "queries", "architecture", "relationships", "performance", "frameworks"]:
         path = CORPUS_DIR / "patterns" / category / f"{pattern_id}.yaml"
         if path.exists():
             return load_yaml(path)
     return None
+
+
+def generate_comparison(pattern: dict, depth: str) -> str:
+    """Generate comparison blog post for architecture/framework comparisons."""
+    blog_hooks = pattern.get("blog_hooks", {}).get(depth, {})
+
+    system_prompt = """You are a senior backend engineer writing educational content about API architectures and frameworks. Your writing style is:
+- Clear and practical, with real-world examples
+- Code-first (show, don't just tell)
+- Honest about tradeoffs (no silver bullets)
+- Balanced comparison without bias
+- Friendly but professional
+
+Write complete, publishable blog posts in markdown format. Do NOT wrap the entire post in markdown code fences."""
+
+    # For comparison patterns (REST vs GraphQL vs gRPC)
+    paradigms = pattern.get('paradigms', [])
+    frameworks = pattern.get('frameworks', [])
+
+    if paradigms:
+        items = paradigms
+        item_type = "paradigm"
+    elif frameworks:
+        items = frameworks
+        item_type = "framework"
+    else:
+        items = []
+        item_type = "option"
+
+    prompt = f"""Write a comparison blog post about "{pattern['name']}".
+
+## Target Audience
+{depth.title()} backend developers.
+
+## Summary
+{pattern['summary']['long']}
+
+## Items to Compare
+"""
+    for item in items:
+        prompt += f"\n### {item['name']}\n"
+        prompt += f"{item.get('description', '')}\n"
+        if 'strengths' in item:
+            prompt += f"Strengths: {', '.join(item['strengths'][:3])}\n"
+        if 'weaknesses' in item:
+            prompt += f"Weaknesses: {', '.join(item['weaknesses'][:3])}\n"
+        if 'best_for' in item:
+            prompt += f"Best for: {', '.join(item['best_for'][:3])}\n"
+
+    # Add comparison matrix if available
+    comparison = pattern.get('comparison_matrix', {})
+    if comparison:
+        prompt += "\n## Comparison Matrix\n"
+        for metric, values in list(comparison.items())[:5]:
+            prompt += f"- **{metric}**: "
+            if isinstance(values, dict):
+                prompt += ", ".join(f"{k}: {v}" for k, v in values.items())
+            else:
+                prompt += str(values)
+            prompt += "\n"
+
+    # Add recommendations if available
+    recommendations = pattern.get('use_case_recommendations', pattern.get('recommendation_matrix', []))
+    if recommendations:
+        prompt += "\n## Use Case Recommendations\n"
+        for rec in recommendations[:4]:
+            prompt += f"- **{rec['scenario']}**: {rec['recommendation']} - {rec['reason']}\n"
+
+    if 'analogy' in blog_hooks:
+        prompt += f"\n## Analogy for {depth} audience\n{blog_hooks['analogy']}\n"
+
+    prompt += f"""
+## Requirements
+Write a complete blog post with:
+1. Catchy title that mentions the key {item_type}s being compared
+2. Introduction explaining why this comparison matters (2-3 paragraphs)
+3. Overview of each {item_type} with code examples
+4. Side-by-side comparison table
+5. When to use each (decision framework)
+6. Common mistakes when choosing
+7. Key takeaways (bullet points)
+8. Conclusion with recommendation
+
+Length: 2000-2500 words
+Include code examples for each {item_type}.
+"""
+
+    return call_vllm(prompt, system_prompt)
 
 
 def call_vllm(prompt: str, system_prompt: str = "") -> str:
@@ -247,10 +335,14 @@ def save_blog(content: str, output_path: Path) -> bool:
 
 def generate_all():
     """Generate all blog posts."""
-    patterns = ["trinity-pattern", "n-plus-one"]
+    # Standard patterns (tutorials, troubleshooting, reference)
+    standard_patterns = ["trinity-pattern", "n-plus-one", "graphql-cascade"]
+    # Comparison patterns (comparison articles at each depth)
+    comparison_patterns = ["rest-vs-graphql-vs-grpc", "graphql-frameworks"]
     depths = ["beginner", "intermediate", "advanced"]
 
-    for pattern_id in patterns:
+    # Generate standard pattern content
+    for pattern_id in standard_patterns:
         print(f"\n=== Processing: {pattern_id} ===")
         pattern = find_pattern(pattern_id)
         if not pattern:
@@ -284,11 +376,30 @@ def generate_all():
             save_blog(content, output_path)
             print(f"    Saved: {output_path}")
 
+    # Generate comparison content
+    for pattern_id in comparison_patterns:
+        print(f"\n=== Processing comparison: {pattern_id} ===")
+        pattern = find_pattern(pattern_id)
+        if not pattern:
+            print(f"  Pattern not found: {pattern_id}")
+            continue
+
+        # Comparison articles at each depth
+        for depth in depths:
+            output_path = OUTPUT_DIR / "comparisons" / f"{pattern_id}-{depth}.md"
+            print(f"  Generating comparison ({depth})...")
+            content = generate_comparison(pattern, depth)
+            if content:
+                save_blog(content, output_path)
+                print(f"    Saved: {output_path}")
+            else:
+                print(f"    FAILED")
+
 
 def main():
     parser = argparse.ArgumentParser(description="Generate blog posts using local vLLM")
     parser.add_argument("--pattern", help="Pattern ID to generate for")
-    parser.add_argument("--type", choices=["tutorial", "troubleshooting", "reference"], default="tutorial")
+    parser.add_argument("--type", choices=["tutorial", "troubleshooting", "reference", "comparison"], default="tutorial")
     parser.add_argument("--depth", choices=["beginner", "intermediate", "advanced"], default="beginner")
     parser.add_argument("--all", action="store_true", help="Generate all blog posts")
     parser.add_argument("--stdout", action="store_true", help="Output to stdout instead of file")
@@ -323,6 +434,9 @@ def main():
     elif args.type == "troubleshooting":
         content = generate_troubleshooting(pattern)
         output_path = OUTPUT_DIR / "troubleshooting" / f"{args.pattern}-troubleshooting.md"
+    elif args.type == "comparison":
+        content = generate_comparison(pattern, args.depth)
+        output_path = OUTPUT_DIR / "comparisons" / f"{args.pattern}-{args.depth}.md"
     else:
         content = generate_reference(pattern)
         output_path = OUTPUT_DIR / "reference" / f"{args.pattern}-reference.md"

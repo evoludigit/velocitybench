@@ -1,0 +1,310 @@
+# GraphQL Cascade (N+1) Problem
+# VelocityBench Knowledge Corpus
+
+id: graphql-cascade
+name: "GraphQL Cascade Problem"
+category: queries
+type: antipattern
+severity: high
+tags:
+  - graphql
+  - n-plus-one
+  - dataloader
+  - performance
+  - resolvers
+
+summary:
+  short: "N+1 query problem specific to GraphQL resolver execution"
+  long: |
+    The GraphQL Cascade Problem is the N+1 query issue manifested in GraphQL's
+    resolver architecture. When resolving nested fields, each parent triggers
+    a separate resolver call for its children, causing cascading database queries.
+    A query for 100 users with their orders generates 101 queries (1 for users,
+    100 for orders). The solution is DataLoader batching and caching.
+
+problem:
+  description: |
+    GraphQL's resolver-per-field architecture executes each field resolver
+    independently. When resolving a list of parent objects, the child resolver
+    is called N times (once per parent), each potentially making a database query.
+    This cascade of queries severely impacts performance, especially with
+    deeply nested queries.
+
+  symptoms:
+    - name: "Linear query growth"
+      description: "Query count grows linearly with result size"
+      detection: "Enable query logging, count queries per request"
+
+    - name: "Slow nested queries"
+      description: "Queries with nested fields take exponentially longer"
+      detection: "Profile resolver execution time"
+
+    - name: "Database connection exhaustion"
+      description: "Connection pool depleted under load"
+      detection: "Monitor connection pool metrics"
+
+    - name: "GraphQL timeout"
+      description: "Complex queries exceed timeout limits"
+      detection: "Monitor GraphQL execution time"
+
+  root_cause: |
+    GraphQL resolvers are designed to be independent and composable. Each field
+    resolver has no knowledge of other resolvers or the broader query context.
+    This isolation means child resolvers can't batch their operations naturally.
+
+  example_query: |
+    query GetUsersWithOrders {
+      users {           # 1 query: SELECT * FROM users
+        id
+        name
+        orders {        # N queries: SELECT * FROM orders WHERE user_id = ?
+          id
+          total
+          items {       # N*M queries: SELECT * FROM order_items WHERE order_id = ?
+            productName
+            quantity
+          }
+        }
+      }
+    }
+
+  query_count_formula: |
+    For a query with depth D and N items at each level:
+    Total queries = 1 + N + N*M + N*M*P + ...
+
+    Example: 100 users, 5 orders each, 3 items each
+    = 1 (users) + 100 (orders) + 500 (items) = 601 queries
+
+solutions:
+  - name: "DataLoader"
+    type: batching
+    description: |
+      Facebook's DataLoader batches and caches resolver calls within a single
+      request. Instead of N individual queries, it collects all IDs and makes
+      one batched query.
+    effectiveness: "95%+ reduction in queries"
+
+    implementation:
+      javascript: |
+        const DataLoader = require('dataloader');
+
+        // Create loader that batches user IDs
+        const orderLoader = new DataLoader(async (userIds) => {
+          // Single query: SELECT * FROM orders WHERE user_id IN (...)
+          const orders = await db.query(
+            'SELECT * FROM orders WHERE user_id = ANY($1)',
+            [userIds]
+          );
+
+          // Map results back to input IDs
+          const ordersByUser = new Map();
+          orders.forEach(order => {
+            if (!ordersByUser.has(order.user_id)) {
+              ordersByUser.set(order.user_id, []);
+            }
+            ordersByUser.get(order.user_id).push(order);
+          });
+
+          return userIds.map(id => ordersByUser.get(id) || []);
+        });
+
+        // Resolver uses loader
+        const resolvers = {
+          User: {
+            orders: (user, args, context) => {
+              return context.loaders.orders.load(user.id);
+            }
+          }
+        };
+
+      python_strawberry: |
+        from strawberry.dataloader import DataLoader
+
+        async def load_orders(user_ids: list[str]) -> list[list[Order]]:
+            orders = await db.fetch_all(
+                "SELECT * FROM orders WHERE user_id = ANY($1)",
+                user_ids
+            )
+
+            orders_by_user = defaultdict(list)
+            for order in orders:
+                orders_by_user[order.user_id].append(order)
+
+            return [orders_by_user.get(uid, []) for uid in user_ids]
+
+        @strawberry.type
+        class User:
+            id: str
+            name: str
+
+            @strawberry.field
+            async def orders(self, info) -> list[Order]:
+                return await info.context.order_loader.load(self.id)
+
+  - name: "Eager Loading (JOINs)"
+    type: query_optimization
+    description: |
+      Fetch all related data in the initial query using JOINs. Works well
+      for predictable query patterns but loses GraphQL's flexibility.
+    effectiveness: "80%+ reduction, but reduces flexibility"
+
+    implementation:
+      sql: |
+        -- Instead of lazy loading, fetch everything upfront
+        SELECT
+          u.*,
+          json_agg(
+            json_build_object(
+              'id', o.id,
+              'total', o.total,
+              'items', (
+                SELECT json_agg(json_build_object('name', i.product_name, 'qty', i.quantity))
+                FROM order_items i WHERE i.order_id = o.id
+              )
+            )
+          ) as orders
+        FROM users u
+        LEFT JOIN orders o ON o.user_id = u.id
+        GROUP BY u.id;
+
+  - name: "Query Lookahead"
+    type: optimization
+    description: |
+      Analyze the GraphQL query AST before execution to determine what data
+      will be needed, then fetch it proactively.
+    effectiveness: "Variable - depends on implementation"
+
+    implementation:
+      concept: |
+        // In root resolver, inspect what fields are requested
+        const resolvers = {
+          Query: {
+            users: async (parent, args, context, info) => {
+              const requestedFields = getRequestedFields(info);
+
+              let query = 'SELECT * FROM users';
+
+              if (requestedFields.includes('orders')) {
+                // Preload orders in single query
+                query = `
+                  SELECT u.*, array_agg(o.*) as orders
+                  FROM users u
+                  LEFT JOIN orders o ON o.user_id = u.id
+                  GROUP BY u.id
+                `;
+              }
+
+              return db.query(query);
+            }
+          }
+        };
+
+  - name: "Persisted Queries"
+    type: caching
+    description: |
+      Pre-define and cache optimized queries. The server knows exactly what
+      data is needed and can optimize accordingly.
+    effectiveness: "High for known query patterns"
+
+framework_specific:
+  apollo_server:
+    dataloader_setup: |
+      // Create loaders per request (important for caching scope)
+      const server = new ApolloServer({
+        typeDefs,
+        resolvers,
+        context: () => ({
+          loaders: {
+            orders: new DataLoader(batchOrders),
+            orderItems: new DataLoader(batchOrderItems),
+          }
+        })
+      });
+
+  strawberry:
+    dataloader_setup: |
+      from strawberry.fastapi import GraphQLRouter
+
+      async def get_context():
+          return {
+              "order_loader": DataLoader(load_fn=load_orders),
+              "item_loader": DataLoader(load_fn=load_items),
+          }
+
+      graphql_app = GraphQLRouter(schema, context_getter=get_context)
+
+  postgraphile:
+    note: |
+      PostGraphile automatically batches queries using look-ahead and
+      generates efficient SQL. No manual DataLoader needed.
+
+    optimization: |
+      -- PostGraphile generates optimized queries like:
+      SELECT
+        users.*,
+        lateral (
+          SELECT json_agg(orders.*)
+          FROM orders
+          WHERE orders.user_id = users.id
+        ) as orders
+      FROM users;
+
+  hasura:
+    note: |
+      Hasura compiles GraphQL to optimized SQL, avoiding N+1 by design.
+      Uses PostgreSQL's lateral joins and aggregations.
+
+detection_tools:
+  - name: "Apollo Studio"
+    description: "Traces resolver execution, shows query patterns"
+
+  - name: "GraphQL Query Complexity"
+    description: "Reject overly complex/deep queries"
+    example: |
+      const { createComplexityLimitRule } = require('graphql-validation-complexity');
+
+      const server = new ApolloServer({
+        validationRules: [
+          createComplexityLimitRule(1000, {
+            onCost: (cost) => console.log('Query cost:', cost)
+          })
+        ]
+      });
+
+  - name: "Database Query Logging"
+    description: "Log all database queries to identify N+1"
+    example: |
+      # PostgreSQL
+      SET log_statement = 'all';
+      SET log_duration = on;
+
+prevention_checklist:
+  - "Always use DataLoader for resolving related entities"
+  - "Create DataLoader instances per-request (not globally)"
+  - "Implement query depth/complexity limits"
+  - "Monitor resolver execution times"
+  - "Use query lookahead for root resolvers"
+  - "Consider persisted queries for known patterns"
+  - "Test with production-scale data volumes"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Imagine a restaurant where each waiter can only carry one plate:
+      - N+1: For a table of 10, one waiter goes to the kitchen 10 times
+      - DataLoader: A smart waiter collects all 10 orders, makes one trip
+
+  intermediate:
+    focus: "DataLoader implementation patterns"
+    key_points:
+      - "Per-request DataLoader instances (important for isolation)"
+      - "Handling null/missing values in batched results"
+      - "Caching strategies within a request"
+
+  advanced:
+    focus: "Advanced optimization and monitoring"
+    key_points:
+      - "Query complexity scoring"
+      - "Automatic persisted queries"
+      - "GraphQL federation and DataLoader"
+      - "Distributed tracing for resolvers"
