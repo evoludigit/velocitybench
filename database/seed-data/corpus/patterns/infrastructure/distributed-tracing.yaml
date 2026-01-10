@@ -1,0 +1,141 @@
+id: distributed-tracing
+name: "Distributed Tracing & Request Context"
+category: infrastructure
+type: pattern
+tags:
+  - observability
+  - tracing
+  - request-context
+  - correlation
+  - debugging
+
+summary:
+  short: "Tracing requests across microservices to understand latency and failures"
+  long: |
+    In microservices, a single user request may span dozens of services. Distributed tracing follows requests through the entire call chain, recording timing and context. Trace context (correlation IDs) must propagate across service boundaries.
+
+problem:
+  description: "Request fails across multiple services; impossible to debug without tracing entire flow"
+  symptoms:
+    - name: "Mystery latency"
+      description: "User request slow; impossible to find bottleneck"
+    - name: "Lost context"
+      description: "Log from service A and service B can't be correlated"
+    - name: "Debugging nightmare"
+      description: "Manually following requests across services"
+    - name: "Incomplete visibility"
+      description: "Only see metrics from single service, not entire flow"
+
+solution:
+  approach: "Inject trace IDs into requests; propagate through services; collect spans to reconstruct request flow"
+  key_points:
+    - "Generate unique trace ID for each request"
+    - "Propagate trace ID through all service calls"
+    - "Record spans (individual work units)"
+    - "Correlate logs and metrics using trace ID"
+    - "Visualize trace flame graphs"
+
+distributed_tracing_concepts:
+  trace: "Complete request flow from entry to exit (contains multiple spans)"
+  span: "Single operation (e.g., database query, HTTP call, function call)"
+  trace_id: "Unique identifier for entire request flow (e.g., UUID)"
+  span_id: "Unique identifier for individual operation"
+  parent_span_id: "Reference to parent span (builds call tree)"
+  baggage: "Metadata propagated with trace (user_id, country, etc.)"
+
+trace_context_propagation:
+  http_headers:
+    traceparent: "traceparent: 00-[trace_id]-[span_id]-01"
+    tracestate: "Additional state (W3C standard)"
+    x_trace_id: "X-Trace-ID: [trace_id] (custom header)"
+
+  format: "Usually base16 or base32 encoded"
+  library_support: "Most libraries auto-inject/extract headers"
+
+  example_flow:
+    request_1: "Client → API Gateway (generate trace_id)"
+    request_2: "API Gateway → Service A (include trace_id in header)"
+    request_3: "Service A → Service B (propagate trace_id)"
+    request_4: "Service B → Database (propagate trace_id)"
+    request_5: "All services log with trace_id for correlation"
+
+instrumentation_levels:
+  automatic: "Framework automatically instruments common operations"
+  manual: "Application code creates spans for custom operations"
+  hybrid: "Mix of automatic and manual"
+
+  libraries:
+    - "OpenTelemetry: Vendor-neutral instrumentation standard"
+    - "Jaeger: Open source distributed tracing"
+    - "Zipkin: Distributed tracing system"
+    - "Datadog: Commercial APM with tracing"
+    - "New Relic: Commercial APM with tracing"
+
+sampling_strategies:
+  always_sample: "Collect all traces (expensive, 100% precision)"
+  never_sample: "Collect no traces (cheap, no visibility)"
+  probabilistic: "Sample X% of traces (e.g., 1% = typical)"
+  adaptive: "Sample based on criteria (error traces, slow traces)"
+  head_sampling: "Decision made at request entry (same for entire trace)"
+  tail_sampling: "Decision made at exit (can sample based on errors)"
+
+  tradeoff: "Head sampling is simpler; tail sampling is more targeted but requires buffering"
+
+span_attributes:
+  operation_name: "Name of operation (get_user, db_query)"
+  duration: "How long the operation took"
+  tags: "Key-value metadata (user_id, endpoint, status)"
+  logs: "Time-stamped events (exception thrown, cache hit)"
+  status: "OK, ERROR, or UNSET"
+
+trace_visualization:
+  flame_graph: "Shows timeline of all spans across services"
+  critical_path: "Highlights slowest path through request"
+  service_map: "Visualization of service dependencies"
+  latency_breakdown: "Shows percentage time in each service"
+
+correlation_id_pattern:
+  concept: "Additional ID linking logs across services"
+  usage: "Log correlation_id in every log entry"
+  benefit: "Search logs by correlation_id to find all related logs"
+  limitation: "Not sufficient alone; need distributed tracing"
+
+context_propagation:
+  explicit: "Pass context as function argument (verbose)"
+  implicit: "Context in thread-local or async context (cleaner)"
+  baggage: "Include custom metadata (user_id, feature flags)"
+
+  implementation:
+    java: "MDC (Mapped Diagnostic Context) + Spring Cloud Sleuth"
+    python: "contextvars + OpenTelemetry"
+    go: "context.Context"
+    nodejs: "AsyncLocalStorage or cls-hooked"
+
+cost_considerations:
+  storage: "Traces can be expensive (1000s of events per request)"
+  sampling: "Use sampling to reduce cost (1-10% typical)"
+  retention: "Keep traces for 7-30 days (varies by provider)"
+  tradeoff: "Cost vs visibility; balance based on needs"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Distributed tracing is like following a letter through postal system:
+      - Without tracing: Letter disappears; no idea where it went
+      - With tracing: Trace ID on letter; stamp at each post office shows journey
+
+      Trace shows complete path from sender to recipient.
+
+  intermediate:
+    focus: "Implementing distributed tracing"
+    key_points:
+      - "Trace context propagation across services"
+      - "Instrumentation using OpenTelemetry"
+      - "Sampling and cost optimization"
+
+  advanced:
+    focus: "Tracing infrastructure at scale"
+    key_points:
+      - "Tail-sampling for targeted data collection"
+      - "Distributed context correlation"
+      - "Debugging using flame graphs"

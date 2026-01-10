@@ -1,0 +1,172 @@
+id: alerting-runbooks
+name: "Alerting & On-Call Runbooks"
+category: reliability
+type: pattern
+tags:
+  - alerting
+  - oncall
+  - incident-management
+  - runbooks
+  - operations
+
+summary:
+  short: "Designing effective alerts and runbooks to minimize incident response time"
+  long: |
+    Bad alerts drive on-call burnout (alert fatigue). Good alerts are actionable, low-noise, and paired with runbooks explaining what to do. This pattern covers alert design, threshold tuning, and runbook creation.
+
+problem:
+  description: "Too many alerts (alert fatigue) or missed real issues; incident response is slow"
+  symptoms:
+    - name: "Alert fatigue"
+      description: "100+ alerts/day; on-call ignores them all"
+    - name: "Missed incidents"
+      description: "Real issues don't generate alerts"
+    - name: "Slow response"
+      description: "No runbook; on-call must debug from scratch"
+    - name: "Repeated incidents"
+      description: "Same issue occurs weekly because root cause not fixed"
+
+solution:
+  approach: "Define actionable alerts with thresholds; pair with runbooks; measure and improve alert quality"
+  key_points:
+    - "Alert should trigger specific action (not 'something might be wrong')"
+    - "Include context and diagnosis in alert"
+    - "Pair alert with runbook explaining response"
+    - "Tune thresholds to minimize false positives"
+    - "Measure alert signal-to-noise ratio"
+
+alert_design:
+  actionable:
+    yes: "Error rate > 5% (clear action: investigate errors)"
+    no: "Memory usage changing (vague, could be normal)"
+
+  specific:
+    yes: "Database query latency p95 > 1000ms"
+    no: "System performing poorly"
+
+  contextual:
+    yes: "Payment processing latency > 2s (affects revenue, customer experience)"
+    no: "API latency > 2s"
+
+alert_threshold_tuning:
+  baseline: "Measure normal behavior over 1-2 weeks"
+  threshold: "Set at ~2x baseline for warning, ~3x for critical"
+  gradual: "Start permissive; gradually increase sensitivity"
+
+  latency_example:
+    baseline: "p95 = 100ms"
+    warning: "p95 > 200ms"
+    critical: "p95 > 300ms"
+
+  error_rate_example:
+    baseline: "0.1%"
+    warning: "0.5%"
+    critical: "1.0%"
+
+alert_types:
+  threshold: "Metric exceeds limit (most common)"
+  anomaly: "Deviation from baseline (requires ML)"
+  composite: "Multiple conditions (e.g., error rate AND latency)"
+  absence: "Expected metric missing (e.g., health check)"
+  change: "Metric changed significantly vs baseline"
+
+false_positive_reduction:
+  - "Use multiple conditions (both latency AND error rate, not just one)"
+  - "Window-based: alert if condition sustained for 2+ minutes (not instant spike)"
+  - "Exclude known spikes (deployments, batch jobs)"
+  - "Adjust thresholds based on time-of-day (higher tolerance at 3am)"
+
+runbook_structure:
+  title: "Clear, actionable title (e.g., 'High Database Latency')"
+  severity: "Critical, High, Medium, Low"
+  alerts: "Which alerts trigger this runbook"
+  diagnosis: "How to determine root cause"
+  immediate_action: "What to do first (may buy time while investigating)"
+  resolution: "How to fix the issue"
+  prevention: "How to prevent future occurrences"
+  links: "Dashboards, logs, documentation"
+
+runbook_example:
+  title: "API Timeout Errors Spiking"
+  severity: "Critical (affects users)"
+  diagnosis:
+    step_1: "Check error rate dashboard; confirm it's spiking"
+    step_2: "Check service logs for errors (grep ERROR)"
+    step_3: "Check dependencies (database, external APIs)"
+    step_4: "Check resource usage (CPU, memory, connections)"
+
+  immediate_action:
+    step_1: "Page on-call engineer if not already"
+    step_2: "Check if recent deployment caused issue; consider rollback"
+    step_3: "Check if dependency outage (external API, database)"
+
+  resolution:
+    step_1: "If deployment caused: rollback"
+    step_2: "If resource exhaustion: scale up or restart service"
+    step_3: "If dependency issue: wait for resolution or failover"
+
+  prevention:
+    step_1: "Add synthetic monitoring for timeouts"
+    step_2: "Review error handling; ensure timeouts are configured"
+    step_3: "Add capacity planning metric (track growth over time)"
+
+alert_routing:
+  team_ownership: "Database team owns database alerts"
+  severity_escalation: "Critical → on-call engineer; High → team Slack"
+  time_windows: "Weekend alerts routed to US team; weekday to EU team"
+  suppression: "Suppress known alerts during maintenance windows"
+
+alert_aggregation:
+  group_related: "Email with all related alerts, not individual messages"
+  deduplicate: "Same alert once per time window, not per instance"
+  correlation: "Group alerts from same incident together"
+
+metrics_for_alert_quality:
+  alert_volume: "Track total alerts/day"
+  ack_time: "Time from alert to human acknowledgment"
+  mttr: "Mean time to recovery"
+  false_positive_rate: "% of alerts that don't require action"
+  noise_index: "Metric combining alert volume and false positive rate"
+
+alert_evolution:
+  measure: "Track false positive rate weekly"
+  improve: "Adjust thresholds based on ratio"
+  iterate: "Gradually improve signal-to-noise"
+
+  goal: "< 10% false positive rate"
+
+on_call_schedule:
+  primary: "Actively on-call; responds to alerts"
+  secondary: "Backup if primary unreachable"
+  primary_hours: "24 hour shift (e.g., Monday 9am - Tuesday 9am)"
+  overlap: "30 min overlap for handoff"
+
+handoff_process:
+  - "Review incidents during shift"
+  - "Discuss ongoing issues"
+  - "Share context and status"
+  - "Update runbooks if needed"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Alerts are like smoke detectors:
+      - Too sensitive: False alarms, ignored
+      - Too insensitive: Missed fires, dangerous
+      - Just right: Real fires caught, acted on
+
+      Goal: Alert on actual fires, not dust.
+
+  intermediate:
+    focus: "Designing alert strategies"
+    key_points:
+      - "Threshold tuning and baseline calculation"
+      - "Runbook creation and maintenance"
+      - "Alert routing and escalation"
+
+  advanced:
+    focus: "Alert systems at scale"
+    key_points:
+      - "Composite and anomaly detection"
+      - "AIOps and automated remediation"
+      - "Alert correlation across services"

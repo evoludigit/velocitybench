@@ -1,0 +1,61 @@
+id: network-optimization
+name: "Network Optimization and Latency Reduction"
+category: performance
+type: pattern
+tags:
+  - performance
+  - network
+  - latency
+  - bandwidth
+
+summary:
+  short: "Techniques to reduce network latency and improve throughput"
+  long: |
+    Network optimization includes reducing payload size, minimizing round trips,
+    using compression, caching at edges, and optimizing connection management.
+
+optimization_techniques:
+  - name: "Compression"
+    description: "Reduce payload size with gzip, brotli"
+    benefit: "10-50x reduction for text"
+  
+  - name: "Protocol Efficiency"
+    description: "Use HTTP/2, HTTP/3, gRPC"
+    benefit: "Multiplexing, header compression"
+  
+  - name: "Connection Pooling"
+    description: "Reuse TCP connections"
+    benefit: "Avoid connection overhead"
+  
+  - name: "Caching"
+    description: "Cache at edges and clients"
+    benefit: "Eliminate round trips"
+
+latency_reduction:
+  - "CDN for static content"
+  - "DNS prefetching"
+  - "Connection keep-alive"
+  - "HTTP/2 server push"
+  - "Early hints"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Network optimization is like shipping:
+      - Compression: Smaller packages
+      - Caching: Local warehouses
+      - Connection pooling: Consolidated shipments
+
+  intermediate:
+    focus: "Measuring and improving latency"
+    key_points:
+      - "Network waterfall diagrams"
+      - "CDN strategies"
+      - "Connection pooling"
+
+  advanced:
+    focus: "Advanced network optimization"
+    key_points:
+      - "HTTP/3 and QUIC"
+      - "Edge computing"
+      - "Network protocol tuning"

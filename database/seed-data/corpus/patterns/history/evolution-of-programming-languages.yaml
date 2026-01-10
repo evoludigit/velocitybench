@@ -1,0 +1,336 @@
+# The Evolution of Programming Languages
+# VelocityBench Knowledge Corpus
+
+id: evolution-of-programming-languages
+name: "The Evolution of Programming Languages: From FORTRAN to Rust"
+category: history
+type: timeline
+tags:
+  - programming-languages
+  - history
+  - computer-science
+  - architecture
+
+summary:
+  short: "How programming languages evolved from low-level machine orientation to high-level abstractions"
+  long: |
+    Programming languages have evolved dramatically over 70 years, each generation
+    solving problems of its time while creating new ones. From FORTRAN's numerical
+    computing focus to modern languages like Rust emphasizing safety and Python's
+    simplicity, each language shaped how we think about computation. This history
+    traces the key innovations, paradigm shifts, and the problems each generation solved.
+
+timeline:
+  - year: 1954
+    title: "FORTRAN (Formula Translator)"
+    description: |
+      John Backus and IBM created FORTRAN, the first high-level programming language.
+      It compiled to machine code rather than requiring assembly. Revolutionary.
+      FORTRAN was designed for scientific computing on IBM mainframes.
+    problem_solved: |
+      - Assembly language was too low-level
+      - Complex mathematical expressions hard to express
+      - Code maintenance nightmare
+    language_features:
+      - Variables and types
+      - Control flow (IF, DO loops)
+      - Functions (SUBROUTINES)
+      - Built-in mathematical functions
+    impact: "Proved high-level languages could be as efficient as hand-written assembly"
+    legacy: "Still used for scientific/numerical computing today"
+
+  - year: 1958
+    title: "ALGOL (Algorithmic Language)"
+    description: |
+      ALGOL introduced key concepts that influenced almost all modern languages:
+      - Structured programming (if-then-else, for loops)
+      - Block scope (begin-end blocks)
+      - Clear syntax (more readable than FORTRAN)
+    philosophical_shift: "Languages should express algorithms clearly, not machine operations"
+    influence: "Parent of C, Pascal, Python, and most modern languages"
+
+  - year: 1960s
+    title: "Language Explosion: COBOL, LISP, BASIC"
+    description: |
+      The 1960s saw languages designed for different domains:
+      - COBOL: Business data processing (verbose, wordy)
+      - LISP: Symbolic computation, AI (parentheses everywhere)
+      - BASIC: Teaching programming (simple, limited)
+    philosophical_differences: |
+      COBOL aimed for readability by business users
+      LISP embraced functional programming, code as data
+      BASIC prioritized accessibility for non-programmers
+    market_split: "COBOL dominated business, LISP in academia, BASIC for hobbyists"
+
+  - year: 1970
+    title: "Pascal & Structured Programming"
+    description: |
+      Niklaus Wirth created Pascal to teach programming based on structured programming
+      principles. Clean, readable, influenced by ALGOL.
+    paradigm: "Structured programming: eliminate GO TO statements"
+    impact: "Changed how people thought about program organization"
+    influence: "Teaching language for a generation"
+
+  - year: 1972
+    title: "C: The Universal Language"
+    description: |
+      Dennis Ritchie created C as a systems programming language. It married
+      high-level abstraction with low-level control. Used to rewrite Unix.
+    design_philosophy: "Give programmers power and trust them to use it responsibly"
+    language_features:
+      - Pointers (for memory manipulation)
+      - Minimal runtime overhead
+      - Portable across systems
+      - Simple, orthogonal syntax
+    impact: "C became the dominant systems language for 40+ years"
+    current_use: "Still the lingua franca of systems programming"
+
+  - year: 1985
+    title: "C++ & Object-Oriented Programming"
+    description: |
+      Bjarne Stroustrup extended C with object-oriented features (classes, inheritance).
+      Became the language for large systems and game engines.
+    complexity: "C++ added power but also tremendous complexity"
+    quote: |
+      "C++ is a multiparadigm language: procedural, OOP, generic, and functional"
+    problems_created: |
+      - Steep learning curve
+      - Many ways to do things
+      - Easy to write bad code
+      - Compile times grew massive
+
+  - year: 1987
+    title: "Perl: The Swiss Army Chainsaw"
+    description: |
+      Larry Wall created Perl for text processing and system administration.
+      Slogan: "There's more than one way to do it."
+    culture: |
+      - Emphasizes programmer freedom
+      - Powerful regular expressions
+      - Culture of clever, concise code
+      - TMTOWTDI (There's More Than One Way To Do It)
+    impact: "Dominated CGI scripting era of web development"
+
+  - year: 1991
+    title: "Python: Simplicity and Readability"
+    description: |
+      Guido van Rossum created Python, prioritizing readability and simplicity.
+      Named after Monty Python (not the snake). Different philosophy than Perl.
+    design_principle: "There should be one—and preferably only one—way to do it"
+    language_philosophy: "Code is read much more often than it is written"
+    key_features:
+      - "Indentation-based blocks (controversial but clean)"
+      - "Dynamic typing but clean"
+      - "batteries included standard library"
+      - "Simple object model"
+    adoption_pattern: "Slow at first, then explosive growth"
+
+  - year: 1995
+    title: "Java: Corporate Computing"
+    description: |
+      James Gosling and Sun Microsystems created Java for embedded systems.
+      Slogan: "Write Once, Run Anywhere" (WORA). Virtual machine runs bytecode.
+    revolutionary: "Bytecode compilation + JVM enabled cross-platform compatibility"
+    enterprise_appeal: |
+      - Strong typing catches errors
+      - Memory management (garbage collection)
+      - Large standard library
+      - OOP from the ground up
+    impact: "Became the dominant enterprise language for 20 years"
+
+  - year: 1995
+    title: "JavaScript: The Accidental Language"
+    description: |
+      Brendan Eich created JavaScript in 10 days for Netscape browsers.
+      Initially derided as a toy language, it became ubiquitous.
+    accident: "Created quickly for browser scripting, now used everywhere"
+    quirks: |
+      - Dynamic typing with surprising coercions
+      - Prototype-based inheritance (unusual)
+      - First-class functions (unusually powerful for a scripting language)
+    impact: "The only language in web browsers (until WebAssembly)"
+
+  - year: 2000s
+    title: "Language Consolidation: C#, Ruby, Groovy"
+    description: |
+      Microsoft created C# as a Java alternative with additional features.
+      Ruby emphasized programmer happiness and metaprogramming.
+      Groovy brought Ruby-like syntax to JVM.
+    market_split: |
+      - C# dominated Windows/.NET
+      - Ruby on Rails made Ruby popular
+      - Groovy integrated with Java ecosystem
+    trend: "Languages now targeting existing ecosystems (JVM, .NET)"
+
+  - year: 2007
+    title: "Python's Scientific Rise"
+    description: |
+      NumPy, SciPy, Matplotlib made Python the language for scientific computing
+      and data analysis. NumPy brought Fortran-like performance to Python.
+    why_python_for_science: |
+      - Easy to learn
+      - Great libraries
+      - Interactive (IPython, Jupyter)
+      - Growing community
+    implication: "Python became data science language of choice"
+
+  - year: 2009
+    title: "Go: Simplicity for Concurrency"
+    description: |
+      Rob Pike, Ken Thompson, Robert Griesemer at Google created Go.
+      Simple language with built-in concurrency (goroutines) and garbage collection.
+    design_philosophy: "Simplicity over features"
+    revolutionary_feature: "Lightweight goroutines for concurrent programming"
+    target: "Systems programming but easier than C/C++"
+    adoption: "Docker, Kubernetes, cloud-native tools"
+
+  - year: 2010
+    title: "Clojure: Functional Programming on JVM"
+    description: |
+      Rich Hickey created Clojure, bringing Lisp-style functional programming to JVM.
+      Emphasizes immutability and simplicity.
+    paradigm_shift: "Functional programming becomes practical for mainstream"
+
+  - year: 2014
+    title: "Swift: Apple's New Direction"
+    description: |
+      Apple released Swift to replace Objective-C. Modern syntax, safe defaults.
+      Compiled to native code, integrated with Apple ecosystem.
+    safety_features: |
+      - Optional types prevent null pointer crashes
+      - Memory safety without garbage collection
+      - Strong type checking
+    impact: "Modernized iOS/macOS development"
+
+  - year: 2015
+    title: "Rust: Safe Systems Programming"
+    description: |
+      Graydon Hoare created Rust at Mozilla to enable safe systems programming.
+      Ownership system prevents memory safety bugs at compile time.
+    revolutionary: "Memory safety without garbage collection, through borrow checking"
+    language_features:
+      - Ownership and borrowing rules
+      - Strong typing
+      - Zero-cost abstractions
+      - No garbage collector
+    impact: "Enables writing systems code safely"
+    adoption: "Linux kernel, web servers, games, cloud tools"
+
+  - year: 2016
+    title: "TypeScript: Type Safety for JavaScript"
+    description: |
+      Microsoft's Anders Hejlsberg created TypeScript as a superset of JavaScript.
+      Compiles to JavaScript but adds static type checking.
+    adoption_story: |
+      - Started as academic exercise
+      - Rejected by React/Vue communities initially
+      - Now nearly ubiquitous in frontend development
+    implication: "JavaScript needed types for large codebases"
+
+  - year: 2018-2020
+    title: "Language Ecosystem Maturation"
+    description: |
+      Package managers became standard (npm, pip, cargo, go mod)
+      Language servers and IDE support improved dramatically
+      Async/await became standard pattern across languages
+    trend: "Convergence on good practices across languages"
+
+  - year: 2023-present
+    title: "Specialization and AI"
+    description: |
+      - Domain-specific languages gaining traction
+      - AI-assisted code generation becoming mainstream
+      - Rust adoption accelerating in systems/cloud
+      - Python dominance in data/ML continues
+      - Consideration of memory safety across industry
+    current_state: |
+      - No single "best" language
+      - Right tool for right job more valued
+      - Multi-language systems common
+      - Language features converging
+
+key_paradigm_shifts:
+  - name: "Assembly → High-Level"
+    year: 1954
+    description: "FORTRAN showed high-level languages could be efficient"
+    impact: "Enabled productive programming"
+
+  - name: "Unstructured → Structured"
+    year: 1960s-1970s
+    description: "ALGOL/Pascal/C eliminated goto statements"
+    impact: "Made large programs comprehensible"
+
+  - name: "Procedural → Object-Oriented"
+    year: 1980s-1990s
+    description: "Organizing code around objects instead of procedures"
+    impact: "Enabled modeling real-world systems"
+
+  - name: "Static → Dynamic"
+    year: 1987-2000s
+    description: "Perl and Python made dynamic typing popular"
+    impact: "Faster development, runtime errors"
+
+  - name: "Single-threaded → Concurrent"
+    year: 2009+
+    description: "Go's goroutines and async/await made concurrency accessible"
+    impact: "Easier to write scalable systems"
+
+  - name: "Manual Memory → Safe Abstractions"
+    year: 2015+
+    description: "Rust proved safety without garbage collection possible"
+    impact: "Systems programming becoming safer"
+
+  - name: "Untyped → Gradually Typed"
+    year: 2016+
+    description: "TypeScript, MyPy, Flow adding types to dynamic languages"
+    impact: "Large codebases become maintainable"
+
+lessons_from_history:
+  - lesson: "No language is universally good"
+    context: "Each solved problems of its time"
+    implication: "Choose languages for their fit"
+
+  - lesson: "Simplicity is powerful"
+    context: "Python, Go, C succeeded through simplicity"
+    implication: "Complex features aren't always beneficial"
+
+  - lesson: "Ecosystem matters more than language"
+    context: "Python became dominant due to libraries (NumPy, Django)"
+    implication: "Language plus ecosystem is the real choice"
+
+  - lesson: "Culture shapes adoption"
+    context: "Ruby culture, Python philosophy affected adoption"
+    implication: "Language design reflects its creator's values"
+
+  - lesson: "Safety becomes more valuable over time"
+    context: "Java safety via GC, Rust via ownership"
+    implication: "Cost of bugs > cost of safety features"
+
+  - lesson: "Syntax matters less than expected"
+    context: "Perl (ugly) and Python (beautiful) both popular"
+    implication: "What matters: expressiveness, not aesthetics"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Programming languages are like tools for different jobs:
+      - Assembly: A single screwdriver (precise but tedious)
+      - C: A multi-tool (powerful, flexible, sharp edges)
+      - Python: A power drill (easy to use, gets the job done)
+      - Rust: A high-precision drill (safe, prevents mistakes)
+
+  intermediate:
+    focus: "Understanding language design decisions"
+    key_points:
+      - "Problems each language solved"
+      - "Trade-offs in language design"
+      - "Why certain features became standard"
+      - "How paradigms shifted"
+
+  advanced:
+    focus: "Predicting language evolution"
+    key_points:
+      - "Lessons from language history"
+      - "What makes languages succeed"
+      - "The role of ecosystems"
+      - "Future directions: safety, performance, simplicity"

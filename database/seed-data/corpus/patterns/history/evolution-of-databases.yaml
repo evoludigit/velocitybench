@@ -1,0 +1,195 @@
+# The Evolution of Databases
+# VelocityBench Knowledge Corpus
+
+id: evolution-of-databases
+name: "The Evolution of Databases: From Relational to Cloud-Native"
+category: history
+type: timeline
+tags:
+  - databases
+  - history
+  - sql
+  - nosql
+  - data
+
+summary:
+  short: "How databases evolved from relational monoliths to distributed, cloud-native systems"
+  long: |
+    Databases have undergone radical transformation from single-server relational
+    systems to globally distributed, polyglot persistence architectures. From CODD's
+    relational model through SQL standardization, the NoSQL explosion, and modern
+    cloud-native databases, each generation solved specific problems while introducing
+    new challenges. This history traces the evolution of data storage from the 1970s
+    to today's multi-database strategies.
+
+timeline:
+  - year: 1970
+    title: "Relational Model Invented"
+    description: |
+      Edgar F. Codd published relational model paper.
+      Proposed replacing hierarchical and network databases with table-based model.
+      Revolutionary concept based on set theory.
+    innovation: "Tables, rows, columns instead of hierarchical trees"
+    impact: "Foundation for all modern SQL databases"
+
+  - year: 1974
+    title: "SQL Language Created"
+    description: |
+      IBM developed SQL (Structured Query Language) for relational database access.
+      Declarative language (describe what, not how).
+      Made databases accessible to non-programmers.
+    quote: "SQL became the lingua franca of databases"
+
+  - year: 1980s
+    title: "ACID Transactions Standardized"
+    description: |
+      Databases formalized transaction properties:
+      - Atomicity: All or nothing
+      - Consistency: Valid state to valid state
+      - Isolation: Concurrent transactions dont interfere
+      - Durability: Committed data survives failures
+    significance: "ACID made databases reliable for mission-critical systems"
+
+  - year: 1990s
+    title: "SQL Database Wars"
+    description: |
+      Oracle, Sybase, Informix, PostgreSQL, MySQL competed.
+      Enterprise databases dominated Fortune 500.
+      Open source started gaining ground.
+    market_split: "Oracle expensive, PostgreSQL free, MySQL web-friendly"
+
+  - year: 2000s
+    title: "ORM Framework Explosion"
+    description: |
+      Object-oriented programming dominated, relational databases remained.
+      ORM libraries tried to bridge gap.
+      Hibernate, SQLAlchemy, ActiveRecord.
+    challenge: "Fundamental paradigm mismatch between objects and relations"
+
+  - year: 2007
+    title: "CouchDB Document Database"
+    description: |
+      Apache CouchDB introduced document-oriented database.
+      Stored JSON documents instead of normalized tables.
+      HTTP/REST API instead of SQL.
+    innovation: "Documents as first-class citizens"
+
+  - year: 2008
+    title: "MongoDB & NoSQL Movement"
+    description: |
+      MongoDB made document databases accessible and popular.
+      Schemaless design for flexibility.
+      Started NoSQL revolution.
+    adoption: "Quick development cycles, flexible schemas"
+
+  - year: 2008-2012
+    title: "NoSQL Explosion"
+    description: |
+      Different databases for different needs:
+      - Document: MongoDB, CouchDB
+      - Key-Value: Redis, Memcached
+      - Wide-Column: HBase, Cassandra
+      - Graph: Neo4j
+    philosophy: "Right tool for right job instead of one-size-fits-all"
+
+  - year: 2011
+    title: "BASE vs ACID Split"
+    description: |
+      Databases split into two camps:
+      - ACID: Consistency-first (relational, traditional)
+      - BASE: Availability-first (NoSQL, distributed)
+    tradeoff: "Cant have both strong consistency and infinite availability"
+
+  - year: 2013
+    title: "Polyglot Persistence"
+    description: |
+      Organizations used multiple databases for different needs.
+      PostgreSQL for structured data.
+      Redis for caching.
+      Elasticsearch for full-text search.
+      MongoDB for flexible documents.
+    implication: "Operational complexity increased significantly"
+
+  - year: 2015
+    title: "Cloud-Native Databases"
+    description: |
+      Databases designed for cloud from the ground up:
+      - AWS Aurora: MySQL/PostgreSQL compatible
+      - Google Cloud Spanner: Globally distributed ACID
+      - Managed services became default.
+    shift: "From self-managed infrastructure to managed services"
+
+  - year: 2017
+    title: "MongoDB Transactions"
+    description: |
+      MongoDB added ACID transactions (multi-document).
+      Closed gap with relational databases for consistency.
+      Proved flexibility and consistency can coexist.
+    significance: "Convergence of relational and document database features"
+
+  - year: 2018
+    title: "Data Lakes & Warehousing"
+    description: |
+      Massive scale analytics databases emerged:
+      - Snowflake: Cloud data warehouse
+      - BigQuery: Serverless analytics
+      - Data Lake architectures.
+    use_case: "Analytics and business intelligence at unlimited scale"
+
+  - year: 2019
+    title: "Serverless Databases"
+    description: |
+      Cloud providers offered serverless database options:
+      - AWS DynamoDB: Serverless NoSQL
+      - Aurora Serverless: Relational database that scales to zero
+      - Google Firestore: Serverless document database.
+    benefit: "Pay per request, auto-scaling, no capacity planning"
+
+  - year: 2021
+    title: "Distributed Databases Mainstream"
+    description: |
+      Distributed architectures became standard:
+      - CockroachDB production-ready
+      - TiDB (MySQL compatible distributed database)
+      - YugabyteDB (PostgreSQL compatible)
+    significance: "Database scale no longer limited by single server"
+
+  - year: 2023
+    title: "Vector Databases"
+    description: |
+      AI/ML explosion created demand for vector databases:
+      - Pinecone: Vector search as service
+      - Milvus: Open source vector database
+      - PostgreSQL pgvector extension.
+    use_case: "Storing and searching embeddings for AI/semantic search"
+
+  - year: 2024
+    title: "AI-Native Databases"
+    description: |
+      Databases optimized for AI workloads:
+      - Built-in embeddings and vector search
+      - JSON/document support for flexible schemas
+      - Graph support for relationships.
+    current_trend: "Convergence of database capabilities"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Databases are like filing systems:
+      - Relational: Perfectly organized filing cabinets (structured)
+      - NoSQL: Flexible storage boxes (flexible)
+      - Cloud: Shared warehouse (scalable)
+
+  intermediate:
+    focus: "Understanding database tradeoffs"
+    key_points:
+      - "Why databases split into relational vs NoSQL"
+      - "ACID vs BASE consistency models"
+      - "Polyglot persistence strategy"
+
+  advanced:
+    focus: "Strategic database architecture"
+    key_points:
+      - "Distributed database design"
+      - "Consistency guarantees in distributed systems"
+      - "Data modeling for different database types"

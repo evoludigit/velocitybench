@@ -1,0 +1,244 @@
+# Rate Limiting Patterns
+# VelocityBench Knowledge Corpus
+
+id: rate-limiting
+name: "API Rate Limiting Patterns"
+category: security
+type: pattern
+tags:
+  - security
+  - rate-limiting
+  - throttling
+  - api
+  - performance
+
+summary:
+  short: "Control API request rates to prevent abuse and ensure fair usage"
+  long: |
+    Rate limiting controls how many requests a client can make in a time window.
+    It protects against abuse (DDoS, scraping), ensures fair resource allocation,
+    and prevents cascading failures. Common algorithms include fixed window,
+    sliding window, token bucket, and leaky bucket.
+
+problem:
+  description: |
+    Without rate limiting, a single client can overwhelm your API. Malicious actors
+    can launch DDoS attacks, scrapers can drain resources, and buggy clients can
+    create accidental load spikes. Rate limiting ensures stability and fairness.
+
+  symptoms:
+    - name: "Service degradation"
+      description: "Slow responses affecting all users"
+      detection: "Latency spikes correlated with traffic from specific clients"
+
+    - name: "Resource exhaustion"
+      description: "Database connections, memory, CPU maxed out"
+      detection: "Infrastructure metrics during load spikes"
+
+    - name: "Unfair resource usage"
+      description: "One client consuming majority of capacity"
+      detection: "Request distribution analysis"
+
+algorithms:
+  - name: "Fixed Window"
+    description: "Count requests in fixed time windows (e.g., per minute)"
+    how_it_works: |
+      - Divide time into fixed windows (00:00-00:59, 01:00-01:59, ...)
+      - Count requests per client in current window
+      - Reset count at window boundary
+    pros:
+      - "Simple to implement"
+      - "Memory efficient"
+    cons:
+      - "Burst at window boundaries (can get 2x limit)"
+    example: |
+      # Redis implementation
+      def is_rate_limited(client_id: str, limit: int = 100) -> bool:
+          key = f"rate:{client_id}:{int(time.time() // 60)}"
+          count = redis.incr(key)
+          if count == 1:
+              redis.expire(key, 60)
+          return count > limit
+
+  - name: "Sliding Window Log"
+    description: "Track timestamp of each request, count in rolling window"
+    how_it_works: |
+      - Store timestamp of each request
+      - Count requests in last N seconds
+      - Remove old timestamps periodically
+    pros:
+      - "Accurate rate limiting"
+      - "No boundary burst problem"
+    cons:
+      - "Memory intensive (stores all timestamps)"
+    example: |
+      def is_rate_limited(client_id: str, limit: int = 100, window: int = 60) -> bool:
+          now = time.time()
+          key = f"rate:{client_id}"
+
+          # Remove old entries
+          redis.zremrangebyscore(key, 0, now - window)
+
+          # Count requests in window
+          count = redis.zcard(key)
+
+          if count >= limit:
+              return True
+
+          # Add current request
+          redis.zadd(key, {str(now): now})
+          redis.expire(key, window)
+          return False
+
+  - name: "Sliding Window Counter"
+    description: "Weighted average of current and previous window"
+    how_it_works: |
+      - Track counts for current and previous window
+      - Calculate weighted count based on position in window
+      - Example: 70% through minute → 30% of prev + 100% of current
+    pros:
+      - "Memory efficient"
+      - "Smooths boundary bursts"
+    cons:
+      - "Approximate (not exact)"
+    example: |
+      def get_rate(client_id: str, window: int = 60) -> float:
+          now = time.time()
+          current_window = int(now // window)
+          previous_window = current_window - 1
+
+          current_count = redis.get(f"rate:{client_id}:{current_window}") or 0
+          previous_count = redis.get(f"rate:{client_id}:{previous_window}") or 0
+
+          # Weight based on position in current window
+          elapsed = now % window
+          weight = elapsed / window
+
+          return int(previous_count) * (1 - weight) + int(current_count)
+
+  - name: "Token Bucket"
+    description: "Tokens added at fixed rate, consumed per request"
+    how_it_works: |
+      - Bucket holds tokens (max = burst limit)
+      - Tokens added at constant rate
+      - Each request consumes one token
+      - No tokens = request rejected
+    pros:
+      - "Allows controlled bursts"
+      - "Smooth rate limiting"
+    cons:
+      - "More complex to implement"
+    example: |
+      class TokenBucket:
+          def __init__(self, rate: float, capacity: int):
+              self.rate = rate  # tokens per second
+              self.capacity = capacity
+              self.tokens = capacity
+              self.last_update = time.time()
+
+          def consume(self, tokens: int = 1) -> bool:
+              now = time.time()
+              # Add tokens based on elapsed time
+              elapsed = now - self.last_update
+              self.tokens = min(self.capacity, self.tokens + elapsed * self.rate)
+              self.last_update = now
+
+              if self.tokens >= tokens:
+                  self.tokens -= tokens
+                  return True
+              return False
+
+  - name: "Leaky Bucket"
+    description: "Requests queue and process at fixed rate"
+    how_it_works: |
+      - Requests enter a queue (bucket)
+      - Queue drains at constant rate
+      - If queue full, new requests rejected
+    pros:
+      - "Produces very smooth output rate"
+      - "Good for downstream protection"
+    cons:
+      - "Adds latency (queuing)"
+      - "Requires queue management"
+
+implementation_locations:
+  - name: "API Gateway"
+    description: "Rate limit at edge before hitting services"
+    examples: "Kong, AWS API Gateway, Cloudflare"
+    pros: "Protects all services, centralized config"
+
+  - name: "Load Balancer"
+    description: "Rate limit at infrastructure level"
+    examples: "Nginx, HAProxy, Envoy"
+    pros: "Low latency, high performance"
+
+  - name: "Application Level"
+    description: "Rate limit in application code"
+    examples: "Middleware, decorators"
+    pros: "Fine-grained control, business logic aware"
+
+  - name: "Database Level"
+    description: "Connection and query limits"
+    examples: "PostgreSQL connection limits, query timeouts"
+    pros: "Protects database from overload"
+
+response_headers:
+  standard: |
+    HTTP/1.1 429 Too Many Requests
+    X-RateLimit-Limit: 100
+    X-RateLimit-Remaining: 0
+    X-RateLimit-Reset: 1623456789
+    Retry-After: 30
+
+  body: |
+    {
+      "error": "rate_limit_exceeded",
+      "message": "Too many requests. Please retry after 30 seconds.",
+      "retry_after": 30
+    }
+
+strategies:
+  - name: "Per-User Limiting"
+    description: "Limit based on authenticated user ID"
+    use_case: "Protect per-user resources"
+
+  - name: "Per-IP Limiting"
+    description: "Limit based on client IP"
+    use_case: "Anonymous/unauthenticated endpoints"
+    caveat: "Shared IPs (NAT, proxies) can cause false positives"
+
+  - name: "Per-API-Key Limiting"
+    description: "Limit based on API key"
+    use_case: "B2B APIs, different tiers"
+
+  - name: "Tiered Limiting"
+    description: "Different limits for different plans"
+    example: |
+      Free: 100 requests/hour
+      Pro: 10,000 requests/hour
+      Enterprise: 1,000,000 requests/hour
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Rate limiting is like a nightclub bouncer:
+      - Fixed Window: "Only 100 people per hour, count resets on the hour"
+      - Token Bucket: "Take a ticket from the jar, we add tickets steadily"
+      - Leaky Bucket: "Form an orderly queue, we let people in one at a time"
+      Without limits, the club gets dangerously overcrowded!
+
+  intermediate:
+    focus: "Choosing and implementing rate limiting"
+    key_points:
+      - "Algorithm selection criteria"
+      - "Redis-based distributed rate limiting"
+      - "Handling rate limit responses gracefully"
+      - "Rate limit headers and best practices"
+
+  advanced:
+    focus: "Distributed and adaptive rate limiting"
+    key_points:
+      - "Global vs local rate limits"
+      - "Adaptive rate limiting based on load"
+      - "Rate limiting in microservices"
+      - "Cost-based rate limiting (expensive endpoints)"

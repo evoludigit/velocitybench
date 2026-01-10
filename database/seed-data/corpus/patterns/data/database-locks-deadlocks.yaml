@@ -1,0 +1,123 @@
+id: database-locks-deadlocks
+name: "Database Locks & Deadlocks"
+category: data
+type: pattern
+tags:
+  - database
+  - locks
+  - deadlocks
+  - concurrency
+  - transactions
+
+summary:
+  short: "Understanding and resolving database locks and deadlock situations"
+  long: |
+    Database locks are fundamental to maintaining consistency in multi-user environments, but mismanagement leads to deadlocks and performance degradation. This pattern covers lock types, deadlock detection, prevention strategies, and recovery procedures for various database systems.
+
+problem:
+  description: "Database locks prevent concurrent access conflicts but can cause deadlocks when multiple transactions wait for each other's resources"
+  symptoms:
+    - name: "Deadlock detected"
+      description: "Database reports circular wait condition between transactions"
+    - name: "Long-running queries"
+      description: "Queries blocked waiting for locks held by other transactions"
+    - name: "Timeout errors"
+      description: "Transactions fail with lock timeout exceptions"
+    - name: "Application freezes"
+      description: "Multiple connections hung waiting for lock acquisition"
+
+solution:
+  approach: "Implement lock strategies, detect deadlocks early, and design transactions to minimize lock contention"
+  key_points:
+    - "Use appropriate isolation levels (READ UNCOMMITTED, READ COMMITTED, REPEATABLE READ, SERIALIZABLE)"
+    - "Minimize transaction scope and duration"
+    - "Order lock acquisition consistently across transactions"
+    - "Implement deadlock retry logic with exponential backoff"
+    - "Monitor lock contention and use advisor locks strategically"
+
+lock_types:
+  - name: "Row-Level Locks"
+    type: "exclusive"
+    description: "Lock individual rows; highest concurrency but more overhead"
+    use_case: "High-concurrency OLTP systems"
+
+  - name: "Page-Level Locks"
+    type: "blocking"
+    description: "Lock a page (8KB block); balance between row and table locks"
+    use_case: "Medium-concurrency workloads"
+
+  - name: "Table-Level Locks"
+    type: "exclusive"
+    description: "Lock entire table; lowest overhead but blocks all concurrent access"
+    use_case: "Batch operations, maintenance tasks"
+
+  - name: "Advisory Locks"
+    type: "application"
+    description: "Application-managed locks for coordinating work outside transaction system"
+    use_case: "Distributed locking, preventing concurrent long-running operations"
+
+isolation_levels:
+  - name: "READ UNCOMMITTED"
+    description: "Allows dirty reads; lowest isolation"
+    benefits: ["High concurrency", "No blocking"]
+    risks: ["Dirty reads", "Lost updates"]
+
+  - name: "READ COMMITTED"
+    description: "Only reads committed data; default in most databases"
+    benefits: ["Good balance", "Prevents dirty reads"]
+    risks: ["Non-repeatable reads", "Phantom reads"]
+
+  - name: "REPEATABLE READ"
+    description: "Prevents non-repeatable reads within transaction"
+    benefits: ["Consistent reads", "MVCC optimization"]
+    risks: ["Phantom reads", "Higher lock contention"]
+
+  - name: "SERIALIZABLE"
+    description: "Highest isolation; prevents all anomalies"
+    benefits: ["Strongest consistency guarantee"]
+    risks: ["Lowest concurrency", "High contention"]
+
+deadlock_prevention:
+  - "Establish consistent lock ordering across all transactions"
+  - "Keep transactions as short as possible"
+  - "Avoid holding locks during I/O operations or external API calls"
+  - "Use timeouts to fail fast rather than wait indefinitely"
+  - "Monitor lock waits and analyze deadlock graphs"
+  - "Consider MVCC (Multi-Version Concurrency Control) for read-heavy workloads"
+
+deadlock_recovery:
+  - "Implement automatic retry logic with exponential backoff"
+  - "Log deadlock details for analysis"
+  - "Increase lock timeout gradually if transient"
+  - "Analyze deadlock graph to identify conflicting transactions"
+  - "Refactor transaction logic if deadlocks are recurring"
+
+tools_and_monitoring:
+  - "PostgreSQL: pg_locks view, deadlock detector, EXPLAIN ANALYZE"
+  - "MySQL: SHOW PROCESSLIST, performance_schema.events_waits_current"
+  - "SQL Server: sp_who, sp_whoisactive, Deadlock Graph in Extended Events"
+  - "Oracle: v$lock, v$session, v$transaction"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Database locks are like seats in a theater:
+      - Row locks: Individual seats (one person per seat)
+      - Table locks: Entire section (exclusive use during maintenance)
+      - Deadlock: Two people each holding a seat, both waiting for the other's seat
+
+      Solution: Buy tickets in order (lock ordering) and keep visits short.
+
+  intermediate:
+    focus: "Designing lock-free transaction patterns"
+    key_points:
+      - "Isolation levels and their tradeoffs"
+      - "MVCC for scaling read-heavy workloads"
+      - "Detecting and analyzing deadlock graphs"
+
+  advanced:
+    focus: "Large-scale lock optimization"
+    key_points:
+      - "Partitioning to reduce lock contention"
+      - "Optimistic locking with version numbers"
+      - "Lock-free algorithms and Compare-And-Swap"

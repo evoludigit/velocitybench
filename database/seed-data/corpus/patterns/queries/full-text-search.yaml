@@ -1,0 +1,313 @@
+# Full-Text Search
+# VelocityBench Knowledge Corpus
+
+id: full-text-search
+name: "Full-Text Search in PostgreSQL"
+category: queries
+type: pattern
+severity: medium
+tags:
+  - search
+  - postgresql
+  - performance
+  - text
+  - queries
+
+summary:
+  short: "Search natural language text efficiently using PostgreSQL's built-in FTS"
+  long: |
+    Full-text search (FTS) enables searching natural language documents by meaning rather
+    than exact string matching. PostgreSQL's built-in FTS parses text into tokens, applies
+    stemming (running → run), removes stop words, and uses inverted indexes for fast
+    lookups. For many use cases, PostgreSQL FTS eliminates the need for external search
+    engines like Elasticsearch.
+
+problem:
+  description: |
+    Simple LIKE queries don't work well for search:
+    - LIKE '%word%' can't use indexes, does full table scan
+    - No stemming: "running" won't match "run"
+    - No relevance ranking
+    - No handling of synonyms or stop words
+    - Poor performance on large text fields
+
+  symptoms:
+    - name: "Slow searches"
+      description: "Search queries take seconds on large tables"
+      detection: "EXPLAIN shows Seq Scan on text columns"
+
+    - name: "Poor relevance"
+      description: "Best results aren't at the top"
+      detection: "Users complain about search quality"
+
+    - name: "Exact match only"
+      description: "Plural/tense variations don't match"
+      detection: "Search for 'running' misses documents with 'run'"
+
+solution:
+  principle: "Parse text into searchable tokens, index with GIN, rank by relevance"
+
+  components:
+    - name: "tsvector"
+      type: "data type"
+      purpose: "Stores processed document text for searching"
+
+    - name: "tsquery"
+      type: "data type"
+      purpose: "Stores search query with operators"
+
+    - name: "GIN index"
+      type: "index"
+      purpose: "Inverted index for fast FTS lookups"
+
+implementation:
+  basic_setup:
+    postgresql: |
+      -- Add tsvector column for search
+      ALTER TABLE articles ADD COLUMN search_vector tsvector;
+
+      -- Populate search vector from title and content
+      UPDATE articles SET search_vector =
+          setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
+          setweight(to_tsvector('english', coalesce(content, '')), 'B');
+
+      -- Create GIN index for fast search
+      CREATE INDEX idx_articles_search ON articles USING GIN(search_vector);
+
+      -- Auto-update search vector on changes
+      CREATE OR REPLACE FUNCTION articles_search_trigger() RETURNS trigger AS $$
+      BEGIN
+          NEW.search_vector :=
+              setweight(to_tsvector('english', coalesce(NEW.title, '')), 'A') ||
+              setweight(to_tsvector('english', coalesce(NEW.content, '')), 'B');
+          RETURN NEW;
+      END
+      $$ LANGUAGE plpgsql;
+
+      CREATE TRIGGER articles_search_update
+          BEFORE INSERT OR UPDATE ON articles
+          FOR EACH ROW EXECUTE FUNCTION articles_search_trigger();
+
+  basic_queries:
+    postgresql: |
+      -- Simple search (AND between terms)
+      SELECT title, content
+      FROM articles
+      WHERE search_vector @@ to_tsquery('english', 'postgresql & performance');
+
+      -- OR search
+      SELECT title
+      FROM articles
+      WHERE search_vector @@ to_tsquery('english', 'postgresql | mysql');
+
+      -- Phrase search (words adjacent)
+      SELECT title
+      FROM articles
+      WHERE search_vector @@ to_tsquery('english', 'full <-> text <-> search');
+
+      -- Prefix search (autocomplete)
+      SELECT title
+      FROM articles
+      WHERE search_vector @@ to_tsquery('english', 'postg:*');
+
+      -- NOT operator
+      SELECT title
+      FROM articles
+      WHERE search_vector @@ to_tsquery('english', 'database & !mysql');
+
+  relevance_ranking:
+    postgresql: |
+      -- ts_rank for relevance scoring
+      SELECT
+          title,
+          ts_rank(search_vector, query) AS rank
+      FROM
+          articles,
+          to_tsquery('english', 'postgresql & index') AS query
+      WHERE
+          search_vector @@ query
+      ORDER BY
+          rank DESC
+      LIMIT 10;
+
+      -- ts_rank_cd considers document length
+      SELECT
+          title,
+          ts_rank_cd(search_vector, query) AS rank
+      FROM
+          articles,
+          to_tsquery('english', 'database & performance') AS query
+      WHERE
+          search_vector @@ query
+      ORDER BY
+          rank DESC;
+
+      -- Boost by weights (A=1.0, B=0.4, C=0.2, D=0.1)
+      SELECT
+          title,
+          ts_rank(search_vector, query, 1) AS rank  -- 1 = normalize by length
+      FROM
+          articles,
+          to_tsquery('english', 'search') AS query
+      WHERE
+          search_vector @@ query
+      ORDER BY
+          rank DESC;
+
+  highlighting:
+    postgresql: |
+      -- Highlight matching terms in results
+      SELECT
+          title,
+          ts_headline(
+              'english',
+              content,
+              to_tsquery('english', 'postgresql'),
+              'StartSel=<b>, StopSel=</b>, MaxWords=35, MinWords=15'
+          ) AS snippet
+      FROM articles
+      WHERE search_vector @@ to_tsquery('english', 'postgresql');
+
+      -- Result: "...optimizing <b>PostgreSQL</b> queries can significantly..."
+
+  user_input_handling:
+    postgresql: |
+      -- plainto_tsquery: Simple user input (spaces become AND)
+      SELECT * FROM articles
+      WHERE search_vector @@ plainto_tsquery('english', 'database performance');
+      -- Equivalent to: 'database & performance'
+
+      -- phraseto_tsquery: Phrase matching
+      SELECT * FROM articles
+      WHERE search_vector @@ phraseto_tsquery('english', 'full text search');
+      -- Equivalent to: 'full <-> text <-> search'
+
+      -- websearch_to_tsquery: Google-like syntax (PostgreSQL 11+)
+      SELECT * FROM articles
+      WHERE search_vector @@ websearch_to_tsquery('english', 'postgresql -mysql "full text"');
+      -- Supports: OR, -, "quoted phrases"
+
+    python: |
+      from sqlalchemy import func, select
+
+      def search_articles(query: str, limit: int = 10):
+          """Search articles with user-provided query."""
+          # Use websearch_to_tsquery for flexible user input
+          ts_query = func.websearch_to_tsquery('english', query)
+
+          stmt = (
+              select(
+                  Article.id,
+                  Article.title,
+                  func.ts_rank(Article.search_vector, ts_query).label('rank'),
+                  func.ts_headline(
+                      'english',
+                      Article.content,
+                      ts_query,
+                      'MaxWords=50'
+                  ).label('snippet')
+              )
+              .where(Article.search_vector.op('@@')(ts_query))
+              .order_by(func.ts_rank(Article.search_vector, ts_query).desc())
+              .limit(limit)
+          )
+
+          return session.execute(stmt).fetchall()
+
+advanced_features:
+  - name: "Custom Dictionary"
+    description: "Add domain-specific terms and synonyms"
+    example: |
+      -- Create custom dictionary
+      CREATE TEXT SEARCH DICTIONARY tech_synonyms (
+          TEMPLATE = synonym,
+          SYNONYMS = tech_terms  -- File: $SHAREDIR/tsearch_data/tech_terms.syn
+      );
+
+      -- tech_terms.syn file:
+      -- postgres postgresql
+      -- js javascript
+      -- db database
+
+  - name: "Multiple Languages"
+    description: "Support different language stemmers"
+    example: |
+      -- Search vector with language detection
+      ALTER TABLE articles ADD COLUMN language TEXT DEFAULT 'english';
+
+      UPDATE articles SET search_vector =
+          to_tsvector(language::regconfig, coalesce(title, '') || ' ' || coalesce(content, ''));
+
+      -- Query with specific language
+      SELECT * FROM articles
+      WHERE search_vector @@ to_tsquery('french', 'recherche');
+
+  - name: "Faceted Search"
+    description: "Filter and aggregate search results"
+    example: |
+      -- Search with category facets
+      SELECT
+          category,
+          COUNT(*) as count
+      FROM articles
+      WHERE search_vector @@ websearch_to_tsquery('english', 'database')
+      GROUP BY category
+      ORDER BY count DESC;
+
+      -- Search within category
+      SELECT * FROM articles
+      WHERE search_vector @@ websearch_to_tsquery('english', 'optimization')
+      AND category = 'performance'
+      ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', 'optimization')) DESC;
+
+performance_tips:
+  - name: "Use generated column (PostgreSQL 12+)"
+    example: |
+      -- More efficient than triggers
+      ALTER TABLE articles ADD COLUMN search_vector tsvector
+          GENERATED ALWAYS AS (
+              setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
+              setweight(to_tsvector('english', coalesce(content, '')), 'B')
+          ) STORED;
+
+  - name: "Partial index for active records"
+    example: |
+      CREATE INDEX idx_active_articles_search
+          ON articles USING GIN(search_vector)
+          WHERE deleted_at IS NULL AND status = 'published';
+
+  - name: "Limit expensive operations"
+    example: |
+      -- ts_headline is expensive, limit usage
+      SELECT
+          id, title,
+          CASE WHEN rank > 0.1 THEN
+              ts_headline('english', content, query, 'MaxWords=35')
+          ELSE
+              substring(content, 1, 150) || '...'
+          END as snippet
+      FROM ...
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Full-text search is like a book's index:
+      - LIKE '%word%': Read every page to find "database"
+      - FTS: Look up "database" in the index, go directly to pages 12, 45, 89
+      The index is pre-built so searches are instant!
+
+  intermediate:
+    focus: "Setting up FTS with ranking and highlighting"
+    key_points:
+      - "tsvector and tsquery basics"
+      - "Creating and maintaining GIN indexes"
+      - "Relevance ranking with ts_rank"
+      - "Highlighting matches for display"
+
+  advanced:
+    focus: "Advanced FTS configuration and scaling"
+    key_points:
+      - "Custom dictionaries and thesaurus"
+      - "Multi-language support"
+      - "When to use PostgreSQL FTS vs Elasticsearch"
+      - "Trigram indexes for fuzzy matching"

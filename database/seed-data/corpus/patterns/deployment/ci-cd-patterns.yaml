@@ -1,0 +1,266 @@
+# CI/CD Patterns for APIs
+# VelocityBench Knowledge Corpus
+
+id: ci-cd-patterns
+name: "CI/CD Patterns for Backend APIs"
+category: deployment
+type: pattern
+tags:
+  - ci-cd
+  - deployment
+  - devops
+  - automation
+  - pipelines
+
+summary:
+  short: "Automate testing, building, and deploying backend APIs"
+  long: |
+    CI/CD (Continuous Integration/Continuous Deployment) automates the path from
+    code commit to production. CI ensures code changes work together through
+    automated testing. CD automates deployment, enabling frequent, reliable releases.
+    Modern APIs deploy multiple times per day using these patterns.
+
+problem:
+  description: |
+    Manual deployments are slow, error-prone, and stressful. Without automation,
+    teams deploy infrequently, leading to big-bang releases with accumulated risk.
+    Integration problems are discovered late, and rollbacks are painful.
+
+  symptoms:
+    - name: "Deployment anxiety"
+      description: "Releases are stressful, require war rooms"
+      detection: "Team dreads deployment days"
+
+    - name: "Long release cycles"
+      description: "Weeks between deployments"
+      detection: "Large batches of changes per release"
+
+    - name: "Integration hell"
+      description: "Merging branches causes conflicts and bugs"
+      detection: "Painful merge processes"
+
+ci_pipeline:
+  stages:
+    - name: "Checkout"
+      description: "Get code from repository"
+      actions:
+        - "Clone repository"
+        - "Checkout branch/commit"
+
+    - name: "Install Dependencies"
+      description: "Install packages and tools"
+      actions:
+        - "Install runtime dependencies"
+        - "Install dev dependencies"
+        - "Cache for speed"
+
+    - name: "Lint"
+      description: "Check code style and quality"
+      tools: ["ESLint", "Ruff", "Prettier", "RuboCop"]
+      fail_fast: true
+
+    - name: "Type Check"
+      description: "Verify type safety"
+      tools: ["TypeScript", "mypy", "pyright"]
+
+    - name: "Unit Tests"
+      description: "Run fast, isolated tests"
+      parallel: true
+      coverage: "Collect coverage metrics"
+
+    - name: "Build"
+      description: "Compile/bundle application"
+      outputs: ["Docker image", "Binary", "Bundle"]
+
+    - name: "Integration Tests"
+      description: "Test with real dependencies"
+      requires: ["Database", "Redis", "Other services"]
+
+    - name: "Security Scan"
+      description: "Check for vulnerabilities"
+      tools: ["Snyk", "Trivy", "npm audit"]
+
+  example_github_actions: |
+    name: CI
+
+    on:
+      push:
+        branches: [main]
+      pull_request:
+        branches: [main]
+
+    jobs:
+      test:
+        runs-on: ubuntu-latest
+        services:
+          postgres:
+            image: postgres:15
+            env:
+              POSTGRES_PASSWORD: postgres
+            options: >-
+              --health-cmd pg_isready
+              --health-interval 10s
+            ports:
+              - 5432:5432
+
+        steps:
+          - uses: actions/checkout@v4
+
+          - uses: actions/setup-python@v5
+            with:
+              python-version: '3.12'
+
+          - name: Install dependencies
+            run: |
+              pip install uv
+              uv sync
+
+          - name: Lint
+            run: ruff check .
+
+          - name: Type check
+            run: mypy src/
+
+          - name: Test
+            run: pytest --cov=src/
+            env:
+              DATABASE_URL: postgres://postgres:postgres@localhost/test
+
+          - name: Upload coverage
+            uses: codecov/codecov-action@v3
+
+cd_strategies:
+  - name: "Rolling Deployment"
+    description: "Gradually replace old instances with new"
+    pros:
+      - "No downtime"
+      - "Easy rollback"
+      - "Resource efficient"
+    cons:
+      - "Multiple versions running simultaneously"
+      - "Database migrations must be backwards compatible"
+    diagram: |
+      v1 v1 v1 v1  →  v1 v1 v1 v2  →  v1 v1 v2 v2  →  v2 v2 v2 v2
+
+  - name: "Blue-Green Deployment"
+    description: "Two identical environments, switch traffic"
+    pros:
+      - "Instant rollback"
+      - "Test in production environment"
+      - "No mixed versions"
+    cons:
+      - "Double infrastructure cost"
+      - "Database state synchronization"
+    diagram: |
+      Blue (v1) ← Traffic
+      Green (v2) [idle]
+
+      → Switch →
+
+      Blue (v1) [idle]
+      Green (v2) ← Traffic
+
+  - name: "Canary Deployment"
+    description: "Route small percentage of traffic to new version"
+    pros:
+      - "Test with real traffic"
+      - "Gradual rollout"
+      - "Quick detection of issues"
+    cons:
+      - "Requires traffic management"
+      - "Monitoring complexity"
+    diagram: |
+      v1 ← 95% traffic
+      v2 ← 5% traffic (canary)
+
+      → If OK →
+
+      v1 ← 50% traffic
+      v2 ← 50% traffic
+
+      → Full rollout →
+
+      v2 ← 100% traffic
+
+  - name: "Feature Flags"
+    description: "Deploy code but toggle features on/off"
+    pros:
+      - "Decouple deploy from release"
+      - "A/B testing"
+      - "Quick disable without deploy"
+    tools: ["LaunchDarkly", "Flagsmith", "Unleash"]
+    example: |
+      if feature_flags.is_enabled("new_checkout"):
+          return new_checkout_flow()
+      else:
+          return legacy_checkout_flow()
+
+database_migrations_in_cd:
+  principles:
+    - "Migrations must be backwards compatible"
+    - "Run migrations before deploying new code"
+    - "Never remove columns in same deploy that removes code"
+
+  expand_contract_pattern: |
+    # Deploy 1: Expand (add new column)
+    ALTER TABLE users ADD COLUMN full_name VARCHAR(255);
+
+    # Deploy 2: Code writes to both old and new
+    # Backfill: UPDATE users SET full_name = first_name || ' ' || last_name;
+
+    # Deploy 3: Code only uses new column
+
+    # Deploy 4: Contract (remove old columns)
+    ALTER TABLE users DROP COLUMN first_name, DROP COLUMN last_name;
+
+monitoring_in_cd:
+  - name: "Deployment Markers"
+    description: "Mark deployments in monitoring tools"
+    purpose: "Correlate metrics changes with deploys"
+
+  - name: "Automatic Rollback"
+    description: "Rollback if error rate exceeds threshold"
+    example: |
+      if error_rate > 1%:
+          trigger_rollback()
+          alert_oncall()
+
+  - name: "Smoke Tests"
+    description: "Quick health checks after deploy"
+    example: |
+      - Check /health endpoint
+      - Verify database connectivity
+      - Test critical endpoints
+
+best_practices:
+  - "Commit small, commit often"
+  - "Run all tests before merge"
+  - "Deploy the same artifact to all environments"
+  - "Use environment variables for configuration"
+  - "Automate everything (no manual steps)"
+  - "Monitor deployments in real-time"
+  - "Have rollback plan ready"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      CI/CD is like an assembly line in a factory:
+      - CI: Quality checks at each station (tests catch defects early)
+      - CD: Conveyor belt to shipping (automated, consistent delivery)
+      Without automation, you're building cars by hand - slow and inconsistent!
+
+  intermediate:
+    focus: "Building a complete CI/CD pipeline"
+    key_points:
+      - "Pipeline stages and ordering"
+      - "Environment management"
+      - "Database migration strategies"
+      - "Secrets management"
+
+  advanced:
+    focus: "CD for distributed systems"
+    key_points:
+      - "Progressive delivery (canary, feature flags)"
+      - "Multi-region deployments"
+      - "GitOps patterns"
+      - "Zero-downtime database migrations"

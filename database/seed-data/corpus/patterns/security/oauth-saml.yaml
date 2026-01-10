@@ -1,0 +1,65 @@
+id: oauth-saml
+name: "OAuth, SAML, and SSO Authentication Patterns"
+category: security
+type: pattern
+tags:
+  - security
+  - authentication
+  - oauth
+  - saml
+  - sso
+
+summary:
+  short: "Enterprise authentication protocols for single sign-on across systems"
+  long: |
+    OAuth 2.0 and SAML 2.0 enable single sign-on (SSO) and delegated
+    authentication. OAuth uses bearer tokens (modern), while SAML uses
+    XML assertions (legacy enterprise). Understanding both is critical
+    for enterprise architecture.
+
+protocols:
+  - name: "OAuth 2.0"
+    year: "2012"
+    use_case: "Delegated authorization, modern web/mobile"
+    flows:
+      - "Authorization Code"
+      - "Client Credentials"
+      - "Implicit"
+      - "Password"
+  
+  - name: "OpenID Connect"
+    year: "2014"
+    use_case: "Authentication on top of OAuth"
+    adds: "ID tokens for identity"
+  
+  - name: "SAML 2.0"
+    year: "2005"
+    use_case: "Enterprise SSO"
+    format: "XML assertions"
+
+comparison:
+  oauth: ["Modern", "Lightweight", "Token-based", "Web/Mobile", "Flexible"]
+  saml: ["Enterprise", "Heavyweight", "Assertion-based", "Browser-based", "Strict"]
+
+blog_hooks:
+  beginner:
+    analogy: |
+      OAuth vs SAML is like:
+      - OAuth: Giving your hotel room key to a valet
+      - SAML: Presenting ID at airport security
+      
+      Different use cases, different approaches.
+
+  intermediate:
+    focus: "Implementing SSO"
+    key_points:
+      - "OAuth 2.0 flows"
+      - "Token validation"
+      - "Session management"
+
+  advanced:
+    focus: "Enterprise authentication architecture"
+    key_points:
+      - "Federated identity"
+      - "Security considerations"
+      - "Multi-tenant SSO"

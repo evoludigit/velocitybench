@@ -1,0 +1,96 @@
+id: evolution-of-open-source
+name: "The Evolution of Open Source Software"
+category: history
+type: timeline
+tags:
+  - open-source
+  - history
+  - licensing
+  - community
+
+summary:
+  short: "How open source evolved from free software movement to industry standard"
+  long: |
+    Open source software transformed from niche movement to cornerstone of
+    modern technology. From early free software philosophy, through Apache and
+    Linux dominance, to modern collaborative development, open source became
+    how software gets built.
+
+timeline:
+  - year: 1983
+    title: "Free Software Movement Begins"
+    description: "Richard Stallman launches GNU Project"
+    philosophy: "Software should be free for users to study and modify"
+  
+  - year: 1989
+    title: "GPL License Created"
+    description: "First copyleft license requiring derivative works be open"
+    impact: "Defined open source licensing model"
+  
+  - year: 1991
+    title: "Linux Kernel Released"
+    description: "Linus Torvalds releases Linux under GPL"
+    significance: "Open source could power entire systems"
+  
+  - year: 1995
+    title: "Apache Web Server"
+    description: "Most popular web server, licensed under Apache License"
+    model: "Meritocratic governance, community-driven"
+  
+  - year: 1998
+    title: "Open Source Initiative"
+    description: "Bruce Perens and Eric Raymond formalize open source definition"
+    shift: "Movement towards pragmatic, business-friendly open source"
+  
+  - year: 2005
+    title: "GitHub Founded"
+    description: "Distributed version control made collaboration easy"
+    impact: "Democratized open source contributions"
+  
+  - year: 2010s
+    title: "Open Source Mainstream"
+    description: "Companies embrace open source"
+    adoption: "Google, Microsoft, Apple contribute to open source"
+  
+  - year: 2020s
+    title: "Open Source Sustainability Crisis"
+    description: "Popular projects struggle with maintenance and funding"
+    challenge: "Unpaid developers burning out"
+
+key_developments:
+  - name: "Licenses"
+    items: ["GPL", "MIT", "Apache", "BSD", "ISC"]
+  
+  - name: "Communities"
+    items: ["Linux", "Apache", "Mozilla", "Python", "JavaScript"]
+  
+  - name: "Business Models"
+    items: ["Pure open source", "Open core", "SaaS", "Support/training"]
+
+lessons:
+  - "Open source creates value"
+  - "Community matters"
+  - "Licensing is important"
+  - "Sustainability is challenge"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Open source is like public libraries:
+      - Free access to knowledge
+      - Community contribution
+      - Building on shared resources
+
+  intermediate:
+    focus: "Open source dynamics"
+    key_points:
+      - "License implications"
+      - "Community governance"
+      - "Contributing to projects"
+
+  advanced:
+    focus: "Open source sustainability"
+    key_points:
+      - "Business models"
+      - "Community building"
+      - "Long-term maintenance"

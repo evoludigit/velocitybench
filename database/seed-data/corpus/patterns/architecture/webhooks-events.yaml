@@ -1,0 +1,146 @@
+id: webhooks-events
+name: "Webhooks & Event Notifications"
+category: architecture
+type: pattern
+tags:
+  - api
+  - webhooks
+  - events
+  - notifications
+  - asynchronous
+
+summary:
+  short: "Delivering real-time events and notifications to clients via webhooks"
+  long: |
+    Instead of clients polling for changes, webhooks push events to client-specified URLs. This enables real-time integrations but introduces delivery challenges: reliability, ordering, deduplication, and failure handling.
+
+problem:
+  description: "Clients need real-time notifications but polling is inefficient; webhooks are complex to implement reliably"
+  symptoms:
+    - name: "Missed events"
+      description: "Webhook delivery fails; client unaware of event"
+    - name: "Duplicate events"
+      description: "Same event delivered multiple times"
+    - name: "Out-of-order events"
+      description: "Events arrive out of sequence"
+    - name: "Unreliable webhooks"
+      description: "Client-side webhook receiver is flaky"
+
+solution:
+  approach: "Implement reliable webhook delivery with retries, deduplication, ordering guarantees, and verification"
+  key_points:
+    - "Support webhook registration and management"
+    - "Implement retry logic with exponential backoff"
+    - "Sign webhooks cryptographically for verification"
+    - "Provide delivery status and replay capabilities"
+    - "Document webhook format and error handling"
+
+webhook_delivery_flow:
+  step_1: "Event occurs (e.g., payment processed)"
+  step_2: "Server generates webhook event payload"
+  step_3: "Server looks up registered webhook URLs"
+  step_4: "Server sends HTTP POST to webhook URL"
+  step_5: "Wait for response (2xx = success, 4xx = client error, 5xx = retry)"
+  step_6: "If failure, retry with exponential backoff"
+  step_7: "Store delivery status and log for debugging"
+
+retry_strategies:
+  exponential_backoff:
+    attempt_1: "Immediately"
+    attempt_2: "After 5 seconds"
+    attempt_3: "After 30 seconds"
+    attempt_4: "After 5 minutes"
+    attempt_5: "After 1 hour"
+    max_attempts: "Usually 5-10 attempts over 24-48 hours"
+
+  status_codes:
+    success: "2xx - webhook handled successfully"
+    client_error: "4xx - webhook rejected by client (don't retry)"
+    server_error: "5xx - server error (retry)"
+    timeout: "No response within 30s (retry)"
+
+webhook_deduplication:
+  - name: "Event ID Tracking"
+    method: "Include unique event_id in payload; client deduplicates by event_id"
+    responsibility: "Shared: server sends id, client tracks"
+    reliability: "Good if client implements properly"
+
+  - name: "Idempotency Keys"
+    method: "Include idempotent_key matching the operation that triggered webhook"
+    responsibility: "Client uses key to detect duplicates"
+    reliability: "Works with proper idempotence"
+
+  - name: "Timestamp-Based"
+    method: "Client ignores webhooks older than expected timestamp"
+    responsibility: "Client clock sync needed"
+    reliability: "Unreliable due to clock skew"
+
+ordering_guarantees:
+  sequential: "Events delivered in strict order (slow, blocks on failures)"
+  causal: "Related events ordered, unrelated events can be concurrent"
+  best_effort: "No ordering guarantee (fast, but application must handle)"
+
+webhook_security:
+  signing: "HMAC-SHA256 signature of payload using shared secret"
+  verification: "Client verifies signature before processing"
+  headers: "X-Webhook-Signature: sha256=<hash>"
+
+  implementation:
+    server: "signature = hmac_sha256(secret, json_body)"
+    client: "expected = hmac_sha256(secret, received_body); assert signature == expected"
+
+webhook_management:
+  registration: "Client registers webhook URL (POST /webhooks)"
+  verification: "Server sends ping webhook; client must respond with correct value"
+  status_page: "Clients see delivery status and retry history"
+  replay: "Ability to re-deliver failed webhooks"
+  filtering: "Client selects which event types to receive"
+
+failure_modes:
+  - name: "Client Unreachable"
+    cause: "Network issue, DNS failure, timeout"
+    handling: "Retry with exponential backoff; alert client after failures"
+
+  - name: "Client Error (4xx)"
+    cause: "Bad endpoint, authentication failure, validation error"
+    handling: "Don't retry; alert client to fix issue"
+
+  - name: "Client Processing Slow"
+    cause: "Client takes > 30s to process webhook"
+    handling: "Don't wait; recommend async processing on client side"
+
+  - name: "Duplicate Delivery"
+    cause: "Retry while first attempt still processing"
+    handling: "Client deduplicates by event_id or idempotency_key"
+
+webhook_best_practices:
+  - "Include timestamp and event_id in every webhook"
+  - "Keep webhook payload small (< 1MB)"
+  - "Sign webhooks for security verification"
+  - "Provide delivery status dashboard for clients"
+  - "Support webhook replay for debugging"
+  - "Document error codes and retry behavior"
+  - "Test webhook endpoints with synthetic events"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Webhooks are like a doorbell:
+      - Polling: Constantly knock on neighbor's door asking "Any messages?"
+      - Webhooks: Install doorbell; neighbor pushes it when ready
+
+      Webhooks are more efficient; neighbor notifies you rather than you checking constantly.
+
+  intermediate:
+    focus: "Implementing reliable webhooks"
+    key_points:
+      - "Signing and verifying webhooks"
+      - "Retry strategies and exponential backoff"
+      - "Deduplication and ordering"
+
+  advanced:
+    focus: "Webhook infrastructure at scale"
+    key_points:
+      - "Distributed webhook delivery systems"
+      - "Handling millions of webhook subscriptions"
+      - "Exactly-once delivery semantics"

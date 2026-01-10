@@ -1,0 +1,131 @@
+id: api-deprecation
+name: "API Deprecation & Sunset Policies"
+category: architecture
+type: pattern
+tags:
+  - api
+  - versioning
+  - backwards-compatibility
+  - communication
+  - operations
+
+summary:
+  short: "Gracefully removing or changing API endpoints while managing client migration"
+  long: |
+    APIs evolve; endpoints become obsolete or need replacement. Deprecating endpoints without breaking clients requires clear communication, migration paths, and sunset deadlines. This pattern covers deprecation strategies and client communication.
+
+problem:
+  description: "Removing or changing endpoints breaks clients; poorly managed deprecation causes outages"
+  symptoms:
+    - name: "Unexpected breakage"
+      description: "Clients break when deprecated endpoints removed without notice"
+    - name: "Support burden"
+      description: "Fielding questions about API changes"
+    - name: "Slow migration"
+      description: "Clients unaware of deprecation, don't migrate"
+    - name: "Maintenance burden"
+      description: "Supporting multiple API versions is expensive"
+
+solution:
+  approach: "Announce deprecation early, provide migration path, enforce sunset with reasonable notice"
+  key_points:
+    - "Follow semantic versioning"
+    - "Announce deprecations 6-12 months before removal"
+    - "Provide clear migration documentation"
+    - "Offer 1:1 support for critical clients"
+    - "Monitor deprecation adoption and extend if needed"
+
+deprecation_timeline:
+  announcement: "0 months - Announce on blog/changelog"
+  warning_period: "3-6 months - Include deprecation headers/warnings"
+  critical_migration: "6-9 months - Reach out to high-volume users"
+  enforcement: "12 months - Remove endpoint, monitor for breakage"
+
+deprecation_signaling:
+  header: "Deprecation: true"
+  explanation: "Deprecation: endpoint will be removed 2024-12-31"
+  link: "Sunset-Link: https://api.example.com/migration-guide"
+
+  response_status: "200 OK (continue serving) but include deprecation headers"
+  not_status_code: "410 Gone (too aggressive) or 451 Unavailable (wrong semantics)"
+
+migration_strategies:
+  - name: "Replace with New Endpoint"
+    old: "GET /api/v1/users/:id"
+    new: "GET /api/v2/users/:id"
+    approach: "Parallel operation, gradual traffic shift"
+    duration: "6-12 months"
+
+  - name: "Rename Endpoint"
+    old: "GET /api/resource"
+    new: "GET /api/resources (plural)"
+    approach: "Keep old endpoint working, alias to new"
+    duration: "3-6 months"
+
+  - name: "Merge Endpoints"
+    old: "GET /api/user, GET /api/profile (two endpoints)"
+    new: "GET /api/users/:id/profile (combined)"
+    approach: "Redirect or proxy old to new"
+    duration: "6-12 months"
+
+  - name: "Change API Style"
+    old: "SOAP/RPC style"
+    new: "REST style"
+    approach: "Provide adapters or migration tooling"
+    duration: "12-24 months (major effort)"
+
+communication_channels:
+  - "API changelog (blog, API docs)"
+  - "Email to registered API key owners"
+  - "Slack/Discord community announcements"
+  - "GitHub issues and PRs in client libraries"
+  - "Deprecation headers in API responses"
+  - "Developer portal or dashboard alerts"
+
+monitoring_deprecation:
+  - "Track endpoint usage by client"
+  - "Alert if high-volume clients still using deprecated endpoint"
+  - "Provide migration tools or scripts"
+  - "Offer office hours for migration questions"
+  - "Monitor support tickets for deprecation-related issues"
+
+backwards_compatibility_tradeoffs:
+  - name: "Full Compatibility"
+    effort: "High - maintain multiple implementations"
+    timeline: "Slow - can't move fast"
+    safety: "Safe for clients - no surprises"
+
+  - name: "Deprecation Warnings"
+    effort: "Medium - parallel support + warnings"
+    timeline: "Moderate - 6-12 months"
+    safety: "Good - advance notice"
+
+  - name: "Breaking Changes"
+    effort: "Low - simple, clean code"
+    timeline: "Fast - no legacy code"
+    safety: "Poor - client breakage"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      API deprecation is like road construction:
+      - Announce: "This road will close in 1 year" (give notice)
+      - Build: New highway alongside old road
+      - Migrate: Gradually move traffic to new highway
+      - Close: Once traffic moved, remove old road
+
+      Surprised drivers crash; notice lets drivers plan alternate routes.
+
+  intermediate:
+    focus: "Managing API lifecycle"
+    key_points:
+      - "Deprecation timeline and communication"
+      - "Monitoring client migration progress"
+      - "Feature flags vs versioning for gradual rollout"
+
+  advanced:
+    focus: "Large-scale API evolution"
+    key_points:
+      - "Multi-version support strategies"
+      - "Zero-downtime deployments with feature flags"
+      - "Coordinating deprecation across ecosystem"

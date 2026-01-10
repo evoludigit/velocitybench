@@ -1,0 +1,80 @@
+id: load-testing
+name: "Load Testing Strategies and Tools"
+category: testing
+type: pattern
+tags:
+  - testing
+  - performance
+  - load
+  - stress
+
+summary:
+  short: "Load testing techniques to verify system behavior under stress"
+  long: |
+    Load testing verifies that systems perform acceptably under expected and
+    peak loads. Tools like JMeter, Gatling, and k6 simulate thousands of
+    concurrent users to identify bottlenecks before production issues occur.
+
+key_tools:
+  - name: "JMeter"
+    purpose: "Load testing HTTP servers and applications"
+    strengths: ["GUI support", "Rich plugins", "Community", "Low cost"]
+  
+  - name: "Gatling"
+    purpose: "High performance load testing in Scala"
+    strengths: ["Performance", "Realistic simulations", "Great reports"]
+  
+  - name: "k6"
+    purpose: "Modern load testing with JavaScript"
+    strengths: ["Easy to write", "Cloud scaling", "Real-time metrics"]
+  
+  - name: "Locust"
+    purpose: "Python-based load testing framework"
+    strengths: ["Python familiar", "Distributed", "Real-time web UI"]
+
+testing_strategy:
+  - phase: "Baseline"
+    description: "Establish normal operating metrics"
+  
+  - phase: "Ramp Up"
+    description: "Gradually increase load to find breaking point"
+  
+  - phase: "Peak Load"
+    description: "Test at maximum expected load"
+  
+  - phase: "Stress Test"
+    description: "Push beyond expected load to find limits"
+  
+  - phase: "Soak Test"
+    description: "Run at moderate load for extended period"
+
+metrics_to_measure:
+  - "Response Time (p50, p95, p99)"
+  - "Throughput (requests per second)"
+  - "Error Rate"
+  - "Resource Utilization (CPU, Memory, Network)"
+  - "Database Connection Pool Utilization"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Load testing is like stress testing a bridge:
+      - Normal traffic: Everyday cars
+      - Peak load: Rush hour traffic
+      - Stress: Heavy trucks and simultaneous events
+      
+      Find the breaking point before it breaks in production.
+
+  intermediate:
+    focus: "Designing realistic load tests"
+    key_points:
+      - "Simulating real user behavior"
+      - "Identifying bottlenecks"
+      - "Load testing distributed systems"
+
+  advanced:
+    focus: "Load testing at scale"
+    key_points:
+      - "Distributed load generation"
+      - "Cloud-based load testing"
+      - "Continuous load testing in CI/CD"

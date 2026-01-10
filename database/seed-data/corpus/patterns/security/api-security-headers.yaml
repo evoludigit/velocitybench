@@ -1,0 +1,304 @@
+# API Security Headers
+# VelocityBench Knowledge Corpus
+
+id: api-security-headers
+name: "HTTP Security Headers for APIs"
+category: security
+type: pattern
+severity: high
+tags:
+  - security
+  - http
+  - headers
+  - api
+  - web
+
+summary:
+  short: "Configure HTTP headers to protect against common web attacks"
+  long: |
+    HTTP security headers instruct browsers and clients how to handle your content
+    securely. They protect against XSS, clickjacking, MIME sniffing, and other attacks.
+    Headers like Content-Security-Policy, X-Frame-Options, and Strict-Transport-Security
+    are essential layers of defense that cost nothing to implement but provide significant
+    protection.
+
+problem:
+  description: |
+    Without security headers, browsers use insecure defaults:
+    - Scripts from any source can execute (XSS)
+    - Your site can be embedded in malicious frames (clickjacking)
+    - Browsers may incorrectly guess content types (MIME confusion)
+    - Connections may be downgraded from HTTPS to HTTP
+    - Sensitive data may leak through referrer headers
+
+  symptoms:
+    - name: "XSS vulnerabilities"
+      description: "Malicious scripts execute in user browsers"
+      detection: "Security scanner findings, user reports"
+
+    - name: "Clickjacking attacks"
+      description: "Users tricked into clicking hidden elements"
+      detection: "Reports of unauthorized actions"
+
+    - name: "Security audit failures"
+      description: "Penetration tests flag missing headers"
+      detection: "securityheaders.com scan, audit reports"
+
+solution:
+  principle: "Defense in depth - headers complement application security"
+
+  essential_headers:
+    - name: "Content-Security-Policy"
+      purpose: "Control which resources can be loaded"
+      priority: "Critical"
+
+    - name: "Strict-Transport-Security"
+      purpose: "Force HTTPS connections"
+      priority: "Critical"
+
+    - name: "X-Content-Type-Options"
+      purpose: "Prevent MIME type sniffing"
+      priority: "High"
+
+    - name: "X-Frame-Options"
+      purpose: "Prevent clickjacking"
+      priority: "High"
+
+implementation:
+  all_headers:
+    python_fastapi: |
+      from fastapi import FastAPI
+      from fastapi.middleware.cors import CORSMiddleware
+      from starlette.middleware.base import BaseHTTPMiddleware
+      from starlette.requests import Request
+
+      app = FastAPI()
+
+      class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+          async def dispatch(self, request: Request, call_next):
+              response = await call_next(request)
+
+              # Prevent XSS and injection attacks
+              response.headers["Content-Security-Policy"] = (
+                  "default-src 'self'; "
+                  "script-src 'self'; "
+                  "style-src 'self' 'unsafe-inline'; "
+                  "img-src 'self' data: https:; "
+                  "font-src 'self'; "
+                  "connect-src 'self' https://api.example.com; "
+                  "frame-ancestors 'none'; "
+                  "base-uri 'self'; "
+                  "form-action 'self';"
+              )
+
+              # Force HTTPS for 1 year, include subdomains
+              response.headers["Strict-Transport-Security"] = (
+                  "max-age=31536000; includeSubDomains; preload"
+              )
+
+              # Prevent MIME type sniffing
+              response.headers["X-Content-Type-Options"] = "nosniff"
+
+              # Prevent clickjacking
+              response.headers["X-Frame-Options"] = "DENY"
+
+              # Control referrer information
+              response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+
+              # Opt out of Google FLoC
+              response.headers["Permissions-Policy"] = (
+                  "accelerometer=(), camera=(), geolocation=(), "
+                  "gyroscope=(), magnetometer=(), microphone=(), "
+                  "payment=(), usb=(), interest-cohort=()"
+              )
+
+              # For API responses
+              response.headers["X-Content-Type-Options"] = "nosniff"
+              response.headers["Cache-Control"] = "no-store"
+
+              return response
+
+      app.add_middleware(SecurityHeadersMiddleware)
+
+    express_javascript: |
+      const helmet = require('helmet');
+      const express = require('express');
+
+      const app = express();
+
+      // Helmet sets secure headers automatically
+      app.use(helmet({
+        contentSecurityPolicy: {
+          directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            imgSrc: ["'self'", "data:", "https:"],
+            connectSrc: ["'self'", "https://api.example.com"],
+            frameSrc: ["'none'"],
+            objectSrc: ["'none'"],
+          },
+        },
+        hsts: {
+          maxAge: 31536000,
+          includeSubDomains: true,
+          preload: true,
+        },
+        frameguard: { action: 'deny' },
+        referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+      }));
+
+      // Additional API-specific headers
+      app.use((req, res, next) => {
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Cache-Control', 'no-store');
+        next();
+      });
+
+    nginx: |
+      # nginx.conf security headers
+      server {
+          listen 443 ssl http2;
+
+          # HSTS
+          add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+
+          # CSP
+          add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';" always;
+
+          # Prevent clickjacking
+          add_header X-Frame-Options "DENY" always;
+
+          # Prevent MIME sniffing
+          add_header X-Content-Type-Options "nosniff" always;
+
+          # Referrer policy
+          add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+          # Permissions policy
+          add_header Permissions-Policy "accelerometer=(), camera=(), geolocation=()" always;
+
+          location /api/ {
+              # API-specific headers
+              add_header Cache-Control "no-store" always;
+              proxy_pass http://backend;
+          }
+      }
+
+header_reference:
+  - name: "Content-Security-Policy (CSP)"
+    purpose: "Whitelist allowed content sources"
+    values: |
+      default-src 'self';           # Default to same-origin only
+      script-src 'self';            # Scripts from same origin
+      style-src 'self' 'unsafe-inline';  # Styles (inline needed for many frameworks)
+      img-src 'self' data: https:;  # Images from same origin, data URIs, HTTPS
+      connect-src 'self' https://api.example.com;  # AJAX/WebSocket destinations
+      frame-ancestors 'none';        # Prevent embedding (replaces X-Frame-Options)
+      base-uri 'self';              # Restrict <base> tag
+      form-action 'self';           # Form submission targets
+    note: "Start strict, loosen as needed. Use report-uri for monitoring."
+
+  - name: "Strict-Transport-Security (HSTS)"
+    purpose: "Force HTTPS connections"
+    values: |
+      max-age=31536000              # Remember for 1 year
+      includeSubDomains             # Apply to all subdomains
+      preload                       # Opt into browser preload lists
+    warning: "Start with short max-age in testing. Once enabled, hard to disable!"
+
+  - name: "X-Frame-Options"
+    purpose: "Prevent clickjacking"
+    values: |
+      DENY                          # Never allow framing
+      SAMEORIGIN                    # Only same-origin frames allowed
+    note: "Being replaced by CSP frame-ancestors, but still useful for older browsers"
+
+  - name: "X-Content-Type-Options"
+    purpose: "Prevent MIME type sniffing"
+    values: |
+      nosniff                       # Only valid value
+    note: "Prevents browser from guessing Content-Type, which can enable attacks"
+
+  - name: "Referrer-Policy"
+    purpose: "Control referrer header information"
+    values: |
+      no-referrer                   # Never send referrer
+      same-origin                   # Only for same-origin requests
+      strict-origin                 # Send origin only, HTTPS→HTTP blocked
+      strict-origin-when-cross-origin  # Full URL same-origin, origin cross-origin
+
+  - name: "Permissions-Policy"
+    purpose: "Control browser features"
+    values: |
+      accelerometer=()              # Disable accelerometer
+      camera=()                     # Disable camera access
+      geolocation=()                # Disable location access
+      microphone=()                 # Disable microphone
+      payment=()                    # Disable Payment Request API
+    note: "Formerly Feature-Policy. Opt-out of features you don't use."
+
+cors_configuration:
+  python_fastapi: |
+    from fastapi.middleware.cors import CORSMiddleware
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "https://app.example.com",
+            "https://admin.example.com"
+        ],  # NOT "*" in production!
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "DELETE"],
+        allow_headers=["Authorization", "Content-Type"],
+        expose_headers=["X-Request-ID"],
+        max_age=3600,  # Cache preflight for 1 hour
+    )
+
+  common_mistakes: |
+    # BAD: Allow all origins
+    allow_origins=["*"]  # Dangerous with credentials!
+
+    # BAD: Reflect origin header
+    Access-Control-Allow-Origin: {request.headers.origin}  # Essentially "*"
+
+    # GOOD: Explicit whitelist
+    allow_origins=["https://trusted-app.com"]
+
+api_specific:
+  json_api_headers: |
+    # Ensure JSON response is treated as JSON, not HTML
+    Content-Type: application/json; charset=utf-8
+    X-Content-Type-Options: nosniff
+
+    # Prevent caching of sensitive data
+    Cache-Control: no-store, no-cache, must-revalidate
+    Pragma: no-cache
+
+    # Don't allow embedding API responses
+    X-Frame-Options: DENY
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Security headers are like safety labels on products:
+      - "Do not microwave" = X-Frame-Options: DENY (don't embed me)
+      - "Keep refrigerated" = HSTS (always use HTTPS)
+      - "Ingredients list" = CSP (only load these sources)
+      The labels protect users from misuse!
+
+  intermediate:
+    focus: "Implementing CSP and CORS correctly"
+    key_points:
+      - "Starting with report-only CSP"
+      - "Understanding CORS preflight requests"
+      - "Balancing security with functionality"
+      - "Testing with securityheaders.com"
+
+  advanced:
+    focus: "Advanced CSP and security header strategies"
+    key_points:
+      - "CSP nonces and hashes for inline scripts"
+      - "Report-URI and violation monitoring"
+      - "HSTS preload submission process"
+      - "Subresource Integrity (SRI)"

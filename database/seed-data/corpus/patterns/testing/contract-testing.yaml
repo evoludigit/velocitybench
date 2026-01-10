@@ -1,0 +1,153 @@
+id: contract-testing
+name: "Contract Testing & API Mocking"
+category: testing
+type: pattern
+tags:
+  - testing
+  - contract-testing
+  - api
+  - microservices
+  - integration-testing
+
+summary:
+  short: "Testing API contracts without requiring running services using consumer-driven contracts"
+  long: |
+    Contract testing verifies that API consumers and providers agree on expected behavior. Rather than integration testing (requiring both services running), contract tests use recorded expectations and mocks to test independently. Consumer-driven contract testing (CDC) lets consumers define requirements.
+
+problem:
+  description: "Integration testing requires running all services; contract mismatch found late causing production issues"
+  symptoms:
+    - name: "Provider changes break consumers"
+      description: "Provider removes field, consumers crash in production"
+    - name: "Slow integration tests"
+      description: "Integration tests require spinning up full stack"
+    - name: "Flaky tests"
+      description: "Tests fail due to environmental issues, not code"
+    - name: "Late discovery"
+      description: "Contract violations discovered during deployment"
+
+solution:
+  approach: "Define contracts (consumer expectations); test both sides independently with mocks"
+  key_points:
+    - "Use contract testing frameworks (Pact, Spring Cloud Contract)"
+    - "Define consumer expectations; provider verifies compliance"
+    - "Exchange contract files between services"
+    - "Test provider in isolation with consumer mock"
+    - "Test consumer in isolation with provider mock"
+
+contract_testing_flow:
+  step_1: "Consumer defines expected behavior (contract)"
+  step_2: "Consumer tests against mock provider (using contract)"
+  step_3: "Consumer publishes contract"
+  step_4: "Provider fetches contract"
+  step_5: "Provider tests against contract"
+  step_6: "If provider complies, merge is safe"
+  step_7: "If mismatch, negotiate and update contract"
+
+tools:
+  - "Pact: Consumer-driven contracts (JavaScript, Python, Go, Ruby, etc.)"
+  - "Spring Cloud Contract: Contracts as Groovy/YAML files"
+  - "API Mocking: Prism, MockServer, Wiremock"
+  - "Contract Brokers: Pact Broker, Artifactory"
+
+contract_definition:
+  example: |
+    POST /api/users
+    Request: { "name": "Alice", "email": "alice@example.com" }
+    Response: { "id": 123, "name": "Alice", "email": "alice@example.com", "created_at": "2024-01-01" }
+    Status: 201
+
+contract_testing_vs_alternatives:
+  - name: "Contract Testing"
+    cost: "Medium - requires upfront contract definition"
+    confidence: "High - caught early in development"
+    speed: "Fast - no service dependencies"
+    best_for: "Microservices, clear contracts"
+
+  - name: "Integration Testing"
+    cost: "High - maintain full test environment"
+    confidence: "Very high - tests real interaction"
+    speed: "Slow - requires spinning up services"
+    best_for: "End-to-end validation, complex workflows"
+
+  - name: "API Mocking"
+    cost: "Low - simple mocks"
+    confidence: "Low - mocks may diverge from reality"
+    speed: "Very fast - no dependencies"
+    best_for: "Frontend development, early prototyping"
+
+  - name: "End-to-End Testing"
+    cost: "Very high - full environment + long runs"
+    confidence: "Very high - tests real system"
+    speed: "Very slow - minutes to hours"
+    best_for: "Critical user journeys, final validation"
+
+consumer_driven_contracts:
+  definition: "Consumer defines what it expects from provider; provider must satisfy"
+
+  advantages:
+    - "Consumer perspective: focuses on actual needs"
+    - "Early mismatch detection: found during PR review"
+    - "Clear API semantics: documented in contracts"
+    - "Breaking change protection: can't accidentally break consumers"
+
+  challenges:
+    - "Provider must implement to spec"
+    - "Contract evolution requires communication"
+    - "Multiple consumers = multiple contracts to satisfy"
+
+api_mocking_strategies:
+  - name: "Record-Replay"
+    method: "Record real API interaction, replay in tests"
+    tool: "VCR.py, nock, Polly"
+    use_case: "External API mocking, snapshot tests"
+
+  - name: "Mock Server"
+    method: "Run mock server matching contract"
+    tool: "Prism, MockServer, Wiremock"
+    use_case: "Frontend development, integration testing"
+
+  - name: "Stub Implementation"
+    method: "Simplified implementation of API for testing"
+    tool: "Custom code, testcontainers"
+    use_case: "In-memory mocks, controlled responses"
+
+contract_versioning:
+  - "Use semantic versioning for contracts"
+  - "Major: Breaking changes (old consumers break)"
+  - "Minor: Added optional fields, new operations"
+  - "Patch: Non-breaking fixes"
+  - "Support multiple contract versions"
+  - "Deprecate old versions with timeline"
+
+contract_brokers:
+  purpose: "Central repository for storing and sharing contracts"
+  benefits:
+    - "Single source of truth for contracts"
+    - "CI/CD integration: test contracts automatically"
+    - "Visualization: dependency map between services"
+    - "Webhook notifications: alert on contract changes"
+  examples: ["Pact Broker", "Artifactory", "Custom HTTP API"]
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Contract testing is like a restaurant reservation:
+      - Integration test: Both customer and restaurant must be present (expensive)
+      - Contract test: Reservation confirms expectations; each side can prepare independently
+
+      Contract is the agreement; both sides can test separately.
+
+  intermediate:
+    focus: "Implementing contract testing"
+    key_points:
+      - "Writing contracts with Pact or similar"
+      - "Testing consumers and providers separately"
+      - "Contract broker setup and CI/CD integration"
+
+  advanced:
+    focus: "Contract testing at scale"
+    key_points:
+      - "Managing multiple contracts across services"
+      - "Contract evolution and versioning"
+      - "Bi-directional contract testing"

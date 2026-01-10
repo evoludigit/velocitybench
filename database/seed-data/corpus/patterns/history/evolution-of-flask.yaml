@@ -1,0 +1,148 @@
+id: evolution-of-flask
+name: "Evolution of Flask Web Framework"
+category: history
+type: timeline
+tags:
+  - flask
+  - python
+  - web-frameworks
+  - microframework
+  - history
+
+summary:
+  short: "From Armin Ronacher's April Fools joke to Python's most flexible web framework"
+  long: |
+    Flask evolved from a tongue-in-cheek April Fools project into Python's most flexible web microframework. Unlike Django's batteries-included approach, Flask embraces minimalism and modularity, allowing developers to choose their own tools. The framework represents a philosophy shift in web development.
+
+timeline:
+  - year: 2010
+    title: "Flask Announced as April Fools Joke"
+    description: "Armin Ronacher creates Flask as parody of existing frameworks"
+    irony: "Joke becomes more popular than the original frameworks"
+
+  - year: 2010
+    title: "Flask 0.1 Released"
+    description: "Despite joke origins, gains serious adoption"
+    philosophy: "Microframework; do one thing and do it well"
+    lines_of_code: "Small, readable codebase"
+
+  - year: 2010
+    title: "Werkzeug & Jinja2 Foundation"
+    description: "Built on proven libraries (WSGI toolkit + templating)"
+    benefit: "Don't reinvent wheels; use best-of-breed components"
+
+  - year: 2011
+    title: "Flask 0.8: Official Stable Release"
+    description: "Matures beyond joke; used in production"
+    adoption: "Startups and small projects standardize on Flask"
+
+  - year: 2012
+    title: "Flask-SQLAlchemy"
+    description: "Optional ORM extension; Flask remains lightweight"
+    pattern: "Extensions ecosystem allows à la carte component selection"
+
+  - year: 2013
+    title: "Flask 0.10: Blueprints"
+    description: "Application structure improvements"
+    benefit: "Organize large Flask apps without Django's conventions"
+
+  - year: 2014
+    title: "Flask Becomes Dominant Microframework"
+    description: "Popularity surpasses Bottle and Tornado"
+    reason: "Sweet spot between simplicity and capability"
+
+  - year: 2016
+    title: "Flask 1.0 Released"
+    description: "Maturity milestone after 6 years of development"
+    stability: "Production-ready stability"
+
+  - year: 2017
+    title: "REST API Boom"
+    description: "Flask becomes popular for REST APIs"
+    with: "Flask-RESTful, Flask-RESTX extensions"
+
+  - year: 2018
+    title: "Async Support Discussion Begins"
+    description: "Community explores async capabilities"
+    challenge: "WSGI-based design complicates async support"
+
+  - year: 2020
+    title: "Flask 2.0 Released"
+    description: "Modern Python support; drops Python 2"
+    features: ["Better async support", "Improved CLI"]
+
+  - year: 2021
+    title: "FastAPI Rises"
+    description: "New framework challenges Flask for API development"
+    comparison: "Flask for flexibility; FastAPI for performance and types"
+
+  - year: 2022
+    title: "Flask 2.1: Async Views"
+    description: "Full async/await support arrives"
+    modernization: "Flask keeps up with async trend"
+
+  - year: 2023
+    title: "Flask 2.3: Async and Modern Features"
+    description: "Flask modernizes while keeping minimalist core"
+    niche: "Still best for simple projects and custom architectures"
+
+  - year: 2024
+    title: "Flask Remains Popular for Specific Use Cases"
+    description: "Best for: simple APIs, learning, custom architectures"
+    competition: "Django for batteries-included; FastAPI for performance; Flask for flexibility"
+
+design_philosophy:
+  - "Microframework; core is minimal"
+  - "Explicit is better than implicit"
+  - "Flexibility over convention"
+  - "Use extensions for everything else"
+
+vs_django:
+  flask:
+    - "Minimal core, choose own tools"
+    - "Great for APIs and simple apps"
+    - "Steep learning curve for structure"
+    - "Faster for small projects"
+
+  django:
+    - "Batteries included"
+    - "Great for full-stack web apps"
+    - "Convention gives structure"
+    - "More initial overhead"
+
+extension_ecosystem:
+  - "Flask-SQLAlchemy: Database ORM"
+  - "Flask-Login: Authentication"
+  - "Flask-WTF: Forms"
+  - "Flask-Caching: Caching"
+  - "Flask-CORS: Cross-origin support"
+  - "Flask-RESTful: REST APIs"
+
+growth_patterns:
+  minimal_project: "Flask excels here"
+  startup_api: "Flask popular, FastAPI rising"
+  full_stack_web: "Django is better choice"
+  microservice: "Flask flexible, FastAPI faster"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Flask is like blank canvas vs Django's paint-by-numbers:
+      - Flask: Start with white canvas, add only what you need
+      - Django: Color-coded sections, just fill them in
+
+      Flask gives freedom; Django gives guidance.
+
+  intermediate:
+    focus: "Flask application patterns"
+    key_points:
+      - "Blueprints for organizing applications"
+      - "Extension architecture and selection"
+      - "Building REST APIs with Flask"
+
+  advanced:
+    focus: "Flask for custom architectures"
+    key_points:
+      - "Async views and performance"
+      - "When Flask is right vs alternatives"
+      - "Scaling Flask applications"

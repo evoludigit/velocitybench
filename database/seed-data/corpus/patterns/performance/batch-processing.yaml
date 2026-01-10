@@ -1,0 +1,244 @@
+# Batch Processing Patterns
+# VelocityBench Knowledge Corpus
+
+id: batch-processing
+name: "Batch Processing vs Individual Requests"
+category: performance
+type: pattern
+severity: high
+tags:
+  - performance
+  - batching
+  - bulk-operations
+  - api
+  - database
+
+summary:
+  short: "Process multiple items in a single operation instead of one at a time"
+  long: |
+    Batch processing combines multiple operations into a single request, dramatically
+    reducing overhead from network round-trips, connection handling, and transaction
+    management. A loop of 1000 individual INSERTs might take 30 seconds; a single
+    bulk INSERT takes 100ms. Understanding when and how to batch is essential for
+    building performant APIs.
+
+problem:
+  description: |
+    Processing items one at a time seems simple but creates massive overhead:
+    - Each request incurs network latency (1-100ms)
+    - Each database operation has transaction overhead
+    - Connection pool exhaustion under load
+    - N+1 patterns in both API calls and database queries
+
+  symptoms:
+    - name: "Linear scaling of time with data size"
+      description: "Processing 1000 items takes 1000x longer than 1 item"
+      detection: "Profile shows most time in network/connection overhead"
+
+    - name: "High connection count"
+      description: "Many short-lived connections instead of few long ones"
+      detection: "Database connection metrics show high churn"
+
+    - name: "Timeout errors at scale"
+      description: "Operations succeed with small data, fail with large"
+      detection: "Errors correlate with batch size"
+
+solution:
+  principle: "Amortize fixed costs across many operations"
+
+  components:
+    - name: "Bulk Insert"
+      type: "database"
+      purpose: "Insert many rows in single statement"
+
+    - name: "Batch API"
+      type: "api"
+      purpose: "Accept arrays of items in single request"
+
+    - name: "Chunking"
+      type: "logic"
+      purpose: "Break large batches into optimal-sized chunks"
+
+implementation:
+  database_bulk_insert:
+    postgresql: |
+      -- Individual inserts (SLOW)
+      INSERT INTO users (name, email) VALUES ('Alice', 'alice@example.com');
+      INSERT INTO users (name, email) VALUES ('Bob', 'bob@example.com');
+      -- ... 998 more statements
+
+      -- Bulk insert (FAST)
+      INSERT INTO users (name, email) VALUES
+        ('Alice', 'alice@example.com'),
+        ('Bob', 'bob@example.com'),
+        -- ... all values in one statement
+        ('Zara', 'zara@example.com');
+
+      -- With COPY (FASTEST for large data)
+      COPY users (name, email) FROM STDIN WITH (FORMAT csv);
+      Alice,alice@example.com
+      Bob,bob@example.com
+      \.
+
+    python: |
+      import psycopg
+
+      # Individual inserts (SLOW) - 1000 round trips
+      for user in users:
+          cursor.execute(
+              "INSERT INTO users (name, email) VALUES (%s, %s)",
+              (user.name, user.email)
+          )
+
+      # executemany (FASTER) - still multiple statements but pipelined
+      cursor.executemany(
+          "INSERT INTO users (name, email) VALUES (%s, %s)",
+          [(u.name, u.email) for u in users]
+      )
+
+      # execute_values (FASTEST) - single statement
+      from psycopg.sql import SQL
+
+      with cursor.copy("COPY users (name, email) FROM STDIN") as copy:
+          for user in users:
+              copy.write_row((user.name, user.email))
+
+  api_batching:
+    graphql: |
+      # Individual mutations (SLOW)
+      mutation { createUser(name: "Alice") { id } }
+      mutation { createUser(name: "Bob") { id } }
+
+      # Batch mutation (FAST)
+      mutation CreateUsers($users: [UserInput!]!) {
+        createUsers(input: $users) {
+          id
+          name
+        }
+      }
+
+      # Variables
+      {
+        "users": [
+          {"name": "Alice", "email": "alice@example.com"},
+          {"name": "Bob", "email": "bob@example.com"}
+        ]
+      }
+
+    rest: |
+      // Individual requests (SLOW)
+      POST /api/users { "name": "Alice" }
+      POST /api/users { "name": "Bob" }
+
+      // Batch endpoint (FAST)
+      POST /api/users/batch
+      {
+        "users": [
+          { "name": "Alice", "email": "alice@example.com" },
+          { "name": "Bob", "email": "bob@example.com" }
+        ]
+      }
+
+  chunking:
+    python: |
+      def chunk_list(items: list, chunk_size: int):
+          """Split list into chunks of specified size."""
+          for i in range(0, len(items), chunk_size):
+              yield items[i:i + chunk_size]
+
+      async def bulk_insert_users(users: list[User]):
+          """Insert users in optimal-sized batches."""
+          CHUNK_SIZE = 1000  # PostgreSQL handles 1000 well
+
+          for chunk in chunk_list(users, CHUNK_SIZE):
+              await db.execute(
+                  "INSERT INTO users (name, email) VALUES " +
+                  ",".join(["(%s, %s)"] * len(chunk)),
+                  [val for user in chunk for val in (user.name, user.email)]
+              )
+
+patterns:
+  - name: "DataLoader Pattern"
+    description: "Batch and deduplicate requests within a single tick"
+    use_case: "GraphQL resolvers, avoiding N+1"
+    example: |
+      # Without DataLoader - N+1 queries
+      async def resolve_author(book):
+          return await db.get_user(book.author_id)  # Called N times
+
+      # With DataLoader - 1 query
+      user_loader = DataLoader(batch_load_users)
+
+      async def resolve_author(book):
+          return await user_loader.load(book.author_id)  # Batched!
+
+      async def batch_load_users(user_ids: list[int]) -> list[User]:
+          users = await db.query("SELECT * FROM users WHERE id = ANY($1)", user_ids)
+          return [users_by_id.get(id) for id in user_ids]
+
+  - name: "Upsert Batch"
+    description: "Insert or update many records efficiently"
+    example: |
+      -- PostgreSQL UPSERT batch
+      INSERT INTO products (sku, name, price)
+      VALUES
+        ('SKU001', 'Widget', 9.99),
+        ('SKU002', 'Gadget', 19.99)
+      ON CONFLICT (sku) DO UPDATE SET
+        name = EXCLUDED.name,
+        price = EXCLUDED.price;
+
+  - name: "Async Batch Queue"
+    description: "Collect items over time, process in batches"
+    example: |
+      class BatchQueue:
+          def __init__(self, processor, batch_size=100, max_wait_ms=100):
+              self.items = []
+              self.processor = processor
+              self.batch_size = batch_size
+              self.max_wait_ms = max_wait_ms
+
+          async def add(self, item):
+              self.items.append(item)
+              if len(self.items) >= self.batch_size:
+                  await self.flush()
+
+          async def flush(self):
+              if self.items:
+                  batch, self.items = self.items, []
+                  await self.processor(batch)
+
+benchmarks:
+  - scenario: "Insert 10,000 users"
+    individual: "45 seconds"
+    bulk_insert: "0.8 seconds"
+    speedup: "56x"
+
+  - scenario: "Fetch 100 related records"
+    n_plus_one: "2.1 seconds (101 queries)"
+    batched: "0.02 seconds (2 queries)"
+    speedup: "105x"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Batch processing is like grocery shopping:
+      - Individual: Drive to store for each item (milk trip, bread trip, eggs trip)
+      - Batched: Make a list, get everything in one trip
+      The overhead of each trip (driving, parking) dwarfs the actual shopping!
+
+  intermediate:
+    focus: "Optimal batch sizes and chunking strategies"
+    key_points:
+      - "Finding the sweet spot: too small = overhead, too large = memory/timeout"
+      - "PostgreSQL parameter limit (65535) affects batch size"
+      - "Transaction size vs memory tradeoffs"
+      - "Partial failure handling in batches"
+
+  advanced:
+    focus: "DataLoader pattern and distributed batching"
+    key_points:
+      - "Request coalescing and deduplication"
+      - "Cross-service batch APIs"
+      - "Backpressure and rate limiting batches"
+      - "Exactly-once semantics in batch processing"

@@ -1,0 +1,125 @@
+id: filtering-projection
+name: "API Request/Response Filtering & Projection"
+category: architecture
+type: pattern
+tags:
+  - api
+  - graphql
+  - rest
+  - performance
+  - bandwidth
+
+summary:
+  short: "Reducing payload size by letting clients select which fields they need"
+  long: |
+    Clients often need only a subset of object fields, but APIs return full objects. Filtering and projection allow clients to request only necessary data, reducing bandwidth and improving performance. Patterns include GraphQL, sparse fieldsets, and query parameter selection.
+
+problem:
+  description: "APIs return complete objects even when clients only need a few fields, wasting bandwidth"
+  symptoms:
+    - name: "Large payloads"
+      description: "API responses include hundreds of fields client ignores"
+    - name: "Mobile performance"
+      description: "Mobile clients suffer from large downloads over slow networks"
+    - name: "Over-fetching"
+      description: "Getting more data than needed (N fields when 5 are required)"
+    - name: "Network bottleneck"
+      description: "API bandwidth is limiting factor for client experience"
+
+solution:
+  approach: "Allow clients to specify which fields to include/exclude and apply projections at API layer"
+  key_points:
+    - "Implement field selection mechanisms (GraphQL, sparse fieldsets, or custom)"
+    - "Validate requested fields against allowed projections"
+    - "Optimize backend queries to fetch only needed columns"
+    - "Set limits on query complexity to prevent abuse"
+    - "Cache based on requested field combinations"
+
+filtering_patterns:
+  - name: "Sparse Fieldsets"
+    standard: "JSON:API, partially in REST"
+    syntax: "GET /users?fields=id,name,email"
+    benefits: ["Simple", "Easy to implement", "RESTful"]
+    risks: ["Can be complex with nested fields", "Cache complexity"]
+
+  - name: "GraphQL Selection"
+    standard: "GraphQL"
+    syntax: |
+      query {
+        user {
+          id
+          name
+          email
+        }
+      }
+    benefits: ["Explicit", "Type-safe", "Supports nesting"]
+    risks: ["Learning curve", "Requires query parser", "Vulnerable to DoS"]
+
+  - name: "Include/Exclude Parameters"
+    standard: "Custom REST APIs"
+    syntax: "GET /users/123?include=profile,permissions&exclude=internal_notes"
+    benefits: ["Flexible", "Intuitive"]
+    risks: ["Can conflict", "Hard to document", "Implementation-specific"]
+
+  - name: "Field Aliasing"
+    standard: "GraphQL aliases"
+    syntax: |
+      query {
+        currentUser: user(id: 1) { id, name }
+        otherUser: user(id: 2) { id, name }
+      }
+    benefits: ["Request same type multiple ways", "Powerful"]
+    risks: ["Complex queries", "Expensive computation"]
+
+projection_optimization:
+  - name: "Query-Level Projection"
+    description: "Modify SQL SELECT to fetch only needed columns"
+    implementation: "Generate SELECT id, name FROM users (not SELECT *)"
+    impact: "Reduces memory, I/O, network"
+
+  - name: "Application-Level Filtering"
+    description: "Fetch all fields, filter in application code"
+    implementation: "SELECT * then iterate and remove fields"
+    impact: "Simple but wasteful, only for small objects"
+
+  - name: "Index Usage"
+    description: "Use covering indexes for frequently-selected field subsets"
+    implementation: "CREATE INDEX idx_users_summary ON users(id, name, email)"
+    impact: "Fast index-only scans"
+
+query_complexity_limits:
+  - "Limit depth of nested queries (max 5 levels)"
+  - "Limit number of fields per query (max 100)"
+  - "Implement query cost estimation (each field costs points)"
+  - "Rate limit by computed query cost"
+  - "Monitor and alert on anomalous queries"
+
+caching_considerations:
+  - "Field selection creates many cache keys (combinatorial explosion)"
+  - "Use canonical field sets for frequently-requested combinations"
+  - "Cache at application layer keyed by [object_id, field_set]"
+  - "Consider caching at CDN level (requires cache key normalization)"
+  - "Be careful with partial object caching (dependencies)"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Filtering is like ordering at a restaurant:
+      - Without filtering: Get entire menu, plate, and kitchen (inefficient)
+      - With filtering: Order just what you want
+
+      Your server doesn't have to prepare everything; client gets exactly what it needs.
+
+  intermediate:
+    focus: "Implementing field selection"
+    key_points:
+      - "GraphQL vs REST field selection tradeoffs"
+      - "Optimizing backend queries for projections"
+      - "Query complexity analysis and limits"
+
+  advanced:
+    focus: "Large-scale filtering and caching"
+    key_points:
+      - "Handling combinatorial field selection"
+      - "Cost-based query optimization"
+      - "Security implications of field access control"

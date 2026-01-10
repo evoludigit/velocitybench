@@ -1,0 +1,261 @@
+# API Error Handling Patterns
+# VelocityBench Knowledge Corpus
+
+id: error-handling
+name: "API Error Handling Best Practices"
+category: architecture
+type: pattern
+tags:
+  - api
+  - errors
+  - exceptions
+  - rest
+  - graphql
+
+summary:
+  short: "Design consistent, informative error responses for APIs"
+  long: |
+    Good error handling improves developer experience, aids debugging, and prevents
+    information leakage. APIs should return consistent error formats, appropriate
+    HTTP status codes, actionable error messages, and correlation IDs for tracing.
+    Different API styles (REST, GraphQL) have different error conventions.
+
+problem:
+  description: |
+    Inconsistent or uninformative errors frustrate developers, make debugging difficult,
+    and can leak sensitive information. Common issues include generic "500 Internal Server
+    Error" responses, inconsistent error formats, missing context, and exposing stack traces
+    in production.
+
+  symptoms:
+    - name: "Support burden"
+      description: "Developers can't self-diagnose API issues"
+      detection: "High volume of support tickets about API errors"
+
+    - name: "Security risks"
+      description: "Stack traces or internal details in error responses"
+      detection: "Security audit findings"
+
+    - name: "Integration failures"
+      description: "Clients can't handle errors programmatically"
+      detection: "Diverse error parsing code in clients"
+
+error_format:
+  rest:
+    standard: |
+      {
+        "error": {
+          "code": "VALIDATION_ERROR",
+          "message": "The request contains invalid data",
+          "details": [
+            {
+              "field": "email",
+              "message": "Invalid email format",
+              "code": "INVALID_FORMAT"
+            }
+          ],
+          "request_id": "req_abc123",
+          "documentation_url": "https://api.example.com/docs/errors#VALIDATION_ERROR"
+        }
+      }
+
+    components:
+      - name: "code"
+        purpose: "Machine-readable error type for programmatic handling"
+      - name: "message"
+        purpose: "Human-readable description"
+      - name: "details"
+        purpose: "Specific field-level errors"
+      - name: "request_id"
+        purpose: "Correlation ID for support/debugging"
+      - name: "documentation_url"
+        purpose: "Link to error documentation"
+
+  graphql:
+    standard: |
+      {
+        "data": null,
+        "errors": [
+          {
+            "message": "User not found",
+            "locations": [{"line": 2, "column": 3}],
+            "path": ["user"],
+            "extensions": {
+              "code": "NOT_FOUND",
+              "timestamp": "2024-01-15T10:30:00Z",
+              "request_id": "req_abc123"
+            }
+          }
+        ]
+      }
+
+http_status_codes:
+  - code: 400
+    name: "Bad Request"
+    use_when: "Malformed syntax, invalid parameters"
+    example: "JSON parse error, missing required field"
+
+  - code: 401
+    name: "Unauthorized"
+    use_when: "Authentication required or failed"
+    example: "Missing or invalid API key/token"
+
+  - code: 403
+    name: "Forbidden"
+    use_when: "Authenticated but not authorized"
+    example: "User doesn't have permission for this resource"
+
+  - code: 404
+    name: "Not Found"
+    use_when: "Resource doesn't exist"
+    example: "GET /users/999 when user 999 doesn't exist"
+
+  - code: 409
+    name: "Conflict"
+    use_when: "State conflict prevents completion"
+    example: "Creating duplicate email, concurrent edit conflict"
+
+  - code: 422
+    name: "Unprocessable Entity"
+    use_when: "Valid syntax but semantic errors"
+    example: "Email format valid but domain doesn't exist"
+
+  - code: 429
+    name: "Too Many Requests"
+    use_when: "Rate limit exceeded"
+    example: "More than 100 requests per minute"
+
+  - code: 500
+    name: "Internal Server Error"
+    use_when: "Unexpected server error"
+    example: "Unhandled exception, database down"
+
+  - code: 502
+    name: "Bad Gateway"
+    use_when: "Upstream service error"
+    example: "Payment provider returned invalid response"
+
+  - code: 503
+    name: "Service Unavailable"
+    use_when: "Temporary overload or maintenance"
+    example: "Database connection pool exhausted"
+
+implementation:
+  python_fastapi: |
+    from fastapi import FastAPI, HTTPException
+    from fastapi.responses import JSONResponse
+    from pydantic import BaseModel
+    import uuid
+
+    class ErrorResponse(BaseModel):
+        code: str
+        message: str
+        request_id: str
+        details: list = None
+
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(request, exc):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "error": {
+                    "code": getattr(exc, 'code', 'ERROR'),
+                    "message": exc.detail,
+                    "request_id": request.state.request_id
+                }
+            }
+        )
+
+    @app.exception_handler(Exception)
+    async def generic_exception_handler(request, exc):
+        # Log full exception for debugging
+        logger.exception(f"Unhandled error: {exc}")
+
+        # Return safe message to client
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": {
+                    "code": "INTERNAL_ERROR",
+                    "message": "An unexpected error occurred",
+                    "request_id": request.state.request_id
+                }
+            }
+        )
+
+  nodejs_express: |
+    // Custom error class
+    class APIError extends Error {
+      constructor(code, message, statusCode = 400, details = null) {
+        super(message);
+        this.code = code;
+        this.statusCode = statusCode;
+        this.details = details;
+      }
+    }
+
+    // Error handling middleware
+    app.use((err, req, res, next) => {
+      const statusCode = err.statusCode || 500;
+      const isProduction = process.env.NODE_ENV === 'production';
+
+      res.status(statusCode).json({
+        error: {
+          code: err.code || 'INTERNAL_ERROR',
+          message: isProduction && statusCode === 500
+            ? 'An unexpected error occurred'
+            : err.message,
+          request_id: req.id,
+          ...(err.details && { details: err.details }),
+          ...(!isProduction && { stack: err.stack })
+        }
+      });
+    });
+
+best_practices:
+  - "Use consistent error format across all endpoints"
+  - "Include request IDs for support correlation"
+  - "Never expose stack traces in production"
+  - "Provide actionable error messages"
+  - "Use appropriate HTTP status codes"
+  - "Document all error codes"
+  - "Log errors with full context server-side"
+  - "Validate input early, fail fast"
+
+anti_patterns:
+  - name: "Generic 500 for everything"
+    problem: "Client can't distinguish between error types"
+    fix: "Use specific status codes and error codes"
+
+  - name: "Stack traces in responses"
+    problem: "Exposes internal implementation details"
+    fix: "Log internally, return safe message"
+
+  - name: "Inconsistent format"
+    problem: "Clients need different parsing for different endpoints"
+    fix: "Standardize error response structure"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Error handling is like a restaurant responding to problems:
+      - Bad: "Sorry, something went wrong" (unhelpful)
+      - Good: "We're out of the salmon (code: OUT_OF_STOCK).
+               May I suggest the halibut? Reference: Order #123"
+      Clear, actionable, with a reference number for follow-up!
+
+  intermediate:
+    focus: "Designing error responses and handling"
+    key_points:
+      - "HTTP status code selection"
+      - "Error response structure"
+      - "Validation error details"
+      - "Error logging and monitoring"
+
+  advanced:
+    focus: "Enterprise error handling patterns"
+    key_points:
+      - "Distributed tracing with correlation IDs"
+      - "Error budgets and SLOs"
+      - "Circuit breakers for cascading failures"
+      - "GraphQL error extensions"

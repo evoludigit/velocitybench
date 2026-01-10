@@ -1,0 +1,241 @@
+# Evolution of API Architectures
+# VelocityBench Knowledge Corpus
+
+id: evolution-of-apis
+name: "The Evolution of API Architectures: From RPC to GraphQL"
+category: history
+type: timeline
+tags:
+  - history
+  - api
+  - rpc
+  - soap
+  - rest
+  - graphql
+  - grpc
+
+summary:
+  short: "How API architectures evolved from RPC to modern GraphQL and gRPC"
+  long: |
+    API architectures have evolved dramatically over five decades, from simple RPC calls
+    to sophisticated systems like GraphQL. Each generation solved problems of its predecessor
+    while introducing new tradeoffs. Understanding this history helps developers choose
+    the right architecture and avoid repeating past mistakes.
+
+timeline:
+  - era: "1970s-1980s: Remote Procedure Calls (RPC)"
+    year_range: "1970-1990"
+    description: |
+      The earliest form of inter-process communication. Programs could call functions
+      on remote machines as if they were local. Sun RPC (1984) and DCE/RPC became standards.
+    characteristics:
+      - "Procedure-oriented (call functions)"
+      - "Binary protocols (efficient but hard to debug)"
+      - "Tightly coupled client/server"
+      - "Language-specific implementations"
+    technologies:
+      - name: "Sun RPC (ONC RPC)"
+        year: 1984
+        note: "Used by NFS"
+      - name: "DCE/RPC"
+        year: 1988
+        note: "Distributed Computing Environment"
+      - name: "CORBA"
+        year: 1991
+        note: "Common Object Request Broker Architecture"
+    problems:
+      - "Binary protocols hard to debug"
+      - "Tight coupling between client and server"
+      - "Firewall unfriendly (random ports)"
+      - "Complex IDL (Interface Definition Language)"
+
+  - era: "1990s-2000s: SOAP and XML-RPC"
+    year_range: "1998-2010"
+    description: |
+      The web era brought HTTP as a universal transport. SOAP wrapped RPC in XML
+      for interoperability. Enterprise systems embraced WS-* standards. This era
+      prioritized standardization over simplicity.
+    characteristics:
+      - "XML-based messages"
+      - "HTTP transport (firewall friendly)"
+      - "WSDL for service description"
+      - "WS-* standards (WS-Security, WS-Transaction)"
+      - "Stateful sessions possible"
+    technologies:
+      - name: "XML-RPC"
+        year: 1998
+        note: "Simple XML over HTTP"
+      - name: "SOAP"
+        year: 1999
+        note: "Simple Object Access Protocol"
+      - name: "WSDL"
+        year: 2000
+        note: "Web Services Description Language"
+      - name: "WS-Security"
+        year: 2002
+        note: "Security extensions for SOAP"
+    problems:
+      - "Verbose XML (bandwidth, parsing overhead)"
+      - "Complex WS-* specifications"
+      - "Tooling required (not human-readable)"
+      - "Tight coupling via WSDL contracts"
+
+  - era: "2000s-2010s: REST Revolution"
+    year_range: "2000-2015"
+    description: |
+      Roy Fielding's 2000 dissertation introduced REST. The simplicity of HTTP verbs,
+      URLs, and JSON made APIs accessible. REST became the dominant paradigm,
+      powering the mobile and social media explosion.
+    characteristics:
+      - "Resource-oriented (nouns, not verbs)"
+      - "HTTP verbs (GET, POST, PUT, DELETE)"
+      - "Stateless interactions"
+      - "JSON as default format"
+      - "HATEOAS (hyperlinks in responses)"
+      - "Human-readable, debuggable"
+    key_principles:
+      - name: "Uniform Interface"
+        description: "Standard HTTP methods for all resources"
+      - name: "Statelessness"
+        description: "No server-side session state"
+      - name: "Cacheability"
+        description: "HTTP caching for scalability"
+      - name: "Client-Server"
+        description: "Separation of concerns"
+    technologies:
+      - name: "REST (concept)"
+        year: 2000
+        note: "Fielding's dissertation"
+      - name: "JSON"
+        year: 2002
+        note: "Lightweight data format"
+      - name: "OAuth"
+        year: 2007
+        note: "Authorization framework"
+      - name: "Swagger/OpenAPI"
+        year: 2011
+        note: "API documentation standard"
+    problems:
+      - "Over-fetching (get entire resource when you need one field)"
+      - "Under-fetching (multiple requests for related data)"
+      - "No standard for real-time updates"
+      - "Versioning challenges"
+
+  - era: "2010s: GraphQL Emerges"
+    year_range: "2012-2020"
+    description: |
+      Facebook created GraphQL in 2012 to solve mobile data fetching problems.
+      Open-sourced in 2015, it offered a query language for APIs. Clients specify
+      exactly what data they need, solving over/under-fetching.
+    characteristics:
+      - "Query language for APIs"
+      - "Client specifies data needs"
+      - "Single endpoint"
+      - "Strongly typed schema"
+      - "Introspection (self-documenting)"
+      - "Real-time with subscriptions"
+    technologies:
+      - name: "GraphQL (internal)"
+        year: 2012
+        note: "Facebook internal use"
+      - name: "GraphQL (open source)"
+        year: 2015
+        note: "Public release"
+      - name: "Apollo"
+        year: 2016
+        note: "GraphQL platform"
+      - name: "Relay"
+        year: 2015
+        note: "Facebook's GraphQL client"
+    problems:
+      - "N+1 query problem (resolver cascade)"
+      - "Caching complexity (no HTTP caching)"
+      - "Query complexity attacks"
+      - "Steeper learning curve"
+
+  - era: "2010s-Present: gRPC and Modern RPC"
+    year_range: "2015-present"
+    description: |
+      Google open-sourced gRPC in 2015, bringing RPC back with modern tooling.
+      Protocol Buffers provide efficient binary serialization. HTTP/2 enables
+      streaming and multiplexing. Ideal for microservices communication.
+    characteristics:
+      - "Binary Protocol Buffers"
+      - "HTTP/2 transport"
+      - "Streaming (client, server, bidirectional)"
+      - "Strong typing with proto files"
+      - "Code generation for multiple languages"
+    technologies:
+      - name: "Protocol Buffers"
+        year: 2008
+        note: "Google's serialization format"
+      - name: "gRPC"
+        year: 2015
+        note: "Google's RPC framework"
+      - name: "Envoy"
+        year: 2016
+        note: "Service mesh proxy with gRPC support"
+    use_cases:
+      - "Microservices internal communication"
+      - "Low-latency, high-throughput systems"
+      - "Streaming data (video, telemetry)"
+      - "Polyglot environments"
+
+  - era: "2020s: API Convergence"
+    year_range: "2020-present"
+    description: |
+      Modern architectures often combine multiple paradigms. REST for public APIs,
+      GraphQL for frontend-backend communication, gRPC for internal services.
+      API gateways unify different protocols.
+    characteristics:
+      - "Multi-protocol APIs"
+      - "API gateways and meshes"
+      - "OpenAPI + GraphQL + gRPC coexistence"
+      - "Federated architectures"
+      - "Event-driven additions (webhooks, SSE)"
+    patterns:
+      - name: "BFF (Backend for Frontend)"
+        description: "Custom API layer per client type"
+      - name: "API Gateway"
+        description: "Unified entry point for multiple backends"
+      - name: "GraphQL Federation"
+        description: "Compose multiple GraphQL services"
+
+lessons_learned:
+  - lesson: "Simplicity wins adoption"
+    examples: "REST beat SOAP; JSON beat XML"
+
+  - lesson: "Binary protocols have a place"
+    examples: "gRPC for internal, text for external"
+
+  - lesson: "One size doesn't fit all"
+    examples: "Different APIs for different use cases"
+
+  - lesson: "Developer experience matters"
+    examples: "Tooling, documentation, debugging"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      API evolution is like communication technology:
+      - RPC = Telegram (efficient but specialized equipment needed)
+      - SOAP = Formal letters (verbose, many forms to fill)
+      - REST = Phone calls (simple, everyone understands)
+      - GraphQL = Text messaging (ask for exactly what you want)
+      - gRPC = Secure radio (fast, encrypted, for professionals)
+
+  intermediate:
+    focus: "Understanding when each paradigm emerged and why"
+    key_points:
+      - "Problems that drove each evolution"
+      - "Why REST replaced SOAP"
+      - "What problems GraphQL solved"
+      - "When to use gRPC vs REST"
+
+  advanced:
+    focus: "Designing multi-protocol API architectures"
+    key_points:
+      - "Protocol selection criteria"
+      - "Gateway patterns for protocol translation"
+      - "Federation and composition strategies"
+      - "Future directions (WASM, edge computing)"

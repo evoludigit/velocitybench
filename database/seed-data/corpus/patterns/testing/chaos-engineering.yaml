@@ -1,0 +1,69 @@
+id: chaos-engineering
+name: "Chaos Engineering: Learning from Controlled Failures"
+category: testing
+type: pattern
+tags:
+  - testing
+  - reliability
+  - chaos
+  - resilience
+
+summary:
+  short: "Proactively injecting failures to find weaknesses in production systems"
+  long: |
+    Chaos engineering involves deliberately introducing failures into systems
+    to learn about their behavior and improve resilience. Rather than waiting
+    for failures to occur, organizations intentionally break things to discover
+    problems before users encounter them.
+
+chaos_experiments:
+  - name: "Network Latency"
+    impact: "Add delays to network calls"
+    learning: "How does system handle slow dependencies?"
+  
+  - name: "Service Failures"
+    impact: "Kill service instances"
+    learning: "Does system gracefully degrade?"
+  
+  - name: "Resource Exhaustion"
+    impact: "Fill disk, memory, CPU"
+    learning: "What breaks first?"
+  
+  - name: "Clock Skew"
+    impact: "Change system time"
+    learning: "Do timestamps break?"
+
+tools:
+  - "Chaos Toolkit"
+  - "Gremlin"
+  - "Pumba"
+  - "Kube-chaos"
+
+principles:
+  - "Start small"
+  - "Define steady state"
+  - "Minimize blast radius"
+  - "Learn, don't blame"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Chaos engineering is like fire drills:
+      - Fire drills practice response to emergencies
+      - Chaos engineering practices response to failures
+      
+      Better to learn in controlled experiments than real disasters.
+
+  intermediate:
+    focus: "Designing chaos experiments"
+    key_points:
+      - "Defining steady state"
+      - "Monitoring during chaos"
+      - "Blast radius control"
+
+  advanced:
+    focus: "Continuous resilience improvement"
+    key_points:
+      - "Chaos in production"
+      - "Organizational culture"
+      - "Automated remediation"

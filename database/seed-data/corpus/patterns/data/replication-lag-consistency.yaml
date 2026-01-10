@@ -1,0 +1,118 @@
+id: replication-lag-consistency
+name: "Database Replication Lag & Consistency"
+category: data
+type: pattern
+tags:
+  - database
+  - replication
+  - eventual-consistency
+  - read-replicas
+  - distributed-systems
+
+summary:
+  short: "Managing eventual consistency and replication lag in read-replica architectures"
+  long: |
+    Database replication enables scaling read traffic, but introduces lag where replicas don't immediately reflect writes. This pattern covers consistency models, detecting lag, and strategies for handling stale reads.
+
+problem:
+  description: "Read replicas lag behind primary, causing inconsistent reads and potential business logic errors"
+  symptoms:
+    - name: "Stale reads"
+      description: "User writes data but immediately reads old version"
+    - name: "Race conditions"
+      description: "Application logic breaks due to inconsistent data versions"
+    - name: "Unpredictable behavior"
+      description: "Same query returns different results on different servers"
+    - name: "Replication lag alerts"
+      description: "Lag grows beyond acceptable threshold"
+
+solution:
+  approach: "Choose appropriate consistency model, detect and handle stale reads, implement fallback strategies"
+  key_points:
+    - "Understand your consistency requirements (strong vs eventual)"
+    - "Implement read-after-write consistency patterns"
+    - "Route critical reads to primary database"
+    - "Detect replication lag and communicate to application"
+    - "Use caching and other strategies to mask lag"
+
+consistency_models:
+  - name: "Strong Consistency (Read-From-Primary)"
+    description: "All reads go to primary; no lag"
+    guarantees: ["Read-after-write", "Causal consistency"]
+    trade_off: "No read scaling benefit"
+    use_case: "Financial systems, inventory, critical features"
+
+  - name: "Eventual Consistency (Read-From-Replica)"
+    description: "Reads allowed from replicas with lag"
+    guarantees: ["Replicas eventually match primary"]
+    trade_off: "Temporary inconsistency, but scales reads"
+    use_case: "Analytics, search, user feeds, most web features"
+
+  - name: "Read-After-Write Consistency"
+    description: "User's writes immediately visible in their reads"
+    guarantees: ["User sees their changes", "others may see stale data"]
+    trade_off: "Complex to implement, good UX"
+    use_case: "User-facing features, session data"
+
+detecting_replication_lag:
+  - name: "Query Heartbeat Table"
+    description: "Primary writes timestamp to heartbeat table; replicas check it"
+    method: "SELECT max(updated_at) FROM heartbeat"
+    overhead: "Minimal; one extra query"
+
+  - name: "Binary Log Position Monitoring"
+    description: "Track replication position (MySQL: SHOW SLAVE STATUS)"
+    method: "Compare primary binlog position with replica position"
+    overhead: "Database-native, no application code needed"
+
+  - name: "Application-Level Tracking"
+    description: "Application tracks which replica is safe for which data"
+    method: "Store write timestamp with data; compare against replica lag"
+    overhead: "Application complexity, most flexible"
+
+handling_stale_reads:
+  - name: "Read-After-Write Pattern"
+    description: "After write, route subsequent reads to primary for short window"
+    implementation: "In-memory session state or sticky routing"
+    duration: "Until replication lag is detected as resolved"
+
+  - name: "Stale-While-Revalidate"
+    description: "Accept stale read, but background-fetch fresh data if old"
+    implementation: "Check timestamp, refetch if older than threshold"
+    use_case: "User feeds, search results, analytics"
+
+  - name: "Causal Consistency"
+    description: "Track dependencies between reads/writes"
+    implementation: "Version vectors, correlation IDs"
+    complexity: "High, but strongest guarantee without primary reads"
+
+replication_lag_mitigation:
+  - "Reduce transaction size and batch commit intervals"
+  - "Increase replication network bandwidth"
+  - "Optimize primary query performance to reduce replication lag"
+  - "Monitor and alert on lag thresholds"
+  - "Implement local caching to reduce lag impact"
+  - "Use asynchronous replication with acknowledgments"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Database replication lag is like spreading news:
+      - Primary: Daily newspaper printing (latest news)
+      - Replicas: Delivery trucks carrying yesterday's paper to readers
+
+      Readers wanting today's news must wait for delivery.
+
+  intermediate:
+    focus: "Consistency patterns and read routing"
+    key_points:
+      - "Detecting and measuring replication lag"
+      - "Choosing consistency models based on use case"
+      - "Read-after-write pattern implementation"
+
+  advanced:
+    focus: "Global distribution and consistency"
+    key_points:
+      - "Causal consistency in multi-region systems"
+      - "Linearizability vs serializability"
+      - "Partition tolerance under WAN conditions"

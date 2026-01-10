@@ -1,0 +1,185 @@
+id: blue-green-canary
+name: "Blue-Green Deployments & Canary Releases"
+category: deployment
+type: pattern
+tags:
+  - deployment
+  - release
+  - zero-downtime
+  - safety
+  - canary
+
+summary:
+  short: "Safely deploying changes with blue-green and canary patterns for risk mitigation"
+  long: |
+    Traditional deployments stop the old version and start the new one, causing downtime and risk. Blue-green deployments run both versions in parallel; canary releases gradually shift traffic to new version. Both enable fast rollback if issues arise.
+
+problem:
+  description: "Deploying changes risks breaking production; rolling back is slow or impossible"
+  symptoms:
+    - name: "Downtime during deployment"
+      description: "Service unavailable for minutes while deployment completes"
+    - name: "Bad deployment impacts all users"
+      description: "Bug affects 100% of users immediately"
+    - name: "Slow rollback"
+      description: "Takes 30+ minutes to revert bad deployment"
+    - name: "Loss of data"
+      description: "Database migration can't be rolled back"
+
+solution:
+  approach: "Keep old version (blue) running while deploying new version (green); switch traffic only after validation"
+  key_points:
+    - "Deploy to idle environment while serving from current"
+    - "Validate new version before switching traffic"
+    - "Maintain quick rollback capability"
+    - "Use canary releases for gradual rollout"
+    - "Monitor metrics during transition"
+
+blue_green_deployment:
+  setup:
+    blue: "Current production version (serving 100% traffic)"
+    green: "New version being deployed (0% traffic)"
+    shared_resources: "Database, cache, external services"
+
+  flow:
+    step_1: "Deploy green environment (full capacity)"
+    step_2: "Run smoke tests against green"
+    step_3: "Run integration tests"
+    step_4: "Run synthetic monitoring against green"
+    step_5: "Switch load balancer to green (blue now idle)"
+    step_6: "Monitor green for errors"
+    step_7: "If issues, switch back to blue (quick rollback)"
+    step_8: "Keep blue running for quick rollback window (1-2 hours)"
+
+  advantages:
+    - "Zero-downtime deployment"
+    - "Quick rollback (seconds not minutes)"
+    - "Full environment testing before switchover"
+    - "No gradual rollout (all users get new version)"
+
+  disadvantages:
+    - "Double infrastructure cost during deployment"
+    - "Database migrations require special handling"
+    - "Difficult for stateful services"
+    - "Risk of missed incompatibilities"
+
+database_migration_strategies:
+  expand_contract:
+    step_1: "Add new column (expand)"
+    step_2: "Deploy blue to use new column"
+    step_3: "Migrate data"
+    step_4: "Deploy green to use new column"
+    step_5: "Remove old column (contract)"
+    duration: "Multiple deployment cycles"
+
+  dual_write:
+    step_1: "Deploy writing to both old and new columns"
+    step_2: "Migrate historical data"
+    step_3: "Deploy reading from new column"
+    step_4: "Remove writes to old column"
+    risk: "Inconsistency between columns"
+
+  feature_flag:
+    step_1: "Deploy with feature flag for new schema"
+    step_2: "Gradually enable for users"
+    step_3: "Monitor for issues"
+    step_4: "Remove old code"
+    duration: "Slow but safe"
+
+canary_release:
+  definition: "Gradually shift traffic from blue to green; monitor metrics at each step"
+
+  flow:
+    step_1: "Deploy green (0% traffic)"
+    step_2: "Shift 5% of traffic to green"
+    step_3: "Monitor error rate, latency, exceptions"
+    step_4: "If healthy, shift 25%"
+    step_5: "If healthy, shift 50%"
+    step_6: "If healthy, shift 100%"
+    step_7: "Keep blue running for rollback"
+
+  advantages:
+    - "Detect issues with small user impact"
+    - "Gradual roll back if issues found"
+    - "Allows real user traffic testing"
+    - "Low risk deployment strategy"
+
+  disadvantages:
+    - "Slower than blue-green (hours vs minutes)"
+    - "Running two versions increases complexity"
+    - "Database state inconsistency harder to manage"
+
+  canary_stages:
+    1_percent: "1% traffic (early warning)"
+    5_percent: "5% traffic (basic health check)"
+    25_percent: "25% traffic (significant validation)"
+    50_percent: "50% traffic (half users on new version)"
+    100_percent: "100% traffic (full rollout)"
+
+traffic_shifting_mechanisms:
+  - name: "Load Balancer"
+    method: "Configure weighted routing (90% blue, 10% green)"
+    tool: "AWS ELB, Nginx, HAProxy, Istio"
+    advantage: "Simple, works with any application"
+
+  - name: "Service Mesh"
+    method: "Virtualservice with canary weight"
+    tool: "Istio, Linkerd"
+    advantage: "Fine-grained control, observability"
+
+  - name: "Feature Flags"
+    method: "Serve different code paths based on flag"
+    tool: "LaunchDarkly, Unleash, custom"
+    advantage: "Single deployment, feature control"
+
+  - name: "DNS/Routing"
+    method: "Route subset of users to new version"
+    tool: "Custom routing, geographic routing"
+    advantage: "Flexible, works cross-region"
+
+metrics_to_monitor:
+  critical:
+    - "Error rate (4xx, 5xx)"
+    - "Response latency (p50, p99)"
+    - "Exception count"
+    - "Business metrics (conversion, revenue)"
+
+  important:
+    - "Database query latency"
+    - "Cache hit rate"
+    - "CPU/memory usage"
+    - "Network bandwidth"
+
+  observability:
+    - "Distributed traces for slow requests"
+    - "Logs for errors"
+    - "Metrics for aggregate health"
+
+rollback_strategy:
+  criteria: "Automatically rollback if error rate > 5% or latency > 2x baseline"
+  duration: "Trigger rollback within 5 minutes of detection"
+  manual: "On-call engineer can manually trigger rollback anytime"
+  validation: "After rollback, ensure blue is healthy"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Blue-green deployment is like changing a light bulb:
+      - Traditional: Turn off light, replace bulb, turn on (brief darkness)
+      - Blue-green: Have two lamps; switch from blue to green (no darkness)
+
+      Safe replacement with instant rollback if new bulb is broken.
+
+  intermediate:
+    focus: "Implementing blue-green and canary"
+    key_points:
+      - "Infrastructure requirements (double capacity)"
+      - "Database migration strategies"
+      - "Traffic shifting and monitoring"
+
+  advanced:
+    focus: "Deployment automation and orchestration"
+    key_points:
+      - "Automated canary progression"
+      - "Correlating metrics for rollback decisions"
+      - "Multi-region deployment coordination"

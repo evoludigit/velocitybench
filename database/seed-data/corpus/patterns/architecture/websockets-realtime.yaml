@@ -1,0 +1,384 @@
+# WebSockets and Real-Time Communication
+# VelocityBench Knowledge Corpus
+
+id: websockets-realtime
+name: "WebSockets and Real-Time Communication"
+category: architecture
+type: pattern
+severity: medium
+tags:
+  - websockets
+  - real-time
+  - architecture
+  - push-notifications
+  - bidirectional
+
+summary:
+  short: "Enable bidirectional, real-time communication between client and server"
+  long: |
+    WebSockets provide persistent, full-duplex communication channels over a single TCP
+    connection. Unlike HTTP request-response, both client and server can send messages
+    at any time. This enables real-time features like live chat, collaborative editing,
+    live dashboards, and gaming. For simpler server-to-client push, Server-Sent Events
+    (SSE) offer a lighter alternative.
+
+problem:
+  description: |
+    HTTP's request-response model doesn't support real-time updates:
+    - Client must poll repeatedly to check for updates (wasteful)
+    - Long-polling improves latency but ties up connections
+    - Server can't push to client when something happens
+    - High latency for time-sensitive applications
+
+  symptoms:
+    - name: "Polling overhead"
+      description: "Clients polling frequently for updates"
+      detection: "Many identical GET requests, mostly returning no changes"
+
+    - name: "Update delays"
+      description: "Users see stale data until refresh"
+      detection: "User complaints about delayed notifications"
+
+    - name: "Scalability issues"
+      description: "Too many connections from polling"
+      detection: "Connection limits hit, server overload"
+
+solution:
+  principle: "Maintain persistent connections for instant bidirectional communication"
+
+  technologies:
+    - name: "WebSockets"
+      protocol: "ws:// / wss://"
+      direction: "Bidirectional"
+      use_case: "Chat, gaming, collaborative apps"
+
+    - name: "Server-Sent Events (SSE)"
+      protocol: "HTTP (text/event-stream)"
+      direction: "Server to client only"
+      use_case: "Live feeds, notifications, dashboards"
+
+    - name: "Socket.io"
+      protocol: "WebSocket with fallbacks"
+      direction: "Bidirectional"
+      use_case: "When you need broad browser support"
+
+implementation:
+  websockets_python:
+    fastapi: |
+      from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+      from typing import List
+      import json
+
+      app = FastAPI()
+
+      class ConnectionManager:
+          """Manage WebSocket connections."""
+
+          def __init__(self):
+              self.active_connections: List[WebSocket] = []
+              self.user_connections: dict[str, WebSocket] = {}
+
+          async def connect(self, websocket: WebSocket, user_id: str):
+              await websocket.accept()
+              self.active_connections.append(websocket)
+              self.user_connections[user_id] = websocket
+
+          def disconnect(self, websocket: WebSocket, user_id: str):
+              self.active_connections.remove(websocket)
+              self.user_connections.pop(user_id, None)
+
+          async def send_to_user(self, user_id: str, message: dict):
+              """Send message to specific user."""
+              websocket = self.user_connections.get(user_id)
+              if websocket:
+                  await websocket.send_json(message)
+
+          async def broadcast(self, message: dict):
+              """Send message to all connected users."""
+              for connection in self.active_connections:
+                  await connection.send_json(message)
+
+      manager = ConnectionManager()
+
+      @app.websocket("/ws/{user_id}")
+      async def websocket_endpoint(websocket: WebSocket, user_id: str):
+          await manager.connect(websocket, user_id)
+          try:
+              while True:
+                  # Receive message from client
+                  data = await websocket.receive_json()
+
+                  # Handle different message types
+                  if data["type"] == "chat":
+                      # Broadcast chat message to all users
+                      await manager.broadcast({
+                          "type": "chat",
+                          "from": user_id,
+                          "message": data["message"]
+                      })
+                  elif data["type"] == "private":
+                      # Send to specific user
+                      await manager.send_to_user(data["to"], {
+                          "type": "private",
+                          "from": user_id,
+                          "message": data["message"]
+                      })
+          except WebSocketDisconnect:
+              manager.disconnect(websocket, user_id)
+              await manager.broadcast({
+                  "type": "system",
+                  "message": f"{user_id} left the chat"
+              })
+
+  websockets_javascript:
+    client: |
+      class WebSocketClient {
+        constructor(url, options = {}) {
+          this.url = url;
+          this.reconnectDelay = options.reconnectDelay || 1000;
+          this.maxReconnectDelay = options.maxReconnectDelay || 30000;
+          this.handlers = new Map();
+          this.connect();
+        }
+
+        connect() {
+          this.ws = new WebSocket(this.url);
+
+          this.ws.onopen = () => {
+            console.log('WebSocket connected');
+            this.reconnectDelay = 1000; // Reset delay on successful connect
+            this.emit('connected');
+          };
+
+          this.ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            this.emit(data.type, data);
+          };
+
+          this.ws.onclose = () => {
+            console.log('WebSocket closed, reconnecting...');
+            this.emit('disconnected');
+            this.scheduleReconnect();
+          };
+
+          this.ws.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            this.emit('error', error);
+          };
+        }
+
+        scheduleReconnect() {
+          setTimeout(() => {
+            this.reconnectDelay = Math.min(
+              this.reconnectDelay * 2,
+              this.maxReconnectDelay
+            );
+            this.connect();
+          }, this.reconnectDelay);
+        }
+
+        send(type, data) {
+          if (this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({ type, ...data }));
+          }
+        }
+
+        on(event, handler) {
+          if (!this.handlers.has(event)) {
+            this.handlers.set(event, []);
+          }
+          this.handlers.get(event).push(handler);
+        }
+
+        emit(event, data) {
+          const handlers = this.handlers.get(event) || [];
+          handlers.forEach(handler => handler(data));
+        }
+      }
+
+      // Usage
+      const ws = new WebSocketClient('wss://api.example.com/ws/user123');
+
+      ws.on('connected', () => {
+        ws.send('chat', { message: 'Hello!' });
+      });
+
+      ws.on('chat', (data) => {
+        console.log(`${data.from}: ${data.message}`);
+      });
+
+    server_nodejs: |
+      import { WebSocketServer, WebSocket } from 'ws';
+      import { createServer } from 'http';
+
+      const server = createServer();
+      const wss = new WebSocketServer({ server });
+
+      const clients = new Map<string, WebSocket>();
+
+      wss.on('connection', (ws, request) => {
+        const userId = new URL(request.url, 'http://localhost').searchParams.get('userId');
+        clients.set(userId, ws);
+
+        ws.on('message', (data) => {
+          const message = JSON.parse(data.toString());
+
+          switch (message.type) {
+            case 'chat':
+              broadcast({ type: 'chat', from: userId, message: message.message });
+              break;
+            case 'private':
+              sendToUser(message.to, { type: 'private', from: userId, message: message.message });
+              break;
+          }
+        });
+
+        ws.on('close', () => {
+          clients.delete(userId);
+          broadcast({ type: 'system', message: `${userId} disconnected` });
+        });
+      });
+
+      function broadcast(message: object) {
+        const data = JSON.stringify(message);
+        clients.forEach((client) => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(data);
+          }
+        });
+      }
+
+      function sendToUser(userId: string, message: object) {
+        const client = clients.get(userId);
+        if (client?.readyState === WebSocket.OPEN) {
+          client.send(JSON.stringify(message));
+        }
+      }
+
+  server_sent_events:
+    python_fastapi: |
+      from fastapi import FastAPI
+      from fastapi.responses import StreamingResponse
+      import asyncio
+
+      app = FastAPI()
+
+      async def event_generator(user_id: str):
+          """Generate SSE events for a user."""
+          while True:
+              # Check for new events (from Redis, database, etc.)
+              events = await get_events_for_user(user_id)
+
+              for event in events:
+                  # SSE format: "data: {json}\n\n"
+                  yield f"data: {json.dumps(event)}\n\n"
+
+              # Heartbeat to keep connection alive
+              yield f": heartbeat\n\n"
+
+              await asyncio.sleep(1)
+
+      @app.get("/events/{user_id}")
+      async def sse_endpoint(user_id: str):
+          return StreamingResponse(
+              event_generator(user_id),
+              media_type="text/event-stream",
+              headers={
+                  "Cache-Control": "no-cache",
+                  "Connection": "keep-alive",
+              }
+          )
+
+    javascript_client: |
+      // SSE client - much simpler than WebSocket
+      const eventSource = new EventSource('/events/user123');
+
+      eventSource.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        console.log('Received:', data);
+      };
+
+      eventSource.onerror = (error) => {
+        console.error('SSE error:', error);
+        // Browser automatically reconnects
+      };
+
+      // Named events
+      eventSource.addEventListener('notification', (event) => {
+        showNotification(JSON.parse(event.data));
+      });
+
+scaling:
+  - name: "Redis Pub/Sub for Multi-Server"
+    description: "Coordinate WebSocket messages across server instances"
+    example: |
+      import redis.asyncio as redis
+
+      class ScaledConnectionManager:
+          """WebSocket manager with Redis pub/sub for scaling."""
+
+          def __init__(self):
+              self.redis = redis.from_url("redis://localhost")
+              self.local_connections: dict[str, WebSocket] = {}
+
+          async def start(self):
+              """Subscribe to Redis channel for cross-server messages."""
+              pubsub = self.redis.pubsub()
+              await pubsub.subscribe("websocket_messages")
+
+              async for message in pubsub.listen():
+                  if message["type"] == "message":
+                      data = json.loads(message["data"])
+                      await self._deliver_local(data)
+
+          async def broadcast(self, message: dict):
+              """Publish to Redis, all servers will receive."""
+              await self.redis.publish(
+                  "websocket_messages",
+                  json.dumps(message)
+              )
+
+          async def _deliver_local(self, message: dict):
+              """Deliver to locally connected clients."""
+              target_user = message.get("to")
+
+              if target_user:
+                  ws = self.local_connections.get(target_user)
+                  if ws:
+                      await ws.send_json(message)
+              else:
+                  # Broadcast to all local connections
+                  for ws in self.local_connections.values():
+                      await ws.send_json(message)
+
+  - name: "Connection Limits"
+    description: "Handle many concurrent connections"
+    tips:
+      - "Use async frameworks (FastAPI, aiohttp, Node.js)"
+      - "Implement heartbeat/ping to detect dead connections"
+      - "Set connection limits per user"
+      - "Use load balancer with sticky sessions"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      WebSockets vs HTTP is like phone calls vs letters:
+      - HTTP: Send a letter, wait for reply, repeat (polling)
+      - WebSocket: Open phone line, talk whenever either side wants
+      Real-time chat needs a phone call, not letters!
+
+  intermediate:
+    focus: "Building robust WebSocket applications"
+    key_points:
+      - "Reconnection with exponential backoff"
+      - "Authentication and authorization"
+      - "Message acknowledgment and ordering"
+      - "Heartbeat and connection health"
+
+  advanced:
+    focus: "Scaling WebSockets in production"
+    key_points:
+      - "Redis pub/sub for multi-server"
+      - "Sticky sessions and load balancing"
+      - "Backpressure and message queuing"
+      - "Protocol design for efficiency"

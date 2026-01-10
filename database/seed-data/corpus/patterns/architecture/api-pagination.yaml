@@ -1,0 +1,251 @@
+# API Pagination Patterns
+# VelocityBench Knowledge Corpus
+
+id: api-pagination
+name: "API Pagination Patterns"
+category: architecture
+type: pattern
+tags:
+  - api
+  - pagination
+  - cursor
+  - offset
+  - graphql
+  - rest
+
+summary:
+  short: "Efficiently return large datasets in manageable chunks"
+  long: |
+    Pagination breaks large result sets into smaller pages, improving performance
+    and user experience. The three main approaches are offset-based (page numbers),
+    cursor-based (opaque tokens), and keyset pagination (ordered column values).
+    Each has tradeoffs in simplicity, consistency, and performance. GraphQL typically
+    uses cursor-based pagination via the Relay Connection spec.
+
+problem:
+  description: |
+    APIs often need to return thousands or millions of records. Returning all data
+    at once causes memory issues, slow responses, and poor UX. Without proper
+    pagination, you face timeout errors, out-of-memory crashes, and users waiting
+    for massive payloads they'll never fully use.
+
+  symptoms:
+    - name: "Timeout errors"
+      description: "Large queries exceed request timeout"
+      detection: "API returns 504 Gateway Timeout"
+
+    - name: "Memory exhaustion"
+      description: "Server OOM when serializing large results"
+      detection: "Process killed, high memory usage"
+
+    - name: "Slow page loads"
+      description: "Users waiting for data that's mostly off-screen"
+      detection: "Large payload sizes, slow TTFB"
+
+pagination_types:
+  - name: "Offset Pagination"
+    description: "Skip N records, take M records"
+    pros:
+      - "Simple to implement and understand"
+      - "Can jump to any page"
+      - "Works with most databases"
+    cons:
+      - "Slow on large offsets (OFFSET 1000000)"
+      - "Inconsistent results if data changes"
+      - "Duplicate/missing items on concurrent writes"
+    example:
+      rest: |
+        GET /api/users?page=5&per_page=20
+
+        -- SQL
+        SELECT * FROM users
+        ORDER BY created_at DESC
+        LIMIT 20 OFFSET 80;
+      graphql: |
+        query {
+          users(page: 5, perPage: 20) {
+            id
+            name
+          }
+        }
+
+  - name: "Cursor Pagination"
+    description: "Use opaque cursor token to track position"
+    pros:
+      - "Consistent results during iteration"
+      - "Works well with real-time data"
+      - "Relay-spec compatible (GraphQL)"
+    cons:
+      - "Can't jump to arbitrary pages"
+      - "More complex implementation"
+      - "Cursor must encode sort order"
+    example:
+      rest: |
+        GET /api/users?first=20&after=eyJpZCI6MTAwfQ
+
+        Response:
+        {
+          "data": [...],
+          "pageInfo": {
+            "hasNextPage": true,
+            "endCursor": "eyJpZCI6MTIwfQ"
+          }
+        }
+      graphql: |
+        query {
+          users(first: 20, after: "eyJpZCI6MTAwfQ") {
+            edges {
+              cursor
+              node {
+                id
+                name
+              }
+            }
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
+          }
+        }
+      implementation: |
+        import base64
+        import json
+
+        def encode_cursor(data: dict) -> str:
+            return base64.b64encode(json.dumps(data).encode()).decode()
+
+        def decode_cursor(cursor: str) -> dict:
+            return json.loads(base64.b64decode(cursor).decode())
+
+        def get_users(first: int, after: str = None):
+            query = "SELECT * FROM users"
+
+            if after:
+                cursor_data = decode_cursor(after)
+                query += f" WHERE id > {cursor_data['id']}"
+
+            query += f" ORDER BY id ASC LIMIT {first + 1}"
+
+            results = db.execute(query)
+            has_next = len(results) > first
+            users = results[:first]
+
+            return {
+                "edges": [
+                    {"cursor": encode_cursor({"id": u.id}), "node": u}
+                    for u in users
+                ],
+                "pageInfo": {
+                    "hasNextPage": has_next,
+                    "endCursor": encode_cursor({"id": users[-1].id}) if users else None
+                }
+            }
+
+  - name: "Keyset Pagination"
+    description: "Use actual column values for pagination"
+    pros:
+      - "Most performant (uses indexes)"
+      - "Consistent results"
+      - "Simple for ordered data"
+    cons:
+      - "Requires stable sort order"
+      - "Complex with multiple sort columns"
+      - "Can't easily show page numbers"
+    example:
+      rest: |
+        GET /api/users?created_after=2024-01-15T10:30:00Z&limit=20
+
+        -- SQL (uses index efficiently)
+        SELECT * FROM users
+        WHERE created_at > '2024-01-15T10:30:00Z'
+        ORDER BY created_at ASC
+        LIMIT 20;
+      multi_column: |
+        -- For ties in primary sort, use secondary column
+        SELECT * FROM users
+        WHERE (created_at, id) > ('2024-01-15T10:30:00Z', 12345)
+        ORDER BY created_at ASC, id ASC
+        LIMIT 20;
+
+relay_connection_spec:
+  description: "GraphQL Relay specification for cursor-based pagination"
+  structure: |
+    type UserConnection {
+      edges: [UserEdge!]!
+      pageInfo: PageInfo!
+      totalCount: Int
+    }
+
+    type UserEdge {
+      cursor: String!
+      node: User!
+    }
+
+    type PageInfo {
+      hasNextPage: Boolean!
+      hasPreviousPage: Boolean!
+      startCursor: String
+      endCursor: String
+    }
+
+  query_args: |
+    # Forward pagination
+    users(first: 10, after: "cursor")
+
+    # Backward pagination
+    users(last: 10, before: "cursor")
+
+  implementation_notes:
+    - "first/after for forward pagination"
+    - "last/before for backward pagination"
+    - "Cursor should encode enough info to find next page"
+    - "Use base64 for opaque cursors (hides implementation)"
+
+best_practices:
+  - "Default page size: 20-50 items"
+  - "Maximum page size: 100-200 items"
+  - "Always return pageInfo/pagination metadata"
+  - "Use cursor pagination for real-time data"
+  - "Use keyset pagination for high-performance needs"
+  - "Offset pagination only for small datasets or admin UIs"
+
+performance_comparison:
+  offset:
+    page_1: "5ms"
+    page_100: "50ms"
+    page_10000: "5000ms+ (scans 10000 rows)"
+
+  cursor:
+    page_1: "5ms"
+    page_100: "5ms"
+    page_10000: "5ms (index seek)"
+
+  keyset:
+    page_1: "3ms"
+    page_100: "3ms"
+    page_10000: "3ms (index seek)"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Pagination is like reading a book:
+      - Offset: "Go to page 50" - works, but you have to flip through 49 pages
+      - Cursor: "Continue from bookmark" - instant, but can't jump ahead
+      - Keyset: "Find chapter starting with 'K'" - fast lookup by content
+
+  intermediate:
+    focus: "Choosing the right pagination strategy"
+    key_points:
+      - "Offset vs cursor vs keyset tradeoffs"
+      - "Relay Connection spec implementation"
+      - "Handling concurrent data changes"
+      - "Performance implications at scale"
+
+  advanced:
+    focus: "High-performance pagination patterns"
+    key_points:
+      - "Keyset pagination with composite keys"
+      - "Cursor encryption and security"
+      - "Total count optimization (avoid COUNT(*))"
+      - "Infinite scroll implementation"
+      - "Bidirectional pagination"

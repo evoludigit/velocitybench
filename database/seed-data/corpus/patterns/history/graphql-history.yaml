@@ -1,0 +1,228 @@
+# The History of GraphQL
+# VelocityBench Knowledge Corpus
+
+id: graphql-history
+name: "The History of GraphQL: From Facebook's News Feed to Industry Standard"
+category: history
+type: timeline
+tags:
+  - graphql
+  - history
+  - facebook
+  - api
+
+summary:
+  short: "How GraphQL evolved from a Facebook internal tool to an industry-standard API technology"
+  long: |
+    GraphQL was created at Facebook in 2012 to solve the data fetching challenges of their
+    mobile News Feed. Open-sourced in 2015, it quickly gained adoption across the industry.
+    Today, it's used by major companies including GitHub, Shopify, Twitter, and Netflix.
+    This history explores the problems it solved and how it became a standard.
+
+timeline:
+  - year: 2012
+    title: "GraphQL Created at Facebook"
+    description: |
+      Facebook's mobile team faced challenges with their iOS app's News Feed.
+      REST APIs were inefficient - multiple round trips and over-fetching
+      made the mobile experience slow. Lee Byron, Nick Schrock, and Dan
+      Schafer created "Graph Query Language" internally.
+    key_people:
+      - name: "Lee Byron"
+        role: "Co-creator, specification lead"
+      - name: "Nick Schrock"
+        role: "Co-creator, infrastructure"
+      - name: "Dan Schafer"
+        role: "Co-creator, product focus"
+    problem_solved: |
+      - Over-fetching: REST endpoints returned too much data
+      - Under-fetching: Multiple requests needed for related data
+      - Mobile bandwidth: Slow 3G networks punished inefficiency
+      - Versioning: REST API versions fragmented
+
+  - year: 2012-2015
+    title: "Internal Adoption at Facebook"
+    description: |
+      GraphQL powered Facebook's mobile apps internally. The iOS and Android
+      apps switched from REST to GraphQL. By 2015, GraphQL handled billions
+      of API calls per day at Facebook.
+    stats:
+      - "Billions of daily API calls"
+      - "Reduced data transfer by up to 70%"
+      - "Faster News Feed load times"
+
+  - year: 2015
+    title: "Open Source Release"
+    month: "September"
+    description: |
+      Facebook open-sourced GraphQL at React.conf 2015. They released:
+      - GraphQL specification
+      - graphql-js reference implementation
+      - GraphiQL (interactive IDE)
+    immediate_impact: |
+      The release generated significant interest. Developers recognized
+      GraphQL solved real problems they faced with REST APIs.
+
+  - year: 2016
+    title: "GitHub Adopts GraphQL"
+    description: |
+      GitHub announced their GraphQL API (v4), becoming the first major
+      platform to offer a public GraphQL API. This validated GraphQL for
+      production use outside Facebook.
+    github_rationale: |
+      - REST API had 100+ endpoints, hard to maintain
+      - Complex nested resources (repos → issues → comments)
+      - Wanted to give clients exactly what they requested
+    quote: |
+      "GraphQL represents a significant investment in our API infrastructure."
+      - Kyle Daigle, GitHub
+
+  - year: 2016
+    title: "Apollo Founded"
+    description: |
+      Meteor Development Group pivoted to focus on GraphQL, creating Apollo.
+      Apollo Client and Apollo Server became the dominant GraphQL ecosystem,
+      providing tooling that made GraphQL practical for teams.
+    products:
+      - "Apollo Client (caching, state management)"
+      - "Apollo Server (Node.js server)"
+      - "Apollo Studio (monitoring, schema management)"
+
+  - year: 2017
+    title: "GraphQL Foundation Discussions Begin"
+    description: |
+      As adoption grew, the community recognized the need for vendor-neutral
+      governance. Discussions began about creating a foundation to steward
+      GraphQL's development.
+
+  - year: 2018
+    title: "Enterprise Adoption Accelerates"
+    description: |
+      Major companies announced GraphQL adoption:
+      - Twitter (public API)
+      - Airbnb (internal and partner APIs)
+      - Pinterest (mobile apps)
+      - PayPal (checkout flows)
+      - The New York Times (content delivery)
+    reasons: |
+      - REST API sprawl becoming unmanageable
+      - Mobile app performance requirements
+      - Developer productivity improvements
+
+  - year: 2018
+    title: "GraphQL Subscriptions Standardized"
+    description: |
+      Real-time capabilities were formalized in the GraphQL specification.
+      Subscriptions enabled push-based updates over WebSockets, crucial
+      for chat apps, live feeds, and collaborative features.
+
+  - year: 2019
+    title: "GraphQL Foundation Launched"
+    month: "November"
+    description: |
+      The GraphQL Foundation was established under the Linux Foundation.
+      Founding members included Apollo, AWS, Facebook, GitHub, IBM, Intuit,
+      and Twitter.
+    purpose: |
+      - Vendor-neutral governance
+      - Specification evolution
+      - Community growth
+      - Ecosystem development
+
+  - year: 2020
+    title: "Apollo Federation Released"
+    description: |
+      Apollo released Federation, enabling composition of multiple GraphQL
+      services into a unified supergraph. This solved the microservices
+      challenge - how to have GraphQL in a distributed architecture.
+    federation_concept: |
+      Multiple GraphQL services → Gateway → Unified API
+
+  - year: 2021
+    title: "Relay Hooks and Modern React"
+    description: |
+      Facebook released Relay with hooks support, modernizing their GraphQL
+      client. Relay's compiler-based approach influenced other clients.
+
+  - year: 2021-2023
+    title: "Database-First GraphQL Tools Mature"
+    description: |
+      Tools like PostGraphile, Hasura, and Supabase made GraphQL accessible
+      without writing resolvers. Auto-generated GraphQL from database schemas
+      became production-ready.
+    tools:
+      - "Hasura: Instant GraphQL over PostgreSQL"
+      - "PostGraphile: PostgreSQL-native GraphQL"
+      - "Supabase: PostgreSQL + auto-generated APIs"
+
+  - year: 2023-present
+    title: "GraphQL at Scale"
+    description: |
+      GraphQL is now established infrastructure. Focus shifted to performance,
+      security, and enterprise features:
+      - Persisted queries for security
+      - @defer and @stream for progressive loading
+      - Federation v2 for better composition
+    current_state: |
+      - Used by majority of Fortune 500 companies
+      - Standard skill for API developers
+      - Rich ecosystem of tools and services
+
+key_innovations:
+  - name: "Schema Definition Language (SDL)"
+    description: "Human-readable schema format"
+    example: |
+      type User {
+        id: ID!
+        name: String!
+        posts: [Post!]!
+      }
+
+  - name: "Introspection"
+    description: "API is self-documenting, can query its own schema"
+    impact: "Enables tools like GraphiQL, IDE autocomplete"
+
+  - name: "Type System"
+    description: "Strong typing catches errors at build time"
+    impact: "Better developer experience, fewer runtime errors"
+
+  - name: "Single Endpoint"
+    description: "All queries go to one endpoint"
+    impact: "Simpler routing, caching strategies"
+
+criticism_and_challenges:
+  - name: "N+1 Query Problem"
+    description: "Resolver architecture can cause database query explosion"
+    solution: "DataLoader batching"
+
+  - name: "Caching Complexity"
+    description: "HTTP caching doesn't work well with single endpoint"
+    solution: "Persisted queries, CDN integration, client-side caching"
+
+  - name: "Security Concerns"
+    description: "Clients can request expensive nested queries"
+    solution: "Query complexity limits, depth limits, persisted queries"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      GraphQL's creation is like inventing a universal remote:
+      - Before: Different remotes for TV, DVD, sound system (REST endpoints)
+      - After: One smart remote that shows exactly what you can control
+      Facebook's mobile team was tired of juggling remotes, so they invented GraphQL.
+
+  intermediate:
+    focus: "Understanding GraphQL's design decisions"
+    key_points:
+      - "Why Facebook chose this approach"
+      - "How the specification evolved"
+      - "The role of the GraphQL Foundation"
+      - "Federation for microservices"
+
+  advanced:
+    focus: "GraphQL's impact on API architecture"
+    key_points:
+      - "Lessons from GraphQL adoption at scale"
+      - "GraphQL vs BFF pattern"
+      - "Future of GraphQL (defer, stream)"
+      - "When NOT to use GraphQL"

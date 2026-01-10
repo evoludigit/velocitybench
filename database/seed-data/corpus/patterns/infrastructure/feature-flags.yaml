@@ -1,0 +1,334 @@
+# Feature Flags and Feature Management
+# VelocityBench Knowledge Corpus
+
+id: feature-flags
+name: "Feature Flags and Gradual Rollouts"
+category: infrastructure
+type: pattern
+severity: high
+tags:
+  - feature-flags
+  - deployment
+  - rollout
+  - canary
+  - experimentation
+
+summary:
+  short: "Control feature visibility and rollout without redeploying"
+  long: |
+    Feature flags decouple deployment from feature release. Deploy code with flags disabled,
+    then gradually enable for users. This enables canary releases, A/B testing, and instant
+    rollback without redeployment. Popular tools include LaunchDarkly, Split, and open-source
+    alternatives like Unleash. Essential for managing risk in production.
+
+problem:
+  description: |
+    Without feature flags, release strategies are limited:
+    - Feature locked in after deployment
+    - Rollback requires redeployment (slow)
+    - Can't test with real users safely
+    - Can't experiment with variants
+    - All-or-nothing releases are risky
+
+  symptoms:
+    - name: "Slow rollbacks"
+      description: "Bug found, must redeploy to roll back"
+      detection: "Rollback takes 30+ minutes"
+
+    - name: "Big bang releases"
+      description: "All users get feature simultaneously"
+      detection: "Releases tie up team, long testing"
+
+    - name: "No experimentation"
+      description: "Can't safely try new ideas with subset"
+      detection: "Feature development stalls"
+
+solution:
+  principle: "Deploy always-on code, enable features independently"
+
+  components:
+    - name: "Flag Evaluation"
+      type: "logic"
+      purpose: "Check if feature enabled for user"
+
+    - name: "Flag Store"
+      type: "storage"
+      purpose: "Central flag configuration"
+
+    - name: "SDK"
+      type: "client"
+      purpose: "Evaluate flags in application"
+
+    - name: "Dashboard"
+      type: "ui"
+      purpose: "Manage flags and rollouts"
+
+flag_types:
+  - name: "Simple Boolean"
+    description: "Feature on or off"
+    example: |
+      if feature_flags.is_enabled('new_checkout'):
+          return new_checkout()
+      else:
+          return old_checkout()
+
+  - name: "Percentage Rollout"
+    description: "Enable for % of users"
+    example: |
+      # Enable for 10% of users
+      if feature_flags.is_enabled('new_checkout', user_id=user.id):
+          # Consistent hashing ensures same user always sees same variant
+
+  - name: "Targeting"
+    description: "Enable for specific users/segments"
+    example: |
+      if feature_flags.is_enabled_for(
+          flag='premium_feature',
+          user=user,
+          context={'plan': 'premium', 'beta_tester': True}
+      ):
+          return premium_feature()
+
+  - name: "Multivariate"
+    description: "Multiple variants of feature"
+    example: |
+      # A/B testing
+      variant = feature_flags.get_variant(
+          'checkout_button_color',
+          user_id=user.id
+      )
+      # Returns: 'control', 'blue', or 'green'
+
+implementation:
+  simple_in_process:
+    python: |
+      # Simple feature flags in-process
+      FEATURE_FLAGS = {
+          'new_checkout': {
+              'enabled': True,
+              'rollout_percentage': 50,
+          },
+          'premium_features': {
+              'enabled': True,
+              'target_users': ['user-123', 'user-456'],
+          }
+      }
+
+      def is_feature_enabled(flag_name, user_id=None):
+          if flag_name not in FEATURE_FLAGS:
+              return False
+
+          flag = FEATURE_FLAGS[flag_name]
+
+          # Check if enabled globally
+          if not flag.get('enabled'):
+              return False
+
+          # Check percentage rollout
+          if 'rollout_percentage' in flag:
+              percentage = flag['rollout_percentage']
+              hash_value = int(hashlib.md5(
+                  f"{flag_name}{user_id}".encode()
+              ).hexdigest(), 16)
+              return (hash_value % 100) < percentage
+
+          # Check targeted users
+          if 'target_users' in flag:
+              return user_id in flag['target_users']
+
+          return True
+
+      # Usage
+      if is_feature_enabled('new_checkout', user.id):
+          return render_new_checkout()
+
+  launchdarkly: |
+    # Commercial feature flag service
+    from ldclient import Context
+    from ldclient.client import LDClient
+
+    # Initialize
+    ld_client = LDClient("sdk-key-here")
+
+    # Evaluate flag
+    context = Context.builder("user-123").build()
+    show_feature = ld_client.variation(
+        "new-checkout-experience",
+        context,
+        False  # default value
+    )
+
+    if show_feature:
+        return render_new_checkout()
+    else:
+        return render_old_checkout()
+
+  unleash_opensource: |
+    # Open-source feature management
+    from UnleashClient import UnleashClient
+
+    client = UnleashClient(
+        url="http://unleash.example.com",
+        app_name="my-app",
+        instance_id="my-instance"
+    )
+
+    context = {
+        'userId': user.id,
+        'sessionId': session.id,
+        'remoteAddress': request.remote_addr,
+    }
+
+    if client.is_enabled("new_checkout", context):
+        return render_new_checkout()
+
+deployment_strategies:
+  rolling_percentage: |
+    # Gradually increase percentage over time
+
+    Day 1: 0% (internal testing)
+    Day 2: 1% (early adopters)
+    Day 3: 5% (wider test)
+    Day 4: 25% (significant portion)
+    Day 5: 100% (full rollout)
+
+    # If issue found, drop back to 0% instantly
+
+  canary_deployment: |
+    # Route small percentage to new code
+    # If metrics good, increase percentage
+
+    0% → New Code
+    100% → Old Code
+
+    Monitor for 30 minutes:
+    - Error rate OK?
+    - Latency OK?
+    - User impact OK?
+
+    If YES:
+    10% → New Code
+    90% → Old Code
+
+    Repeat until 100% → New Code
+
+  blue_green_deployment: |
+    # Two complete environments
+
+    BLUE (v1): Production
+    GREEN (v2): Ready to deploy
+
+    With feature flags:
+    1. Deploy to GREEN
+    2. Route 100% to BLUE initially
+    3. Gradually shift to GREEN via flag
+    4. If issue, shift back to BLUE instantly
+
+ab_testing: |
+    # Experiment with variants
+    variant = feature_flags.get_variant(
+        'payment_button_color',
+        user_id=user.id
+    )
+
+    if variant == 'blue':
+        button_color = '#0073e6'
+    elif variant == 'green':
+        button_color = '#00a86b'
+    else:  # control
+        button_color = '#333333'
+
+    return render_button(color=button_color)
+
+    # Measure conversion rate per variant
+    # Declare winner based on stats
+
+best_practices:
+  - name: "Use consistent hashing for percentage rollout"
+    description: "Same user always sees same variant"
+    reason: "Prevents 'flickering' - user switches variants"
+
+  - name: "Default to false for new flags"
+    description: "Feature disabled by default"
+    benefit: "Safe - accidental deploy doesn't enable unwanted features"
+
+  - name: "Clean up old flags"
+    description: "Remove flags once feature is stable"
+    timeline: "Remove when 100% rolled out for 2+ weeks"
+    benefit: "Reduces cognitive load, improves performance"
+
+  - name: "Monitor flag performance"
+    description: "Track metrics for each flag variant"
+    metrics:
+      - "Error rate per variant"
+      - "Latency per variant"
+      - "User impact"
+
+  - name: "Have kill switch"
+    description: "Instant disable if issues found"
+    benefit: "Fast rollback without redeployment"
+
+patterns:
+  - name: "Gradual Rollout"
+    purpose: "Risk-managed feature release"
+    process: |
+      1. Deploy with flag disabled
+      2. Enable for 1%
+      3. Monitor for 1 hour
+      4. 5% if OK, else rollback
+      5. 25%, 50%, 100% similarly
+
+  - name: "Internal Flag"
+    purpose: "QA/internal testing before rollout"
+    example: |
+      INTERNAL_USERS = ['qa@company.com', 'dev@company.com']
+
+      if is_internal_user(user.email):
+          features_to_test = [
+              'new_checkout',
+              'premium_features'
+          ]
+      else:
+          features_to_test = []
+
+  - name: "Ops-Driven Kill Switch"
+    purpose: "Production ops can disable feature"
+    benefit: |
+      - No redeploy needed
+      - Instant response to issues
+      - Ops empowered without code changes
+
+comparison:
+  commercial: |
+    LaunchDarkly: $$$, full-featured, managed
+    Split.io: $$, experimentation focus
+    Contlo: $$, mobile focus
+
+  open_source: |
+    Unleash: Self-hosted, good features
+    Flagsmith: Self-hosted, growing
+    GrowthBook: Focus on experiments
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Feature flags are like a dimmer switch:
+      - Without: Light is on or off (binary)
+      - With flags: Adjust brightness gradually
+      Safe to introduce new lighting without shocking anyone!
+
+  intermediate:
+    focus: "Implementing flags and percentage rollouts"
+    key_points:
+      - "Consistent hashing for user rollouts"
+      - "Monitoring variants separately"
+      - "Cleanup strategies for old flags"
+      - "Kill switch patterns"
+
+  advanced:
+    focus: "Advanced rollout strategies and experimentation"
+    key_points:
+      - "Canary deployments with flags"
+      - "A/B testing and statistical significance"
+      - "Multi-armed bandits for optimization"
+      - "Flag complexity at scale"

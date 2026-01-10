@@ -1,0 +1,293 @@
+id: cors-security
+name: "CORS & Cross-Origin Resource Sharing Security"
+category: security
+type: standard
+tags:
+  - cors
+  - security
+  - web-applications
+  - api-security
+
+summary:
+  short: "Securing cross-origin requests between browsers and APIs while allowing legitimate use"
+  long: |
+    Cross-Origin Resource Sharing (CORS) is a browser security mechanism that controls which websites can access APIs from other origins. Misconfigured CORS is a common vulnerability that can lead to data leaks and unauthorized actions.
+
+problem:
+  description: "Browsers enforce same-origin policy; cross-origin requests are blocked unless API explicitly allows them"
+  symptoms:
+    - "Frontend can't call API; CORS error in console"
+    - "Simple configuration: overly permissive (*) allows any origin"
+    - "Complex configurations miss edge cases"
+    - "Credentials leaked through improper CORS config"
+    - "Preflight requests slow down API; not understood by developers"
+  impact: "API unusable from frontend, security vulnerabilities, poor developer experience"
+
+solution:
+  description: "Properly configure CORS to allow legitimate requests while rejecting malicious ones"
+
+what_is_cors:
+  definition: "Mechanism for browsers to allow servers to specify who can make cross-origin requests"
+  browser_enforcement: "Browsers enforce this; requests without proper headers are blocked"
+  non_browser_tools: "curl, Postman, server-to-server calls: CORS doesn't apply"
+  misunderstanding: "Developers often think CORS blocks requests on server side; it's browser enforcement"
+
+request_types:
+  simple_requests:
+    description: "No preflight needed; sent directly"
+    methods: ["GET", "POST", "HEAD"]
+    headers_allowed:
+      - "Accept"
+      - "Accept-Language"
+      - "Content-Type (with restrictions)"
+    process: |
+      1. Browser sends request with Origin header
+      2. Server responds with Access-Control-Allow-Origin
+      3. Browser checks if origin is allowed
+      4. If allowed: JavaScript can access response
+      5. If not allowed: response blocked from JavaScript
+
+  preflight_requests:
+    description: "Browser sends OPTIONS request first"
+    triggers:
+      - "DELETE, PUT, PATCH methods"
+      - "Custom headers"
+      - "Content-Type: application/json"
+    process: |
+      1. Browser sends OPTIONS with:
+         - Origin: https://frontend.com
+         - Access-Control-Request-Method: DELETE
+         - Access-Control-Request-Headers: Content-Type
+      2. Server responds with allowed methods/headers
+      3. Browser evaluates if actual request allowed
+      4. Browser sends actual request if preflight passed
+      5. Browser again checks response CORS headers
+
+  performance_impact: "Preflight adds latency; good reason to minimize for sensitive endpoints"
+
+configuration_basics:
+  allowed_origins:
+    description: "Which origins can make cross-origin requests"
+    options:
+      specific: |
+        Access-Control-Allow-Origin: https://frontend.com
+        (Only this origin allowed)
+
+      wildcard: |
+        Access-Control-Allow-Origin: *
+        (Any origin allowed - DANGEROUS for APIs with credentials)
+
+      multiple: |
+        # Parse Origin header and respond accordingly
+        Access-Control-Allow-Origin: https://frontend1.com
+        OR
+        Access-Control-Allow-Origin: https://frontend2.com
+
+  allowed_methods:
+    header: "Access-Control-Allow-Methods"
+    example: "GET, POST, PUT, DELETE"
+    default: "Simple requests allow GET, POST, HEAD"
+
+  allowed_headers:
+    header: "Access-Control-Allow-Headers"
+    example: "Content-Type, Authorization, X-Custom-Header"
+    important: "Must include headers sent in actual request"
+
+  credentials_handling:
+    description: "Whether cookies/auth headers are sent"
+    header: "Access-Control-Allow-Credentials: true"
+    requirement: "Cannot use * for origin if credentials included"
+    correct_config: |
+      Access-Control-Allow-Origin: https://specific-origin.com
+      Access-Control-Allow-Credentials: true
+    incorrect_config: |
+      Access-Control-Allow-Origin: *
+      Access-Control-Allow-Credentials: true
+      # Browser rejects this; * incompatible with credentials
+
+configuration_examples:
+  public_api_read_only:
+    description: "Public API, read-only, no credentials"
+    headers: |
+      Access-Control-Allow-Origin: *
+      Access-Control-Allow-Methods: GET
+      # Simple; safe; anyone can call
+
+  authenticated_api:
+    description: "API with user authentication"
+    headers: |
+      Access-Control-Allow-Origin: https://frontend.example.com
+      Access-Control-Allow-Methods: GET, POST, PUT, DELETE
+      Access-Control-Allow-Headers: Content-Type, Authorization
+      Access-Control-Allow-Credentials: true
+      Access-Control-Max-Age: 3600
+    explanation: "Specific origin, credentials allowed, preflight cached 1 hour"
+
+  multiple_frontends:
+    description: "Support multiple frontend origins"
+    code: |
+      allowed = [
+        'https://frontend.example.com',
+        'https://admin.example.com',
+        'https://beta.example.com'
+      ]
+
+      if request.origin in allowed:
+        response.headers['Access-Control-Allow-Origin'] = request.origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+
+wildcard_risks:
+  security_implications: |
+    Access-Control-Allow-Origin: *
+
+    - Any website can make requests to your API
+    - If user logged in: attacker's site can make authenticated requests
+    - User data exposed without their knowledge
+
+  example_attack: |
+    Attacker's website:
+      <script>
+        fetch('https://victim-bank.com/api/transfer?to=attacker&amount=1000', {
+          credentials: 'include'
+        })
+      </script>
+
+    Browser allows request because of CORS: *
+    Request includes user's auth cookie
+    Bank API processes transfer
+
+  correct_approach: |
+    Access-Control-Allow-Origin: https://specific-origin.com
+    Access-Control-Allow-Credentials: true
+
+    Attacker's site blocked; request fails in browser
+
+preflight_optimization:
+  problem: "Preflight requests add latency (2 requests instead of 1)"
+  solutions:
+    cache_preflight: |
+      Access-Control-Max-Age: 3600
+      Browser caches preflight for 1 hour
+      Subsequent requests skip preflight
+
+    reduce_custom_headers: |
+      Minimize custom headers in requests
+      Reduces need for preflight
+
+    use_simple_requests: |
+      Keep to GET/POST with simple headers
+      Avoids preflight entirely
+
+common_mistakes:
+  - name: "Using * with credentials"
+    consequence: "Browser rejects; API unusable for authenticated requests"
+    fix: "Specific origins with credentials"
+
+  - name: "Forgetting Authorization header"
+    consequence: "Preflight fails; cannot send auth"
+    fix: "Access-Control-Allow-Headers must include Authorization"
+
+  - name: "Dynamic origins without validation"
+    consequence: "Can inadvertently allow any origin"
+    fix: "Maintain whitelist; validate against it"
+
+  - name: "Allowing OPTIONS without CSRF protection"
+    consequence: "Preflight bypass CSRF tokens"
+    fix: "Validate origin before allowing OPTIONS"
+
+  - name: "Not handling credentials in requests"
+    consequence: "API returns data but JavaScript can't access it"
+    fix: "Include credentials: 'include' in fetch"
+
+implementation:
+  express_example: |
+    const cors = require('cors');
+
+    const corsOptions = {
+      origin: [
+        'https://frontend.example.com',
+        'https://admin.example.com'
+      ],
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+      maxAge: 3600
+    };
+
+    app.use(cors(corsOptions));
+
+  browser_request: |
+    fetch('https://api.example.com/data', {
+      credentials: 'include',  # Include cookies
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+
+alternatives_to_cors:
+  server_proxy:
+    description: "Frontend calls own server; server calls API"
+    advantage: "No CORS needed (server-to-server)"
+    disadvantage: "Extra latency; adds server burden"
+
+  jsonp:
+    description: "Older technique using <script> tags"
+    status: "Deprecated; don't use"
+
+  same_origin:
+    description: "Keep frontend and API on same origin"
+    advantage: "No CORS needed"
+    disadvantage: "Less flexibility in architecture"
+
+best_practices:
+  - name: "Be explicit with allowed origins"
+    description: "Whitelist specific origins; never use * for authenticated APIs"
+
+  - name: "Understand simple vs preflight requests"
+    description: "Know which request types trigger preflight"
+
+  - name: "Cache preflight responses"
+    description: "Set appropriate max-age"
+
+  - name: "Include credentials explicitly"
+    description: "If using authentication, include credentials in fetch"
+
+  - name: "Validate origin server-side"
+    description: "Don't trust browser to enforce CORS"
+
+  - name: "Document CORS requirements"
+    description: "Frontend developers need to know what origins are allowed"
+
+  - name: "Use CORS in conjunction with other security measures"
+    description: "CORS not sufficient alone; add CSRF tokens, validation"
+
+  - name: "Test CORS configuration"
+    description: "Test from different origins; ensure correct responses"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      CORS is like a nightclub bouncer:
+      - Browser = nightclub
+      - Frontend = person wanting entry
+      - Backend API = VIP area
+      - Origin header = ID proving where you're from
+      - CORS headers = bouncer's decision on who enters
+
+      Bouncer (browser) checks API's (bouncer's) list of allowed origins.
+
+  intermediate:
+    focus: "CORS configuration patterns"
+    key_points:
+      - "Simple requests vs preflight requests"
+      - "Origins, credentials, and security implications"
+      - "Configuration examples for different scenarios"
+      - "Common mistakes and fixes"
+
+  advanced:
+    focus: "CORS at scale"
+    key_points:
+      - "Dynamic origin validation"
+      - "Preflight optimization strategies"
+      - "CORS with service mesh and reverse proxies"
+      - "Debugging complex CORS issues"

@@ -1,0 +1,310 @@
+# The Evolution of Cloud Computing
+# VelocityBench Knowledge Corpus
+
+id: evolution-of-cloud-computing
+name: "The Evolution of Cloud Computing: From Colocation to Serverless"
+category: history
+type: timeline
+tags:
+  - cloud
+  - infrastructure
+  - history
+  - devops
+
+summary:
+  short: "How cloud computing evolved from centralized data centers to distributed serverless architectures"
+  long: |
+    Cloud computing transformed how applications are deployed and scaled. Starting
+    with simple co-location facilities where companies rented physical space, through
+    virtualization's abstraction of hardware, to today's serverless platforms where
+    developers think only about code, the progression represents a continuous journey
+    toward easier infrastructure management. This history traces the key innovations
+    and the business problems each solved.
+
+timeline:
+  - year: 1960s
+    title: "The Era of Data Centers"
+    description: |
+      Before cloud, companies operated their own data centers.
+      Huge capital expenditures for buildings, cooling, power.
+      Dedicated teams managed hardware, networks, security.
+    characteristics: |
+      - In-house data center ownership
+      - Specialized hardware for specific workloads
+      - Long procurement cycles (months)
+      - High upfront capital costs
+      - Hard to scale up or down
+
+  - year: 1990s
+    title: "Co-location Facilities"
+    description: |
+      Companies began renting rack space in shared data centers.
+      Still owned their own hardware but outsourced the building.
+      Reduced capital costs but still significant hardware costs.
+    innovation: "Outsource the facility, keep hardware ownership"
+    problems_remained: |
+      - Still required to buy hardware upfront
+      - Long lead times for new capacity
+      - Underutilized servers common
+
+  - year: 2000s
+    title: "Virtualization Revolution"
+    description: |
+      VMware and others made virtualization practical.
+      Run multiple virtual machines on single physical server.
+      Transformed data center economics.
+    breakthrough: "One physical server → many virtual servers"
+    implications: |
+      - Better hardware utilization
+      - Easier to migrate workloads
+      - Could have diverse operating systems on one server
+      - Foundation for cloud computing
+
+  - year: 2006
+    title: "AWS EC2 Launches"
+    description: |
+      Amazon Web Services released Elastic Compute Cloud (EC2).
+      On-demand virtual machines, pay per hour.
+      Fundamental shift in computing economics.
+    revolutionary_aspects: |
+      - No upfront hardware costs
+      - Pay only for what you use
+      - Instant provisioning (minutes vs months)
+      - Scalability as needed
+    business_model: "Infrastructure as a Service (IaaS)"
+    impact: "Created the cloud computing market entirely"
+
+  - year: 2006
+    title: "AWS S3 (Simple Storage Service)"
+    description: |
+      Amazon also released S3for object storage.
+      Infinitely scalable, reliable, cheap storage.
+      Changed how applications handle data.
+    significance: "Storage separated from compute"
+    adoption: "Became default for unstructured data"
+
+  - year: 2008-2010
+    title: "Cloud Maturation & Platform Services"
+    description: |
+      Beyond IaaS, cloud providers offered:
+      - Managed databases (RDS)
+      - Load balancers (ELB)
+      - Message queues (SQS)
+      - CDNs
+    shift: "From compute + storage to full platform services"
+    implication: "Developers no longer managed database servers"
+
+  - year: 2009
+    title: "Heroku: Platform as a Service (PaaS)"
+    description: |
+      Heroku abstracted away infrastructure entirely.
+      Push code (git push heroku master), it just works.
+      Different paradigm from AWS IaaS.
+    philosophy: "Developers care about code, not infrastructure"
+    experience: |
+      - One command deployment
+      - Scaling via dynos (horizontal units)
+      - Built-in databases, caching, monitoring
+    influence: "Inspired thinking about developer experience"
+
+  - year: 2011
+    title: "Docker & Containerization"
+    description: |
+      Docker made containerization accessible and practical.
+      Lightweight isolation without full VMs.
+      Unified packaging: "build once, run anywhere"
+    revolutionary: "Containers more efficient than VMs, easier than bare metal"
+    implications: |
+      - Portable across cloud providers
+      - Microservices became practical
+      - Dependency management became easier
+    impact: "Changed deployment paradigm"
+
+  - year: 2014
+    title: "Kubernetes Orchestration"
+    description: |
+      Google open-sourced Kubernetes (K8s).
+      Orchestrate containers across clusters of machines.
+      Self-healing, auto-scaling, rolling updates.
+    problem_solved: "Managing hundreds of containers manually impossible"
+    paradigm: "Declarative infrastructure (desired state)"
+    adoption: "Became standard for containerized systems"
+
+  - year: 2014
+    title: "AWS Lambda: Serverless Computing"
+    description: |
+      AWS Lambda let developers upload functions, not servers.
+      Cloud provider manages all infrastructure.
+      Charged per execution, not per instance hour.
+    breakthrough: "Pay per execution, not per server"
+    developer_experience: |
+      - Upload a function
+      - Specify triggers
+      - No server management
+      - Auto-scales infinitely
+    implication: "Serverless ≠ no servers, just abstracted away"
+
+  - year: 2015-2017
+    title: "Serverless Ecosystem Emerges"
+    description: |
+      Serverless frameworks and services proliferated:
+      - API Gateway for HTTP endpoints
+      - DynamoDB for NoSQL storage
+      - SNS/SQS for event messaging
+      - CloudWatch for monitoring
+    architectural_pattern: "Event-driven architecture"
+    adoption: "Perfect for: IoT, webhooks, scheduled jobs, APIs"
+
+  - year: 2017
+    title: "Cloud Providers War"
+    description: |
+      Google Cloud, Azure, and smaller providers competed.
+      Each added proprietary services.
+      Price competition intensified.
+    market_consolidation: |
+      - AWS: ~35% market share
+      - Azure: ~20%
+      - GCP: ~10%
+      - Others split remainder
+    lock-in_concerns: "Proprietary services made switching difficult"
+
+  - year: 2018-2019
+    title: "Kubernetes Standardization"
+    description: |
+      Kubernetes became the de facto standard for orchestration.
+      Available on all major cloud providers (EKS, GKE, AKS).
+      De facto multi-cloud orchestration layer.
+    significance: "Reduced vendor lock-in compared to proprietary orchestration"
+
+  - year: 2020
+    title: "Containers & Kubernetes Mainstream"
+    description: |
+      By 2020, containerization was standard practice.
+      Kubernetes for any moderately complex deployment.
+      Container registries (ECR, GCR, ACR) everywhere.
+    adoption: "Industry standard, not optional"
+    cost: "Complexity trade-off for control and portability"
+
+  - year: 2021-2022
+    title: "Edge Computing Rise"
+    description: |
+      Cloud functions moved to edge (near users).
+      - Cloudflare Workers
+      - AWS Lambda@Edge
+      - Vercel Edge Functions
+      - Fastly Compute@Edge
+    innovation: "Compute closer to users for lower latency"
+    use_cases: |
+      - Content personalization
+      - A/B testing
+      - DDoS mitigation
+      - API composition
+
+  - year: 2023-present
+    title: "Multi-cloud & Hybrid"
+    description: |
+      Organizations use multiple cloud providers strategically:
+      - Data sovereignty/compliance requirements
+      - Avoiding single vendor dependency
+      - Workload optimization (right tool for right job)
+    trend: "Cloud as commodity, not destination"
+    emerging_focus: |
+      - FinOps (cost optimization)
+      - Cloud security
+      - Multi-cloud management
+      - GitOps for infrastructure
+
+architectural_patterns_by_era:
+  - era: "Colocation (1990s)"
+    pattern: "Monolithic application on owned hardware"
+    scaling: "Buy more servers"
+
+  - era: "Early Cloud (2006-2010)"
+    pattern: "EC2 instances running same monolith, load balanced"
+    scaling: "Spin up more instances"
+
+  - era: "Service-Oriented (2010-2015)"
+    pattern: "Services on shared infrastructure, databases"
+    scaling: "Services scale independently"
+
+  - era: "Containerization (2015-2020)"
+    pattern: "Microservices in containers orchestrated by K8s"
+    scaling: "Automatic based on metrics"
+
+  - era: "Serverless (2020+)"
+    pattern: "Functions triggered by events, databases for state"
+    scaling: "Automatic, infinite"
+
+cost_evolution:
+  - era: "Colocation"
+    model: "High capital, operational expenses"
+    min_investment: "$100k+ upfront"
+
+  - era: "EC2 Era"
+    model: "Pay per instance hour"
+    min_investment: "$100/month"
+
+  - era: "Auto-scaling"
+    model: "Per hour + data transfer"
+    min_investment: "$50-100/month"
+
+  - era: "Serverless"
+    model: "Pay per execution + storage"
+    min_investment: "$0 (free tier), grows with usage"
+
+key_insights:
+  - insight: "Abstraction enables cost reduction"
+    example: "VMs → reduced hardware costs, Serverless → near-zero idle costs"
+
+  - insight: "Managed services reduce operational burden"
+    example: "Managing RDS < managing database servers yourself"
+
+  - insight: "Containers solved portability"
+    example: "Docker unified local dev and production environments"
+
+  - insight: "Kubernetes has complexity cost"
+    example: "Solves orchestration but requires expertise"
+
+  - insight: "Serverless for right workloads is powerful"
+    example: "But not suitable for all applications (long-running processes)"
+
+lessons_for_architects:
+  - lesson: "Cloud isn't free, just different costs"
+    insight: "Pay per use avoids capital costs but per-minute charges add up"
+
+  - lesson: "Vendor lock-in is real but manageable"
+    insight: "Use standard tools (containers, K8s) but accept some lock-in"
+
+  - lesson: "Right tool for right job"
+    insight: "Serverless for spiky workloads, K8s for steady-state"
+
+  - lesson: "Operational complexity moves, not disappears"
+    insight: "Managed services trade for provider complexity trade-off"
+
+  - lesson: "Multi-cloud is more aspirational than practical"
+    insight: "Usually end up with primary + backup provider"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Cloud computing evolution is like housing:
+      - Co-location: Buying property in a shared building
+      - EC2: Renting an apartment (pay as you go)
+      - Kubernetes: Apartment complex management
+      - Serverless: Airbnb (pay exactly for what you use)
+
+  intermediate:
+    focus: "Understanding architectural implications"
+    key_points:
+      - "How each generation solved cost problems"
+      - "Scalability patterns at each stage"
+      - "Trade-offs between control and convenience"
+      - "Choosing the right layer for your workload"
+
+  advanced:
+    focus: "Strategic infrastructure decisions"
+    key_points:
+      - "Multi-cloud strategies and when they make sense"
+      - "Cost optimization at scale"
+      - "Avoiding vendor lock-in (practical approach)"
+      - "Predicting next cloud computing evolution"

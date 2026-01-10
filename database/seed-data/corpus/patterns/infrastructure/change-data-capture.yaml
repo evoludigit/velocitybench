@@ -1,0 +1,328 @@
+# Change Data Capture (CDC)
+# VelocityBench Knowledge Corpus
+
+id: change-data-capture
+name: "Change Data Capture (CDC) Patterns"
+category: infrastructure
+type: pattern
+severity: high
+tags:
+  - cdc
+  - data-replication
+  - streaming
+  - debezium
+  - kafka
+
+summary:
+  short: "Capture and stream database changes in real-time to downstream systems"
+  long: |
+    Change Data Capture (CDC) automatically detects and captures changes to data in a
+    source system, then streams those changes to downstream consumers. Debezium is a
+    popular open-source CDC platform that captures changes from PostgreSQL, MySQL, MongoDB,
+    etc., and publishes them to Kafka or other message queues. Essential for real-time
+    analytics, cache invalidation, event sourcing, and data synchronization.
+
+problem:
+  description: |
+    Keeping multiple systems in sync is challenging:
+    - Database changes must be reflected in cache, search index, analytics warehouse
+    - Polling for changes is slow and resource-intensive
+    - Manual synchronization is error-prone and incomplete
+    - Hard to maintain audit trail of all changes
+    - Lost changes if sync process crashes
+
+  symptoms:
+    - name: "Stale data in downstream systems"
+      description: "Cache/indexes don't reflect database changes"
+      detection: "Users see old data, discrepancies between systems"
+
+    - name: "Polling overhead"
+      description: "Constant polling queries to check for changes"
+      detection: "High database load from repeated queries"
+
+    - name: "Complex sync logic"
+      description: "Custom code in multiple places to sync data"
+      detection: "Difficult deployments, frequent sync bugs"
+
+solution:
+  principle: "Let the database stream all changes to a message queue"
+
+  components:
+    - name: "Change Log"
+      type: "source"
+      purpose: "Database transaction log (WAL, bin log)"
+
+    - name: "CDC Connector"
+      type: "capture"
+      purpose: "Reads change log, captures changes"
+
+    - name: "Message Queue"
+      type: "streaming"
+      purpose: "Reliable distribution of changes"
+
+    - name: "Consumer"
+      type: "sink"
+      purpose: "Processes changes (update cache, index, etc.)"
+
+cdc_approaches:
+  - name: "Query-based CDC"
+    description: "Poll database for changes"
+    pros: ["Simple", "Works with any database"]
+    cons: ["Slow", "High load", "Misses changes between polls"]
+    best_for: "Batch processes, non-critical sync"
+
+  - name: "Log-based CDC (Debezium)"
+    description: "Read database transaction logs"
+    pros: ["Real-time", "Complete capture", "Low impact"]
+    cons: ["Database-specific", "Complex setup"]
+    best_for: "Real-time streaming, critical sync"
+
+  - name: "Trigger-based CDC"
+    description: "Database triggers record changes"
+    pros: ["No polling", "Real-time"]
+    cons: ["Triggers slow writes", "Complex logic", "Hard to maintain"]
+    best_for: "Legacy systems, limited alternatives"
+
+implementation:
+  debezium_postgresql:
+    setup: |
+      # Enable logical decoding in PostgreSQL
+      # postgresql.conf
+      wal_level = logical
+      max_wal_senders = 10
+      max_replication_slots = 10
+
+      # Create publication for CDC
+      CREATE PUBLICATION dbz_publication FOR ALL TABLES;
+
+      # Create replication slot
+      SELECT * FROM pg_create_logical_replication_slot('dbz_slot', 'pgoutput');
+
+    docker_compose: |
+      version: '3'
+      services:
+        postgres:
+          image: postgres:15
+          environment:
+            POSTGRES_USER: myapp
+            POSTGRES_PASSWORD: password
+            POSTGRES_DB: myapp
+          command:
+            - "postgres"
+            - "-c"
+            - "wal_level=logical"
+
+        kafka:
+          image: confluentinc/cp-kafka:latest
+          depends_on:
+            - zookeeper
+          environment:
+            KAFKA_BROKER_ID: 1
+            KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+
+        zookeeper:
+          image: confluentinc/cp-zookeeper:latest
+          environment:
+            ZOOKEEPER_CLIENT_PORT: 2181
+
+        kafka-connect:
+          image: confluentinc/cp-kafka-connect:latest
+          depends_on:
+            - kafka
+            - postgres
+          ports:
+            - "8083:8083"
+          environment:
+            CONNECT_BOOTSTRAP_SERVERS: kafka:29092
+            CONNECT_REST_PORT: 8083
+
+  debezium_connector_config:
+    postgresql: |
+      {
+        "name": "postgres-cdc",
+        "config": {
+          "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+          "database.hostname": "postgres",
+          "database.port": 5432,
+          "database.user": "myapp",
+          "database.password": "password",
+          "database.dbname": "myapp",
+          "database.server.name": "postgres-server",
+          "publication.name": "dbz_publication",
+          "slot.name": "dbz_slot",
+          "table.include.list": "public.users,public.orders,public.products",
+          "transforms": "route",
+          "transforms.route.type": "org.apache.kafka.connect.transforms.RegexRouter",
+          "transforms.route.regex": "([^.]+)\\.([^.]+)\\.([^.]+)",
+          "transforms.route.replacement": "$3"
+        }
+      }
+
+  consuming_changes:
+    python_kafka: |
+      from kafka import KafkaConsumer
+      import json
+      import logging
+
+      consumer = KafkaConsumer(
+          'users',  # Listen to users table changes
+          bootstrap_servers=['localhost:9092'],
+          value_deserializer=lambda m: json.loads(m.decode('utf-8')),
+          auto_offset_reset='earliest',
+          group_id='cache-updater'
+      )
+
+      for message in consumer:
+          change = message.value
+
+          # Debezium message structure
+          if 'payload' in change:
+              payload = change['payload']
+              op = payload['op']  # c=create, u=update, d=delete, r=read
+              after = payload['after']  # New state
+              before = payload['before']  # Old state
+
+              if op == 'c':
+                  print(f"CREATE: {after}")
+                  cache.set(f"user:{after['id']}", after)
+
+              elif op == 'u':
+                  print(f"UPDATE: {after}")
+                  cache.set(f"user:{after['id']}", after)
+
+              elif op == 'd':
+                  print(f"DELETE: {before}")
+                  cache.delete(f"user:{before['id']}")
+
+    node_kafka: |
+      const { Kafka } = require('kafkajs');
+      const redis = require('redis');
+
+      const kafka = new Kafka({
+        clientId: 'cache-updater',
+        brokers: ['localhost:9092']
+      });
+
+      const consumer = kafka.consumer({ groupId: 'cache-updater' });
+      const redisClient = redis.createClient();
+
+      await consumer.subscribe({ topic: 'users' });
+      await consumer.run({
+        eachMessage: async ({ partition, message }) => {
+          const change = JSON.parse(message.value.toString());
+          const { payload } = change;
+
+          switch (payload.op) {
+            case 'c':
+            case 'u':
+              // Create or update - store in cache
+              await redisClient.set(
+                `user:${payload.after.id}`,
+                JSON.stringify(payload.after)
+              );
+              break;
+
+            case 'd':
+              // Delete - remove from cache
+              await redisClient.del(`user:${payload.before.id}`);
+              break;
+          }
+        }
+      });
+
+patterns:
+  - name: "Cache Invalidation via CDC"
+    description: "Keep cache in sync with database"
+    use_case: "Real-time cache updates"
+    example: |
+      # Any database write automatically invalidates cache
+      # Consumers update cache from CDC stream
+      # No need for manual cache invalidation
+
+  - name: "Search Index Synchronization"
+    description: "Keep Elasticsearch/Solr in sync"
+    use_case: "Real-time full-text search"
+    example: |
+      # CDC → Kafka → Elasticsearch Consumer
+      # Elasticsearch always reflects latest database state
+
+  - name: "Event Sourcing from CDC"
+    description: "Build event stream from change log"
+    use_case: "Audit trail, temporal queries"
+    example: |
+      # Database transaction log IS the event log
+      # Publish to event stream for subscribers
+
+  - name: "Data Warehouse Sync"
+    description: "Stream changes to analytics warehouse"
+    use_case: "Real-time analytics"
+    example: |
+      # CDC → Kafka → ETL → Data Warehouse
+      # Analytics always current, no batch delays
+
+best_practices:
+  - name: "Use log-based CDC for critical systems"
+    description: "Log-based CDC is more reliable than polling"
+    rationale: "No missed changes, real-time, low impact"
+
+  - name: "Handle exactly-once semantics"
+    description: "Ensure no duplicate or lost changes"
+    approach: |
+      - Idempotent consumer processing
+      - Track processed offsets
+      - Handle out-of-order messages
+
+  - name: "Version change schemas"
+    description: "Schema evolution causes breaks"
+    approach: |
+      - Use schema registry (Confluent)
+      - Version change messages
+      - Support multiple schema versions in consumers
+
+  - name: "Monitor lag"
+    description: "Track how far behind consumers are"
+    metrics:
+      - "Consumer offset vs producer offset"
+      - "Time to process changes"
+      - "Alert if lag exceeds threshold"
+
+comparison:
+  - name: "Debezium vs Custom CDC"
+    debezium_pros:
+      - "Battle-tested, widely used"
+      - "Supports many databases"
+      - "Handles edge cases"
+      - "Community support"
+    debezium_cons:
+      - "Additional infrastructure"
+      - "Kafka/message queue required"
+    custom_pros:
+      - "Simpler setup for specific database"
+      - "Fewer moving parts"
+    custom_cons:
+      - "Bugs from home-grown code"
+      - "Hard to maintain"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      CDC is like a mail subscription service:
+      - No CDC: You check the mailbox every day (polling)
+      - CDC: Mail is automatically delivered when it arrives
+      The mail carrier (CDC) handles delivery for you!
+
+  intermediate:
+    focus: "Setting up Debezium with PostgreSQL and Kafka"
+    key_points:
+      - "Enabling logical decoding in PostgreSQL"
+      - "Debezium connector configuration"
+      - "Consuming changes from Kafka"
+      - "Handling schema evolution"
+
+  advanced:
+    focus: "CDC at scale and architecture patterns"
+    key_points:
+      - "Multi-table consistency"
+      - "Handling transactional boundaries"
+      - "Scale to millions of changes/second"
+      - "Building CQRS from CDC"

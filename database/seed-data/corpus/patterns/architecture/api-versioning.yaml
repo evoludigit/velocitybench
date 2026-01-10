@@ -1,0 +1,218 @@
+# API Versioning Strategies
+# VelocityBench Knowledge Corpus
+
+id: api-versioning
+name: "API Versioning Strategies"
+category: architecture
+type: pattern
+tags:
+  - api
+  - versioning
+  - rest
+  - graphql
+  - backwards-compatibility
+
+summary:
+  short: "Evolve APIs without breaking existing clients"
+  long: |
+    API versioning allows you to introduce breaking changes while maintaining
+    backwards compatibility for existing clients. Strategies include URL versioning
+    (/v1/users), header versioning (Accept: application/vnd.api+json;version=1),
+    and query parameter versioning (?version=1). GraphQL typically uses schema
+    evolution with deprecation instead of explicit versions.
+
+problem:
+  description: |
+    APIs evolve over time - fields get renamed, endpoints restructured, response
+    formats changed. Without versioning, any change can break clients. Mobile apps
+    can't be force-updated, third-party integrations may take months to adapt,
+    and breaking changes cause support nightmares and lost customers.
+
+  symptoms:
+    - name: "Client breakage"
+      description: "API changes break mobile apps or integrations"
+      detection: "Error spikes after deployments"
+
+    - name: "Frozen APIs"
+      description: "Fear of breaking changes prevents improvements"
+      detection: "Accumulating technical debt in API design"
+
+    - name: "Version sprawl"
+      description: "Too many versions to maintain"
+      detection: "Multiple code paths for different versions"
+
+versioning_strategies:
+  - name: "URL Path Versioning"
+    description: "Version in the URL path"
+    example: |
+      GET /v1/users
+      GET /v2/users
+    pros:
+      - "Explicit and visible"
+      - "Easy to route and cache"
+      - "Clear separation of versions"
+    cons:
+      - "Not truly RESTful (resource has multiple URIs)"
+      - "Harder to sunset versions"
+    implementation: |
+      # Express.js
+      app.use('/v1', require('./routes/v1'));
+      app.use('/v2', require('./routes/v2'));
+
+      # FastAPI
+      app.include_router(v1_router, prefix="/v1")
+      app.include_router(v2_router, prefix="/v2")
+
+  - name: "Header Versioning"
+    description: "Version in Accept or custom header"
+    example: |
+      GET /users
+      Accept: application/vnd.myapi.v1+json
+
+      # Or custom header
+      GET /users
+      X-API-Version: 2
+    pros:
+      - "Clean URLs"
+      - "More RESTful"
+      - "Flexible versioning scheme"
+    cons:
+      - "Harder to test in browser"
+      - "Easy to forget the header"
+      - "Caching complexity"
+    implementation: |
+      # FastAPI with header versioning
+      @app.get("/users")
+      async def get_users(
+          version: int = Header(1, alias="X-API-Version")
+      ):
+          if version == 1:
+              return v1_get_users()
+          elif version == 2:
+              return v2_get_users()
+
+  - name: "Query Parameter Versioning"
+    description: "Version as query parameter"
+    example: |
+      GET /users?version=1
+      GET /users?api_version=2
+    pros:
+      - "Easy to test"
+      - "Works in browser"
+      - "Simple to implement"
+    cons:
+      - "Pollutes query string"
+      - "Optional parameter can be forgotten"
+      - "Caching complications"
+
+  - name: "GraphQL Schema Evolution"
+    description: "Evolve schema without versions using deprecation"
+    example: |
+      type User {
+        id: ID!
+        name: String!
+        # Old field - deprecated
+        fullName: String @deprecated(reason: "Use 'name' instead")
+
+        # New field
+        displayName: String!
+      }
+    pros:
+      - "No version management overhead"
+      - "Clients request only what they need"
+      - "Gradual migration with deprecation warnings"
+    cons:
+      - "Requires careful schema design"
+      - "Can't remove fields without breaking clients"
+      - "Schema complexity grows over time"
+
+evolution_patterns:
+  - name: "Additive Changes (Non-Breaking)"
+    safe_changes:
+      - "Add new endpoints"
+      - "Add optional fields to responses"
+      - "Add optional parameters to requests"
+      - "Add new enum values (with care)"
+    example: |
+      # v1 response
+      {"id": 1, "name": "John"}
+
+      # v1.1 response (backwards compatible)
+      {"id": 1, "name": "John", "email": "john@example.com"}
+
+  - name: "Breaking Changes (Require New Version)"
+    breaking_changes:
+      - "Remove or rename fields"
+      - "Change field types"
+      - "Change endpoint paths"
+      - "Make optional fields required"
+      - "Change authentication method"
+    mitigation: |
+      # Deprecation period before removal
+      {
+        "id": 1,
+        "name": "John",              # New field
+        "full_name": "John Doe",     # Deprecated, will be removed in v3
+        "_deprecated": ["full_name"]
+      }
+
+  - name: "Content Negotiation"
+    description: "Different representations of same resource"
+    example: |
+      # Request JSON
+      GET /users/1
+      Accept: application/json
+
+      # Request XML (same endpoint, different format)
+      GET /users/1
+      Accept: application/xml
+
+      # Request specific version
+      GET /users/1
+      Accept: application/vnd.myapi.v2+json
+
+deprecation_strategy:
+  timeline:
+    - "Announce deprecation (blog, changelog, API response headers)"
+    - "Add Deprecation and Sunset headers to responses"
+    - "Monitor usage of deprecated endpoints"
+    - "Remove after sunset date (typically 6-12 months)"
+  headers: |
+    HTTP/1.1 200 OK
+    Deprecation: true
+    Sunset: Sat, 31 Dec 2024 23:59:59 GMT
+    Link: <https://api.example.com/v2/users>; rel="successor-version"
+
+best_practices:
+  - "Default to latest stable version for new clients"
+  - "Maintain at most 2-3 active versions"
+  - "Document all breaking changes in changelog"
+  - "Use semantic versioning for APIs"
+  - "Provide migration guides for major versions"
+  - "Set clear deprecation timelines"
+  - "Monitor version usage to plan sunsetting"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      API versioning is like a restaurant menu:
+      - v1: Original menu everyone knows
+      - v2: New dishes added, some renamed
+      - Regular customers can still order from v1 while trying v2
+      Eventually v1 items are removed, but with plenty of notice!
+
+  intermediate:
+    focus: "Choosing the right versioning strategy"
+    key_points:
+      - "URL vs header vs query parameter tradeoffs"
+      - "Backwards compatible changes"
+      - "Deprecation and sunset headers"
+      - "Version negotiation patterns"
+
+  advanced:
+    focus: "Enterprise API versioning"
+    key_points:
+      - "Multi-tenant version management"
+      - "API gateways and version routing"
+      - "Contract testing across versions"
+      - "GraphQL schema stitching with versioning"

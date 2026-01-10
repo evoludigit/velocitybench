@@ -1,0 +1,287 @@
+# Circuit Breaker Pattern
+# VelocityBench Knowledge Corpus
+
+id: circuit-breaker
+name: "Circuit Breaker Pattern"
+category: reliability
+type: pattern
+severity: high
+tags:
+  - reliability
+  - fault-tolerance
+  - resilience
+  - microservices
+  - distributed-systems
+
+summary:
+  short: "Prevent cascade failures by stopping calls to failing services"
+  long: |
+    The circuit breaker pattern prevents an application from repeatedly trying to
+    execute an operation that's likely to fail. Like an electrical circuit breaker,
+    it "trips" when failures exceed a threshold, immediately returning errors instead
+    of waiting for timeouts. After a cooling period, it allows test requests through
+    to see if the service has recovered.
+
+problem:
+  description: |
+    In distributed systems, services depend on other services. When a downstream
+    service fails or slows down:
+    - Requests pile up waiting for timeouts
+    - Thread pools exhaust, affecting healthy operations
+    - Cascade failures spread through the system
+    - Recovery is slow even after the issue is fixed
+
+  symptoms:
+    - name: "Cascade failures"
+      description: "One service failure brings down multiple services"
+      detection: "Correlated error spikes across services"
+
+    - name: "Timeout accumulation"
+      description: "Threads blocked waiting for slow/dead services"
+      detection: "Thread pool exhaustion, growing request queues"
+
+    - name: "Slow recovery"
+      description: "System stays broken after root cause is fixed"
+      detection: "Manual intervention needed to recover"
+
+solution:
+  principle: "Fail fast when a service is known to be down"
+
+  states:
+    - name: "Closed"
+      description: "Normal operation, requests flow through"
+      behavior: "Track failures, trip if threshold exceeded"
+
+    - name: "Open"
+      description: "Circuit tripped, requests fail immediately"
+      behavior: "Return error without calling service"
+
+    - name: "Half-Open"
+      description: "Testing if service recovered"
+      behavior: "Allow limited requests, close on success, open on failure"
+
+implementation:
+  simple_circuit_breaker:
+    python: |
+      import time
+      from enum import Enum
+      from dataclasses import dataclass
+      from typing import Callable, TypeVar
+
+      T = TypeVar('T')
+
+      class State(Enum):
+          CLOSED = "closed"
+          OPEN = "open"
+          HALF_OPEN = "half_open"
+
+      @dataclass
+      class CircuitBreaker:
+          failure_threshold: int = 5
+          recovery_timeout: float = 30.0
+          half_open_max_calls: int = 3
+
+          state: State = State.CLOSED
+          failure_count: int = 0
+          last_failure_time: float = 0
+          half_open_calls: int = 0
+
+          def call(self, func: Callable[[], T]) -> T:
+              if self.state == State.OPEN:
+                  if time.time() - self.last_failure_time >= self.recovery_timeout:
+                      self.state = State.HALF_OPEN
+                      self.half_open_calls = 0
+                  else:
+                      raise CircuitOpenError("Circuit breaker is open")
+
+              if self.state == State.HALF_OPEN:
+                  if self.half_open_calls >= self.half_open_max_calls:
+                      raise CircuitOpenError("Half-open call limit reached")
+                  self.half_open_calls += 1
+
+              try:
+                  result = func()
+                  self._on_success()
+                  return result
+              except Exception as e:
+                  self._on_failure()
+                  raise
+
+          def _on_success(self):
+              if self.state == State.HALF_OPEN:
+                  self.state = State.CLOSED
+              self.failure_count = 0
+
+          def _on_failure(self):
+              self.failure_count += 1
+              self.last_failure_time = time.time()
+
+              if self.failure_count >= self.failure_threshold:
+                  self.state = State.OPEN
+              elif self.state == State.HALF_OPEN:
+                  self.state = State.OPEN
+
+    javascript: |
+      class CircuitBreaker {
+        constructor(options = {}) {
+          this.failureThreshold = options.failureThreshold || 5;
+          this.recoveryTimeout = options.recoveryTimeout || 30000;
+
+          this.state = 'closed';
+          this.failureCount = 0;
+          this.lastFailureTime = null;
+        }
+
+        async call(fn) {
+          if (this.state === 'open') {
+            if (Date.now() - this.lastFailureTime >= this.recoveryTimeout) {
+              this.state = 'half-open';
+            } else {
+              throw new Error('Circuit breaker is open');
+            }
+          }
+
+          try {
+            const result = await fn();
+            this.onSuccess();
+            return result;
+          } catch (error) {
+            this.onFailure();
+            throw error;
+          }
+        }
+
+        onSuccess() {
+          this.failureCount = 0;
+          this.state = 'closed';
+        }
+
+        onFailure() {
+          this.failureCount++;
+          this.lastFailureTime = Date.now();
+
+          if (this.failureCount >= this.failureThreshold) {
+            this.state = 'open';
+          }
+        }
+      }
+
+      // Usage
+      const breaker = new CircuitBreaker({ failureThreshold: 3 });
+
+      async function fetchUserWithBreaker(userId) {
+        return breaker.call(() => fetchUser(userId));
+      }
+
+  with_fallback:
+    python: |
+      class CircuitBreakerWithFallback:
+          def __init__(self, fallback: Callable[[], T]):
+              self.breaker = CircuitBreaker()
+              self.fallback = fallback
+
+          def call(self, func: Callable[[], T]) -> T:
+              try:
+                  return self.breaker.call(func)
+              except CircuitOpenError:
+                  return self.fallback()
+
+      # Usage
+      def get_user_from_cache(user_id):
+          return cache.get(f"user:{user_id}")
+
+      user_breaker = CircuitBreakerWithFallback(
+          fallback=lambda: get_user_from_cache(user_id)
+      )
+
+      user = user_breaker.call(lambda: db.get_user(user_id))
+
+  libraries:
+    python: |
+      # Using pybreaker
+      import pybreaker
+
+      db_breaker = pybreaker.CircuitBreaker(
+          fail_max=5,
+          reset_timeout=30
+      )
+
+      @db_breaker
+      def get_user(user_id: int):
+          return db.query("SELECT * FROM users WHERE id = %s", user_id)
+
+    javascript: |
+      // Using opossum
+      import CircuitBreaker from 'opossum';
+
+      const breaker = new CircuitBreaker(fetchUser, {
+        timeout: 3000,
+        errorThresholdPercentage: 50,
+        resetTimeout: 30000
+      });
+
+      breaker.fallback(() => ({ id: 0, name: 'Unknown' }));
+
+      breaker.on('open', () => console.log('Circuit opened!'));
+      breaker.on('halfOpen', () => console.log('Circuit half-open'));
+      breaker.on('close', () => console.log('Circuit closed'));
+
+      const user = await breaker.fire(userId);
+
+configuration:
+  - name: "failure_threshold"
+    description: "Number of failures before opening circuit"
+    typical_value: "5-10 failures"
+    considerations: "Lower = faster protection, higher = more tolerance"
+
+  - name: "recovery_timeout"
+    description: "Time to wait before testing recovery"
+    typical_value: "30-60 seconds"
+    considerations: "Long enough for service to recover, short enough for responsiveness"
+
+  - name: "timeout"
+    description: "Max time to wait for operation"
+    typical_value: "3-10 seconds"
+    considerations: "Based on normal operation time + buffer"
+
+  - name: "error_threshold_percentage"
+    description: "Percentage of failures to trigger open"
+    typical_value: "50%"
+    considerations: "Requires sufficient request volume"
+
+monitoring:
+  metrics:
+    - "circuit_breaker_state (gauge: 0=closed, 1=open, 2=half-open)"
+    - "circuit_breaker_failures_total (counter)"
+    - "circuit_breaker_successes_total (counter)"
+    - "circuit_breaker_rejected_total (counter)"
+
+  alerts:
+    - condition: "circuit_breaker_state == 1"
+      severity: "warning"
+      message: "Circuit breaker open for {service}"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      A circuit breaker is like a home electrical breaker:
+      - When too much current flows (failures), the breaker trips
+      - While tripped, no current flows (requests fail fast)
+      - You reset it and test if the problem is fixed
+      Without it, wires overheat and cause fires (cascade failures)!
+
+  intermediate:
+    focus: "Tuning thresholds and integrating with monitoring"
+    key_points:
+      - "Choosing appropriate thresholds for your traffic"
+      - "Distinguishing transient errors from real outages"
+      - "Combining with retries (retry inside or outside breaker?)"
+      - "Dashboard and alerting integration"
+
+  advanced:
+    focus: "Distributed circuit breakers and advanced patterns"
+    key_points:
+      - "Per-endpoint vs per-service breakers"
+      - "Bulkhead pattern combination"
+      - "Adaptive thresholds based on traffic"
+      - "Shared state across instances"

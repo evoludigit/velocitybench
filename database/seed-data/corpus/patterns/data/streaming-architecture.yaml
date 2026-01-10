@@ -1,0 +1,76 @@
+id: streaming-architecture
+name: "Real-Time Streaming Data Architecture"
+category: data
+type: pattern
+tags:
+  - data
+  - streaming
+  - real-time
+  - event-driven
+  - kafka
+
+summary:
+  short: "Building event-driven systems with real-time data streaming"
+  long: |
+    Streaming architectures process data as events happen, enabling
+    real-time analytics, alerts, and reactions. Apache Kafka, Pulsar,
+    and cloud services provide the infrastructure.
+
+streaming_models:
+  - name: "Event Sourcing"
+    description: "Store all changes as events"
+    benefit: "Complete audit trail"
+  
+  - name: "Change Data Capture"
+    description: "Capture database changes"
+    benefit: "Sync systems without coupling"
+  
+  - name: "Publish-Subscribe"
+    description: "Decouple producers from consumers"
+    benefit: "Flexible, scalable"
+
+streaming_platforms:
+  - name: "Apache Kafka"
+    use: "High-throughput, durable streaming"
+  
+  - name: "Apache Pulsar"
+    use: "Multi-tenant, geo-replication"
+  
+  - name: "AWS Kinesis"
+    use: "Managed streaming service"
+
+processing_frameworks:
+  - "Kafka Streams"
+  - "Apache Flink"
+  - "Apache Spark Structured Streaming"
+  - "AWS Lambda"
+
+use_cases:
+  - "Real-time analytics"
+  - "Fraud detection"
+  - "Recommendations"
+  - "Alerting"
+  - "Data replication"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Streaming is like radio:
+      - Traditional: Record, then replay
+      - Streaming: Listen live
+      
+      React to events as they happen.
+
+  intermediate:
+    focus: "Building streaming systems"
+    key_points:
+      - "Producer-consumer pattern"
+      - "Partitioning and ordering"
+      - "Exactly-once semantics"
+
+  advanced:
+    focus: "Complex event processing"
+    key_points:
+      - "Windowed operations"
+      - "Complex joins"
+      - "Stateful processing"

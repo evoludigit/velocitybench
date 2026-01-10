@@ -1,0 +1,352 @@
+# Graceful Degradation
+# VelocityBench Knowledge Corpus
+
+id: graceful-degradation
+name: "Graceful Degradation Patterns"
+category: reliability
+type: pattern
+severity: high
+tags:
+  - reliability
+  - resilience
+  - fault-tolerance
+  - user-experience
+  - distributed-systems
+
+summary:
+  short: "Maintain partial functionality when components fail"
+  long: |
+    Graceful degradation allows a system to continue operating with reduced functionality
+    when parts fail, rather than completely crashing. When the recommendation engine is
+    down, show popular items instead of personalized ones. When the payment processor
+    times out, queue the order for retry. Users experience degraded service, not no service.
+
+problem:
+  description: |
+    Systems with hard dependencies fail completely when any dependency fails:
+    - Page won't load because recommendation service is slow
+    - Checkout fails because fraud check times out
+    - User can't log in because profile service is down
+    Complete failures for partial problems frustrate users and lose revenue.
+
+  symptoms:
+    - name: "All-or-nothing failures"
+      description: "Entire feature unavailable due to one component"
+      detection: "Error rates mirror single dependency status"
+
+    - name: "Slow page loads"
+      description: "Waiting for slow/dead services instead of fallback"
+      detection: "Response times spike when dependencies are slow"
+
+    - name: "User frustration"
+      description: "Users can't complete critical tasks"
+      detection: "Support tickets spike during partial outages"
+
+solution:
+  principle: "Design for failure - every dependency should have a fallback"
+
+  strategies:
+    - name: "Fallback Data"
+      description: "Return cached or default data when source unavailable"
+      use_case: "Recommendations, user preferences, non-critical data"
+
+    - name: "Feature Flags"
+      description: "Disable non-essential features during degradation"
+      use_case: "Comments, reviews, social features"
+
+    - name: "Queue for Retry"
+      description: "Accept the request, process later"
+      use_case: "Payments, notifications, analytics"
+
+    - name: "Static Fallback"
+      description: "Serve pre-generated static content"
+      use_case: "Homepage, product catalog, search results"
+
+implementation:
+  fallback_pattern:
+    python: |
+      from typing import TypeVar, Callable, Optional
+      from functools import wraps
+      import logging
+
+      T = TypeVar('T')
+
+      def with_fallback(fallback_value: T, timeout: float = 5.0):
+          """Decorator that returns fallback value on failure."""
+          def decorator(func: Callable[..., T]) -> Callable[..., T]:
+              @wraps(func)
+              async def wrapper(*args, **kwargs) -> T:
+                  try:
+                      return await asyncio.wait_for(
+                          func(*args, **kwargs),
+                          timeout=timeout
+                      )
+                  except Exception as e:
+                      logging.warning(f"{func.__name__} failed, using fallback: {e}")
+                      return fallback_value
+              return wrapper
+          return decorator
+
+      # Usage
+      @with_fallback(fallback_value=[], timeout=2.0)
+      async def get_recommendations(user_id: str) -> list[Product]:
+          return await recommendation_service.get_for_user(user_id)
+
+      @with_fallback(fallback_value=DEFAULT_USER_PREFERENCES)
+      async def get_preferences(user_id: str) -> UserPreferences:
+          return await preference_service.get(user_id)
+
+    javascript: |
+      function withFallback(fn, fallbackValue, options = {}) {
+        const { timeout = 5000, onError } = options;
+
+        return async (...args) => {
+          try {
+            const result = await Promise.race([
+              fn(...args),
+              new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Timeout')), timeout)
+              )
+            ]);
+            return result;
+          } catch (error) {
+            onError?.(error);
+            console.warn(`${fn.name} failed, using fallback:`, error.message);
+            return typeof fallbackValue === 'function'
+              ? fallbackValue(...args)
+              : fallbackValue;
+          }
+        };
+      }
+
+      // Usage
+      const getRecommendations = withFallback(
+        fetchRecommendations,
+        () => getPopularProducts(),  // Dynamic fallback
+        { timeout: 2000 }
+      );
+
+      const getUserPreferences = withFallback(
+        fetchUserPreferences,
+        DEFAULT_PREFERENCES,  // Static fallback
+        { timeout: 1000 }
+      );
+
+  tiered_fallback:
+    python: |
+      async def get_product_data(product_id: str) -> ProductData:
+          """Try multiple sources in order of preference."""
+
+          # Tier 1: Real-time personalized data
+          try:
+              return await asyncio.wait_for(
+                  personalization_service.get_product(product_id, user_id),
+                  timeout=1.0
+              )
+          except Exception:
+              pass
+
+          # Tier 2: Cached data from Redis
+          try:
+              cached = await redis.get(f"product:{product_id}")
+              if cached:
+                  return ProductData.parse_raw(cached)
+          except Exception:
+              pass
+
+          # Tier 3: Database (slower but reliable)
+          try:
+              return await db.get_product(product_id)
+          except Exception:
+              pass
+
+          # Tier 4: Static fallback
+          return ProductData(
+              id=product_id,
+              name="Product Temporarily Unavailable",
+              price=None,
+              available=False
+          )
+
+  feature_degradation:
+    python: |
+      from dataclasses import dataclass
+      from enum import Enum
+
+      class DegradationLevel(Enum):
+          FULL = "full"           # All features available
+          PARTIAL = "partial"     # Some features disabled
+          MINIMAL = "minimal"     # Critical features only
+          MAINTENANCE = "maint"   # Read-only mode
+
+      @dataclass
+      class SystemStatus:
+          level: DegradationLevel
+          disabled_features: list[str]
+          message: str
+
+      # Global status (updated by health checks)
+      system_status = SystemStatus(
+          level=DegradationLevel.FULL,
+          disabled_features=[],
+          message=""
+      )
+
+      def feature_available(feature: str) -> bool:
+          """Check if feature is available at current degradation level."""
+          return feature not in system_status.disabled_features
+
+      # Usage in API
+      @app.post("/orders")
+      async def create_order(order: OrderCreate):
+          if system_status.level == DegradationLevel.MAINTENANCE:
+              raise HTTPException(503, "System in maintenance mode")
+
+          # Process order
+          result = await process_order(order)
+
+          # Optional features degrade gracefully
+          if feature_available("email_confirmation"):
+              await send_confirmation_email(order)
+          else:
+              await queue_email_for_later(order)
+
+          if feature_available("real_time_inventory"):
+              await update_inventory_realtime(order)
+          else:
+              await queue_inventory_update(order)
+
+          return result
+
+  queue_for_retry:
+    python: |
+      import asyncio
+      from datetime import datetime
+      import json
+
+      class DeferredQueue:
+          """Queue operations for later when service is unavailable."""
+
+          def __init__(self, redis_client):
+              self.redis = redis_client
+
+          async def enqueue(self, operation: str, payload: dict):
+              """Add operation to retry queue."""
+              item = {
+                  "operation": operation,
+                  "payload": payload,
+                  "queued_at": datetime.utcnow().isoformat(),
+                  "attempts": 0
+              }
+              await self.redis.lpush("deferred_queue", json.dumps(item))
+
+          async def process_queue(self):
+              """Background worker to process deferred operations."""
+              while True:
+                  item_json = await self.redis.rpop("deferred_queue")
+                  if not item_json:
+                      await asyncio.sleep(5)
+                      continue
+
+                  item = json.loads(item_json)
+                  try:
+                      await self.execute_operation(item)
+                  except Exception as e:
+                      item["attempts"] += 1
+                      if item["attempts"] < 5:
+                          # Re-queue with backoff
+                          await asyncio.sleep(2 ** item["attempts"])
+                          await self.redis.lpush("deferred_queue", json.dumps(item))
+                      else:
+                          # Move to dead letter queue
+                          await self.redis.lpush("dead_letter_queue", json.dumps(item))
+
+      # Usage
+      async def send_notification(user_id: str, message: str):
+          try:
+              await notification_service.send(user_id, message)
+          except ServiceUnavailable:
+              # Queue for later instead of failing
+              await deferred_queue.enqueue("notification", {
+                  "user_id": user_id,
+                  "message": message
+              })
+
+patterns:
+  - name: "Bulkhead Pattern"
+    description: "Isolate failures to prevent cascade"
+    example: |
+      # Separate thread pools for different dependencies
+      import concurrent.futures
+
+      recommendation_pool = concurrent.futures.ThreadPoolExecutor(max_workers=10)
+      payment_pool = concurrent.futures.ThreadPoolExecutor(max_workers=20)
+      notification_pool = concurrent.futures.ThreadPoolExecutor(max_workers=5)
+
+      # If recommendations exhaust their pool, payments still work
+      async def get_recommendations():
+          return await asyncio.get_event_loop().run_in_executor(
+              recommendation_pool,
+              fetch_recommendations
+          )
+
+  - name: "Timeout Budget"
+    description: "Allocate time budget across operations"
+    example: |
+      async def build_product_page(product_id: str, total_budget: float = 3.0):
+          """Build page with time budget for each component."""
+          start = time.time()
+
+          # Critical: product data (50% of budget)
+          product = await asyncio.wait_for(
+              get_product(product_id),
+              timeout=total_budget * 0.5
+          )
+
+          remaining = total_budget - (time.time() - start)
+
+          # Optional: recommendations (25% of remaining)
+          try:
+              recommendations = await asyncio.wait_for(
+                  get_recommendations(product_id),
+                  timeout=remaining * 0.5
+              )
+          except asyncio.TimeoutError:
+              recommendations = []
+
+          remaining = total_budget - (time.time() - start)
+
+          # Optional: reviews (remaining time)
+          try:
+              reviews = await asyncio.wait_for(
+                  get_reviews(product_id),
+                  timeout=remaining
+              )
+          except asyncio.TimeoutError:
+              reviews = []
+
+          return ProductPage(product, recommendations, reviews)
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Graceful degradation is like a restaurant during a power outage:
+      - Without degradation: "Kitchen is down, restaurant closed!"
+      - With degradation: "Hot food unavailable, but we have sandwiches and salads!"
+      Customers get something, not nothing. The show goes on!
+
+  intermediate:
+    focus: "Implementing fallback strategies for different scenarios"
+    key_points:
+      - "Identifying critical vs optional features"
+      - "Designing tiered fallback chains"
+      - "Communicating degraded status to users"
+      - "Testing degradation paths"
+
+  advanced:
+    focus: "System-wide degradation coordination"
+    key_points:
+      - "Bulkhead pattern for failure isolation"
+      - "Time budget allocation across services"
+      - "Automatic degradation based on health signals"
+      - "Chaos engineering to verify degradation paths"

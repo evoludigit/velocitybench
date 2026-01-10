@@ -1,0 +1,302 @@
+# Deployment Models: On-Premises vs Cloud vs Hybrid
+# VelocityBench Knowledge Corpus
+
+id: deployment-models
+name: "Deployment Models: On-Premises vs Cloud vs Hybrid"
+category: infrastructure
+type: pattern
+severity: high
+tags:
+  - infrastructure
+  - deployment
+  - cloud
+  - on-premises
+  - hybrid
+
+summary:
+  short: "Choose between on-premises, cloud, and hybrid deployment models"
+  long: |
+    Deployment model choice shapes your architecture, operations, compliance, and costs.
+    On-premises gives control but requires capital investment and operational expertise.
+    Cloud offers scalability and managed services but with vendor lock-in and data concerns.
+    Hybrid combines benefits but adds complexity. The right choice depends on requirements,
+    budget, compliance, data sensitivity, and team expertise.
+
+problem:
+  description: |
+    Choosing wrong has major implications:
+    - Wrong model locks you in (hard to migrate)
+    - Operations costs spiral in wrong model
+    - Compliance requirements force specific models
+    - Scaling limitations constrain business
+    - Data sovereignty rules out certain models
+
+  symptoms:
+    - name: "Runaway costs"
+      description: "Cloud spend exceeds budget"
+      detection: "Monthly cloud bills growing exponentially"
+
+    - name: "Operational burden"
+      description: "On-prem requires too much maintenance"
+      detection: "Operations team overloaded, slow deployments"
+
+    - name: "Compliance failures"
+      description: "Chosen model doesn't meet regulations"
+      detection: "Audit failures, regulatory violations"
+
+solution:
+  principle: "Match deployment model to requirements and constraints"
+
+deployment_models:
+  - name: "On-Premises"
+    location: "Customer's data center"
+    control: "Full"
+    scalability: "Limited by hardware"
+    capex: "High"
+    opex: "High (staff, maintenance)"
+    time_to_deploy: "Slow (hardware procurement)"
+    compliance: "Full control"
+
+    pros:
+      - "Complete control"
+      - "Data stays on-site"
+      - "No vendor lock-in"
+      - "Compliance friendly"
+      - "No egress costs"
+
+    cons:
+      - "High capex investment"
+      - "High operational overhead"
+      - "Hard to scale quickly"
+      - "Security burden"
+      - "Disaster recovery complex"
+
+    best_for:
+      - "Financial institutions (data sovereignty)"
+      - "Healthcare (HIPAA)"
+      - "Government/defense"
+      - "Companies with predictable load"
+      - "Strong operations team"
+
+  - name: "Cloud (Public)"
+    location: "Shared provider infrastructure"
+    control: "Limited to config"
+    scalability: "Unlimited (auto-scaling)"
+    capex: "None"
+    opex: "Moderate (pay-as-you-go)"
+    time_to_deploy: "Minutes (pre-built resources)"
+    compliance: "Provider-dependent"
+
+    options:
+      - "Infrastructure-as-a-Service (IaaS): AWS EC2, Azure VMs"
+      - "Platform-as-a-Service (PaaS): Heroku, Google App Engine"
+      - "Serverless: AWS Lambda, Google Cloud Functions"
+
+    pros:
+      - "Low upfront cost"
+      - "Automatic scaling"
+      - "Managed services reduce ops burden"
+      - "Global deployment"
+      - "Disaster recovery built-in"
+
+    cons:
+      - "Vendor lock-in"
+      - "Less control"
+      - "Egress/bandwidth costs"
+      - "Multi-tenant security concerns"
+      - "Less predictable costs"
+
+    best_for:
+      - "Startups (low upfront cost)"
+      - "Variable workloads"
+      - "Global applications"
+      - "Companies OK with SaaS dependencies"
+
+  - name: "Hybrid"
+    location: "Mix of on-prem and cloud"
+    control: "Partial"
+    scalability: "Moderate (burst to cloud)"
+    capex: "Moderate"
+    opex: "Moderate (complex)"
+    time_to_deploy: "Moderate (depends on layer)"
+    compliance: "Flexible (choose per service)"
+
+    patterns:
+      - "Lift-and-shift core workloads on-prem, burst overload to cloud"
+      - "Sensitive data on-prem, non-sensitive in cloud"
+      - "Legacy on-prem, new services in cloud"
+
+    pros:
+      - "Use cloud for what works best"
+      - "Keep sensitive data on-prem"
+      - "Gradual migration path"
+      - "Avoid vendor lock-in"
+      - "Negotiate better cloud pricing (partial)"
+
+    cons:
+      - "Operational complexity"
+      - "Network latency between on-prem and cloud"
+      - "Integration challenges"
+      - "Security at edges"
+      - "Double compliance burden"
+
+    best_for:
+      - "Migrating from on-prem to cloud"
+      - "Regulated industries (partial compliance)"
+      - "Companies with existing on-prem investment"
+
+implementation:
+  on_premises_architecture:
+    infrastructure: |
+      # On-prem infrastructure stack
+      - Physical servers (or virtualized)
+      - Storage arrays (SAN/NAS)
+      - Network infrastructure (routers, switches, firewalls)
+      - Backup and disaster recovery systems
+      - Monitoring and alerting
+      - Security (VPN, IDS/IPS, firewalls)
+
+    operations:
+      - Capacity planning (6-12 month lead)
+      - Hardware procurement and setup
+      - System administration
+      - Security patching
+      - Backup and recovery
+      - Disaster recovery planning
+
+  cloud_architecture:
+    aws_example: |
+      # AWS cloud architecture (IaaS)
+      - EC2 (compute)
+      - RDS (managed database)
+      - S3 (object storage)
+      - CloudFront (CDN)
+      - Auto Scaling groups
+      - Elastic Load Balancer
+      - Managed backups
+      - CloudWatch (monitoring)
+
+    serverless_example: |
+      # Serverless architecture
+      - Lambda functions (code execution)
+      - API Gateway (HTTP endpoints)
+      - DynamoDB (managed database)
+      - S3 (static hosting)
+      - CloudFront (CDN)
+      - Cognito (auth)
+      - No servers to manage
+
+  hybrid_connectivity:
+    network: |
+      # Connecting on-prem and cloud
+      - VPN (Virtual Private Network)
+      - Direct connection (AWS Direct Connect)
+      - VPC peering
+      - Private links (AWS PrivateLink)
+
+    data_sync: |
+      # Keeping data in sync
+      - Replication services (AWS DataSync)
+      - File gateways (AWS Storage Gateway)
+      - Database replication
+      - API-based synchronization
+
+cost_comparison:
+    scenario: "Web application serving 1 million requests/day"
+    on_premises: |
+      Capex (3-year):
+      - Servers: $50,000
+      - Storage: $30,000
+      - Network: $20,000
+      - Software licenses: $15,000
+      Total Capex: $115,000
+
+      Opex (3-year):
+      - Staff (2 ops engineers): $300,000
+      - Power/cooling: $30,000
+      - Maintenance: $20,000
+      Total Opex: $350,000
+
+      Total 3-year cost: $465,000
+      Per month: $12,917
+
+    aws_public_cloud: |
+      Compute (on-demand):
+      - t3.large 24/7: $30/month
+      - Peak auto-scaling: $500/month peak
+
+      Storage and database:
+      - RDS PostgreSQL: $300/month
+      - S3 storage: $100/month
+      - Data transfer out: $200/month (if heavy)
+
+      Managed services:
+      - CloudFront CDN: $100/month
+      - Other services: $200/month
+
+      Opex (3-year):
+      - AWS bill: ~$50k/year = $150k/3-year
+      - Some ops staff: $150k/3-year
+      Total Opex: $300,000
+
+      Total 3-year cost: $300,000
+      Per month: $8,333
+
+    hybrid: |
+      On-prem core + cloud burst:
+      - Initial on-prem investment: $80k
+      - Reduced on-prem ops: $200k
+      - Hybrid network: $30k
+      - Cloud burst capacity: $50k
+      Total: $360k over 3 years
+      Per month: $10,000
+
+decision_framework: |
+  Choose ON-PREMISES if:
+  ✓ Strict data sovereignty requirements (GDPR, HIPAA)
+  ✓ Very large organizations with existing IT infrastructure
+  ✓ Predictable, steady workload
+  ✓ Strong operations team
+  ✓ Custom hardware requirements
+  ✓ Legacy system integration priority
+
+  Choose PUBLIC CLOUD if:
+  ✓ Startups or limited capital
+  ✓ Variable workload (need elasticity)
+  ✓ Global users (need low latency)
+  ✓ Want to focus on product, not ops
+  ✓ New application, no legacy burden
+  ✓ Serverless/managed services appeal
+
+  Choose HYBRID if:
+  ✓ Migrating from on-prem to cloud
+  ✓ Sensitive data must stay on-prem
+  ✓ Regulatory requirements vary by data
+  ✓ Want to avoid vendor lock-in
+  ✓ Testing cloud adoption before full commitment
+  ✓ Existing on-prem investment to leverage
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Deployment models are like housing:
+      - On-prem: Buy and own house (upfront cost, full control)
+      - Cloud: Rent apartment (flexible, move anytime)
+      - Hybrid: Own house + rent space at office (flexibility + control)
+      Different choices for different people!
+
+  intermediate:
+    focus: "Comparing models for specific use cases"
+    key_points:
+      - "Cost analysis over time"
+      - "Compliance requirements per model"
+      - "Operational complexity trade-offs"
+      - "Migration paths between models"
+
+  advanced:
+    focus: "Multi-cloud and sophisticated architectures"
+    key_points:
+      - "Avoiding vendor lock-in"
+      - "Multi-cloud strategies"
+      - "Disaster recovery across models"
+      - "Cost optimization per region/model"

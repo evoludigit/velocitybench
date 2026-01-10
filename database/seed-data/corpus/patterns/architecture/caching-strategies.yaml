@@ -1,0 +1,233 @@
+# Caching Strategies
+# VelocityBench Knowledge Corpus
+
+id: caching-strategies
+name: "API Caching Strategies"
+category: architecture
+type: pattern
+tags:
+  - caching
+  - redis
+  - performance
+  - api
+  - architecture
+
+summary:
+  short: "Store computed results to avoid repeated expensive operations"
+  long: |
+    Caching stores the results of expensive operations so they can be reused without
+    re-computation. A well-designed caching strategy can reduce database load by 90%+,
+    improve response times from seconds to milliseconds, and enable massive scale.
+    Key decisions include cache location (client, CDN, API, database), invalidation
+    strategy, and cache key design.
+
+problem:
+  description: |
+    Many API operations are expensive and repetitive. A product catalog query might
+    hit the database 1000 times per second with identical results. User profile
+    lookups, permission checks, and computed aggregations are all commonly repeated.
+    Without caching, you're wasting resources and delivering slow responses.
+
+  symptoms:
+    - name: "High database load"
+      description: "Database CPU high despite low write volume"
+      detection: "Monitor query patterns - many identical reads"
+
+    - name: "Slow API responses"
+      description: "Consistent latency despite fast individual queries"
+      detection: "Profile shows time spent on repeated operations"
+
+    - name: "Scaling limits"
+      description: "Can't handle more traffic without more DB capacity"
+      detection: "Linear scaling cost despite read-heavy workload"
+
+solution:
+  principle: "Cache aggressively, invalidate precisely"
+
+  components:
+    - name: "Cache Store"
+      type: "infrastructure"
+      purpose: "Fast key-value storage (Redis, Memcached)"
+
+    - name: "Cache Key Strategy"
+      type: "design"
+      purpose: "Consistent, collision-free key generation"
+
+    - name: "Invalidation Strategy"
+      type: "logic"
+      purpose: "Keep cache consistent with source of truth"
+
+caching_layers:
+  - name: "Client Cache"
+    location: "Browser/App"
+    latency: "0ms"
+    description: "HTTP cache headers, local storage"
+    example: |
+      // HTTP Response Headers
+      Cache-Control: public, max-age=3600
+      ETag: "abc123"
+
+  - name: "CDN Cache"
+    location: "Edge servers"
+    latency: "1-50ms"
+    description: "Cloudflare, Fastly, CloudFront"
+    best_for: "Static assets, public API responses"
+
+  - name: "API Cache"
+    location: "Application layer"
+    latency: "1-10ms"
+    description: "Redis, Memcached"
+    example: |
+      # Python with Redis
+      import redis
+
+      cache = redis.Redis()
+
+      def get_user(user_id: str) -> User:
+          cache_key = f"user:{user_id}"
+
+          # Try cache first
+          cached = cache.get(cache_key)
+          if cached:
+              return User.parse_raw(cached)
+
+          # Cache miss - fetch from DB
+          user = db.query(User).get(user_id)
+
+          # Store in cache
+          cache.setex(cache_key, 3600, user.json())
+
+          return user
+
+  - name: "Query Cache"
+    location: "Database layer"
+    latency: "0-1ms"
+    description: "PostgreSQL, MySQL query cache"
+    note: "Often disabled - application cache is more flexible"
+
+invalidation_strategies:
+  - name: "TTL (Time-to-Live)"
+    description: "Cache expires after fixed time"
+    pros: ["Simple", "Self-healing", "No coordination needed"]
+    cons: ["Stale data possible", "Cache stampede risk"]
+    example: |
+      # 1 hour TTL
+      cache.setex("user:123", 3600, user_data)
+
+  - name: "Write-Through"
+    description: "Update cache on every write"
+    pros: ["Always fresh", "No stale reads"]
+    cons: ["More complex", "Write latency increased"]
+    example: |
+      def update_user(user_id: str, data: dict):
+          # Update DB
+          db.execute("UPDATE users SET ... WHERE id = $1", user_id)
+
+          # Update cache
+          user = db.query(User).get(user_id)
+          cache.set(f"user:{user_id}", user.json())
+
+  - name: "Write-Behind (Write-Back)"
+    description: "Write to cache first, async persist to DB"
+    pros: ["Fast writes", "Batch DB operations"]
+    cons: ["Data loss risk", "Complex consistency"]
+    best_for: "Analytics, counters, non-critical data"
+
+  - name: "Cache-Aside (Lazy Loading)"
+    description: "App manages cache reads/writes explicitly"
+    pros: ["Flexible", "Only cache what's needed"]
+    cons: ["Cache miss penalty", "Stale data possible"]
+    example: |
+      def get_product(product_id: str):
+          # Try cache
+          cached = cache.get(f"product:{product_id}")
+          if cached:
+              return json.loads(cached)
+
+          # Cache miss
+          product = db.get_product(product_id)
+          cache.setex(f"product:{product_id}", 300, json.dumps(product))
+          return product
+
+      def update_product(product_id: str, data: dict):
+          db.update_product(product_id, data)
+          cache.delete(f"product:{product_id}")  # Invalidate
+
+  - name: "Event-Driven Invalidation"
+    description: "Publish events on changes, subscribers invalidate"
+    pros: ["Decoupled", "Real-time", "Scalable"]
+    cons: ["Infrastructure complexity", "Eventual consistency"]
+    example: |
+      # Publisher (on write)
+      def update_user(user_id: str, data: dict):
+          db.update_user(user_id, data)
+          event_bus.publish("user.updated", {"user_id": user_id})
+
+      # Subscriber (cache service)
+      @event_handler("user.updated")
+      def invalidate_user_cache(event):
+          cache.delete(f"user:{event['user_id']}")
+
+cache_patterns:
+  - name: "Cache Stampede Prevention"
+    description: "Prevent thundering herd on cache miss"
+    solution: |
+      # Use distributed lock
+      def get_expensive_data(key: str):
+          cached = cache.get(key)
+          if cached:
+              return cached
+
+          # Try to acquire lock
+          lock = cache.lock(f"lock:{key}", timeout=10)
+          if lock.acquire(blocking=False):
+              try:
+                  # Double-check after acquiring lock
+                  cached = cache.get(key)
+                  if cached:
+                      return cached
+
+                  # Compute and cache
+                  data = expensive_computation()
+                  cache.setex(key, 3600, data)
+                  return data
+              finally:
+                  lock.release()
+          else:
+              # Another process is computing, wait and retry
+              time.sleep(0.1)
+              return get_expensive_data(key)
+
+  - name: "Cache Warming"
+    description: "Pre-populate cache before traffic"
+    example: |
+      # On deploy or scheduled job
+      def warm_cache():
+          popular_products = db.get_popular_products(limit=1000)
+          for product in popular_products:
+              cache.setex(f"product:{product.id}", 3600, product.json())
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Caching is like a chef's mise en place:
+      - Without cache: Chop onions fresh for every order (slow, repetitive)
+      - With cache: Pre-chop onions at start of service, use from container
+      The cache (container) makes repeated operations instant!
+
+  intermediate:
+    focus: "Cache invalidation and consistency"
+    key_points:
+      - "TTL vs explicit invalidation tradeoffs"
+      - "Cache key design and namespacing"
+      - "Handling cache misses gracefully"
+      - "Redis data structures for caching"
+
+  advanced:
+    focus: "Distributed caching and advanced patterns"
+    key_points:
+      - "Cache stampede and thundering herd"
+      - "Multi-tier caching (L1/L2)"
+      - "Cache-aside vs read-through vs write-through"
+      - "Consistent hashing for cache distribution"
+      - "Cache coherence in microservices"
