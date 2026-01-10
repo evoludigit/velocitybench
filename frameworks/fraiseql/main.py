@@ -172,63 +172,163 @@ class CreateCommentInput:
 
 
 # FraiseQL Mutation Success Types
-@fraiseql.type
+# Pattern: @fraiseql.success decorator provides auto-injection of:
+# - status: str = "success"
+# - message: str | None
+# - errors: list[Error] | None = None
+# Also auto-mapped from database mutation_response:
+# - id: ID (from entity_id)
+# - updatedFields: list[str] (from updated_fields)
+
+@fraiseql.success
 class UpdateUserSuccess:
-    """Result of successful user update."""
+    """Result of successful user update.
+
+    Auto-injected fields (do NOT define here):
+    - status: str = "success"
+    - message: str | None
+    - errors: list[Error] | None
+
+    Custom entity fields:
+    - user: The updated User object from composition layer
+    - cascade: Related entities updated in cascade operations (optional)
+    """
+
     user: User
+    # Optional: cascade data from related mutations
+    cascade: "Cascade | None" = None
 
 
-@fraiseql.type
+@fraiseql.success
 class CreatePostSuccess:
-    """Result of successful post creation."""
+    """Result of successful post creation.
+
+    Auto-injected fields (do NOT define here):
+    - status: str = "success"
+    - message: str | None
+    - errors: list[Error] | None
+
+    Custom entity fields:
+    - post: The created Post object with author nested
+    - cascade: Related entities created in cascade operations
+    """
+
     post: Post
+    cascade: "Cascade | None" = None
 
 
-@fraiseql.type
+@fraiseql.success
 class CreateCommentSuccess:
-    """Result of successful comment creation."""
+    """Result of successful comment creation.
+
+    Auto-injected fields (do NOT define here):
+    - status: str = "success"
+    - message: str | None
+    - errors: list[Error] | None
+
+    Custom entity fields:
+    - comment: The created Comment with author, post, parentComment nested
+    - cascade: Related entities created in cascade operations
+    """
+
     comment: Comment
+    cascade: "Cascade | None" = None
 
 
 # FraiseQL Mutation Error Types
-@fraiseql.type
+# Pattern: @fraiseql.error decorator provides auto-injection of:
+# - status: str = "error"
+# - message: str | None
+# - errors: list[Error] | None
+# Also auto-mapped from database mutation_response:
+# - id: ID (from entity_id)
+# - updatedFields: list[str] (from updated_fields)
+
+@fraiseql.error
 class UpdateUserError:
-    """Error result for user update operations."""
-    message: str
-    code: str
+    """Error result for user update failures.
+
+    Auto-injected fields (do NOT define here):
+    - status: str = "error"
+    - message: str | None (human-readable error)
+    - errors: list[Error] | None (structured error details)
+
+    Custom context fields:
+    - current_user: Current state of the user before failed update
+    - cascade: Cascade operations that failed or were rolled back
+    """
+
+    current_user: User | None = None
+    cascade: "Cascade | None" = None
 
 
-@fraiseql.type
+@fraiseql.error
 class CreatePostError:
-    """Error result for post creation operations."""
-    message: str
-    code: str
+    """Error result for post creation failures.
+
+    Auto-injected fields (do NOT define here):
+    - status: str = "error"
+    - message: str | None
+    - errors: list[Error] | None
+
+    Custom context fields:
+    - conflicting_post: Existing post with same constraints (if applicable)
+    - cascade: Failed cascade operations
+    """
+
+    conflicting_post: Post | None = None
+    cascade: "Cascade | None" = None
 
 
-@fraiseql.type
+@fraiseql.error
 class CreateCommentError:
-    """Error result for comment creation operations."""
-    message: str
-    code: str
+    """Error result for comment creation failures.
+
+    Auto-injected fields (do NOT define here):
+    - status: str = "error"
+    - message: str | None
+    - errors: list[Error] | None
+
+    Custom context fields:
+    - conflicting_comment: Existing comment with same constraints
+    - cascade: Failed cascade operations
+    """
+
+    conflicting_comment: Comment | None = None
+    cascade: "Cascade | None" = None
 
 
 # FraiseQL Mutation NOOP Types (No Operation - idempotent results)
-@fraiseql.type
+# Pattern: Used for operations that have no effect (e.g., "no fields to update")
+
+@fraiseql.noop
 class UpdateUserNoop:
-    """No-op result when user has no fields to update."""
-    message: str = "No fields to update"
+    """No-op result when user update has no changes.
+
+    Returned when:
+    - No fields to update (all update inputs are empty)
+    - Current values match input values
+
+    Auto-injected fields:
+    - status: str = "noop"
+    - message: str | None
+    """
+
+    pass  # No custom fields for NOOP
 
 
-@fraiseql.type
+@fraiseql.noop
 class CreatePostNoop:
-    """No-op result for post creation (reserved for future idempotent operations)."""
-    message: str = "Post creation skipped"
+    """No-op result for post creation (reserved for future idempotent patterns)."""
+
+    pass
 
 
-@fraiseql.type
+@fraiseql.noop
 class CreateCommentNoop:
-    """No-op result for comment creation (reserved for future idempotent operations)."""
-    message: str = "Comment creation skipped"
+    """No-op result for comment creation (reserved for future idempotent patterns)."""
+
+    pass
 
 
 # FraiseQL Mutation Core Implementation Functions
@@ -405,18 +505,54 @@ async def create_comment_impl(
 
 # FraiseQL Enterprise Mutation Classes
 # Pattern: Class-based mutations with @fraiseql.mutation decorator
-# References: function="app.{mutation_name}" points to implementation above
+# Advanced features from PrintOptim backend:
+# - enable_cascade=True: Automatic related entity management
+# - context_params: Extract from GraphQL context (tenant_id, user_id, etc.)
+# - function="...": Database function reference
+# - @fraiseql.success/@fraiseql.error: Auto-injection of status, message, errors
 
 
-@fraiseql.mutation(function="app.update_user")
+@fraiseql.mutation(
+    function="benchmark.update_user",
+    enable_cascade=True,  # Enable cascade for related entity updates
+)
 class UpdateUser:
-    """Update user with enterprise mutation pattern.
+    """Update user with advanced enterprise mutation pattern.
 
-    Blueprint Pattern:
+    Enterprise Pattern (PrintOptim-style):
     - Dedicated input type (UpdateUserInput)
     - Three response types: Success, Error, NoOp
-    - Function attribute points to implementation
-    - Composition layer provides all nested data
+    - @fraiseql.success/@fraiseql.error decorators with auto-injection
+    - enable_cascade=True for related entity updates
+    - Function points to database function
+
+    Cascade Behavior:
+        When enable_cascade=True, updating a user may automatically:
+        - Update all user-related posts and comments
+        - Invalidate related queries in cache
+        - Maintain referential integrity
+
+    Auto-Injected Fields:
+    Success Response:
+        - status: str = "success"
+        - message: str | None
+        - errors: list[Error] | None = None
+        - id: ID (from database entity_id)
+        - updatedFields: list[str] (from database updated_fields)
+
+    Error Response:
+        - status: str = "error"
+        - message: str | None
+        - errors: list[Error] | None
+        - id: ID (from database entity_id)
+
+    NoOp Response:
+        - status: str = "noop"
+        - message: str | None
+
+    Database Function:
+        Executes: benchmark.update_user(input: UpdateUserInput)
+        Returns: mutation_response with updated_user entity and cascade details
     """
 
     input: UpdateUserInput
@@ -425,15 +561,50 @@ class UpdateUser:
     noop: UpdateUserNoop
 
 
-@fraiseql.mutation(function="app.create_post")
+@fraiseql.mutation(
+    function="benchmark.create_post",
+    enable_cascade=True,  # Enable cascade for author and category cascades
+)
 class CreatePost:
-    """Create post with enterprise mutation pattern.
+    """Create post with advanced enterprise mutation pattern.
 
-    Blueprint Pattern:
+    Enterprise Pattern (PrintOptim-style):
     - Dedicated input type (CreatePostInput)
-    - Success/Error response types
-    - Function attribute points to implementation
-    - Composition layer includes nested author object
+    - Success/Error response types (no NoOp for creates)
+    - @fraiseql.success/@fraiseql.error decorators
+    - enable_cascade=True for related entity creation
+    - Function points to database function
+
+    Cascade Behavior:
+        When enable_cascade=True, creating a post may automatically:
+        - Create default relationships
+        - Update materialized views
+        - Trigger related mutations atomically
+        - Rollback all changes on constraint violation
+
+    Auto-Injected Fields:
+    Success Response:
+        - status: str = "success"
+        - message: str | None
+        - errors: list[Error] | None = None
+        - id: ID (from database entity_id)
+        - createdFields: list[str] (from database created_fields)
+
+    Error Response:
+        - status: str = "error"
+        - message: str | None
+        - errors: list[Error] | None (validation details)
+        - id: ID (from database entity_id if partial success)
+
+    Composition Layer:
+        Post returned includes:
+        - All post fields (id, title, content, status, etc.)
+        - Nested author object (zero N+1 from tv_post view)
+        - Cascade information for related entities
+
+    Database Function:
+        Executes: benchmark.create_post(input: CreatePostInput)
+        Returns: mutation_response with post entity and cascade details
     """
 
     input: CreatePostInput
@@ -441,15 +612,52 @@ class CreatePost:
     error: CreatePostError
 
 
-@fraiseql.mutation(function="app.create_comment")
+@fraiseql.mutation(
+    function="benchmark.create_comment",
+    enable_cascade=True,  # Enable cascade for nested comment structures
+)
 class CreateComment:
-    """Create comment with enterprise mutation pattern.
+    """Create comment with advanced enterprise mutation pattern.
 
-    Blueprint Pattern:
+    Enterprise Pattern (PrintOptim-style):
     - Dedicated input type (CreateCommentInput)
     - Success/Error response types
-    - Function attribute points to implementation
-    - Composition layer includes author, post, parentComment
+    - @fraiseql.success/@fraiseql.error decorators
+    - enable_cascade=True for nested comment and reply cascades
+    - Function points to database function
+
+    Cascade Behavior:
+        When enable_cascade=True, creating a comment may automatically:
+        - Update parent comment reply counts
+        - Update post comment statistics
+        - Update author comment metrics
+        - Invalidate comment feed queries in cache
+
+    Auto-Injected Fields:
+    Success Response:
+        - status: str = "success"
+        - message: str | None
+        - errors: list[Error] | None = None
+        - id: ID (from database entity_id)
+        - createdFields: list[str]
+
+    Error Response:
+        - status: str = "error"
+        - message: str | None
+        - errors: list[Error] | None (validation details)
+        - id: ID (from database entity_id if partial success)
+
+    Composition Layer:
+        Comment returned includes:
+        - All comment fields (id, content, is_approved, etc.)
+        - Nested author object (from tv_comment JSONB)
+        - Nested post object (from tv_comment JSONB)
+        - Nested parentComment for threaded replies (from tv_comment JSONB)
+        - Zero N+1 queries via pre-composed JSONB
+
+    Database Function:
+        Executes: benchmark.create_comment(input: CreateCommentInput, author_id, post_id)
+        Returns: mutation_response with comment entity and cascade details
     """
 
     input: CreateCommentInput
