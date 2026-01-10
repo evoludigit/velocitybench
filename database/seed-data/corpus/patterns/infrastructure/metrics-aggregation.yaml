@@ -1,0 +1,51 @@
+id: metrics-aggregation
+name: Metrics Aggregation
+category: infrastructure
+type: standard
+tags:
+- infrastructure
+- metrics_aggregation
+summary:
+  short: Collecting system metrics
+  long: Collecting system metrics. This is a comprehensive pattern that provides guidance
+    on implementation and best practices.
+problem:
+  description: Issues arise without proper metrics aggregation
+  symptoms:
+  - System lacks proper metrics aggregation
+  - Performance or reliability issues
+  - Difficulty scaling the system
+  - Maintenance challenges
+  - Integration problems
+  impact: System reliability and performance degradation
+solution:
+  description: Implement metrics aggregation effectively
+key_concepts:
+  concept_1: Understanding metrics aggregation fundamentals
+  concept_2: Implementing metrics aggregation in your system
+  concept_3: Best practices for metrics aggregation
+implementation_considerations:
+  consideration_1: Understand your specific use case
+  consideration_2: Consider trade-offs and scalability
+  consideration_3: Plan for maintenance and evolution
+best_practices:
+- name: Understand metrics-aggregation
+  description: Learn the fundamentals before implementing
+- name: Plan carefully
+  description: Design for your specific requirements
+- name: Test thoroughly
+  description: Validate your implementation works
+- name: Monitor continuously
+  description: Track performance and issues
+anti_patterns:
+- name: Ignoring the pattern
+  consequence: Systems become unreliable
+- name: Misapplication
+  consequence: Wasted effort and poor results
+blog_hooks:
+  beginner:
+    focus: Introduction to Metrics Aggregation
+  intermediate:
+    focus: Implementing Metrics Aggregation
+  advanced:
+    focus: Advanced Metrics Aggregation techniques

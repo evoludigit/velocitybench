@@ -1,0 +1,51 @@
+id: hexagonal-architecture
+name: Hexagonal Architecture
+category: architecture
+type: standard
+tags:
+- architecture
+- hexagonal_architecture
+summary:
+  short: Isolating business logic from external concerns
+  long: Isolating business logic from external concerns. This is a comprehensive pattern
+    that provides guidance on implementation and best practices.
+problem:
+  description: Issues arise without proper hexagonal architecture
+  symptoms:
+  - System lacks proper hexagonal architecture
+  - Performance or reliability issues
+  - Difficulty scaling the system
+  - Maintenance challenges
+  - Integration problems
+  impact: System reliability and performance degradation
+solution:
+  description: Implement hexagonal architecture effectively
+key_concepts:
+  concept_1: Understanding hexagonal architecture fundamentals
+  concept_2: Implementing hexagonal architecture in your system
+  concept_3: Best practices for hexagonal architecture
+implementation_considerations:
+  consideration_1: Understand your specific use case
+  consideration_2: Consider trade-offs and scalability
+  consideration_3: Plan for maintenance and evolution
+best_practices:
+- name: Understand hexagonal-architecture
+  description: Learn the fundamentals before implementing
+- name: Plan carefully
+  description: Design for your specific requirements
+- name: Test thoroughly
+  description: Validate your implementation works
+- name: Monitor continuously
+  description: Track performance and issues
+anti_patterns:
+- name: Ignoring the pattern
+  consequence: Systems become unreliable
+- name: Misapplication
+  consequence: Wasted effort and poor results
+blog_hooks:
+  beginner:
+    focus: Introduction to Hexagonal Architecture
+  intermediate:
+    focus: Implementing Hexagonal Architecture
+  advanced:
+    focus: Advanced Hexagonal Architecture techniques
