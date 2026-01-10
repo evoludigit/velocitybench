@@ -1,0 +1,346 @@
+id: csrf-protection
+name: "CSRF Protection (Cross-Site Request Forgery)"
+category: security
+type: standard
+tags:
+  - security
+  - csrf
+  - web-applications
+  - owasp-top-10
+
+summary:
+  short: "Preventing Cross-Site Request Forgery attacks where attackers trick users into unwanted actions"
+  long: |
+    CSRF attacks trick authenticated users into performing unwanted actions (transfer money, change password, delete data). The attacker crafts a request that the victim's browser automatically sends because they're logged in. CSRF tokens prevent this by requiring a secret token that the attacker cannot access.
+
+problem:
+  description: "Attacker tricks logged-in user into clicking link that performs action on their behalf"
+  symptoms:
+    - "User visits evil.com while logged into their bank"
+    - "Evil.com page contains: <img src='bank.com/transfer?amount=1000&to=attacker'>"
+    - "Browser automatically sends request with user's bank session cookie"
+    - "Money transferred without user's knowledge"
+  impact: "Unauthorized actions (transfers, deletions), account compromise, financial loss"
+
+solution:
+  description: "Require CSRF token that attacker cannot access"
+  key_principle: "State-changing requests must include a token only the legitimate site can provide"
+
+attack_mechanics:
+  step_by_step: |
+    1. User logs into bank.com
+    2. User's browser stores session cookie (authenticated)
+    3. User visits evil.com (still logged in)
+    4. Evil.com contains: <img src="bank.com/transfer?to=attacker&amount=1000">
+    5. Browser sends GET request with cookies (automatic)
+    6. Bank transfers money (request authenticated with user's cookie)
+
+  why_cookies_are_sent: |
+    Browsers automatically send cookies for all requests to a domain:
+    - GET request to bank.com → cookies included
+    - POST request to bank.com → cookies included
+    - AJAX request to bank.com → cookies included
+
+    Attacker cannot READ cookies (same-origin policy), but browser sends them automatically
+
+prevention_techniques:
+  synchronizer_token_pattern:
+    description: "Generate unique token per form, validate on submission"
+    implementation: |
+      # Backend: Generate token
+      @app.route('/transfer')
+      def transfer_form():
+          csrf_token = generate_random_token()
+          session['csrf_token'] = csrf_token
+          return render_template('transfer.html', token=csrf_token)
+
+      # Frontend: Include token in form
+      <form method="POST" action="/transfer">
+          <input type="hidden" name="csrf_token" value="{{ token }}">
+          <input type="number" name="amount" placeholder="Amount">
+          <button type="submit">Transfer</button>
+      </form>
+
+      # Backend: Validate token
+      @app.route('/transfer', methods=['POST'])
+      def process_transfer():
+          token = request.form.get('csrf_token')
+          if token != session.get('csrf_token'):
+              abort(403, 'CSRF token invalid')
+          # Token valid; process transfer
+          amount = request.form.get('amount')
+          transfer_money(amount)
+
+    why_it_works: |
+      - Attacker knows form URL (/transfer)
+      - Attacker does NOT know CSRF token (stored in session, server-side)
+      - Attack page cannot generate valid token
+      - Request will be rejected
+      - Safe!
+
+  double_submit_cookie_pattern:
+    description: "CSRF token sent in both cookie and form data; must match"
+    implementation: |
+      # Backend: Set cookie
+      @app.route('/transfer')
+      def transfer_form():
+          csrf_token = generate_random_token()
+          response = make_response(render_template('transfer.html'))
+          response.set_cookie('csrf_token', csrf_token, httponly=False)
+          return response
+
+      # Frontend: Include token from cookie in form
+      <form method="POST" action="/transfer">
+          <input type="hidden" name="csrf_token" value="{{ cookies.csrf_token }}">
+          <button type="submit">Transfer</button>
+      </form>
+
+      # Backend: Validate
+      @app.route('/transfer', methods=['POST'])
+      def process_transfer():
+          token_from_cookie = request.cookies.get('csrf_token')
+          token_from_form = request.form.get('csrf_token')
+          if token_from_cookie != token_from_form:
+              abort(403, 'CSRF token mismatch')
+
+    why_it_works: |
+      - Attacker can set cookie (no protection there)
+      - But attacker cannot READ cookie from JavaScript (same-origin policy)
+      - Attacker cannot submit form with matching token
+      - Request rejected
+
+  same_site_cookie_attribute:
+    description: "Browser refuses to send cookie with cross-site requests"
+    implementation: |
+      # Backend: Set SameSite attribute on session cookie
+      response.set_cookie(
+          'session_id',
+          value=session_id,
+          httponly=True,
+          secure=True,
+          samesite='Strict'  # Don't send to other sites
+      )
+
+      # Or in HTTP header:
+      Set-Cookie: session_id=abc123; Path=/; Secure; SameSite=Strict
+
+    samesite_levels: |
+      SameSite=Strict:
+        - Cookie ONLY sent to exact same domain
+        - User clicks bank.com link from email → cookie sent
+        - User navigates from other site → cookie NOT sent
+        - Most secure, but breaks some workflows
+
+      SameSite=Lax (default in modern browsers):
+        - Cookie sent for top-level navigation (link clicks)
+        - Cookie NOT sent for subresource requests (img, script)
+        - Blocks img tag attacks
+
+      SameSite=None:
+        - Cookie sent in all cases (old behavior)
+        - Requires Secure flag (HTTPS only)
+
+    why_it_works: |
+      - Browser enforces SameSite
+      - Attack page cannot send request with cookie
+      - No session = no authentication = no transfer
+
+csrf_in_different_contexts:
+  form_based_apps:
+    vulnerability: |
+      POST /transfer with form data
+      <img src="bank.com/transfer?to=attacker&amount=1000">
+      Browser sends POST with cookies
+
+    protection: |
+      - CSRF token in form
+      - Or SameSite=Lax on session cookie
+
+  single_page_applications:
+    vulnerability: |
+      XMLHttpRequest to API from other domain
+      fetch('bank.com/api/transfer', {
+          method: 'POST',
+          body: JSON.stringify({amount: 1000})
+      })
+      Cookie included automatically
+
+    protection: |
+      - Check Origin/Referer headers
+      - CSRF token in request header (X-CSRF-Token)
+      - SameSite cookie
+
+  rest_apis:
+    vulnerability: |
+      PUT /api/users/123 from other domain
+      Modifies user account
+
+    protection: |
+      - CSRF token in X-CSRF-Token header
+      - Origin header validation
+      - SameSite cookie
+
+framework_protections:
+  django: |
+    # Django provides CSRF protection built-in
+    from django.middleware.csrf import csrf_protect
+
+    @csrf_protect
+    def transfer_view(request):
+        if request.method == 'POST':
+            # Token automatically checked
+            amount = request.POST['amount']
+            process_transfer(amount)
+
+    # In template:
+    <form method="post">
+        {% csrf_token %}
+        <input type="number" name="amount">
+        <button type="submit">Transfer</button>
+    </form>
+
+  flask: |
+    # Flask with Flask-WTF
+    from flask_wtf import FlaskForm
+    from wtforms import IntegerField, SubmitField
+
+    class TransferForm(FlaskForm):
+        amount = IntegerField('Amount')
+        submit = SubmitField('Transfer')
+
+    @app.route('/transfer', methods=['GET', 'POST'])
+    def transfer():
+        form = TransferForm()
+        if form.validate_on_submit():
+            # Token validated by Flask-WTF
+            process_transfer(form.amount.data)
+        return render_template('transfer.html', form=form)
+
+  react: |
+    // Store CSRF token from meta tag or cookie
+    const csrf_token = document.querySelector('meta[name="csrf-token"]').content;
+
+    // Include in POST request
+    const response = await fetch('/api/transfer', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrf_token
+        },
+        body: JSON.stringify({amount: 100})
+    });
+
+common_mistakes:
+  - name: "Only protecting POST, not PUT/DELETE"
+    problem: "Attacker uses PUT or DELETE (form-based CSRF uses POST)"
+    fix: "Protect all state-changing methods (POST, PUT, DELETE, PATCH)"
+
+  - name: "CSRF token in URL or cookie only"
+    problem: "Attacker can sometimes craft URL or set cookie"
+    fix: "Token in form/body (harder to access)"
+
+  - name: "Reusing same CSRF token"
+    problem: "If attacker gets one token, can reuse it"
+    fix: "One token per form submission"
+
+  - name: "CSRF token not checked"
+    problem: "Token generated but never validated"
+    fix: "Validate on every state-changing request"
+
+  - name: "CSRF token stored insecurely"
+    problem: "If stored in cookie without httponly, JavaScript can access"
+    fix: "Store in session (server-side) or use httponly cookie"
+
+testing_csrf_protection:
+  test_token_required: |
+    def test_transfer_requires_csrf_token():
+      response = client.post('/transfer', data={
+          'amount': 100
+          # Missing csrf_token
+      })
+      assert response.status_code == 403  # Forbidden
+
+  test_token_validation: |
+    def test_csrf_token_validated():
+      response = client.post('/transfer', data={
+          'csrf_token': 'invalid_token',
+          'amount': 100
+      })
+      assert response.status_code == 403
+
+  test_valid_token_accepted: |
+    def test_valid_csrf_token():
+      # Get form with valid token
+      response = client.get('/transfer')
+      csrf_token = extract_token_from_response(response)
+
+      # Submit with valid token
+      response = client.post('/transfer', data={
+          'csrf_token': csrf_token,
+          'amount': 100
+      })
+      assert response.status_code == 200  # Success
+
+best_practices:
+  - name: "Protect all state-changing requests"
+    description: "POST, PUT, DELETE, PATCH all need CSRF protection"
+
+  - name: "Use built-in framework protection"
+    description: "Django, Flask-WTF, Rails, etc. provide CSRF protection"
+
+  - name: "Set SameSite on session cookies"
+    description: "SameSite=Lax provides defense-in-depth"
+
+  - name: "Validate Origin/Referer headers"
+    description: "Additional layer to detect cross-site requests"
+
+  - name: "Use short CSRF token expiry"
+    description: "Tokens valid for session or few hours"
+
+  - name: "Generate new token per form"
+    description: "One-time tokens prevent token reuse attacks"
+
+  - name: "Test CSRF protection"
+    description: "Include CSRF tests in test suite"
+
+anti_patterns:
+  - name: "CSRF protection on GET requests"
+    consequence: "Breaks prefetching, caching, legitimate requests"
+    fix: "CSRF protection on POST/PUT/DELETE only"
+
+  - name: "CSRF token in URL"
+    consequence: "Token leaked in logs, referer headers, history"
+    fix: "CSRF token in request body, not URL"
+
+  - name: "Disabling CSRF for API endpoints"
+    consequence: "API endpoints vulnerable to CSRF"
+    fix: "CSRF protection required everywhere"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      CSRF is like someone forging your signature:
+      - Attacker can't forge your signature (you have unique pen)
+      - But if attacker tricks you to sign something
+      - You've authorized it without reading
+
+      CSRF token is like checking document before signing:
+      - Bank gives you special token per transaction
+      - Attacker can't get token (secret between you and bank)
+      - Attack fails
+
+  intermediate:
+    focus: "CSRF prevention techniques"
+    key_points:
+      - "How CSRF attacks work and why cookies are vulnerable"
+      - "CSRF token patterns and implementation"
+      - "SameSite cookies as defense layer"
+      - "Framework built-in protections"
+
+  advanced:
+    focus: "Advanced CSRF scenarios"
+    key_points:
+      - "CSRF in single-page applications"
+      - "API endpoint protection"
+      - "CSRF token rotation and lifecycle"
+      - "Testing CSRF vulnerabilities"

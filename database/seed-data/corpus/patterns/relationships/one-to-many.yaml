@@ -1,0 +1,343 @@
+id: one-to-many
+name: "One-to-Many Relationships & Cascading"
+category: relationships
+type: standard
+tags:
+  - relationships
+  - database-design
+  - foreign-keys
+  - referential-integrity
+
+summary:
+  short: "Implementing one-to-many relationships where one record relates to multiple records"
+  long: |
+    One-to-many relationships are the most common in databases: one user has many posts, one category has many products, one order has many items. Proper implementation requires foreign keys, cascading rules, and efficient querying to avoid N+1 problems.
+
+problem:
+  description: "Orphaned records, dangling references, or deleted data breaks application"
+  symptoms:
+    - "Delete category; orphaned products with invalid category_id"
+    - "Query all user posts; loop with N+1 queries"
+    - "Update user id; related posts have stale references"
+    - "No way to enforce which records relate to each other"
+  impact: "Data integrity issues, orphaned records, performance problems, complex application logic"
+
+solution:
+  description: "Use foreign keys, cascading rules, and efficient queries"
+
+relational_design:
+  one_to_many_schema: |
+    # Table structure
+    CREATE TABLE users (
+        id INTEGER PRIMARY KEY,
+        name VARCHAR(100) NOT NULL
+    );
+
+    CREATE TABLE posts (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        title VARCHAR(200),
+        content TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+
+    # One user → many posts
+    users table:
+    id   name
+    1    Alice
+    2    Bob
+
+    posts table:
+    id   user_id   title
+    1    1         Alice's first post
+    2    1         Alice's second post
+    3    2         Bob's first post
+
+  relationships: |
+    alice = User(id=1, name='Alice')
+    alice.posts = [
+        Post(id=1, user_id=1, title='Alice\'s first post'),
+        Post(id=2, user_id=1, title='Alice\'s second post')
+    ]
+
+    bob = User(id=2, name='Bob')
+    bob.posts = [
+        Post(id=3, user_id=2, title='Bob\'s first post')
+    ]
+
+cascading_operations:
+  cascade_delete: |
+    CREATE TABLE posts (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        title VARCHAR(200),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    # When user deleted, posts automatically deleted
+    DELETE FROM users WHERE id = 1;
+    # Results in:
+    # - User 1 deleted
+    # - Post 1 deleted
+    # - Post 2 deleted
+
+  cascade_update: |
+    CREATE TABLE posts (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        title VARCHAR(200),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE CASCADE
+    );
+
+    # When user id updated, post user_id auto-updates
+    UPDATE users SET id = 100 WHERE id = 1;
+    # Results in:
+    # - User 1 becomes User 100
+    # - Post.user_id automatically becomes 100
+
+  restrict: |
+    CREATE TABLE posts (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        title VARCHAR(200),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
+    );
+
+    # Cannot delete user if posts exist
+    DELETE FROM users WHERE id = 1;
+    # Error: Cannot delete user; child records exist
+    # Must delete posts first
+
+  set_null: |
+    CREATE TABLE posts (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER,  -- NULL allowed
+        title VARCHAR(200),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    );
+
+    # When user deleted, post.user_id becomes NULL
+    DELETE FROM users WHERE id = 1;
+    # Results in:
+    # - User 1 deleted
+    # - Post.user_id becomes NULL (orphaned post)
+
+querying_relationships:
+  simple_lookup: |
+    # Get all posts for user
+    SELECT * FROM posts WHERE user_id = 1;
+    # Results: Alice's two posts
+
+  join_query: |
+    # Get user with their posts
+    SELECT u.id, u.name, p.id, p.title
+    FROM users u
+    LEFT JOIN posts p ON p.user_id = u.id
+    WHERE u.id = 1;
+
+    # Results:
+    # id   name    p_id   title
+    # 1    Alice   1      Alice's first post
+    # 1    Alice   2      Alice's second post
+
+  subquery: |
+    # Count posts per user
+    SELECT id, name,
+           (SELECT COUNT(*) FROM posts WHERE user_id = users.id) as post_count
+    FROM users;
+
+    # Results:
+    # id   name    post_count
+    # 1    Alice   2
+    # 2    Bob     1
+
+  aggregate: |
+    # Get users with 2+ posts
+    SELECT u.id, u.name, COUNT(p.id) as post_count
+    FROM users u
+    LEFT JOIN posts p ON p.user_id = u.id
+    GROUP BY u.id, u.name
+    HAVING COUNT(p.id) >= 2;
+
+avoiding_n_plus_one:
+  n_plus_one_problem: |
+    # SLOW: N+1 queries
+    users = db.query("SELECT * FROM users")
+    for user in users:
+        posts = db.query("SELECT * FROM posts WHERE user_id = ?", [user.id])
+        # 1 query for users + N queries for posts = N+1 total
+
+    # With 1000 users: 1001 queries!
+
+  solution_join: |
+    # FAST: Single query
+    result = db.query("""
+        SELECT u.id, u.name, p.id, p.title
+        FROM users u
+        LEFT JOIN posts p ON p.user_id = u.id
+    """)
+
+    # Process results to reconstruct relationships
+    users = {}
+    for row in result:
+        if row['user_id'] not in users:
+            users[row['user_id']] = {
+                'id': row['user_id'],
+                'name': row['name'],
+                'posts': []
+            }
+        users[row['user_id']]['posts'].append({
+            'id': row['post_id'],
+            'title': row['title']
+        })
+
+  solution_eager_loading: |
+    # ORM eager loading (avoid N+1)
+    # SQLAlchemy
+    users = session.query(User).options(
+        joinedload(User.posts)
+    ).all()
+
+    # Django
+    users = User.objects.prefetch_related('posts').all()
+
+    # Executes 2 queries (not N+1)
+
+  solution_batch_loading: |
+    # Load all posts at once
+    users = db.query("SELECT * FROM users")
+    user_ids = [u['id'] for u in users]
+
+    posts = db.query(
+        "SELECT * FROM posts WHERE user_id IN (?)",
+        [user_ids]
+    )
+
+    # Attach posts to users
+    posts_by_user = {}
+    for post in posts:
+        if post['user_id'] not in posts_by_user:
+            posts_by_user[post['user_id']] = []
+        posts_by_user[post['user_id']].append(post)
+
+    for user in users:
+        user['posts'] = posts_by_user.get(user['id'], [])
+
+    # 2 queries instead of 1001
+
+indexing_for_relationships:
+  foreign_key_index: |
+    # Index on foreign key for queries like:
+    # SELECT * FROM posts WHERE user_id = 1
+
+    CREATE INDEX idx_posts_user_id ON posts(user_id);
+
+    # Without index: Table scan (slow)
+    # With index: Index lookup (fast)
+
+  composite_index: |
+    # Index for "get user's posts ordered by date"
+    CREATE INDEX idx_posts_user_created ON posts(user_id, created_at);
+
+    # Efficiently supports:
+    SELECT * FROM posts WHERE user_id = 1 ORDER BY created_at DESC;
+
+testing_relationships:
+  test_foreign_key: |
+    def test_post_requires_user():
+        with pytest.raises(IntegrityError):
+            # Post references non-existent user
+            db.insert('posts', {
+                'user_id': 999,  # User doesn't exist
+                'title': 'Orphaned post'
+            })
+
+  test_cascade_delete: |
+    def test_deleting_user_deletes_posts():
+        user = create_user(id=1, name='Alice')
+        post1 = create_post(user_id=1, title='Post 1')
+        post2 = create_post(user_id=1, title='Post 2')
+
+        # Delete user
+        db.delete('users', id=1)
+
+        # Verify posts deleted (cascade)
+        posts = db.query('SELECT * FROM posts WHERE user_id = 1')
+        assert len(posts) == 0
+
+  test_n_plus_one: |
+    def test_get_users_with_posts_efficient():
+        # Create test data
+        for i in range(10):
+            user = create_user(id=i, name=f'User {i}')
+            for j in range(5):
+                create_post(user_id=i, title=f'Post {j}')
+
+        # Track queries
+        with count_queries() as query_count:
+            users = get_users_with_posts()
+
+        # Should be 2 queries (users + posts), not 11
+        assert query_count == 2
+
+best_practices:
+  - name: "Use foreign keys"
+    description: "Enforce referential integrity at database level"
+
+  - name: "Choose appropriate cascading rule"
+    description: "CASCADE for dependent data, RESTRICT to prevent deletion"
+
+  - name: "Index foreign key columns"
+    description: "Critical for query performance on relationships"
+
+  - name: "Avoid N+1 queries"
+    description: "Use joins or eager loading, not loops"
+
+  - name: "Test referential integrity"
+    description: "Verify foreign key constraints work"
+
+  - name: "Document cascading behavior"
+    description: "Make clear what happens when parent deleted"
+
+  - name: "Denormalize when needed"
+    description: "Cache counts or frequently accessed data to avoid joins"
+
+anti_patterns:
+  - name: "No foreign key constraints"
+    consequence: "Orphaned records, data integrity issues"
+    fix: "Always define foreign key constraints"
+
+  - name: "Querying relationships in application code"
+    consequence: "N+1 queries, slow performance"
+    fix: "Use joins or eager loading"
+
+  - name: "Cascading deletes without consideration"
+    consequence: "Delete user, lose all historical posts"
+    fix: "Use RESTRICT or SET NULL for important data"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      One-to-many relationships are like authors and books:
+      - One author writes many books
+      - Each book belongs to one author
+      - Delete author → delete books? Or keep orphaned books?
+
+      Foreign keys enforce: books must have valid author
+
+  intermediate:
+    focus: "Implementing one-to-many relationships"
+    key_points:
+      - "Foreign key constraints and cascading operations"
+      - "Efficient querying with joins and eager loading"
+      - "Avoiding N+1 query problems"
+      - "Indexing for relationship queries"
+
+  advanced:
+    focus: "Complex one-to-many scenarios"
+    key_points:
+      - "Soft deletes and historical data"
+      - "Optimizing relationship queries at scale"
+      - "Denormalization strategies"
+      - "Relationship auditing and compliance"
