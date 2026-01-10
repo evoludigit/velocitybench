@@ -171,46 +171,80 @@ class CreateCommentInput:
     parent_comment_id: str | None = None
 
 
-# FraiseQL Mutation Result Types
+# FraiseQL Mutation Success Types
 @fraiseql.type
-class MutationResult:
-    """Base mutation result with success flag and message."""
-    success: bool
+class UpdateUserSuccess:
+    """Result of successful user update."""
+    user: User
+
+
+@fraiseql.type
+class CreatePostSuccess:
+    """Result of successful post creation."""
+    post: Post
+
+
+@fraiseql.type
+class CreateCommentSuccess:
+    """Result of successful comment creation."""
+    comment: Comment
+
+
+# FraiseQL Mutation Error Types
+@fraiseql.type
+class UpdateUserError:
+    """Error result for user update operations."""
     message: str
+    code: str
 
 
 @fraiseql.type
-class UserMutationResult(MutationResult):
-    """Result of user mutation operations."""
-    user: User | None = None
+class CreatePostError:
+    """Error result for post creation operations."""
+    message: str
+    code: str
 
 
 @fraiseql.type
-class PostMutationResult(MutationResult):
-    """Result of post mutation operations."""
-    post: Post | None = None
+class CreateCommentError:
+    """Error result for comment creation operations."""
+    message: str
+    code: str
+
+
+# FraiseQL Mutation NOOP Types (No Operation - idempotent results)
+@fraiseql.type
+class UpdateUserNoop:
+    """No-op result when user has no fields to update."""
+    message: str = "No fields to update"
 
 
 @fraiseql.type
-class CommentMutationResult(MutationResult):
-    """Result of comment mutation operations."""
-    comment: Comment | None = None
+class CreatePostNoop:
+    """No-op result for post creation (reserved for future idempotent operations)."""
+    message: str = "Post creation skipped"
 
 
-# FraiseQL Mutation Resolvers
-@fraiseql.mutation
-async def update_user(
+@fraiseql.type
+class CreateCommentNoop:
+    """No-op result for comment creation (reserved for future idempotent operations)."""
+    message: str = "Comment creation skipped"
+
+
+# FraiseQL Mutation Core Implementation Functions
+# These implement the actual business logic
+
+async def update_user_impl(
     info: GraphQLResolveInfo,
     id: str,
     input: UpdateUserInput,
-) -> UserMutationResult:
-    """Update user by UUID id via database mutation.
+) -> UpdateUserSuccess | UpdateUserError | UpdateUserNoop:
+    """Core implementation for updating user via database functions.
 
-    Pattern: Uses database functions for mutations
-    - Takes mutation input as dedicated input type
-    - Returns special MutationResult type
-    - Result includes success flag, message, and updated entity
-    - Composition layer (tv_user) provides all nested data
+    Pattern: FraiseQL enterprise mutation pattern
+    - Calls database functions for mutation
+    - Returns one of three types: Success, Error, or NoOp
+    - Uses composition layer (tv_user) for nested data
     """
     db = info.context["db"]
 
@@ -224,12 +258,9 @@ async def update_user(
         if input.bio is not None:
             update_data["bio"] = input.bio
 
+        # NOOP: No fields to update
         if not update_data:
-            return UserMutationResult(
-                success=False,
-                message="No fields to update",
-                user=None,
-            )
+            return UpdateUserNoop()
 
         # Update write layer (tb_user table)
         await db.update(
@@ -240,31 +271,27 @@ async def update_user(
 
         # Return via composition layer (tv_user view with JSONB data)
         user = await db.find_one("benchmark.tv_user", id=id)
-        return UserMutationResult(
-            success=True,
-            message=f"User {id} updated successfully",
-            user=user,
-        )
+        return UpdateUserSuccess(user=user)
+
     except Exception as e:
-        return UserMutationResult(
-            success=False,
+        return UpdateUserError(
             message=f"Failed to update user: {str(e)}",
-            user=None,
+            code="UPDATE_FAILED",
         )
 
 
-@fraiseql.mutation
-async def create_post(
+async def create_post_impl(
     info: GraphQLResolveInfo,
     author_id: str,
     input: CreatePostInput,
-) -> PostMutationResult:
-    """Create post mutation via database insert.
+) -> CreatePostSuccess | CreatePostError:
+    """Core implementation for creating post via database functions.
 
-    Pattern: Uses database functions for mutations
-    - Takes mutation input as dedicated input type
-    - Returns special MutationResult type with created entity
-    - Composition layer (tv_post) provides author nested in JSONB
+    Pattern: FraiseQL enterprise mutation pattern
+    - Validates author exists before insert
+    - Calls database insert function
+    - Returns Success or Error (no NoOp for create)
+    - Uses composition layer (tv_post) with nested author
     """
     db = info.context["db"]
 
@@ -272,15 +299,12 @@ async def create_post(
         # Verify author exists
         author = await db.find_one("benchmark.tv_user", id=author_id)
         if not author:
-            return PostMutationResult(
-                success=False,
+            return CreatePostError(
                 message=f"Author {author_id} not found",
-                post=None,
+                code="AUTHOR_NOT_FOUND",
             )
 
         # Insert into write layer (tb_post table)
-        # Note: tb_post uses fk_author (integer FK), but we receive author_id (UUID)
-        # The tv_post view handles the join from UUID id to internal pk_user
         result = await db.insert(
             "benchmark.tb_post",
             data={
@@ -295,67 +319,60 @@ async def create_post(
         # Return newly created post via composition layer
         if result and "id" in result:
             post = await db.find_one("benchmark.tv_post", id=result["id"])
-            return PostMutationResult(
-                success=True,
-                message=f"Post created successfully",
-                post=post,
-            )
+            return CreatePostSuccess(post=post)
         else:
-            return PostMutationResult(
-                success=False,
+            return CreatePostError(
                 message="Failed to create post - no ID returned",
-                post=None,
+                code="CREATE_FAILED",
             )
+
     except Exception as e:
-        return PostMutationResult(
-            success=False,
+        return CreatePostError(
             message=f"Failed to create post: {str(e)}",
-            post=None,
+            code="CREATE_ERROR",
         )
 
 
-@fraiseql.mutation
-async def create_comment(
+async def create_comment_impl(
     info: GraphQLResolveInfo,
     author_id: str,
     post_id: str,
     input: CreateCommentInput,
-) -> CommentMutationResult:
-    """Create comment mutation via database insert.
+) -> CreateCommentSuccess | CreateCommentError:
+    """Core implementation for creating comment via database functions.
 
-    Pattern: Uses database functions for mutations
-    - Takes mutation input as dedicated input type
-    - Returns special MutationResult type with created entity
-    - Composition layer (tv_comment) provides author, post, parentComment nested in JSONB
+    Pattern: FraiseQL enterprise mutation pattern
+    - Validates author, post, and parent comment exist
+    - Calls database insert function
+    - Returns Success or Error (no NoOp for create)
+    - Uses composition layer (tv_comment) with nested objects
     """
     db = info.context["db"]
 
     try:
-        # Verify author and post exist
+        # Verify author exists
         author = await db.find_one("benchmark.tv_user", id=author_id)
         if not author:
-            return CommentMutationResult(
-                success=False,
+            return CreateCommentError(
                 message=f"Author {author_id} not found",
-                comment=None,
+                code="AUTHOR_NOT_FOUND",
             )
 
+        # Verify post exists
         post = await db.find_one("benchmark.tv_post", id=post_id)
         if not post:
-            return CommentMutationResult(
-                success=False,
+            return CreateCommentError(
                 message=f"Post {post_id} not found",
-                comment=None,
+                code="POST_NOT_FOUND",
             )
 
         # Verify parent comment exists if provided
         if input.parent_comment_id:
             parent = await db.find_one("benchmark.tv_comment", id=input.parent_comment_id)
             if not parent:
-                return CommentMutationResult(
-                    success=False,
+                return CreateCommentError(
                     message=f"Parent comment {input.parent_comment_id} not found",
-                    comment=None,
+                    code="PARENT_NOT_FOUND",
                 )
 
         # Insert into write layer (tb_comment table)
@@ -372,23 +389,72 @@ async def create_comment(
         # Return newly created comment via composition layer
         if result and "id" in result:
             comment = await db.find_one("benchmark.tv_comment", id=result["id"])
-            return CommentMutationResult(
-                success=True,
-                message="Comment created successfully",
-                comment=comment,
-            )
+            return CreateCommentSuccess(comment=comment)
         else:
-            return CommentMutationResult(
-                success=False,
+            return CreateCommentError(
                 message="Failed to create comment - no ID returned",
-                comment=None,
+                code="CREATE_FAILED",
             )
+
     except Exception as e:
-        return CommentMutationResult(
-            success=False,
+        return CreateCommentError(
             message=f"Failed to create comment: {str(e)}",
-            comment=None,
+            code="CREATE_ERROR",
         )
+
+
+# FraiseQL Enterprise Mutation Classes
+# Pattern: Class-based mutations with @fraiseql.mutation decorator
+# References: function="app.{mutation_name}" points to implementation above
+
+
+@fraiseql.mutation(function="app.update_user")
+class UpdateUser:
+    """Update user with enterprise mutation pattern.
+
+    Blueprint Pattern:
+    - Dedicated input type (UpdateUserInput)
+    - Three response types: Success, Error, NoOp
+    - Function attribute points to implementation
+    - Composition layer provides all nested data
+    """
+
+    input: UpdateUserInput
+    success: UpdateUserSuccess
+    error: UpdateUserError
+    noop: UpdateUserNoop
+
+
+@fraiseql.mutation(function="app.create_post")
+class CreatePost:
+    """Create post with enterprise mutation pattern.
+
+    Blueprint Pattern:
+    - Dedicated input type (CreatePostInput)
+    - Success/Error response types
+    - Function attribute points to implementation
+    - Composition layer includes nested author object
+    """
+
+    input: CreatePostInput
+    success: CreatePostSuccess
+    error: CreatePostError
+
+
+@fraiseql.mutation(function="app.create_comment")
+class CreateComment:
+    """Create comment with enterprise mutation pattern.
+
+    Blueprint Pattern:
+    - Dedicated input type (CreateCommentInput)
+    - Success/Error response types
+    - Function attribute points to implementation
+    - Composition layer includes author, post, parentComment
+    """
+
+    input: CreateCommentInput
+    success: CreateCommentSuccess
+    error: CreateCommentError
 
 
 # Context getter for FraiseQL
