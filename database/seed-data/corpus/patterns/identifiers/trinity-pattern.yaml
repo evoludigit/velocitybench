@@ -1,0 +1,414 @@
+# Trinity Pattern - The Three-Identifier Strategy
+# Flagship pattern for VelocityBench educational corpus
+
+id: trinity-pattern
+name: Trinity Pattern
+category: identifiers
+difficulty: intermediate
+tags:
+  - database-design
+  - api-design
+  - performance
+  - security
+
+# ============================================================
+# SUMMARY
+# ============================================================
+summary:
+  short: "Three identifier types for optimal database + API design"
+  long: |
+    The Trinity Pattern uses three types of identifiers to solve the eternal
+    backend dilemma: how to identify records optimally for database operations,
+    API exposure, and user-facing URLs simultaneously.
+
+    Instead of choosing between sequential IDs, UUIDs, or slugs, use all three
+    - each optimized for its specific purpose.
+
+# ============================================================
+# THE PROBLEM
+# ============================================================
+problem:
+  description: |
+    Every backend developer faces the same fundamental question: how should
+    I identify my database records?
+
+    Each traditional approach has significant drawbacks:
+    - **Sequential IDs**: Fast but leak business information
+    - **UUIDs**: Secure but have index performance overhead
+    - **Slugs**: Human-readable but may change over time
+
+    Choosing just one forces painful tradeoffs.
+
+  symptoms:
+    - name: "Business information leakage"
+      description: "Sequential IDs reveal total record counts, creation order, and growth rate"
+      example: "/users/12847 tells competitors you have ~12,847 users"
+      severity: security
+
+    - name: "UUID index bloat"
+      description: "UUID primary keys cause B-tree index fragmentation and slower joins"
+      example: "JOIN operations 3-10x slower with UUID PKs vs INTEGER PKs"
+      severity: performance
+
+    - name: "Ugly URLs"
+      description: "UUIDs in URLs are unmemorable and unfriendly"
+      example: "/users/a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+      severity: ux
+
+    - name: "Slug instability"
+      description: "User-editable slugs break bookmarks and SEO"
+      example: "User changes username from 'bob' to 'robert', all links break"
+      severity: reliability
+
+  anti_patterns:
+    - name: "UUID as primary key"
+      why_bad: "Index fragmentation, slower joins, larger indexes"
+      common_justification: "Security through obscurity"
+
+    - name: "Exposing sequential IDs in API"
+      why_bad: "Enables enumeration attacks, leaks business metrics"
+      common_justification: "Simpler implementation"
+
+    - name: "Slug as the only identifier"
+      why_bad: "Changes break links, collision handling complex"
+      common_justification: "SEO-friendly URLs"
+
+# ============================================================
+# THE SOLUTION
+# ============================================================
+solution:
+  principle: |
+    Use three identifiers, each optimized for its purpose:
+    1. **pk_*** - Internal integer for database operations (never exposed)
+    2. **id** - UUID for public API exposure (always stable)
+    3. **identifier** - Human-readable slug for URLs (can change, redirect)
+
+  components:
+    - name: "pk_* (Primary Key)"
+      type: "SERIAL INTEGER"
+      purpose: "Internal database operations"
+      visibility: "Never exposed outside database"
+      naming: "pk_user, pk_post, pk_comment (prefix: pk_)"
+      benefits:
+        - "O(1) index lookups"
+        - "Minimal storage (4 bytes vs 16 for UUID)"
+        - "Optimal B-tree structure (sequential insertion)"
+        - "Fastest possible JOINs"
+
+    - name: "id (UUID)"
+      type: "UUID"
+      purpose: "Public API exposure"
+      visibility: "All API responses and requests"
+      naming: "Always just 'id'"
+      benefits:
+        - "No information leakage"
+        - "Safe to expose publicly"
+        - "Globally unique (no collisions)"
+        - "Stable across migrations"
+
+    - name: "identifier (Slug)"
+      type: "VARCHAR UNIQUE"
+      purpose: "Human-readable URLs"
+      visibility: "User-facing URLs only"
+      naming: "username, slug, handle (context-dependent)"
+      benefits:
+        - "Memorable URLs"
+        - "SEO-friendly"
+        - "Social sharing friendly"
+        - "Can change with redirects"
+
+  decision_matrix:
+    - use_case: "Database JOINs"
+      identifier: "pk_*"
+      reason: "Integer comparison is fastest"
+
+    - use_case: "API responses"
+      identifier: "id"
+      reason: "UUID is safe to expose"
+
+    - use_case: "API mutations (create/update)"
+      identifier: "id"
+      reason: "Client references by UUID"
+
+    - use_case: "User-facing URLs"
+      identifier: "identifier (slug)"
+      reason: "Human-readable, shareable"
+
+    - use_case: "Internal system references"
+      identifier: "pk_*"
+      reason: "Performance optimization"
+
+    - use_case: "Webhook payloads"
+      identifier: "id"
+      reason: "External systems need stable refs"
+
+# ============================================================
+# SCHEMA
+# ============================================================
+schema:
+  sql: |
+    -- Trinity Pattern: User table example
+    CREATE TABLE tb_user (
+        -- INTERNAL: Database optimization
+        pk_user SERIAL PRIMARY KEY,
+
+        -- PUBLIC: API exposure
+        id UUID UNIQUE NOT NULL DEFAULT gen_random_uuid(),
+
+        -- USER-FACING: Human-readable URLs
+        username VARCHAR(100) UNIQUE NOT NULL,
+
+        -- Data columns
+        email VARCHAR(255) UNIQUE NOT NULL,
+        first_name VARCHAR(100),
+        last_name VARCHAR(100),
+        bio TEXT,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    -- Index strategy (optimized for each identifier type)
+    CREATE INDEX idx_user_pk ON tb_user (pk_user);      -- Already PK, but explicit
+    CREATE INDEX idx_user_id ON tb_user (id);            -- API lookups
+    CREATE INDEX idx_user_username ON tb_user (username); -- URL routing
+
+  foreign_key_example: |
+    -- Trinity Pattern: Foreign key references use pk_* for performance
+    CREATE TABLE tb_post (
+        pk_post SERIAL PRIMARY KEY,
+        id UUID UNIQUE NOT NULL DEFAULT gen_random_uuid(),
+        slug VARCHAR(255) UNIQUE NOT NULL,
+
+        -- FK uses INTEGER, not UUID (performance!)
+        fk_author INTEGER NOT NULL REFERENCES tb_user(pk_user),
+
+        title VARCHAR(500) NOT NULL,
+        content TEXT,
+        published_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    -- To expose author info in API, JOIN and return author.id (UUID)
+    SELECT
+        p.id AS post_id,
+        p.slug,
+        p.title,
+        u.id AS author_id,        -- UUID for API
+        u.username AS author_username -- Slug for display
+    FROM tb_post p
+    JOIN tb_user u ON p.fk_author = u.pk_user;  -- INTEGER join (fast!)
+
+# ============================================================
+# PERFORMANCE COMPARISON
+# ============================================================
+performance:
+  benchmarks:
+    - operation: "Simple lookup by identifier"
+      results:
+        - identifier: "pk_user (INTEGER)"
+          avg_time: "0.1ms"
+          index_type: "B-tree INTEGER"
+          index_size: "~4 bytes per entry"
+
+        - identifier: "id (UUID)"
+          avg_time: "1.5ms"
+          index_type: "B-tree UUID"
+          index_size: "~16 bytes per entry"
+
+        - identifier: "username (VARCHAR)"
+          avg_time: "0.8ms"
+          index_type: "B-tree VARCHAR"
+          index_size: "~variable"
+
+    - operation: "JOIN 10K rows"
+      results:
+        - identifier: "pk_* INTEGER FK"
+          avg_time: "12ms"
+          explanation: "Sequential integers optimize B-tree traversal"
+
+        - identifier: "UUID FK"
+          avg_time: "45ms"
+          explanation: "Random UUID distribution causes cache misses"
+
+  optimization_tips:
+    - tip: "Always JOIN on pk_*/fk_* columns, never on UUID"
+      impact: "3-10x faster JOINs"
+
+    - tip: "Use covering indexes for common API queries"
+      impact: "Eliminates table lookups"
+
+    - tip: "Consider BRIN indexes for created_at on large tables"
+      impact: "10-100x smaller index for time-series queries"
+
+# ============================================================
+# SEED DATA
+# ============================================================
+seed_data:
+  description: |
+    Fixed fixtures with predictable UUIDs for reproducible testing.
+    These 5 users appear in all dataset sizes (xs, medium, large).
+
+  fixtures:
+    - pk_user: 1
+      id: "11111111-1111-1111-1111-111111111111"
+      username: "alice"
+      email: "alice@example.com"
+      first_name: "Alice"
+      last_name: "Anderson"
+      bio: "Software engineer passionate about GraphQL and database optimization"
+      is_active: true
+      role: "admin"
+
+    - pk_user: 2
+      id: "22222222-2222-2222-2222-222222222222"
+      username: "bob"
+      email: "bob@example.com"
+      first_name: "Bob"
+      last_name: "Builder"
+      bio: "Database administrator and PostgreSQL enthusiast"
+      is_active: true
+      role: "user"
+
+    - pk_user: 3
+      id: "33333333-3333-3333-3333-333333333333"
+      username: "charlie"
+      email: "charlie@example.com"
+      first_name: "Charlie"
+      last_name: "Chen"
+      bio: "Full-stack developer exploring API design patterns"
+      is_active: true
+      role: "user"
+
+    - pk_user: 4
+      id: "44444444-4444-4444-4444-444444444444"
+      username: "diana"
+      email: "diana@example.com"
+      first_name: "Diana"
+      last_name: "Davis"
+      bio: "Backend architect specializing in high-performance systems"
+      is_active: true
+      role: "moderator"
+
+    - pk_user: 5
+      id: "55555555-5555-5555-5555-555555555555"
+      username: "eve"
+      email: "eve@example.com"
+      first_name: "Eve"
+      last_name: "Edwards"
+      bio: "Security researcher and performance optimization expert"
+      is_active: false
+      role: "user"
+
+  generation:
+    strategy: "sequential"
+    template: "user{i}@example.com"
+    count:
+      xs: 95        # Total: 100 users (5 fixtures + 95 generated)
+      medium: 9995  # Total: 10,000 users
+      large: 99995  # Total: 100,000 users
+
+# ============================================================
+# BLOG HOOKS (for AI generation)
+# ============================================================
+blog_hooks:
+  beginner:
+    analogy: |
+      Think of it like a person having three forms of identification:
+      - **Social Security Number** (pk_*): Used by government systems internally,
+        never shared publicly, optimized for database lookups
+      - **Passport Number** (id UUID): Official ID you share with airports and
+        banks, globally unique, safe to show
+      - **Nickname** (username): What friends call you, easy to remember,
+        might change over time
+
+    common_mistakes:
+      - "Using UUID as the primary key (performance issue)"
+      - "Exposing sequential IDs in API responses (security issue)"
+      - "Not using integer foreign keys (performance issue)"
+
+    key_takeaways:
+      - "Use INTEGER for internal operations (fast)"
+      - "Use UUID for external exposure (safe)"
+      - "Use slugs for human-facing URLs (friendly)"
+
+  intermediate:
+    migration_guide: |
+      If you have an existing system using UUID primary keys:
+      1. Add pk_* column as SERIAL
+      2. Populate pk_* with sequential values
+      3. Add fk_* columns pointing to pk_*
+      4. Update JOINs to use fk_*/pk_*
+      5. Keep id (UUID) for API exposure
+      6. Monitor performance improvements
+
+    framework_considerations:
+      - framework: "Django"
+        notes: "Use BigAutoField for pk_*, UUIDField for id"
+      - framework: "Rails"
+        notes: "Use integer :id (rename to :pk_*), add uuid :public_id"
+      - framework: "Spring"
+        notes: "@GeneratedValue for pk_*, @Column for uuid"
+
+  advanced:
+    performance_deep_dive: true
+    benchmark_comparison: true
+    distributed_systems_considerations: |
+      In distributed systems, the Trinity Pattern extends naturally:
+      - pk_* remains local to each database shard
+      - id (UUID) provides global uniqueness across shards
+      - Slug/identifier can include shard hints for routing
+
+# ============================================================
+# APPLICABLE FRAMEWORKS
+# ============================================================
+applicable_frameworks:
+  universal:
+    - "Works with all 26 VelocityBench frameworks"
+    - "Database-level pattern, framework-agnostic"
+
+  special_considerations:
+    - framework: "postgraphile"
+      notes: "Use smart tags to hide pk_*/fk_* from GraphQL schema"
+      code: |
+        COMMENT ON COLUMN tb_user.pk_user IS E'@omit';
+        COMMENT ON COLUMN tb_post.fk_author IS E'@omit';
+
+    - framework: "fraiseql"
+      notes: "Use views to expose only id and slug, hide pk_*/fk_*"
+      code: |
+        CREATE VIEW v_user AS
+        SELECT id, username, email, first_name, last_name, bio
+        FROM tb_user;  -- pk_user intentionally excluded
+
+# ============================================================
+# RELATED PATTERNS
+# ============================================================
+related_patterns:
+  - id: "uuid-strategies"
+    relationship: "extends"
+    description: "Different UUID versions and when to use each"
+
+  - id: "soft-deletes"
+    relationship: "combines-with"
+    description: "Trinity Pattern works well with soft delete patterns"
+
+  - id: "cqrs"
+    relationship: "enables"
+    description: "Separate read/write models can use different identifier strategies"
+
+# ============================================================
+# REFERENCES
+# ============================================================
+references:
+  - title: "PostgreSQL UUID Performance"
+    url: "https://www.postgresql.org/docs/current/uuid-ossp.html"
+    type: "documentation"
+
+  - title: "B-tree Index Internals"
+    url: "https://use-the-index-luke.com/sql/anatomy"
+    type: "tutorial"
+
+  - title: "UUID vs Integer Performance Benchmark"
+    type: "internal"
+    location: "velocitybench/benchmarks/uuid-vs-integer/"

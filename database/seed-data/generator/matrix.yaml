@@ -1,0 +1,205 @@
+# Generation Matrix Configuration
+# Defines which pattern/framework/depth combinations to generate
+
+# ============================================================
+# BLOG POST GENERATION MATRIX
+# ============================================================
+blog_generation:
+  # Patterns to generate blog posts for
+  patterns:
+    - trinity-pattern
+    - n-plus-one
+    # Add more as they're created:
+    # - cqrs
+    # - dataloader-pattern
+    # - pagination
+    # - soft-deletes
+
+  # Blog post types
+  types:
+    - tutorial
+    - troubleshooting
+    - reference
+
+  # Audience depths
+  depths:
+    - beginner
+    - intermediate
+    - advanced
+
+  # Framework comparisons to generate
+  comparisons:
+    - frameworks: [postgraphile, apollo-server]
+      patterns: [trinity-pattern, n-plus-one]
+
+    - frameworks: [strawberry, graphene]
+      patterns: [trinity-pattern, n-plus-one]
+
+    - frameworks: [spring-graphql, quarkus-graphql]
+      patterns: [trinity-pattern]
+
+    - frameworks: [hot-chocolate, graphql-net]
+      patterns: [trinity-pattern]
+
+  # Model assignment for different content types
+  model_assignment:
+    tutorial:
+      beginner: opencode      # Simple, free tier works well
+      intermediate: opencode  # Still straightforward
+      advanced: claude-code   # Needs nuance and depth
+
+    comparison:
+      all: claude-code        # Needs judgment for fair comparison
+
+    troubleshooting:
+      beginner: opencode
+      intermediate: opencode
+      advanced: claude-code   # Complex debugging guidance
+
+    reference:
+      all: vllm               # Structured output, repetitive
+
+# ============================================================
+# SQL GENERATION MATRIX
+# ============================================================
+sql_generation:
+  # Dataset sizes to generate
+  sizes:
+    - xs
+    - medium
+    - large
+
+  # Output locations
+  output:
+    xs: "database/03-data-xs.sql"
+    medium: "database/03-data-medium.sql"
+    large: "database/03-data-large.sql"
+
+# ============================================================
+# FRAMEWORK COVERAGE
+# ============================================================
+frameworks:
+  # All 26 frameworks in VelocityBench
+  all:
+    - postgraphile
+    - fraiseql
+    - apollo-server
+    - graphql-yoga
+    - fastify-graphql
+    - express-graphql
+    - mercurius
+    - strawberry
+    - graphene
+    - ariadne
+    - asgi-graphql
+    - rails
+    - hanami
+    - spring-graphql
+    - micronaut-graphql
+    - quarkus-graphql
+    - play-graphql
+    - hot-chocolate
+    - entity-framework-core
+    - graphql-net
+    - gqlgen
+    - graphql-go
+    - graphql-core-php
+    - webonyx-graphql-php
+    - async-graphql
+    - juniper
+
+  # Frameworks by language (for language-specific posts)
+  by_language:
+    javascript:
+      - postgraphile
+      - apollo-server
+      - graphql-yoga
+      - fastify-graphql
+      - express-graphql
+      - mercurius
+
+    python:
+      - strawberry
+      - graphene
+      - ariadne
+      - asgi-graphql
+
+    ruby:
+      - rails
+      - hanami
+
+    java:
+      - spring-graphql
+      - micronaut-graphql
+      - quarkus-graphql
+      - play-graphql
+
+    csharp:
+      - hot-chocolate
+      - entity-framework-core
+      - graphql-net
+
+    go:
+      - gqlgen
+      - graphql-go
+
+    php:
+      - graphql-core-php
+      - webonyx-graphql-php
+
+    rust:
+      - async-graphql
+      - juniper
+
+    custom:
+      - fraiseql
+
+# ============================================================
+# GENERATION STATISTICS (EXPECTED)
+# ============================================================
+expected_output:
+  blog_posts:
+    # Per pattern: 3 types × 3 depths = 9 posts (reference has 1 depth)
+    # = 3 + 3 + 1 = 7 posts per pattern
+    per_pattern: 7
+
+    # Comparisons: each generates 1 post
+    comparisons: 4
+
+    # With 2 patterns currently:
+    # 2 patterns × 7 posts = 14
+    # + 4 comparisons = 4
+    # Total: 18 blog posts (with current patterns)
+
+    # With 50 patterns:
+    # 50 patterns × 7 = 350 posts
+    # + 325 comparisons (26 choose 2) × 3 depths = 975
+    # Total: 1,325+ blog posts
+
+  sql_files:
+    count: 3
+    sizes: [xs, medium, large]
+
+# ============================================================
+# AUTOMATION HINTS
+# ============================================================
+automation:
+  # Run order for full generation
+  sequence:
+    - "Generate SQL files first (needed for testing)"
+    - "Generate blog prompts"
+    - "Use opencode for bulk generation"
+    - "Use Claude Code for quality review"
+
+  # CI/CD integration
+  ci_commands:
+    generate_sql: "python generator/generate_sql.py --size xs"
+    generate_prompts: "python generator/generate_blog_prompt.py --pattern trinity-pattern --all-types --all-depths"
+    validate: "python generator/validate_corpus.py"
+
+  # Parallelization hints
+  parallel_safe:
+    - sql_generation      # Each size independent
+    - prompt_generation   # Each pattern independent
+  not_parallel_safe:
+    - blog_generation     # API rate limits

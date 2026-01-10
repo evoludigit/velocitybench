@@ -1,0 +1,338 @@
+#!/home/lionel/.venv/bin/python
+"""
+Blog Generator using local vLLM
+
+Generates blog posts directly using the local vLLM server,
+bypassing opencode's interactive permission system.
+
+Usage:
+    python generate_blog_vllm.py --pattern trinity-pattern --type tutorial --depth beginner
+    python generate_blog_vllm.py --all  # Generate all blog posts
+"""
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+import requests
+import yaml
+
+# Configuration
+VLLM_URL = "http://localhost:8000/v1/chat/completions"
+MODEL_ID = "/data/models/fp16/Ministral-3-8B-Instruct-2512"
+MAX_TOKENS = 4096
+TEMPERATURE = 0.7
+
+# Paths
+SCRIPT_DIR = Path(__file__).parent
+CORPUS_DIR = SCRIPT_DIR.parent / "corpus"
+OUTPUT_DIR = SCRIPT_DIR.parent / "output" / "blog"
+
+
+def load_yaml(path: Path) -> dict:
+    """Load YAML file."""
+    with open(path) as f:
+        return yaml.safe_load(f)
+
+
+def find_pattern(pattern_id: str) -> dict | None:
+    """Find pattern in corpus."""
+    for category in ["identifiers", "queries", "architecture", "relationships", "performance"]:
+        path = CORPUS_DIR / "patterns" / category / f"{pattern_id}.yaml"
+        if path.exists():
+            return load_yaml(path)
+    return None
+
+
+def call_vllm(prompt: str, system_prompt: str = "") -> str:
+    """Call local vLLM server."""
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": prompt})
+
+    payload = {
+        "model": MODEL_ID,
+        "messages": messages,
+        "max_tokens": MAX_TOKENS,
+        "temperature": TEMPERATURE,
+    }
+
+    try:
+        response = requests.post(VLLM_URL, json=payload, timeout=300)
+        response.raise_for_status()
+        result = response.json()
+        return result["choices"][0]["message"]["content"]
+    except requests.exceptions.RequestException as e:
+        print(f"Error calling vLLM: {e}")
+        return ""
+
+
+def generate_tutorial(pattern: dict, depth: str) -> str:
+    """Generate tutorial blog post."""
+    blog_hooks = pattern.get("blog_hooks", {}).get(depth, {})
+
+    system_prompt = """You are a senior backend engineer writing educational content about database and API design patterns. Your writing style is:
+- Clear and practical, with real-world examples
+- Code-first (show, don't just tell)
+- Honest about tradeoffs (no silver bullets)
+- Friendly but professional
+
+Write complete, publishable blog posts in markdown format."""
+
+    # Handle both 'solution' (singular) and 'solutions' (plural) structures
+    solution = pattern.get('solution', {})
+    solutions = pattern.get('solutions', [])
+
+    if solution:
+        solution_text = solution.get('principle', '')
+        components = solution.get('components', [])
+    elif solutions:
+        # For patterns with multiple solutions, summarize all
+        solution_text = "Multiple solutions exist for this problem:\n"
+        for sol in solutions:
+            solution_text += f"- **{sol['name']}**: {sol['description']}\n"
+        components = []
+    else:
+        solution_text = "See the detailed solutions below."
+        components = []
+
+    prompt = f"""Write a tutorial blog post about the "{pattern['name']}" pattern.
+
+## Target Audience
+{depth.title()} backend developers.
+
+## Summary
+{pattern['summary']['long']}
+
+## The Problem
+{pattern['problem']['description']}
+
+## The Solution
+{solution_text}
+
+## Components/Solutions
+"""
+    for comp in components:
+        prompt += f"- **{comp['name']}** ({comp.get('type', 'approach')}): {comp['purpose']}\n"
+
+    for sol in solutions:
+        prompt += f"- **{sol['name']}**: {sol['description']}\n"
+
+    # Handle schema - may not exist for all patterns
+    schema = pattern.get('schema', {})
+    if schema and 'sql' in schema:
+        prompt += f"""
+## Schema Example
+```sql
+{schema['sql']}
+```
+"""
+    else:
+        prompt += "\n## Code Examples\nInclude practical code examples demonstrating the pattern.\n"
+
+    if 'analogy' in blog_hooks:
+        prompt += f"""
+## Analogy for {depth} audience
+{blog_hooks['analogy']}
+"""
+
+    prompt += """
+## Requirements
+Write a complete blog post with:
+1. Catchy title with the pattern name
+2. Introduction (2-3 paragraphs)
+3. The Problem section
+4. The Solution section with code examples
+5. Implementation Guide
+6. Common Mistakes to Avoid
+7. Key Takeaways (bullet points)
+8. Conclusion
+
+Length: 1500-2000 words
+Use ```sql for SQL code blocks.
+"""
+
+    return call_vllm(prompt, system_prompt)
+
+
+def generate_troubleshooting(pattern: dict) -> str:
+    """Generate troubleshooting guide."""
+    system_prompt = """You are a senior backend engineer writing debugging guides. Be practical and focused on quick problem resolution."""
+
+    prompt = f"""Write a troubleshooting guide for the "{pattern['name']}" pattern.
+
+## Pattern Summary
+{pattern['summary']['short']}
+
+## Common Symptoms
+"""
+    for symptom in pattern.get('problem', {}).get('symptoms', []):
+        prompt += f"- **{symptom['name']}**: {symptom['description']}\n"
+
+    prompt += """
+## Requirements
+Write a troubleshooting guide with:
+1. Title: "Debugging [Pattern]: A Troubleshooting Guide"
+2. Symptom Checklist
+3. Common Issues and Fixes (with code)
+4. Debugging Tools and Techniques
+5. Prevention Strategies
+
+Length: 1000-1500 words
+"""
+
+    return call_vllm(prompt, system_prompt)
+
+
+def generate_reference(pattern: dict) -> str:
+    """Generate reference documentation."""
+    system_prompt = """You are a technical writer creating reference documentation. Be precise and scannable."""
+
+    # Handle schema - may not exist
+    schema = pattern.get('schema', {})
+    schema_section = ""
+    if schema and 'sql' in schema:
+        schema_section = f"""## Schema
+```sql
+{schema['sql']}
+```
+"""
+    else:
+        schema_section = "## Code Examples\nProvide relevant code examples for this pattern.\n"
+
+    # Handle solution/solutions
+    solution = pattern.get('solution', {})
+    solutions = pattern.get('solutions', [])
+    components = solution.get('components', []) if solution else []
+
+    prompt = f"""Write reference documentation for the "{pattern['name']}" pattern.
+
+## Summary
+{pattern['summary']['long']}
+
+{schema_section}
+
+## Components/Solutions
+"""
+    for comp in components:
+        prompt += f"- **{comp['name']}** ({comp.get('type', 'approach')}): {comp['purpose']}\n"
+
+    for sol in solutions:
+        prompt += f"- **{sol['name']}**: {sol['description']}\n"
+
+    prompt += """
+## Requirements
+Write reference documentation with:
+1. Title: "[Pattern] Reference Guide"
+2. Overview (1 paragraph)
+3. Schema Reference (table format)
+4. Query Examples
+5. Related Patterns
+
+Length: 800-1200 words
+"""
+
+    return call_vllm(prompt, system_prompt)
+
+
+def save_blog(content: str, output_path: Path) -> bool:
+    """Save blog post to file."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(output_path, 'w') as f:
+        f.write(content)
+    return True
+
+
+def generate_all():
+    """Generate all blog posts."""
+    patterns = ["trinity-pattern", "n-plus-one"]
+    depths = ["beginner", "intermediate", "advanced"]
+
+    for pattern_id in patterns:
+        print(f"\n=== Processing: {pattern_id} ===")
+        pattern = find_pattern(pattern_id)
+        if not pattern:
+            print(f"  Pattern not found: {pattern_id}")
+            continue
+
+        # Tutorials
+        for depth in depths:
+            output_path = OUTPUT_DIR / "tutorials" / f"{pattern_id}-tutorial-{depth}.md"
+            print(f"  Generating tutorial ({depth})...")
+            content = generate_tutorial(pattern, depth)
+            if content:
+                save_blog(content, output_path)
+                print(f"    Saved: {output_path}")
+            else:
+                print(f"    FAILED")
+
+        # Troubleshooting
+        output_path = OUTPUT_DIR / "troubleshooting" / f"{pattern_id}-troubleshooting.md"
+        print(f"  Generating troubleshooting guide...")
+        content = generate_troubleshooting(pattern)
+        if content:
+            save_blog(content, output_path)
+            print(f"    Saved: {output_path}")
+
+        # Reference
+        output_path = OUTPUT_DIR / "reference" / f"{pattern_id}-reference.md"
+        print(f"  Generating reference...")
+        content = generate_reference(pattern)
+        if content:
+            save_blog(content, output_path)
+            print(f"    Saved: {output_path}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Generate blog posts using local vLLM")
+    parser.add_argument("--pattern", help="Pattern ID to generate for")
+    parser.add_argument("--type", choices=["tutorial", "troubleshooting", "reference"], default="tutorial")
+    parser.add_argument("--depth", choices=["beginner", "intermediate", "advanced"], default="beginner")
+    parser.add_argument("--all", action="store_true", help="Generate all blog posts")
+    parser.add_argument("--stdout", action="store_true", help="Output to stdout instead of file")
+
+    args = parser.parse_args()
+
+    # Check vLLM is running
+    try:
+        response = requests.get("http://localhost:8000/v1/models", timeout=5)
+        response.raise_for_status()
+    except:
+        print("Error: vLLM server not running at localhost:8000")
+        print("Start it with: vllm-switch implementer")
+        sys.exit(1)
+
+    if args.all:
+        generate_all()
+        return
+
+    if not args.pattern:
+        parser.error("--pattern required (or use --all)")
+
+    pattern = find_pattern(args.pattern)
+    if not pattern:
+        print(f"Pattern not found: {args.pattern}")
+        sys.exit(1)
+
+    # Generate based on type
+    if args.type == "tutorial":
+        content = generate_tutorial(pattern, args.depth)
+        output_path = OUTPUT_DIR / "tutorials" / f"{args.pattern}-tutorial-{args.depth}.md"
+    elif args.type == "troubleshooting":
+        content = generate_troubleshooting(pattern)
+        output_path = OUTPUT_DIR / "troubleshooting" / f"{args.pattern}-troubleshooting.md"
+    else:
+        content = generate_reference(pattern)
+        output_path = OUTPUT_DIR / "reference" / f"{args.pattern}-reference.md"
+
+    if args.stdout:
+        print(content)
+    else:
+        save_blog(content, output_path)
+        print(f"Saved: {output_path}")
+
+
+if __name__ == "__main__":
+    main()

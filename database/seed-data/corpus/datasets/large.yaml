@@ -1,0 +1,223 @@
+# Large Dataset Configuration
+# Production-scale dataset for stress testing and bottleneck analysis
+
+id: large
+name: "Large"
+description: "Production-scale dataset to reveal architectural limits and bottlenecks"
+
+# ============================================================
+# COUNTS
+# ============================================================
+counts:
+  users: 100000
+  posts: 500000
+  comments: 2000000
+  categories: 50
+  post_categories: 750000    # ~1.5 categories per post
+  user_follows: 1000000      # ~10 follows per user
+  post_likes: 5000000        # ~10 likes per post
+  user_profiles: 100000      # 1:1 with users
+
+# ============================================================
+# DISTRIBUTIONS
+# ============================================================
+distributions:
+  posts_per_user:
+    type: power_law
+    alpha: 1.5
+    min: 0
+    max: 1000
+    description: "Power law - few power users create most content"
+
+  comments_per_post:
+    type: power_law
+    alpha: 2.0
+    min: 0
+    max: 10000
+    description: "Viral posts can have thousands of comments"
+
+  nested_comment_probability: 0.25
+  description: "25% of comments are threaded (deeper conversations)"
+
+  followers_distribution:
+    type: power_law
+    alpha: 1.8
+    description: "Extreme inequality - few influencers, many observers"
+
+# ============================================================
+# PERFORMANCE EXPECTATIONS
+# ============================================================
+performance_expectations:
+  load_time: "5-15 minutes"
+  database_size: "5-10 GB"
+
+  query_times:
+    simple_lookup: "5-20ms"
+    user_with_posts: "50-200ms"
+    nested_3_levels: "500ms-2s"
+    n_plus_one_bad: "10-60 seconds (timeout!)"
+    n_plus_one_fixed: "100-500ms"
+    full_table_scan: "5-30 seconds"
+    aggregation_queries: "1-10 seconds"
+
+  visibility:
+    n_plus_one_visible: true      # And painful
+    caching_benefit_visible: true  # Essential for survival
+    connection_pooling_visible: true  # Will crash without
+    index_importance_visible: true    # Missing = disaster
+    memory_limits_visible: true       # OOM possible
+    timeout_risks_visible: true       # Default timeouts fail
+
+  breaking_points: |
+    At large scale, you'll hit these limits:
+    - Connection pool exhaustion (100 connections insufficient)
+    - Memory limits (Node.js 4GB heap exceeded)
+    - Default timeouts (30s timeout fails)
+    - Pagination required (can't return all results)
+
+# ============================================================
+# BOTTLENECK ANALYSIS
+# ============================================================
+bottleneck_analysis:
+  - name: "Connection Pool Exhaustion"
+    trigger: "N+1 queries under load"
+    symptoms:
+      - "Connection timeout errors"
+      - "Request queuing"
+      - "Cascading failures"
+    solution: "Fix N+1, increase pool size, use connection limiting"
+    threshold: ">100 concurrent connections"
+
+  - name: "Memory Exhaustion (OOM)"
+    trigger: "Loading too much data into memory"
+    symptoms:
+      - "Process killed by OS"
+      - "Gradual memory growth"
+      - "GC pauses"
+    solution: "Streaming, pagination, cursor-based fetching"
+    threshold: ">4GB heap usage"
+
+  - name: "Query Timeouts"
+    trigger: "Complex queries without indexes"
+    symptoms:
+      - "Statement timeout errors"
+      - "Slow response times"
+      - "Database connection hogging"
+    solution: "Add indexes, optimize queries, use EXPLAIN ANALYZE"
+    threshold: ">30 second queries"
+
+  - name: "Serialization Overhead"
+    trigger: "Large JSON responses"
+    symptoms:
+      - "High CPU usage"
+      - "Slow response times despite fast queries"
+      - "Memory spikes during serialization"
+    solution: "Pagination, field selection, streaming JSON"
+    threshold: ">10MB response size"
+
+# ============================================================
+# USE CASES
+# ============================================================
+use_cases:
+  - name: "Stress testing"
+    description: "Find breaking points before production does"
+
+  - name: "Capacity planning"
+    description: "Determine infrastructure requirements"
+
+  - name: "Architecture validation"
+    description: "Verify patterns hold at scale"
+
+  - name: "Production simulation"
+    description: "Test with realistic production volume"
+
+  - name: "Disaster recovery testing"
+    description: "Verify behavior under extreme conditions"
+
+# ============================================================
+# REALISTIC DATA PATTERNS
+# ============================================================
+data_patterns:
+  user_activity:
+    active_daily: 5%      # 5,000 users
+    active_weekly: 15%    # 15,000 users
+    active_monthly: 30%   # 30,000 users
+    dormant: 50%          # 50,000 users (typical for mature product)
+
+  post_engagement:
+    viral: 0.1%           # 500 posts with 1000+ comments
+    high_engagement: 2%   # 10,000 posts with 100+ comments
+    medium_engagement: 10% # 50,000 posts with 10-100 comments
+    low_engagement: 40%   # 200,000 posts with 1-10 comments
+    no_engagement: 48%    # 240,000 posts with 0 comments
+
+  social_graph:
+    mega_influencers: 0.01%  # 10 users with 50K+ followers
+    influencers: 0.1%        # 100 users with 5K+ followers
+    micro_influencers: 1%    # 1,000 users with 500+ followers
+    regular: 70%             # 70,000 users with 5-50 followers
+    lurkers: 29%             # 29,000 users with 0-5 followers
+
+# ============================================================
+# WARNING SIGNS AT SCALE
+# ============================================================
+warning_signs:
+  - metric: "p99 response time"
+    healthy: "<500ms"
+    warning: "500ms-2s"
+    critical: ">2s"
+    action: "Profile slow requests, add caching"
+
+  - metric: "Database connections"
+    healthy: "<50% pool utilization"
+    warning: "50-80% pool utilization"
+    critical: ">80% pool utilization"
+    action: "Fix N+1, increase pool, add read replicas"
+
+  - metric: "Memory usage"
+    healthy: "<60% available"
+    warning: "60-80% available"
+    critical: ">80% available"
+    action: "Add pagination, reduce payload sizes"
+
+  - metric: "Query duration"
+    healthy: "<100ms"
+    warning: "100ms-1s"
+    critical: ">1s"
+    action: "Add indexes, optimize query plans"
+
+# ============================================================
+# BLOG HOOKS
+# ============================================================
+blog_hooks:
+  when_to_use: |
+    Use Large dataset when:
+    - Testing production readiness
+    - Finding architectural limits
+    - Capacity planning
+    - Validating scaling strategies
+    - Training operations teams
+
+  what_breaks: |
+    At large scale, expect these failures:
+    - Naive ORMs will timeout or OOM
+    - Missing indexes cause table scans
+    - Connection pools will exhaust
+    - Serialization becomes bottleneck
+    - Caching becomes mandatory
+
+  survival_strategies: |
+    To survive at large scale:
+    1. Fix ALL N+1 queries (non-negotiable)
+    2. Add proper indexes (EXPLAIN ANALYZE everything)
+    3. Implement pagination (no unbounded queries)
+    4. Use connection pooling (PgBouncer recommended)
+    5. Add caching layer (Redis for hot data)
+    6. Monitor everything (APM, metrics, logs)
+
+  comparison_to_smaller: |
+    Large vs Medium:
+    - Medium shows problems clearly
+    - Large shows whether solutions actually work
+    - Large reveals second-order effects
+    - Large tests operational readiness
