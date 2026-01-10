@@ -193,7 +193,7 @@ compute_models:
       - "Function timeout limits"
       - "Vendor lock-in"
 
-comparison_table: |
+comparison_table: |-
   | Model | Cost (idle) | Startup | Scaling | Perf | Control | Use Case |
   |-------|-----------|---------|---------|------|---------|----------|
   | Bare Metal | Very High | Minutes | Manual | Best | Full | HPC, DB |
