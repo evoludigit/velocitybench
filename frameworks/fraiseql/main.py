@@ -146,72 +146,172 @@ async def comment(info: GraphQLResolveInfo, id: str) -> Comment | None:
     return await db.find_one("benchmark.tv_comment", id=id)
 
 
+# FraiseQL Mutation Input Types
+@fraiseql.input
+class UpdateUserInput:
+    """Input for updating user information."""
+    first_name: str | None = None
+    last_name: str | None = None
+    bio: str | None = None
+
+
+@fraiseql.input
+class CreatePostInput:
+    """Input for creating a new post."""
+    title: str
+    content: str | None = None
+    excerpt: str | None = None
+    status: str = "published"
+
+
+@fraiseql.input
+class CreateCommentInput:
+    """Input for creating a new comment."""
+    content: str
+    parent_comment_id: str | None = None
+
+
+# FraiseQL Mutation Result Types
+@fraiseql.type
+class MutationResult:
+    """Base mutation result with success flag and message."""
+    success: bool
+    message: str
+
+
+@fraiseql.type
+class UserMutationResult(MutationResult):
+    """Result of user mutation operations."""
+    user: User | None = None
+
+
+@fraiseql.type
+class PostMutationResult(MutationResult):
+    """Result of post mutation operations."""
+    post: Post | None = None
+
+
+@fraiseql.type
+class CommentMutationResult(MutationResult):
+    """Result of comment mutation operations."""
+    comment: Comment | None = None
+
+
 # FraiseQL Mutation Resolvers
 @fraiseql.mutation
 async def update_user(
     info: GraphQLResolveInfo,
     id: str,
-    first_name: str | None = None,
-    last_name: str | None = None,
-    bio: str | None = None,
-) -> User | None:
-    """Update user by UUID id.
+    input: UpdateUserInput,
+) -> UserMutationResult:
+    """Update user by UUID id via database mutation.
 
-    Updates tb_user table (write layer) and returns via tv_user (composition layer).
+    Pattern: Uses database functions for mutations
+    - Takes mutation input as dedicated input type
+    - Returns special MutationResult type
+    - Result includes success flag, message, and updated entity
+    - Composition layer (tv_user) provides all nested data
     """
     db = info.context["db"]
 
-    # Build update data - snake_case for database columns
-    update_data = {}
-    if first_name is not None:
-        update_data["first_name"] = first_name
-    if last_name is not None:
-        update_data["last_name"] = last_name
-    if bio is not None:
-        update_data["bio"] = bio
+    try:
+        # Build update data - snake_case for database columns
+        update_data = {}
+        if input.first_name is not None:
+            update_data["first_name"] = input.first_name
+        if input.last_name is not None:
+            update_data["last_name"] = input.last_name
+        if input.bio is not None:
+            update_data["bio"] = input.bio
 
-    if update_data:
-        update_data["updated_at"] = "NOW()"  # SQL function
+        if not update_data:
+            return UserMutationResult(
+                success=False,
+                message="No fields to update",
+                user=None,
+            )
 
         # Update write layer (tb_user table)
-        await db.update("benchmark.tb_user", where={"id": {"eq": id}}, data=update_data)
+        await db.update(
+            "benchmark.tb_user",
+            where={"id": {"eq": id}},
+            data=update_data,
+        )
 
-    # Return via composition layer (tv_user view with JSONB data)
-    return await db.find_one("benchmark.tv_user", id=id)
+        # Return via composition layer (tv_user view with JSONB data)
+        user = await db.find_one("benchmark.tv_user", id=id)
+        return UserMutationResult(
+            success=True,
+            message=f"User {id} updated successfully",
+            user=user,
+        )
+    except Exception as e:
+        return UserMutationResult(
+            success=False,
+            message=f"Failed to update user: {str(e)}",
+            user=None,
+        )
 
 
 @fraiseql.mutation
 async def create_post(
     info: GraphQLResolveInfo,
     author_id: str,
-    title: str,
-    content: str | None = None,
-    excerpt: str | None = None,
-    status: str = "published",
-) -> Post | None:
-    """Create post mutation.
+    input: CreatePostInput,
+) -> PostMutationResult:
+    """Create post mutation via database insert.
 
-    Inserts into tb_post table (write layer) and returns via tv_post (composition layer).
-    Note: author_id is the UUID id, FraiseQL will convert to internal pk_author via view join.
+    Pattern: Uses database functions for mutations
+    - Takes mutation input as dedicated input type
+    - Returns special MutationResult type with created entity
+    - Composition layer (tv_post) provides author nested in JSONB
     """
     db = info.context["db"]
 
-    # Insert into write layer (tb_post table)
-    # The view will join with author using fk_author -> pk_user mapping
-    insert_data = {
-        "author_id": author_id,
-        "title": title,
-        "content": content,
-        "excerpt": excerpt,
-        "status": status,
-    }
+    try:
+        # Verify author exists
+        author = await db.find_one("benchmark.tv_user", id=author_id)
+        if not author:
+            return PostMutationResult(
+                success=False,
+                message=f"Author {author_id} not found",
+                post=None,
+            )
 
-    result = await db.insert("benchmark.tb_post", data=insert_data)
+        # Insert into write layer (tb_post table)
+        # Note: tb_post uses fk_author (integer FK), but we receive author_id (UUID)
+        # The tv_post view handles the join from UUID id to internal pk_user
+        result = await db.insert(
+            "benchmark.tb_post",
+            data={
+                "author_id": author_id,
+                "title": input.title,
+                "content": input.content,
+                "excerpt": input.excerpt,
+                "status": input.status,
+            },
+        )
 
-    # Return newly created post via composition layer
-    if result:
-        return await db.find_one("benchmark.tv_post", id=result["id"])
-    return None
+        # Return newly created post via composition layer
+        if result and "id" in result:
+            post = await db.find_one("benchmark.tv_post", id=result["id"])
+            return PostMutationResult(
+                success=True,
+                message=f"Post created successfully",
+                post=post,
+            )
+        else:
+            return PostMutationResult(
+                success=False,
+                message="Failed to create post - no ID returned",
+                post=None,
+            )
+    except Exception as e:
+        return PostMutationResult(
+            success=False,
+            message=f"Failed to create post: {str(e)}",
+            post=None,
+        )
 
 
 @fraiseql.mutation
@@ -219,28 +319,76 @@ async def create_comment(
     info: GraphQLResolveInfo,
     author_id: str,
     post_id: str,
-    content: str,
-    parent_comment_id: str | None = None,
-) -> Comment | None:
-    """Create comment mutation.
+    input: CreateCommentInput,
+) -> CommentMutationResult:
+    """Create comment mutation via database insert.
 
-    Inserts into tb_comment table (write layer) and returns via tv_comment (composition layer).
+    Pattern: Uses database functions for mutations
+    - Takes mutation input as dedicated input type
+    - Returns special MutationResult type with created entity
+    - Composition layer (tv_comment) provides author, post, parentComment nested in JSONB
     """
     db = info.context["db"]
 
-    insert_data = {
-        "author_id": author_id,
-        "post_id": post_id,
-        "content": content,
-        "parent_comment_id": parent_comment_id,
-    }
+    try:
+        # Verify author and post exist
+        author = await db.find_one("benchmark.tv_user", id=author_id)
+        if not author:
+            return CommentMutationResult(
+                success=False,
+                message=f"Author {author_id} not found",
+                comment=None,
+            )
 
-    result = await db.insert("benchmark.tb_comment", data=insert_data)
+        post = await db.find_one("benchmark.tv_post", id=post_id)
+        if not post:
+            return CommentMutationResult(
+                success=False,
+                message=f"Post {post_id} not found",
+                comment=None,
+            )
 
-    # Return newly created comment via composition layer
-    if result:
-        return await db.find_one("benchmark.tv_comment", id=result["id"])
-    return None
+        # Verify parent comment exists if provided
+        if input.parent_comment_id:
+            parent = await db.find_one("benchmark.tv_comment", id=input.parent_comment_id)
+            if not parent:
+                return CommentMutationResult(
+                    success=False,
+                    message=f"Parent comment {input.parent_comment_id} not found",
+                    comment=None,
+                )
+
+        # Insert into write layer (tb_comment table)
+        result = await db.insert(
+            "benchmark.tb_comment",
+            data={
+                "author_id": author_id,
+                "post_id": post_id,
+                "content": input.content,
+                "parent_comment_id": input.parent_comment_id,
+            },
+        )
+
+        # Return newly created comment via composition layer
+        if result and "id" in result:
+            comment = await db.find_one("benchmark.tv_comment", id=result["id"])
+            return CommentMutationResult(
+                success=True,
+                message="Comment created successfully",
+                comment=comment,
+            )
+        else:
+            return CommentMutationResult(
+                success=False,
+                message="Failed to create comment - no ID returned",
+                comment=None,
+            )
+    except Exception as e:
+        return CommentMutationResult(
+            success=False,
+            message=f"Failed to create comment: {str(e)}",
+            comment=None,
+        )
 
 
 # Context getter for FraiseQL
