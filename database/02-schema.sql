@@ -4,8 +4,10 @@
 SET search_path TO benchmark, public;
 
 -- tb_user: Users table (core entity, write-side)
+-- Trinity Pattern: pk_user (integer PK) + id (UUID for API) + fk_* (integer FKs)
 CREATE TABLE tb_user (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pk_user SERIAL PRIMARY KEY,
+    id UUID UNIQUE NOT NULL DEFAULT uuid_generate_v4(),
     email VARCHAR(255) UNIQUE NOT NULL,
     username VARCHAR(100) UNIQUE NOT NULL,
     first_name VARCHAR(100),
@@ -18,9 +20,11 @@ CREATE TABLE tb_user (
 );
 
 -- tb_post: Posts table (content with relationships, write-side)
+-- Trinity Pattern: pk_post (integer PK) + id (UUID for API) + fk_user (integer FK)
 CREATE TABLE tb_post (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    author_id UUID NOT NULL REFERENCES tb_user(id) ON DELETE CASCADE,
+    pk_post SERIAL PRIMARY KEY,
+    id UUID UNIQUE NOT NULL DEFAULT uuid_generate_v4(),
+    fk_user INTEGER NOT NULL REFERENCES tb_user(pk_user) ON DELETE CASCADE,
     title VARCHAR(500) NOT NULL,
     content TEXT,
     excerpt VARCHAR(500),
@@ -31,11 +35,13 @@ CREATE TABLE tb_post (
 );
 
 -- tb_comment: Comments table (nested relationships, write-side)
+-- Trinity Pattern: pk_comment (integer PK) + id (UUID for API) + fk_post/fk_user (integer FKs)
 CREATE TABLE tb_comment (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    post_id UUID NOT NULL REFERENCES tb_post(id) ON DELETE CASCADE,
-    author_id UUID NOT NULL REFERENCES tb_user(id) ON DELETE CASCADE,
-    parent_id UUID REFERENCES tb_comment(id) ON DELETE CASCADE, -- for nested comments
+    pk_comment SERIAL PRIMARY KEY,
+    id UUID UNIQUE NOT NULL DEFAULT uuid_generate_v4(),
+    fk_post INTEGER NOT NULL REFERENCES tb_post(pk_post) ON DELETE CASCADE,
+    fk_user INTEGER NOT NULL REFERENCES tb_user(pk_user) ON DELETE CASCADE,
+    fk_parent INTEGER REFERENCES tb_comment(pk_comment) ON DELETE CASCADE,
     content TEXT NOT NULL,
     is_approved BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -86,12 +92,17 @@ CREATE TABLE user_profiles (
 );
 
 -- Indexes for performance (critical for benchmarking)
-CREATE INDEX idx_tb_post_author_id ON tb_post(author_id);
+-- Trinity Pattern indexes: use integer FKs for better performance than UUID
+CREATE INDEX idx_tb_post_fk_user ON tb_post(fk_user);
 CREATE INDEX idx_tb_post_status ON tb_post(status);
 CREATE INDEX idx_tb_post_published_at ON tb_post(published_at);
-CREATE INDEX idx_tb_comment_post_id ON tb_comment(post_id);
-CREATE INDEX idx_tb_comment_author_id ON tb_comment(author_id);
-CREATE INDEX idx_tb_comment_parent_id ON tb_comment(parent_id);
+CREATE INDEX idx_tb_comment_fk_post ON tb_comment(fk_post);
+CREATE INDEX idx_tb_comment_fk_user ON tb_comment(fk_user);
+CREATE INDEX idx_tb_comment_fk_parent ON tb_comment(fk_parent);
+-- API UUID indexes for lookups by id
+CREATE INDEX idx_tb_user_id ON tb_user(id);
+CREATE INDEX idx_tb_post_id ON tb_post(id);
+CREATE INDEX idx_tb_comment_id ON tb_comment(id);
 CREATE INDEX idx_user_follows_follower ON user_follows(follower_id);
 CREATE INDEX idx_user_follows_following ON user_follows(following_id);
 CREATE INDEX idx_post_likes_post ON post_likes(post_id);

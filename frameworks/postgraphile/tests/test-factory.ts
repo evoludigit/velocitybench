@@ -43,21 +43,21 @@ export class TestFactory {
 
   /**
    * Create a test post with author relationship
-   * Trinity Pattern: author_id references tb_user(id)
+   * Trinity Pattern: fk_user references tb_user(pk_user)
    */
   async createPost(overrides?: Partial<{
     title: string;
     content: string;
-    author_id?: string; // UUID of the author
+    fk_user?: number; // pk_user of the author
     status?: string;
   }>) {
     // Create author if not provided
-    let authorId: string;
-    if (overrides?.author_id) {
-      authorId = overrides.author_id;
+    let fkUser: number;
+    if (overrides?.fk_user) {
+      fkUser = overrides.fk_user;
     } else {
       const user = await this.createUser();
-      authorId = user.id;
+      fkUser = user.pk_user;
     }
 
     const {
@@ -69,10 +69,10 @@ export class TestFactory {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
-        `INSERT INTO benchmark.tb_post (author_id, title, content, status)
+        `INSERT INTO benchmark.tb_post (fk_user, title, content, status)
          VALUES ($1, $2, $3, $4)
          RETURNING *`,
-        [authorId, title, content, status]
+        [fkUser, title, content, status]
       );
       return result.rows[0];
     } finally {
@@ -82,28 +82,28 @@ export class TestFactory {
 
   /**
    * Create a test comment
-   * Trinity Pattern: References tb_post(id) and tb_user(id)
+   * Trinity Pattern: References tb_post(pk_post) and tb_user(pk_user)
    */
   async createComment(overrides?: Partial<{
-    post_id?: string;
-    author_id?: string;
+    fk_post?: number;
+    fk_user?: number;
     content?: string;
   }>) {
-    let postId: string;
-    let authorId: string;
+    let fkPost: number;
+    let fkUser: number;
 
-    if (overrides?.post_id) {
-      postId = overrides.post_id;
+    if (overrides?.fk_post) {
+      fkPost = overrides.fk_post;
     } else {
       const post = await this.createPost();
-      postId = post.id;
+      fkPost = post.pk_post;
     }
 
-    if (overrides?.author_id) {
-      authorId = overrides.author_id;
+    if (overrides?.fk_user) {
+      fkUser = overrides.fk_user;
     } else {
       const user = await this.createUser();
-      authorId = user.id;
+      fkUser = user.pk_user;
     }
 
     const content = overrides?.content || 'Test comment';
@@ -111,10 +111,10 @@ export class TestFactory {
     const client = await this.pool.connect();
     try {
       const result = await client.query(
-        `INSERT INTO benchmark.tb_comment (post_id, author_id, content)
+        `INSERT INTO benchmark.tb_comment (fk_post, fk_user, content)
          VALUES ($1, $2, $3)
          RETURNING *`,
-        [postId, authorId, content]
+        [fkPost, fkUser, content]
       );
       return result.rows[0];
     } finally {
