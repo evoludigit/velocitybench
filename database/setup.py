@@ -6,12 +6,19 @@ Sets up isolated PostgreSQL databases for each framework with:
 1. Fresh PostgreSQL database per framework
 2. Shared Trinity Pattern schema (schema-template.sql)
 3. Framework-specific extensions (frameworks/{framework}/database/extensions.sql)
-4. Seed data (database/seed-data.sql)
+4. Seed data from YAML corpus (database/seed-data/)
 
 Usage:
-    python database/setup.py                    # Setup all frameworks
+    python database/setup.py                    # Setup all frameworks (xs dataset)
     python database/setup.py postgraphile       # Setup only postgraphile
     python database/setup.py fraiseql rails     # Setup specific frameworks
+    python database/setup.py --size medium      # Use medium dataset
+    python database/setup.py --size large       # Use large dataset
+
+Dataset sizes:
+    xs     - 100 users, 500 posts (default, <1 second load)
+    medium - 10K users, 50K posts (30-60 second load, N+1 visible)
+    large  - 100K users, 500K posts (5-15 minute load, stress testing)
 
 Environment variables:
     DB_HOST              - PostgreSQL host (default: localhost)
@@ -20,6 +27,7 @@ Environment variables:
     DB_ADMIN_PASSWORD    - Admin password (default: postgres)
     DB_TEST_USER         - Test user for framework databases (default: velocitybench)
     DB_TEST_PASSWORD     - Test user password (default: password)
+    SEED_SIZE            - Dataset size: xs, medium, large (default: xs)
 """
 
 import os
@@ -71,6 +79,11 @@ FRAMEWORKS = [
 ]
 
 
+# Valid seed data sizes
+SEED_SIZES = ['xs', 'medium', 'large']
+DEFAULT_SEED_SIZE = 'xs'
+
+
 @dataclass
 class DatabaseConfig:
     """PostgreSQL connection configuration"""
@@ -81,6 +94,7 @@ class DatabaseConfig:
     test_user: str
     test_password: str
     schema: str = 'benchmark'
+    seed_size: str = DEFAULT_SEED_SIZE
 
 
 class DatabaseSetup:
@@ -93,8 +107,13 @@ class DatabaseSetup:
         self.project_root = Path(__file__).parent.parent
 
     @staticmethod
-    def _load_config() -> DatabaseConfig:
+    def _load_config(seed_size: str = DEFAULT_SEED_SIZE) -> DatabaseConfig:
         """Load database configuration from environment variables"""
+        size = os.getenv('SEED_SIZE', seed_size)
+        if size not in SEED_SIZES:
+            print(f"Warning: Invalid SEED_SIZE '{size}', using '{DEFAULT_SEED_SIZE}'")
+            size = DEFAULT_SEED_SIZE
+
         return DatabaseConfig(
             host=os.getenv('DB_HOST', 'localhost'),
             port=int(os.getenv('DB_PORT', '5432')),
@@ -102,6 +121,7 @@ class DatabaseSetup:
             admin_password=os.getenv('DB_ADMIN_PASSWORD', 'postgres'),
             test_user=os.getenv('DB_TEST_USER', 'velocitybench'),
             test_password=os.getenv('DB_TEST_PASSWORD', 'password'),
+            seed_size=size,
         )
 
     def _get_admin_connection_string(self) -> str:
@@ -166,6 +186,37 @@ class DatabaseSetup:
             return False
         except Exception as e:
             print(f"  ❌ Error: {e}")
+            return False
+
+    def _generate_seed_data(self, size: str) -> bool:
+        """Generate seed data SQL from YAML corpus"""
+        generator_path = self.project_root / 'database' / 'seed-data' / 'generator' / 'generate_sql.py'
+        output_path = self.project_root / 'database' / 'seed-data' / 'output' / 'sql' / f'03-data-{size}.sql'
+
+        if not generator_path.exists():
+            print(f"  ⚠️  Seed data generator not found: {generator_path}")
+            return False
+
+        try:
+            result = subprocess.run(
+                [sys.executable, str(generator_path), '--size', size, '--output', str(output_path)],
+                capture_output=True,
+                text=True,
+                timeout=300,  # 5 minutes for large dataset
+                cwd=str(self.project_root)
+            )
+
+            if result.returncode != 0:
+                print(f"  ⚠️  Seed data generation failed:")
+                print(f"     {result.stderr[:200]}")
+                return False
+
+            return output_path.exists()
+        except subprocess.TimeoutExpired:
+            print(f"  ⚠️  Seed data generation timed out")
+            return False
+        except Exception as e:
+            print(f"  ⚠️  Seed data generation error: {e}")
             return False
 
     def _ensure_test_user(self) -> bool:
@@ -256,9 +307,20 @@ class DatabaseSetup:
         else:
             print(f"  5️⃣  No framework-specific extensions found (skipping)")
 
-        # Step 6: Load seed data
-        print(f"  6️⃣  Loading seed data...")
-        if not self._apply_sql_file(db_name, 'database/03-data.sql'):
+        # Step 6: Load seed data (size-appropriate from corpus)
+        seed_file = f'database/seed-data/output/sql/03-data-{self.config.seed_size}.sql'
+        seed_path = self.project_root / seed_file
+
+        # Generate seed data if it doesn't exist
+        if not seed_path.exists():
+            print(f"  6️⃣  Generating seed data ({self.config.seed_size})...")
+            if not self._generate_seed_data(self.config.seed_size):
+                # Fall back to legacy seed file if generation fails
+                seed_file = 'database/03-data.sql'
+                print(f"  ⚠️  Generation failed, trying legacy seed file...")
+
+        print(f"  6️⃣  Loading seed data ({self.config.seed_size})...")
+        if not self._apply_sql_file(db_name, seed_file):
             print(f"  ⚠️  Failed to load seed data (continuing anyway)")
 
         # Success
@@ -336,14 +398,51 @@ class DatabaseSetup:
 
 def main():
     """Main entry point"""
-    # Parse command-line arguments
-    if len(sys.argv) > 1:
-        frameworks = sys.argv[1:]
-    else:
-        frameworks = None
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description='VelocityBench Database Setup - Creates isolated databases for each framework'
+    )
+    parser.add_argument(
+        'frameworks',
+        nargs='*',
+        help='Specific frameworks to setup (default: all frameworks)'
+    )
+    parser.add_argument(
+        '--size',
+        choices=SEED_SIZES,
+        default=DEFAULT_SEED_SIZE,
+        help=f'Dataset size: xs (100 users), medium (10K users), large (100K users). Default: {DEFAULT_SEED_SIZE}'
+    )
+    parser.add_argument(
+        '--generate-only',
+        action='store_true',
+        help='Only generate seed data SQL files, do not setup databases'
+    )
+
+    args = parser.parse_args()
+
+    # Handle generate-only mode
+    if args.generate_only:
+        print(f"Generating seed data for size: {args.size}")
+        config = DatabaseConfig(
+            host='', port=0, admin_user='', admin_password='',
+            test_user='', test_password='', seed_size=args.size
+        )
+        setup = DatabaseSetup(config)
+        if setup._generate_seed_data(args.size):
+            print(f"✅ Generated: database/seed-data/output/sql/03-data-{args.size}.sql")
+            sys.exit(0)
+        else:
+            print(f"❌ Failed to generate seed data")
+            sys.exit(1)
+
+    # Create config with seed size
+    config = DatabaseSetup._load_config(args.size)
+    setup = DatabaseSetup(config)
 
     # Run setup
-    setup = DatabaseSetup()
+    frameworks = args.frameworks if args.frameworks else None
     success = setup.setup_all(frameworks)
 
     # Exit with appropriate code
