@@ -1,0 +1,59 @@
+id: horizontal-scaling
+name: Horizontal Scaling Patterns
+category: performance
+type: standard
+tags:
+- performance
+- horizontal_scaling
+summary:
+  short: Adding more servers instead of making single server more powerful
+  long: Adding more servers instead of making single server more powerful. This pattern
+    provides comprehensive guidance on implementing and optimizing this aspect of
+    software engineering.
+problem:
+  description: Issues arise when adding more servers instead of making single server
+    more powerful is not properly implemented
+  symptoms:
+  - System performance degrades without proper horizontal-scaling
+  - Lack of visibility into system behavior
+  - Frequent failures and reliability issues
+  - Difficult to debug and troubleshoot problems
+  - Scaling issues as load increases
+  impact: Poor system reliability, performance issues, increased debugging time, production
+    incidents
+solution:
+  description: Implement best practices for adding more servers instead of making
+    single server more powerful
+key_concepts:
+  concept_1: Understanding horizontal-scaling fundamentals
+  concept_2: Implementing horizontal-scaling effectively
+  concept_3: Monitoring and maintaining horizontal-scaling
+best_practices:
+- name: Use horizontal-scaling strategically
+  description: Apply this pattern where it provides the most value
+- name: Monitor effectiveness
+  description: Track metrics to verify the pattern is working
+- name: Document decisions
+  description: Record why you chose this approach
+anti_patterns:
+- name: Ignoring this pattern
+  consequence: Systems become unreliable and difficult to maintain
+- name: Over-engineering
+  consequence: Unnecessary complexity
+blog_hooks:
+  beginner:
+    analogy: Adding more servers instead of making single server more powerful is
+      a critical part of software engineering.
+    focus: Understanding the basics
+  intermediate:
+    focus: Implementing horizontal-scaling effectively
+    key_points:
+    - Core concepts of horizontal-scaling
+    - Common implementation approaches
+    - Trade-offs and considerations
+  advanced:
+    focus: Advanced horizontal-scaling techniques
+    key_points:
+    - Optimization strategies
+    - Complex scenarios
+    - Production considerations

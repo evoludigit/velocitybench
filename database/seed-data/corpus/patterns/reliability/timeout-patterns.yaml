@@ -1,0 +1,57 @@
+id: timeout-patterns
+name: Timeout & Deadline Patterns
+category: reliability
+type: standard
+tags:
+- reliability
+- timeout_patterns
+summary:
+  short: Preventing hung requests with timeouts
+  long: Preventing hung requests with timeouts. This pattern provides comprehensive
+    guidance on implementing and optimizing this aspect of software engineering.
+problem:
+  description: Issues arise when preventing hung requests with timeouts is not properly
+    implemented
+  symptoms:
+  - System performance degrades without proper timeout-patterns
+  - Lack of visibility into system behavior
+  - Frequent failures and reliability issues
+  - Difficult to debug and troubleshoot problems
+  - Scaling issues as load increases
+  impact: Poor system reliability, performance issues, increased debugging time, production
+    incidents
+solution:
+  description: Implement best practices for preventing hung requests with timeouts
+key_concepts:
+  concept_1: Understanding timeout-patterns fundamentals
+  concept_2: Implementing timeout-patterns effectively
+  concept_3: Monitoring and maintaining timeout-patterns
+best_practices:
+- name: Use timeout-patterns strategically
+  description: Apply this pattern where it provides the most value
+- name: Monitor effectiveness
+  description: Track metrics to verify the pattern is working
+- name: Document decisions
+  description: Record why you chose this approach
+anti_patterns:
+- name: Ignoring this pattern
+  consequence: Systems become unreliable and difficult to maintain
+- name: Over-engineering
+  consequence: Unnecessary complexity
+blog_hooks:
+  beginner:
+    analogy: Preventing hung requests with timeouts is a critical part of software
+      engineering.
+    focus: Understanding the basics
+  intermediate:
+    focus: Implementing timeout-patterns effectively
+    key_points:
+    - Core concepts of timeout-patterns
+    - Common implementation approaches
+    - Trade-offs and considerations
+  advanced:
+    focus: Advanced timeout-patterns techniques
+    key_points:
+    - Optimization strategies
+    - Complex scenarios
+    - Production considerations

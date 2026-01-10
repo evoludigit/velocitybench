@@ -1,0 +1,59 @@
+id: rate-limiting-ddos
+name: Rate Limiting & DDoS Protection
+category: security
+type: standard
+tags:
+- security
+- rate_limiting_ddos
+summary:
+  short: Protecting services from abuse and denial-of-service attacks
+  long: Protecting services from abuse and denial-of-service attacks. This pattern
+    provides comprehensive guidance on implementing and optimizing this aspect of
+    software engineering.
+problem:
+  description: Issues arise when protecting services from abuse and denial-of-service
+    attacks is not properly implemented
+  symptoms:
+  - System performance degrades without proper rate-limiting-ddos
+  - Lack of visibility into system behavior
+  - Frequent failures and reliability issues
+  - Difficult to debug and troubleshoot problems
+  - Scaling issues as load increases
+  impact: Poor system reliability, performance issues, increased debugging time, production
+    incidents
+solution:
+  description: Implement best practices for protecting services from abuse and denial-of-service
+    attacks
+key_concepts:
+  concept_1: Understanding rate-limiting-ddos fundamentals
+  concept_2: Implementing rate-limiting-ddos effectively
+  concept_3: Monitoring and maintaining rate-limiting-ddos
+best_practices:
+- name: Use rate-limiting-ddos strategically
+  description: Apply this pattern where it provides the most value
+- name: Monitor effectiveness
+  description: Track metrics to verify the pattern is working
+- name: Document decisions
+  description: Record why you chose this approach
+anti_patterns:
+- name: Ignoring this pattern
+  consequence: Systems become unreliable and difficult to maintain
+- name: Over-engineering
+  consequence: Unnecessary complexity
+blog_hooks:
+  beginner:
+    analogy: Protecting services from abuse and denial-of-service attacks is a critical
+      part of software engineering.
+    focus: Understanding the basics
+  intermediate:
+    focus: Implementing rate-limiting-ddos effectively
+    key_points:
+    - Core concepts of rate-limiting-ddos
+    - Common implementation approaches
+    - Trade-offs and considerations
+  advanced:
+    focus: Advanced rate-limiting-ddos techniques
+    key_points:
+    - Optimization strategies
+    - Complex scenarios
+    - Production considerations

@@ -1,0 +1,59 @@
+id: data-normalization
+name: Database Normalization vs Denormalization
+category: data
+type: standard
+tags:
+- data
+- data_normalization
+summary:
+  short: Trade-offs between normalized and denormalized schemas
+  long: Trade-offs between normalized and denormalized schemas. This pattern provides
+    comprehensive guidance on implementing and optimizing this aspect of software
+    engineering.
+problem:
+  description: Issues arise when trade-offs between normalized and denormalized schemas
+    is not properly implemented
+  symptoms:
+  - System performance degrades without proper data-normalization
+  - Lack of visibility into system behavior
+  - Frequent failures and reliability issues
+  - Difficult to debug and troubleshoot problems
+  - Scaling issues as load increases
+  impact: Poor system reliability, performance issues, increased debugging time, production
+    incidents
+solution:
+  description: Implement best practices for trade-offs between normalized and denormalized
+    schemas
+key_concepts:
+  concept_1: Understanding data-normalization fundamentals
+  concept_2: Implementing data-normalization effectively
+  concept_3: Monitoring and maintaining data-normalization
+best_practices:
+- name: Use data-normalization strategically
+  description: Apply this pattern where it provides the most value
+- name: Monitor effectiveness
+  description: Track metrics to verify the pattern is working
+- name: Document decisions
+  description: Record why you chose this approach
+anti_patterns:
+- name: Ignoring this pattern
+  consequence: Systems become unreliable and difficult to maintain
+- name: Over-engineering
+  consequence: Unnecessary complexity
+blog_hooks:
+  beginner:
+    analogy: Trade-offs between normalized and denormalized schemas is a critical
+      part of software engineering.
+    focus: Understanding the basics
+  intermediate:
+    focus: Implementing data-normalization effectively
+    key_points:
+    - Core concepts of data-normalization
+    - Common implementation approaches
+    - Trade-offs and considerations
+  advanced:
+    focus: Advanced data-normalization techniques
+    key_points:
+    - Optimization strategies
+    - Complex scenarios
+    - Production considerations

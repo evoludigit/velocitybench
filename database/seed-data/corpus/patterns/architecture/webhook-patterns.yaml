@@ -1,0 +1,58 @@
+id: webhook-patterns
+name: Webhooks & Real-time Notifications
+category: architecture
+type: standard
+tags:
+- architecture
+- webhook_patterns
+summary:
+  short: Pushing events to external systems in real-time
+  long: Pushing events to external systems in real-time. This pattern provides comprehensive
+    guidance on implementing and optimizing this aspect of software engineering.
+problem:
+  description: Issues arise when pushing events to external systems in real-time is
+    not properly implemented
+  symptoms:
+  - System performance degrades without proper webhook-patterns
+  - Lack of visibility into system behavior
+  - Frequent failures and reliability issues
+  - Difficult to debug and troubleshoot problems
+  - Scaling issues as load increases
+  impact: Poor system reliability, performance issues, increased debugging time, production
+    incidents
+solution:
+  description: Implement best practices for pushing events to external systems in
+    real-time
+key_concepts:
+  concept_1: Understanding webhook-patterns fundamentals
+  concept_2: Implementing webhook-patterns effectively
+  concept_3: Monitoring and maintaining webhook-patterns
+best_practices:
+- name: Use webhook-patterns strategically
+  description: Apply this pattern where it provides the most value
+- name: Monitor effectiveness
+  description: Track metrics to verify the pattern is working
+- name: Document decisions
+  description: Record why you chose this approach
+anti_patterns:
+- name: Ignoring this pattern
+  consequence: Systems become unreliable and difficult to maintain
+- name: Over-engineering
+  consequence: Unnecessary complexity
+blog_hooks:
+  beginner:
+    analogy: Pushing events to external systems in real-time is a critical part of
+      software engineering.
+    focus: Understanding the basics
+  intermediate:
+    focus: Implementing webhook-patterns effectively
+    key_points:
+    - Core concepts of webhook-patterns
+    - Common implementation approaches
+    - Trade-offs and considerations
+  advanced:
+    focus: Advanced webhook-patterns techniques
+    key_points:
+    - Optimization strategies
+    - Complex scenarios
+    - Production considerations

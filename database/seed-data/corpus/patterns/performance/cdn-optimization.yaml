@@ -1,0 +1,59 @@
+id: cdn-optimization
+name: CDN & Content Delivery Optimization
+category: performance
+type: standard
+tags:
+- performance
+- cdn_optimization
+summary:
+  short: Using CDNs to serve content from locations closest to users
+  long: Using CDNs to serve content from locations closest to users. This pattern
+    provides comprehensive guidance on implementing and optimizing this aspect of
+    software engineering.
+problem:
+  description: Issues arise when using cdns to serve content from locations closest
+    to users is not properly implemented
+  symptoms:
+  - System performance degrades without proper cdn-optimization
+  - Lack of visibility into system behavior
+  - Frequent failures and reliability issues
+  - Difficult to debug and troubleshoot problems
+  - Scaling issues as load increases
+  impact: Poor system reliability, performance issues, increased debugging time, production
+    incidents
+solution:
+  description: Implement best practices for using cdns to serve content from locations
+    closest to users
+key_concepts:
+  concept_1: Understanding cdn-optimization fundamentals
+  concept_2: Implementing cdn-optimization effectively
+  concept_3: Monitoring and maintaining cdn-optimization
+best_practices:
+- name: Use cdn-optimization strategically
+  description: Apply this pattern where it provides the most value
+- name: Monitor effectiveness
+  description: Track metrics to verify the pattern is working
+- name: Document decisions
+  description: Record why you chose this approach
+anti_patterns:
+- name: Ignoring this pattern
+  consequence: Systems become unreliable and difficult to maintain
+- name: Over-engineering
+  consequence: Unnecessary complexity
+blog_hooks:
+  beginner:
+    analogy: Using CDNs to serve content from locations closest to users is a critical
+      part of software engineering.
+    focus: Understanding the basics
+  intermediate:
+    focus: Implementing cdn-optimization effectively
+    key_points:
+    - Core concepts of cdn-optimization
+    - Common implementation approaches
+    - Trade-offs and considerations
+  advanced:
+    focus: Advanced cdn-optimization techniques
+    key_points:
+    - Optimization strategies
+    - Complex scenarios
+    - Production considerations

@@ -1,0 +1,58 @@
+id: canary-deployment
+name: Canary Deployments
+category: deployment
+type: standard
+tags:
+- deployment
+- canary_deployment
+summary:
+  short: Rolling out changes to a small subset first
+  long: Rolling out changes to a small subset first. This pattern provides comprehensive
+    guidance on implementing and optimizing this aspect of software engineering.
+problem:
+  description: Issues arise when rolling out changes to a small subset first is not
+    properly implemented
+  symptoms:
+  - System performance degrades without proper canary-deployment
+  - Lack of visibility into system behavior
+  - Frequent failures and reliability issues
+  - Difficult to debug and troubleshoot problems
+  - Scaling issues as load increases
+  impact: Poor system reliability, performance issues, increased debugging time, production
+    incidents
+solution:
+  description: Implement best practices for rolling out changes to a small subset
+    first
+key_concepts:
+  concept_1: Understanding canary-deployment fundamentals
+  concept_2: Implementing canary-deployment effectively
+  concept_3: Monitoring and maintaining canary-deployment
+best_practices:
+- name: Use canary-deployment strategically
+  description: Apply this pattern where it provides the most value
+- name: Monitor effectiveness
+  description: Track metrics to verify the pattern is working
+- name: Document decisions
+  description: Record why you chose this approach
+anti_patterns:
+- name: Ignoring this pattern
+  consequence: Systems become unreliable and difficult to maintain
+- name: Over-engineering
+  consequence: Unnecessary complexity
+blog_hooks:
+  beginner:
+    analogy: Rolling out changes to a small subset first is a critical part of software
+      engineering.
+    focus: Understanding the basics
+  intermediate:
+    focus: Implementing canary-deployment effectively
+    key_points:
+    - Core concepts of canary-deployment
+    - Common implementation approaches
+    - Trade-offs and considerations
+  advanced:
+    focus: Advanced canary-deployment techniques
+    key_points:
+    - Optimization strategies
+    - Complex scenarios
+    - Production considerations

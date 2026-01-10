@@ -1,0 +1,57 @@
+id: encryption-tls
+name: Encryption & TLS/SSL
+category: security
+type: standard
+tags:
+- security
+- encryption_tls
+summary:
+  short: Encrypting data in transit and at rest
+  long: Encrypting data in transit and at rest. This pattern provides comprehensive
+    guidance on implementing and optimizing this aspect of software engineering.
+problem:
+  description: Issues arise when encrypting data in transit and at rest is not properly
+    implemented
+  symptoms:
+  - System performance degrades without proper encryption-tls
+  - Lack of visibility into system behavior
+  - Frequent failures and reliability issues
+  - Difficult to debug and troubleshoot problems
+  - Scaling issues as load increases
+  impact: Poor system reliability, performance issues, increased debugging time, production
+    incidents
+solution:
+  description: Implement best practices for encrypting data in transit and at rest
+key_concepts:
+  concept_1: Understanding encryption-tls fundamentals
+  concept_2: Implementing encryption-tls effectively
+  concept_3: Monitoring and maintaining encryption-tls
+best_practices:
+- name: Use encryption-tls strategically
+  description: Apply this pattern where it provides the most value
+- name: Monitor effectiveness
+  description: Track metrics to verify the pattern is working
+- name: Document decisions
+  description: Record why you chose this approach
+anti_patterns:
+- name: Ignoring this pattern
+  consequence: Systems become unreliable and difficult to maintain
+- name: Over-engineering
+  consequence: Unnecessary complexity
+blog_hooks:
+  beginner:
+    analogy: Encrypting data in transit and at rest is a critical part of software
+      engineering.
+    focus: Understanding the basics
+  intermediate:
+    focus: Implementing encryption-tls effectively
+    key_points:
+    - Core concepts of encryption-tls
+    - Common implementation approaches
+    - Trade-offs and considerations
+  advanced:
+    focus: Advanced encryption-tls techniques
+    key_points:
+    - Optimization strategies
+    - Complex scenarios
+    - Production considerations

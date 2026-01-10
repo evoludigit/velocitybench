@@ -1,0 +1,59 @@
+id: blue-green-deployment
+name: Blue-Green Deployment
+category: deployment
+type: standard
+tags:
+- deployment
+- blue_green_deployment
+summary:
+  short: Running two identical environments for safer deployments
+  long: Running two identical environments for safer deployments. This pattern provides
+    comprehensive guidance on implementing and optimizing this aspect of software
+    engineering.
+problem:
+  description: Issues arise when running two identical environments for safer deployments
+    is not properly implemented
+  symptoms:
+  - System performance degrades without proper blue-green-deployment
+  - Lack of visibility into system behavior
+  - Frequent failures and reliability issues
+  - Difficult to debug and troubleshoot problems
+  - Scaling issues as load increases
+  impact: Poor system reliability, performance issues, increased debugging time, production
+    incidents
+solution:
+  description: Implement best practices for running two identical environments for
+    safer deployments
+key_concepts:
+  concept_1: Understanding blue-green-deployment fundamentals
+  concept_2: Implementing blue-green-deployment effectively
+  concept_3: Monitoring and maintaining blue-green-deployment
+best_practices:
+- name: Use blue-green-deployment strategically
+  description: Apply this pattern where it provides the most value
+- name: Monitor effectiveness
+  description: Track metrics to verify the pattern is working
+- name: Document decisions
+  description: Record why you chose this approach
+anti_patterns:
+- name: Ignoring this pattern
+  consequence: Systems become unreliable and difficult to maintain
+- name: Over-engineering
+  consequence: Unnecessary complexity
+blog_hooks:
+  beginner:
+    analogy: Running two identical environments for safer deployments is a critical
+      part of software engineering.
+    focus: Understanding the basics
+  intermediate:
+    focus: Implementing blue-green-deployment effectively
+    key_points:
+    - Core concepts of blue-green-deployment
+    - Common implementation approaches
+    - Trade-offs and considerations
+  advanced:
+    focus: Advanced blue-green-deployment techniques
+    key_points:
+    - Optimization strategies
+    - Complex scenarios
+    - Production considerations

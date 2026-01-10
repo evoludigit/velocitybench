@@ -1,0 +1,59 @@
+id: performance-testing
+name: Performance & Stress Testing
+category: testing
+type: standard
+tags:
+- testing
+- performance_testing
+summary:
+  short: Testing system behavior under performance requirements
+  long: Testing system behavior under performance requirements. This pattern provides
+    comprehensive guidance on implementing and optimizing this aspect of software
+    engineering.
+problem:
+  description: Issues arise when testing system behavior under performance requirements
+    is not properly implemented
+  symptoms:
+  - System performance degrades without proper performance-testing
+  - Lack of visibility into system behavior
+  - Frequent failures and reliability issues
+  - Difficult to debug and troubleshoot problems
+  - Scaling issues as load increases
+  impact: Poor system reliability, performance issues, increased debugging time, production
+    incidents
+solution:
+  description: Implement best practices for testing system behavior under performance
+    requirements
+key_concepts:
+  concept_1: Understanding performance-testing fundamentals
+  concept_2: Implementing performance-testing effectively
+  concept_3: Monitoring and maintaining performance-testing
+best_practices:
+- name: Use performance-testing strategically
+  description: Apply this pattern where it provides the most value
+- name: Monitor effectiveness
+  description: Track metrics to verify the pattern is working
+- name: Document decisions
+  description: Record why you chose this approach
+anti_patterns:
+- name: Ignoring this pattern
+  consequence: Systems become unreliable and difficult to maintain
+- name: Over-engineering
+  consequence: Unnecessary complexity
+blog_hooks:
+  beginner:
+    analogy: Testing system behavior under performance requirements is a critical
+      part of software engineering.
+    focus: Understanding the basics
+  intermediate:
+    focus: Implementing performance-testing effectively
+    key_points:
+    - Core concepts of performance-testing
+    - Common implementation approaches
+    - Trade-offs and considerations
+  advanced:
+    focus: Advanced performance-testing techniques
+    key_points:
+    - Optimization strategies
+    - Complex scenarios
+    - Production considerations

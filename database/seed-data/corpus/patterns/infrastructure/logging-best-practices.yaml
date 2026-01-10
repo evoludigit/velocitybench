@@ -1,0 +1,59 @@
+id: logging-best-practices
+name: Logging Best Practices
+category: infrastructure
+type: standard
+tags:
+- infrastructure
+- logging_best_practices
+summary:
+  short: Structured logging for better debugging and analysis
+  long: Structured logging for better debugging and analysis. This pattern provides
+    comprehensive guidance on implementing and optimizing this aspect of software
+    engineering.
+problem:
+  description: Issues arise when structured logging for better debugging and analysis
+    is not properly implemented
+  symptoms:
+  - System performance degrades without proper logging-best-practices
+  - Lack of visibility into system behavior
+  - Frequent failures and reliability issues
+  - Difficult to debug and troubleshoot problems
+  - Scaling issues as load increases
+  impact: Poor system reliability, performance issues, increased debugging time, production
+    incidents
+solution:
+  description: Implement best practices for structured logging for better debugging
+    and analysis
+key_concepts:
+  concept_1: Understanding logging-best-practices fundamentals
+  concept_2: Implementing logging-best-practices effectively
+  concept_3: Monitoring and maintaining logging-best-practices
+best_practices:
+- name: Use logging-best-practices strategically
+  description: Apply this pattern where it provides the most value
+- name: Monitor effectiveness
+  description: Track metrics to verify the pattern is working
+- name: Document decisions
+  description: Record why you chose this approach
+anti_patterns:
+- name: Ignoring this pattern
+  consequence: Systems become unreliable and difficult to maintain
+- name: Over-engineering
+  consequence: Unnecessary complexity
+blog_hooks:
+  beginner:
+    analogy: Structured logging for better debugging and analysis is a critical part
+      of software engineering.
+    focus: Understanding the basics
+  intermediate:
+    focus: Implementing logging-best-practices effectively
+    key_points:
+    - Core concepts of logging-best-practices
+    - Common implementation approaches
+    - Trade-offs and considerations
+  advanced:
+    focus: Advanced logging-best-practices techniques
+    key_points:
+    - Optimization strategies
+    - Complex scenarios
+    - Production considerations

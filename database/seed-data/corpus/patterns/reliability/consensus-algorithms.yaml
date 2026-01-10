@@ -1,0 +1,57 @@
+id: consensus-algorithms
+name: Consensus Algorithms (Raft, Paxos)
+category: reliability
+type: standard
+tags:
+- reliability
+- consensus_algorithms
+summary:
+  short: Reaching agreement in distributed systems
+  long: Reaching agreement in distributed systems. This pattern provides comprehensive
+    guidance on implementing and optimizing this aspect of software engineering.
+problem:
+  description: Issues arise when reaching agreement in distributed systems is not
+    properly implemented
+  symptoms:
+  - System performance degrades without proper consensus-algorithms
+  - Lack of visibility into system behavior
+  - Frequent failures and reliability issues
+  - Difficult to debug and troubleshoot problems
+  - Scaling issues as load increases
+  impact: Poor system reliability, performance issues, increased debugging time, production
+    incidents
+solution:
+  description: Implement best practices for reaching agreement in distributed systems
+key_concepts:
+  concept_1: Understanding consensus-algorithms fundamentals
+  concept_2: Implementing consensus-algorithms effectively
+  concept_3: Monitoring and maintaining consensus-algorithms
+best_practices:
+- name: Use consensus-algorithms strategically
+  description: Apply this pattern where it provides the most value
+- name: Monitor effectiveness
+  description: Track metrics to verify the pattern is working
+- name: Document decisions
+  description: Record why you chose this approach
+anti_patterns:
+- name: Ignoring this pattern
+  consequence: Systems become unreliable and difficult to maintain
+- name: Over-engineering
+  consequence: Unnecessary complexity
+blog_hooks:
+  beginner:
+    analogy: Reaching agreement in distributed systems is a critical part of software
+      engineering.
+    focus: Understanding the basics
+  intermediate:
+    focus: Implementing consensus-algorithms effectively
+    key_points:
+    - Core concepts of consensus-algorithms
+    - Common implementation approaches
+    - Trade-offs and considerations
+  advanced:
+    focus: Advanced consensus-algorithms techniques
+    key_points:
+    - Optimization strategies
+    - Complex scenarios
+    - Production considerations
