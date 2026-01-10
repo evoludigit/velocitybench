@@ -2,6 +2,16 @@
 """
 FraiseQL Comparative Benchmarking Implementation v1.8.1
 Optimized GraphQL server using FraiseQL with Rust pipeline for performance testing against other frameworks.
+
+Architecture: Three-layer view system
+1. tb_* (write layer): Tables with pk_*, id (UUID), fk_* (internal FKs)
+2. v_* (projection layer): Scalar extraction from tb_* tables
+3. tv_* (composition layer): JSONB denormalized objects for FraiseQL GraphQL
+
+FraiseQL queries tv_* views which provide JSONB 'data' field with:
+- All scalar fields in camelCase (id, username, firstName, lastName, bio, etc.)
+- Nested objects (author, post, parentComment) as pre-composed JSONB
+- No need for N+1 queries - all composition done at database layer
 """
 
 import logging
@@ -27,9 +37,9 @@ def create_fraiseql_config() -> FraiseQLConfig:
         environment="development",
         introspection_policy=IntrospectionPolicy.PUBLIC,
         enable_playground=True,
-        default_query_schema="public",
-        default_mutation_schema="benchmark",
-        auto_camel_case=False,  # Disable to match JSONB camelCase fields directly
+        default_query_schema="benchmark",  # Query from benchmark schema where views live
+        default_mutation_schema="benchmark",  # Mutations update tb_* tables in benchmark schema
+        auto_camel_case=True,  # Convert snake_case from DB to camelCase in GraphQL
         cors_enabled=True,
         complexity_enabled=False,  # Disable for benchmarking
         database_pool_size=20,
@@ -39,37 +49,50 @@ def create_fraiseql_config() -> FraiseQLConfig:
 
 
 # FraiseQL GraphQL Types
-@fraiseql.type(sql_source="tv_user")
+# These map to tv_* views which provide JSONB 'data' field with composed objects
+
+@fraiseql.type(sql_source="benchmark.tv_user")
 class User:
+    """User type - queries tv_user view returning JSONB-composed user objects."""
     id: UUID
     username: str
-    fullName: str | None = None
+    email: str
+    first_name: str | None = None
+    last_name: str | None = None
     bio: str | None = None
-
-    # Add posts resolver for compatibility with JMeter tests
-    @fraiseql.field
-    async def posts(self, info, limit: int = 10) -> list["Post"]:
-        """Get posts for this user."""
-        db = info.context["db"]
-        return await db.find(
-            "tv_post", where={"author_id": {"eq": str(self.id)}}, limit=limit
-        )
+    avatar_url: str | None = None
+    is_active: bool = True
+    created_at: str
+    updated_at: str
 
 
-@fraiseql.type(sql_source="tv_post")
+@fraiseql.type(sql_source="benchmark.tv_post")
 class Post:
+    """Post type - queries tv_post view returning JSONB-composed posts with author."""
     id: UUID
     title: str
-    content: str
+    content: str | None = None
+    excerpt: str | None = None
+    status: str = "published"
+    published_at: str | None = None
+    created_at: str
+    updated_at: str
+    # author field is pre-composed in tv_post JSONB, FraiseQL will deserialize it
     author: User
 
 
-@fraiseql.type(sql_source="tv_comment")
+@fraiseql.type(sql_source="benchmark.tv_comment")
 class Comment:
+    """Comment type - queries tv_comment view returning JSONB-composed comments with author, post, parent."""
     id: UUID
     content: str
+    is_approved: bool = True
+    created_at: str
+    updated_at: str
+    # Nested objects are pre-composed in tv_comment JSONB
     author: User
     post: Post
+    parent_comment: "Comment | None" = None
 
 
 # FraiseQL Query Resolvers
@@ -80,74 +103,144 @@ async def ping(info: GraphQLResolveInfo) -> str:
 
 
 @fraiseql.query
-async def user(info: GraphQLResolveInfo, id: UUID) -> User | None:
-    """Get user by ID."""
+async def user(info: GraphQLResolveInfo, id: str) -> User | None:
+    """Get user by UUID id."""
     db = info.context["db"]
-    return await db.find_one("tv_user", id=id)
+    return await db.find_one("benchmark.tv_user", id=id)
 
 
 @fraiseql.query
 async def users(info: GraphQLResolveInfo, limit: int = 10) -> list[User]:
     """Get users list with pagination."""
     db = info.context["db"]
-    return await db.find("tv_user", limit=limit, order_by=[{"created_at": "DESC"}])
+    return await db.find("benchmark.tv_user", limit=limit, order_by=[{"created_at": "DESC"}])
 
 
 @fraiseql.query
 async def posts(info: GraphQLResolveInfo, limit: int = 10) -> list[Post]:
-    """Get posts list."""
+    """Get posts list - with pre-composed author objects."""
     db = info.context["db"]
-    # FraiseQL queries the tv_post view directly
-    return await db.find("tv_post", limit=limit, order_by=[{"created_at": "DESC"}])
+    # tv_post view includes author as nested JSONB object
+    return await db.find("benchmark.tv_post", limit=limit, order_by=[{"created_at": "DESC"}])
 
 
 @fraiseql.query
 async def comments(info: GraphQLResolveInfo, limit: int = 10) -> list[Comment]:
-    """Get comments list."""
+    """Get comments list - with pre-composed author, post, and parent comment objects."""
     db = info.context["db"]
-    # FraiseQL queries views directly
-    return await db.find("tv_comment", limit=limit, order_by=[{"created_at": "DESC"}])
+    # tv_comment view includes author, post, and parentComment as nested JSONB objects
+    return await db.find("benchmark.tv_comment", limit=limit, order_by=[{"created_at": "DESC"}])
 
 
 @fraiseql.query
-async def post(info: GraphQLResolveInfo, id: UUID) -> Post | None:
-    """Get post by ID."""
+async def post(info: GraphQLResolveInfo, id: str) -> Post | None:
+    """Get post by UUID id - includes pre-composed author object."""
     db = info.context["db"]
-    return await db.find_one("tv_post", id=id)
+    return await db.find_one("benchmark.tv_post", id=id)
 
 
 @fraiseql.query
-async def comment(info: GraphQLResolveInfo, id: UUID) -> Comment | None:
-    """Get comment by ID."""
+async def comment(info: GraphQLResolveInfo, id: str) -> Comment | None:
+    """Get comment by UUID id - includes pre-composed author, post, and parent comment objects."""
     db = info.context["db"]
-    return await db.find_one("tv_comment", id=id)
+    return await db.find_one("benchmark.tv_comment", id=id)
 
 
 # FraiseQL Mutation Resolvers
 @fraiseql.mutation
 async def update_user(
     info: GraphQLResolveInfo,
-    id: UUID,
-    fullName: str | None = None,
+    id: str,
+    first_name: str | None = None,
+    last_name: str | None = None,
     bio: str | None = None,
 ) -> User | None:
-    """Update user mutation."""
+    """Update user by UUID id.
+
+    Updates tb_user table (write layer) and returns via tv_user (composition layer).
+    """
     db = info.context["db"]
 
-    # Build update data
+    # Build update data - snake_case for database columns
     update_data = {}
-    if fullName is not None:
-        update_data["fullName"] = fullName
+    if first_name is not None:
+        update_data["first_name"] = first_name
+    if last_name is not None:
+        update_data["last_name"] = last_name
     if bio is not None:
         update_data["bio"] = bio
 
     if update_data:
         update_data["updated_at"] = "NOW()"  # SQL function
 
-        await db.update("tb_user", where={"id": {"eq": str(id)}}, data=update_data)
+        # Update write layer (tb_user table)
+        await db.update("benchmark.tb_user", where={"id": {"eq": id}}, data=update_data)
 
-    # Return updated user data
-    return await db.find_one("tv_user", id=id)
+    # Return via composition layer (tv_user view with JSONB data)
+    return await db.find_one("benchmark.tv_user", id=id)
+
+
+@fraiseql.mutation
+async def create_post(
+    info: GraphQLResolveInfo,
+    author_id: str,
+    title: str,
+    content: str | None = None,
+    excerpt: str | None = None,
+    status: str = "published",
+) -> Post | None:
+    """Create post mutation.
+
+    Inserts into tb_post table (write layer) and returns via tv_post (composition layer).
+    Note: author_id is the UUID id, FraiseQL will convert to internal pk_author via view join.
+    """
+    db = info.context["db"]
+
+    # Insert into write layer (tb_post table)
+    # The view will join with author using fk_author -> pk_user mapping
+    insert_data = {
+        "author_id": author_id,
+        "title": title,
+        "content": content,
+        "excerpt": excerpt,
+        "status": status,
+    }
+
+    result = await db.insert("benchmark.tb_post", data=insert_data)
+
+    # Return newly created post via composition layer
+    if result:
+        return await db.find_one("benchmark.tv_post", id=result["id"])
+    return None
+
+
+@fraiseql.mutation
+async def create_comment(
+    info: GraphQLResolveInfo,
+    author_id: str,
+    post_id: str,
+    content: str,
+    parent_comment_id: str | None = None,
+) -> Comment | None:
+    """Create comment mutation.
+
+    Inserts into tb_comment table (write layer) and returns via tv_comment (composition layer).
+    """
+    db = info.context["db"]
+
+    insert_data = {
+        "author_id": author_id,
+        "post_id": post_id,
+        "content": content,
+        "parent_comment_id": parent_comment_id,
+    }
+
+    result = await db.insert("benchmark.tb_comment", data=insert_data)
+
+    # Return newly created comment via composition layer
+    if result:
+        return await db.find_one("benchmark.tv_comment", id=result["id"])
+    return None
 
 
 # Context getter for FraiseQL
