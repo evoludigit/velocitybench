@@ -25,6 +25,10 @@ describe('PostGraphile GraphQL Mutations', () => {
     server.close();
   }, 15000);
 
+  beforeEach(async () => {
+    await factory.startTransaction();
+  });
+
   afterEach(async () => {
     await factory.cleanup();
   });

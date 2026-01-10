@@ -1,7 +1,46 @@
-import { Pool } from 'pg';
+import { Pool, PoolClient } from 'pg';
 
 export class TestFactory {
+  private testClient: PoolClient | null = null;
+
   constructor(private pool: Pool) {}
+
+  /**
+   * Start a test transaction for isolation
+   * Each test gets its own transaction that can be rolled back
+   * This is better than truncating tables - PostGraphile's schema stays intact
+   */
+  async startTransaction() {
+    this.testClient = await this.pool.connect();
+    await this.testClient.query('BEGIN ISOLATION LEVEL READ COMMITTED');
+  }
+
+  /**
+   * Rollback the test transaction
+   * All test data is automatically cleaned up, no manual truncation needed
+   */
+  async rollbackTransaction() {
+    if (this.testClient) {
+      try {
+        await this.testClient.query('ROLLBACK');
+      } finally {
+        this.testClient.release();
+        this.testClient = null;
+      }
+    }
+  }
+
+  /**
+   * Get the appropriate client for queries
+   * Uses test transaction if one is active, otherwise gets a new connection
+   * This ensures test data stays within the transaction scope
+   */
+  private async getClient(): Promise<{ client: PoolClient; shouldRelease: boolean }> {
+    if (this.testClient) {
+      return { client: this.testClient, shouldRelease: false };
+    }
+    return { client: await this.pool.connect(), shouldRelease: true };
+  }
 
   /**
    * Create a test user using the benchmark schema
@@ -27,7 +66,7 @@ export class TestFactory {
       bio = 'Test bio',
     } = overrides || {};
 
-    const client = await this.pool.connect();
+    const { client, shouldRelease } = await this.getClient();
     try {
       const result = await client.query(
         `INSERT INTO benchmark.tb_user (username, email, first_name, last_name, bio)
@@ -37,7 +76,9 @@ export class TestFactory {
       );
       return result.rows[0];
     } finally {
-      client.release();
+      if (shouldRelease) {
+        client.release();
+      }
     }
   }
 
@@ -66,7 +107,7 @@ export class TestFactory {
       status = 'published',
     } = overrides || {};
 
-    const client = await this.pool.connect();
+    const { client, shouldRelease } = await this.getClient();
     try {
       const result = await client.query(
         `INSERT INTO benchmark.tb_post (fk_author, title, content, status)
@@ -76,7 +117,9 @@ export class TestFactory {
       );
       return result.rows[0];
     } finally {
-      client.release();
+      if (shouldRelease) {
+        client.release();
+      }
     }
   }
 
@@ -108,7 +151,7 @@ export class TestFactory {
 
     const content = overrides?.content || 'Test comment';
 
-    const client = await this.pool.connect();
+    const { client, shouldRelease } = await this.getClient();
     try {
       const result = await client.query(
         `INSERT INTO benchmark.tb_comment (fk_post, fk_author, content)
@@ -118,26 +161,18 @@ export class TestFactory {
       );
       return result.rows[0];
     } finally {
-      client.release();
+      if (shouldRelease) {
+        client.release();
+      }
     }
   }
 
   /**
-   * Clean up all test data (respecting foreign key order)
-   * Note: Only truncate base tables (tb_*), not views (v_* or tv_*)
+   * Clean up test data via transaction rollback
+   * This is called after each test to automatically clean up all test data
+   * Much better than truncating tables - respects PostGraphile schema configuration
    */
   async cleanup() {
-    const client = await this.pool.connect();
-    try {
-      // Truncate in correct order (respecting foreign keys)
-      // Comments must be deleted first (they reference posts and users)
-      await client.query('TRUNCATE TABLE benchmark.tb_comment CASCADE');
-      // Posts must be deleted second (they reference users)
-      await client.query('TRUNCATE TABLE benchmark.tb_post CASCADE');
-      // Users can be deleted last
-      await client.query('TRUNCATE TABLE benchmark.tb_user CASCADE');
-    } finally {
-      client.release();
-    }
+    await this.rollbackTransaction();
   }
 }
