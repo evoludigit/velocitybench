@@ -87,8 +87,8 @@ describe('PostGraphile GraphQL Mutations', () => {
         .post('/graphql')
         .send({
           query: `{
-            user1: userById(id: ${user1.id}) { id name }
-            user2: userById(id: ${user2.id}) { id name }
+            user1: userById(id: "${user1.id}") { id name }
+            user2: userById(id: "${user2.id}") { id name }
           }`,
         });
 
@@ -121,7 +121,7 @@ describe('PostGraphile GraphQL Mutations', () => {
       const response1 = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: ${user.id}) { name } }`,
+          query: `{ userById(id: "${user.id}") { name } }`,
         });
 
       expect(response1.status).toBe(200);
@@ -139,7 +139,7 @@ describe('PostGraphile GraphQL Mutations', () => {
       const response2 = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: ${user.id}) { name } }`,
+          query: `{ userById(id: "${user.id}") { name } }`,
         });
 
       expect(response2.status).toBe(200);
@@ -153,7 +153,7 @@ describe('PostGraphile GraphQL Mutations', () => {
       const response1 = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: ${user.id}) { id } }`,
+          query: `{ userById(id: "${user.id}") { id } }`,
         });
 
       expect(response1.status).toBe(200);
@@ -168,7 +168,7 @@ describe('PostGraphile GraphQL Mutations', () => {
       const response2 = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: ${user.id}) { id } }`,
+          query: `{ userById(id: "${user.id}") { id } }`,
         });
 
       expect(response2.status).toBe(200);
@@ -187,8 +187,8 @@ describe('PostGraphile GraphQL Mutations', () => {
         .post('/graphql')
         .send({
           query: `{
-            user1: userById(id: ${user1.id}) { id }
-            user2: userById(id: ${user2.id}) { id }
+            user1: userById(id: "${user1.id}") { id }
+            user2: userById(id: "${user2.id}") { id }
           }`,
         });
 
@@ -199,7 +199,7 @@ describe('PostGraphile GraphQL Mutations', () => {
 
     test('should handle cascade deletions', async () => {
       const author = await factory.createUser({ name: 'Author' });
-      const post = await factory.createPost({ title: 'Post', author_id: author.id });
+      const post = await factory.createPost({ title: 'Post', fk_user: author.pk_user });
 
       // Delete author (should cascade delete post due to FK constraint)
       const client = await pool.connect();
@@ -209,7 +209,7 @@ describe('PostGraphile GraphQL Mutations', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ postById(id: ${post.id}) { id } }`,
+          query: `{ postById(id: "${post.id}") { id } }`,
         });
 
       expect(response.status).toBe(200);
@@ -246,8 +246,8 @@ describe('PostGraphile GraphQL Mutations', () => {
     test('should handle null value insertions', async () => {
       const client = await pool.connect();
       await client.query(
-        'INSERT INTO users (id, name, email, bio) VALUES ($1, $2, $3, $4)',
-        [Math.floor(Math.random() * 1000000), 'NullBioUser', 'test@example.com', null]
+        'INSERT INTO users (name, email, bio) VALUES ($1, $2, $3)',
+        ['NullBioUser', 'test@example.com', null]
       );
       client.release();
 
@@ -278,7 +278,7 @@ describe('PostGraphile GraphQL Mutations', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: ${user.id}) { name } }`,
+          query: `{ userById(id: "${user.id}") { name } }`,
         });
 
       expect(response.status).toBe(200);
@@ -293,8 +293,8 @@ describe('PostGraphile GraphQL Mutations', () => {
       const client = await pool.connect();
       try {
         await client.query(
-          'INSERT INTO users (id, name, email) VALUES ($1, $2, $3)',
-          [Math.floor(Math.random() * 1000000), 'User2', 'unique@example.com']
+          'INSERT INTO users (name, email) VALUES ($1, $2)',
+          ['User2', 'unique@example.com']
         );
       } catch (e) {
         // Expected to fail due to unique constraint
@@ -306,7 +306,7 @@ describe('PostGraphile GraphQL Mutations', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: ${user1.id}) { email } }`,
+          query: `{ userById(id: "${user1.id}") { email } }`,
         });
 
       expect(response.status).toBe(200);
@@ -316,17 +316,17 @@ describe('PostGraphile GraphQL Mutations', () => {
     test('should handle relationship modifications', async () => {
       const author1 = await factory.createUser({ name: 'Author1' });
       const author2 = await factory.createUser({ name: 'Author2' });
-      const post = await factory.createPost({ title: 'Post', author_id: author1.id });
+      const post = await factory.createPost({ title: 'Post', fk_user: author1.pk_user });
 
       // Change author relationship
       const client = await pool.connect();
-      await client.query('UPDATE posts SET author_id = $1 WHERE id = $2', [author2.id, post.id]);
+      await client.query('UPDATE posts SET fk_user = $1 WHERE id = $2', [author2.pk_user, post.id]);
       client.release();
 
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ postById(id: ${post.id}) { title } }`,
+          query: `{ postById(id: "${post.id}") { title } }`,
         });
 
       expect(response.status).toBe(200);

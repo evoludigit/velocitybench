@@ -37,7 +37,7 @@ describe('PostGraphile GraphQL Query Operations', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: ${user.id}) { id name email } }`,
+          query: `{ userById(id: "${user.id}") { id name email } }`,
         });
 
       expect(response.status).toBe(200);
@@ -50,7 +50,7 @@ describe('PostGraphile GraphQL Query Operations', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: 999999) { id name } }`,
+          query: `{ userById(id: "00000000-0000-0000-0000-000000000000") { id name } }`,
         });
 
       expect(response.status).toBe(200);
@@ -63,7 +63,7 @@ describe('PostGraphile GraphQL Query Operations', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: ${user.id}) { id name } }`,
+          query: `{ userById(id: "${user.id}") { id name } }`,
         });
 
       expect(response.status).toBe(200);
@@ -78,7 +78,7 @@ describe('PostGraphile GraphQL Query Operations', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: ${user.id}) { name } }`,
+          query: `{ userById(id: "${user.id}") { name } }`,
         });
 
       expect(response.status).toBe(200);
@@ -91,7 +91,7 @@ describe('PostGraphile GraphQL Query Operations', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: ${user.id}) { name } }`,
+          query: `{ userById(id: "${user.id}") { name } }`,
         });
 
       expect(response.status).toBe(200);
@@ -107,7 +107,7 @@ describe('PostGraphile GraphQL Query Operations', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: ${user.id}) { name bio } }`,
+          query: `{ userById(id: "${user.id}") { name bio } }`,
         });
 
       expect(response.status).toBe(200);
@@ -121,7 +121,7 @@ describe('PostGraphile GraphQL Query Operations', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: ${user.id}) { name bio } }`,
+          query: `{ userById(id: "${user.id}") { name bio } }`,
         });
 
       expect(response.status).toBe(200);
@@ -135,7 +135,7 @@ describe('PostGraphile GraphQL Query Operations', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: ${user.id}) { bio } }`,
+          query: `{ userById(id: "${user.id}") { bio } }`,
         });
 
       expect(response.status).toBe(200);
@@ -148,7 +148,7 @@ describe('PostGraphile GraphQL Query Operations', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ postById(id: ${post.id}) { id title content } }`,
+          query: `{ postById(id: "${post.id}") { id title content } }`,
         });
 
       expect(response.status).toBe(200);
@@ -161,15 +161,15 @@ describe('PostGraphile GraphQL Query Operations', () => {
       const author = await factory.createUser({ name: 'Author' });
       const client = await pool.connect();
       const result = await client.query(
-        `INSERT INTO comments (content, post_id, author_id) VALUES ($1, $2, $3) RETURNING *`,
-        ['Test comment', post.id, author.id]
+        `INSERT INTO comments (content, fk_post, fk_user) VALUES ($1, $2, $3) RETURNING *`,
+        ['Test comment', post.pk_post, author.pk_user]
       );
       client.release();
 
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ commentById(id: ${result.rows[0].id}) { id content } }`,
+          query: `{ commentById(id: "${result.rows[0].id}") { id content } }`,
         });
 
       expect(response.status).toBe(200);
@@ -177,16 +177,16 @@ describe('PostGraphile GraphQL Query Operations', () => {
     });
 
     test('should return scalar types correctly', async () => {
-      const user = await factory.createUser({ name: 'David', id: 42 });
+      const user = await factory.createUser({ name: 'David' });
 
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: ${user.id}) { id name } }`,
+          query: `{ userById(id: "${user.id}") { id name } }`,
         });
 
       expect(response.status).toBe(200);
-      expect(typeof response.body.data.userById.id).toBe('number');
+      expect(typeof response.body.data.userById.id).toBe('string');
       expect(typeof response.body.data.userById.name).toBe('string');
     });
   });
@@ -346,8 +346,8 @@ describe('PostGraphile GraphQL Query Operations', () => {
         .post('/graphql')
         .send({
           query: `{
-            userData: userById(id: ${user.id}) { name }
-            postData: postById(id: ${post.id}) { title }
+            userData: userById(id: "${user.id}") { name }
+            postData: postById(id: "${post.id}") { title }
           }`,
         });
 
@@ -365,7 +365,7 @@ describe('PostGraphile GraphQL Query Operations', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: ${user.id}) { id name } }`,
+          query: `{ userById(id: "${user.id}") { id name } }`,
         });
 
       expect(response.status).toBe(200);
@@ -374,12 +374,12 @@ describe('PostGraphile GraphQL Query Operations', () => {
 
     test('should support Trinity pattern - foreign key relationships', async () => {
       const author = await factory.createUser({ name: 'Author' });
-      const post = await factory.createPost({ title: 'Test', author_id: author.id });
+      const post = await factory.createPost({ title: 'Test', fk_user: author.pk_user });
 
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ postById(id: ${post.id}) { id title } }`,
+          query: `{ postById(id: "${post.id}") { id title } }`,
         });
 
       expect(response.status).toBe(200);
@@ -388,13 +388,13 @@ describe('PostGraphile GraphQL Query Operations', () => {
 
     test('should handle deeply nested relationships', async () => {
       const user = await factory.createUser({ name: 'Author' });
-      const post = await factory.createPost({ title: 'Post', author_id: user.id });
+      const post = await factory.createPost({ title: 'Post', fk_user: user.pk_user });
 
       const response = await request(server)
         .post('/graphql')
         .send({
           query: `{
-            postById(id: ${post.id}) {
+            postById(id: "${post.id}") {
               title
             }
           }`,
@@ -408,7 +408,7 @@ describe('PostGraphile GraphQL Query Operations', () => {
       const author = await factory.createUser({ name: 'John' });
       const post = await factory.createPost({
         title: 'My Post',
-        author_id: author.id,
+        fk_user: author.pk_user,
         content: 'Content',
       });
 
@@ -416,7 +416,7 @@ describe('PostGraphile GraphQL Query Operations', () => {
         .post('/graphql')
         .send({
           query: `{
-            postById(id: ${post.id}) {
+            postById(id: "${post.id}") {
               title
               content
             }
@@ -430,15 +430,15 @@ describe('PostGraphile GraphQL Query Operations', () => {
     test('should handle multiple relationships', async () => {
       const user1 = await factory.createUser({ name: 'User1' });
       const user2 = await factory.createUser({ name: 'User2' });
-      const post1 = await factory.createPost({ title: 'Post1', author_id: user1.id });
-      const post2 = await factory.createPost({ title: 'Post2', author_id: user2.id });
+      const post1 = await factory.createPost({ title: 'Post1', fk_user: user1.pk_user });
+      const post2 = await factory.createPost({ title: 'Post2', fk_user: user2.pk_user });
 
       const response = await request(server)
         .post('/graphql')
         .send({
           query: `{
-            post1: postById(id: ${post1.id}) { title }
-            post2: postById(id: ${post2.id}) { title }
+            post1: postById(id: "${post1.id}") { title }
+            post2: postById(id: "${post2.id}") { title }
           }`,
         });
 
@@ -455,8 +455,8 @@ describe('PostGraphile GraphQL Query Operations', () => {
         .post('/graphql')
         .send({
           query: `{
-            alice: userById(id: ${user1.id}) { name }
-            bob: userById(id: ${user2.id}) { name }
+            alice: userById(id: "${user1.id}") { name }
+            bob: userById(id: "${user2.id}") { name }
           }`,
         });
 
@@ -471,7 +471,7 @@ describe('PostGraphile GraphQL Query Operations', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `query GetUser($id: Int!) { userById(id: $id) { id name } }`,
+          query: `query GetUser($id: UUID!) { userById(id: $id) { id name } }`,
           variables: { id: user.id },
         });
 

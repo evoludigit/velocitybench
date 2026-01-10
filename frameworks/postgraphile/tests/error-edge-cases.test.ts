@@ -123,7 +123,7 @@ describe('PostGraphile Error Handling and Edge Cases', () => {
         .post('/graphql')
         .send({
           query: `{
-            userById(id: ${user.id}) {
+            userById(id: "${user.id}") {
               id: name
               id: email
             }
@@ -141,7 +141,7 @@ describe('PostGraphile Error Handling and Edge Cases', () => {
         .post('/graphql')
         .send({
           query: `{
-            userById(id: ${user.id}) {
+            userById(id: "${user.id}") {
               id
               name
             }
@@ -243,7 +243,7 @@ describe('PostGraphile Error Handling and Edge Cases', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: ${user.id}) { name } }`,
+          query: `{ userById(id: "${user.id}") { name } }`,
         });
 
       expect(response.status).toBe(200);
@@ -258,7 +258,7 @@ describe('PostGraphile Error Handling and Edge Cases', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: ${user.id}) { name } }`,
+          query: `{ userById(id: "${user.id}") { name } }`,
         });
 
       expect(response.status).toBe(200);
@@ -273,7 +273,7 @@ describe('PostGraphile Error Handling and Edge Cases', () => {
         .send({
           query: `{
             # This is a comment
-            userById(id: ${user.id}) {
+            userById(id: "${user.id}") {
               id
               # Another comment
               name
@@ -303,8 +303,8 @@ describe('PostGraphile Error Handling and Edge Cases', () => {
         .post('/graphql')
         .send({
           query: `{
-            first: userById(id: ${user.id}) { id }
-            second: userById(id: ${user.id}) { id }
+            first: userById(id: "${user.id}") { id }
+            second: userById(id: "${user.id}") { id }
           }`,
         });
 
@@ -339,13 +339,13 @@ describe('PostGraphile Error Handling and Edge Cases', () => {
       const response1 = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: ${user.id}) { name } }`,
+          query: `{ userById(id: "${user.id}") { name } }`,
         });
 
       const response2 = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: ${user.id}) { name } }`,
+          query: `{ userById(id: "${user.id}") { name } }`,
         });
 
       expect(response1.body.data.userById.name).toBe(response2.body.data.userById.name);
@@ -374,7 +374,7 @@ describe('PostGraphile Error Handling and Edge Cases', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: ${user.id}) { Name } }`,
+          query: `{ userById(id: "${user.id}") { Name } }`,
         });
 
       expect(response.status).toBeGreaterThanOrEqual(400);
