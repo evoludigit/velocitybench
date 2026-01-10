@@ -1,0 +1,28 @@
+id: ops-log-management
+name: Log Management Patterns
+category: specialized
+type: standard
+tags:
+- ops
+summary:
+  short: Patterns and practices for log management patterns
+  long: Comprehensive guide to log management patterns
+problem:
+  description: Challenges with log management patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement log management patterns
+key_concepts:
+  concept: Understanding Log Management Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Log Management Patterns
+  intermediate:
+    focus: Implementing Log Management Patterns
+  advanced:
+    focus: Advanced Log Management Patterns

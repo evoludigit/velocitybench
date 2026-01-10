@@ -1,0 +1,28 @@
+id: websockets-testing
+name: Websockets Testing
+category: comprehensive
+type: standard
+tags:
+- websockets
+summary:
+  short: Websockets Testing and implementation guidelines
+  long: Complete guide to websockets testing
+problem:
+  description: Challenges without proper websockets testing
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement websockets testing
+key_concepts:
+  concept: Websockets Testing
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

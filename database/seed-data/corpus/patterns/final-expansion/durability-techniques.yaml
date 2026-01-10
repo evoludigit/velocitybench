@@ -1,0 +1,28 @@
+id: durability-techniques
+name: Durability Techniques
+category: comprehensive
+type: standard
+tags:
+- durability
+summary:
+  short: Durability Techniques and implementation guidelines
+  long: Complete guide to durability techniques
+problem:
+  description: Challenges without proper durability techniques
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement durability techniques
+key_concepts:
+  concept: Durability Techniques
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

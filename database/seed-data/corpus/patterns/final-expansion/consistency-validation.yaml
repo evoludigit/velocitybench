@@ -1,0 +1,28 @@
+id: consistency-validation
+name: Consistency Validation
+category: comprehensive
+type: standard
+tags:
+- consistency
+summary:
+  short: Consistency Validation and implementation guidelines
+  long: Complete guide to consistency validation
+problem:
+  description: Challenges without proper consistency validation
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement consistency validation
+key_concepts:
+  concept: Consistency Validation
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

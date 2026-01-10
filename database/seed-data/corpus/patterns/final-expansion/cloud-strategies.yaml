@@ -1,0 +1,28 @@
+id: cloud-strategies
+name: Cloud Strategies
+category: comprehensive
+type: standard
+tags:
+- cloud
+summary:
+  short: Cloud Strategies and implementation guidelines
+  long: Complete guide to cloud strategies
+problem:
+  description: Challenges without proper cloud strategies
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement cloud strategies
+key_concepts:
+  concept: Cloud Strategies
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

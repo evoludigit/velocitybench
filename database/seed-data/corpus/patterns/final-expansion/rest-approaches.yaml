@@ -1,0 +1,28 @@
+id: rest-approaches
+name: Rest Approaches
+category: comprehensive
+type: standard
+tags:
+- rest
+summary:
+  short: Rest Approaches and implementation guidelines
+  long: Complete guide to rest approaches
+problem:
+  description: Challenges without proper rest approaches
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement rest approaches
+key_concepts:
+  concept: Rest Approaches
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,28 @@
+id: ml-model-evaluation
+name: Model Evaluation Patterns
+category: specialized
+type: standard
+tags:
+- ml
+summary:
+  short: Patterns and practices for model evaluation patterns
+  long: Comprehensive guide to model evaluation patterns
+problem:
+  description: Challenges with model evaluation patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement model evaluation patterns
+key_concepts:
+  concept: Understanding Model Evaluation Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Model Evaluation Patterns
+  intermediate:
+    focus: Implementing Model Evaluation Patterns
+  advanced:
+    focus: Advanced Model Evaluation Patterns

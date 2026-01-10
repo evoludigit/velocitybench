@@ -1,0 +1,28 @@
+id: databases-approaches
+name: Databases Approaches
+category: comprehensive
+type: standard
+tags:
+- databases
+summary:
+  short: Databases Approaches and implementation guidelines
+  long: Complete guide to databases approaches
+problem:
+  description: Challenges without proper databases approaches
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement databases approaches
+key_concepts:
+  concept: Databases Approaches
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

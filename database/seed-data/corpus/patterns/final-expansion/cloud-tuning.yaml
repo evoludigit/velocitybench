@@ -1,0 +1,28 @@
+id: cloud-tuning
+name: Cloud Tuning
+category: comprehensive
+type: standard
+tags:
+- cloud
+summary:
+  short: Cloud Tuning and implementation guidelines
+  long: Complete guide to cloud tuning
+problem:
+  description: Challenges without proper cloud tuning
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement cloud tuning
+key_concepts:
+  concept: Cloud Tuning
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

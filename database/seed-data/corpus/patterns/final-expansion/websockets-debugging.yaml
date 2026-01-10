@@ -1,0 +1,28 @@
+id: websockets-debugging
+name: Websockets Debugging
+category: comprehensive
+type: standard
+tags:
+- websockets
+summary:
+  short: Websockets Debugging and implementation guidelines
+  long: Complete guide to websockets debugging
+problem:
+  description: Challenges without proper websockets debugging
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement websockets debugging
+key_concepts:
+  concept: Websockets Debugging
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,28 @@
+id: logging-verification
+name: Logging Verification
+category: comprehensive
+type: standard
+tags:
+- logging
+summary:
+  short: Logging Verification and implementation guidelines
+  long: Complete guide to logging verification
+problem:
+  description: Challenges without proper logging verification
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement logging verification
+key_concepts:
+  concept: Logging Verification
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

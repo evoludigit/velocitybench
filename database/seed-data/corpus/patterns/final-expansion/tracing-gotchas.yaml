@@ -1,0 +1,28 @@
+id: tracing-gotchas
+name: Tracing Gotchas
+category: comprehensive
+type: standard
+tags:
+- tracing
+summary:
+  short: Tracing Gotchas and implementation guidelines
+  long: Complete guide to tracing gotchas
+problem:
+  description: Challenges without proper tracing gotchas
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement tracing gotchas
+key_concepts:
+  concept: Tracing Gotchas
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

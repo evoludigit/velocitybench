@@ -1,0 +1,28 @@
+id: hybrid-troubleshooting
+name: Hybrid Troubleshooting
+category: comprehensive
+type: standard
+tags:
+- hybrid
+summary:
+  short: Hybrid Troubleshooting and implementation guidelines
+  long: Complete guide to hybrid troubleshooting
+problem:
+  description: Challenges without proper hybrid troubleshooting
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement hybrid troubleshooting
+key_concepts:
+  concept: Hybrid Troubleshooting
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

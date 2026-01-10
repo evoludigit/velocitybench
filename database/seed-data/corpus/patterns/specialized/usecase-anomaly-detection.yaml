@@ -1,0 +1,28 @@
+id: usecase-anomaly-detection
+name: Anomaly Detection Patterns
+category: specialized
+type: standard
+tags:
+- usecase
+summary:
+  short: Patterns and practices for anomaly detection patterns
+  long: Comprehensive guide to anomaly detection patterns
+problem:
+  description: Challenges with anomaly detection patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement anomaly detection patterns
+key_concepts:
+  concept: Understanding Anomaly Detection Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Anomaly Detection Patterns
+  intermediate:
+    focus: Implementing Anomaly Detection Patterns
+  advanced:
+    focus: Advanced Anomaly Detection Patterns

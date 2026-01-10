@@ -1,0 +1,28 @@
+id: messaging-best-practices
+name: Messaging Best Practices
+category: comprehensive
+type: standard
+tags:
+- messaging
+summary:
+  short: Messaging Best Practices and implementation guidelines
+  long: Complete guide to messaging best practices
+problem:
+  description: Challenges without proper messaging best practices
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement messaging best practices
+key_concepts:
+  concept: Messaging Best Practices
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

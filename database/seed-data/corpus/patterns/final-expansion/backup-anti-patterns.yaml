@@ -1,0 +1,28 @@
+id: backup-anti-patterns
+name: Backup Anti Patterns
+category: comprehensive
+type: standard
+tags:
+- backup
+summary:
+  short: Backup Anti Patterns and implementation guidelines
+  long: Complete guide to backup anti patterns
+problem:
+  description: Challenges without proper backup anti patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement backup anti patterns
+key_concepts:
+  concept: Backup Anti Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,28 @@
+id: logging-strategies
+name: Logging Strategies
+category: comprehensive
+type: standard
+tags:
+- logging
+summary:
+  short: Logging Strategies and implementation guidelines
+  long: Complete guide to logging strategies
+problem:
+  description: Challenges without proper logging strategies
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement logging strategies
+key_concepts:
+  concept: Logging Strategies
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

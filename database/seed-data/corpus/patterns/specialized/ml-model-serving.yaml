@@ -1,0 +1,28 @@
+id: ml-model-serving
+name: Model Serving Patterns
+category: specialized
+type: standard
+tags:
+- ml
+summary:
+  short: Patterns and practices for model serving patterns
+  long: Comprehensive guide to model serving patterns
+problem:
+  description: Challenges with model serving patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement model serving patterns
+key_concepts:
+  concept: Understanding Model Serving Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Model Serving Patterns
+  intermediate:
+    focus: Implementing Model Serving Patterns
+  advanced:
+    focus: Advanced Model Serving Patterns

@@ -1,0 +1,28 @@
+id: tracing-conventions
+name: Tracing Conventions
+category: comprehensive
+type: standard
+tags:
+- tracing
+summary:
+  short: Tracing Conventions and implementation guidelines
+  long: Complete guide to tracing conventions
+problem:
+  description: Challenges without proper tracing conventions
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement tracing conventions
+key_concepts:
+  concept: Tracing Conventions
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

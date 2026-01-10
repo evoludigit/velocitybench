@@ -1,0 +1,28 @@
+id: latency-gotchas
+name: Latency Gotchas
+category: comprehensive
+type: standard
+tags:
+- latency
+summary:
+  short: Latency Gotchas and implementation guidelines
+  long: Complete guide to latency gotchas
+problem:
+  description: Challenges without proper latency gotchas
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement latency gotchas
+key_concepts:
+  concept: Latency Gotchas
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

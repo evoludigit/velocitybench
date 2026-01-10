@@ -1,0 +1,28 @@
+id: queuing-techniques
+name: Queuing Techniques
+category: comprehensive
+type: standard
+tags:
+- queuing
+summary:
+  short: Queuing Techniques and implementation guidelines
+  long: Complete guide to queuing techniques
+problem:
+  description: Challenges without proper queuing techniques
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement queuing techniques
+key_concepts:
+  concept: Queuing Techniques
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

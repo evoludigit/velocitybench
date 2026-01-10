@@ -1,0 +1,28 @@
+id: encryption-migration
+name: Encryption Migration
+category: comprehensive
+type: standard
+tags:
+- encryption
+summary:
+  short: Encryption Migration and implementation guidelines
+  long: Complete guide to encryption migration
+problem:
+  description: Challenges without proper encryption migration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement encryption migration
+key_concepts:
+  concept: Encryption Migration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

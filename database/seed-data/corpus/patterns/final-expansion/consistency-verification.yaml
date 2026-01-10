@@ -1,0 +1,28 @@
+id: consistency-verification
+name: Consistency Verification
+category: comprehensive
+type: standard
+tags:
+- consistency
+summary:
+  short: Consistency Verification and implementation guidelines
+  long: Complete guide to consistency verification
+problem:
+  description: Challenges without proper consistency verification
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement consistency verification
+key_concepts:
+  concept: Consistency Verification
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

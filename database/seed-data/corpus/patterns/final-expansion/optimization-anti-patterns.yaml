@@ -1,0 +1,28 @@
+id: optimization-anti-patterns
+name: Optimization Anti Patterns
+category: comprehensive
+type: standard
+tags:
+- optimization
+summary:
+  short: Optimization Anti Patterns and implementation guidelines
+  long: Complete guide to optimization anti patterns
+problem:
+  description: Challenges without proper optimization anti patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement optimization anti patterns
+key_concepts:
+  concept: Optimization Anti Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

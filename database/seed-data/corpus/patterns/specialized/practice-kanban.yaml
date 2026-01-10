@@ -1,0 +1,28 @@
+id: practice-kanban
+name: Kanban Practices
+category: specialized
+type: standard
+tags:
+- practice
+summary:
+  short: Patterns and practices for kanban practices
+  long: Comprehensive guide to kanban practices
+problem:
+  description: Challenges with kanban practices
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement kanban practices
+key_concepts:
+  concept: Understanding Kanban Practices
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Kanban Practices
+  intermediate:
+    focus: Implementing Kanban Practices
+  advanced:
+    focus: Advanced Kanban Practices

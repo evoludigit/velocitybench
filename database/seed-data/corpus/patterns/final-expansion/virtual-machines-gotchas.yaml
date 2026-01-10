@@ -1,0 +1,28 @@
+id: virtual-machines-gotchas
+name: Virtual-Machines Gotchas
+category: comprehensive
+type: standard
+tags:
+- virtual-machines
+summary:
+  short: Virtual-Machines Gotchas and implementation guidelines
+  long: Complete guide to virtual-machines gotchas
+problem:
+  description: Challenges without proper virtual-machines gotchas
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement virtual-machines gotchas
+key_concepts:
+  concept: Virtual-Machines Gotchas
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

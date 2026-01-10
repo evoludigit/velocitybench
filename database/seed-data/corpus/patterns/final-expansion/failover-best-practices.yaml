@@ -1,0 +1,28 @@
+id: failover-best-practices
+name: Failover Best Practices
+category: comprehensive
+type: standard
+tags:
+- failover
+summary:
+  short: Failover Best Practices and implementation guidelines
+  long: Complete guide to failover best practices
+problem:
+  description: Challenges without proper failover best practices
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement failover best practices
+key_concepts:
+  concept: Failover Best Practices
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

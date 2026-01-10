@@ -1,0 +1,28 @@
+id: governance-testing
+name: Governance Testing
+category: comprehensive
+type: standard
+tags:
+- governance
+summary:
+  short: Governance Testing and implementation guidelines
+  long: Complete guide to governance testing
+problem:
+  description: Challenges without proper governance testing
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement governance testing
+key_concepts:
+  concept: Governance Testing
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

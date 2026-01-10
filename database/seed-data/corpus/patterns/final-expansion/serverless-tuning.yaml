@@ -1,0 +1,28 @@
+id: serverless-tuning
+name: Serverless Tuning
+category: comprehensive
+type: standard
+tags:
+- serverless
+summary:
+  short: Serverless Tuning and implementation guidelines
+  long: Complete guide to serverless tuning
+problem:
+  description: Challenges without proper serverless tuning
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement serverless tuning
+key_concepts:
+  concept: Serverless Tuning
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

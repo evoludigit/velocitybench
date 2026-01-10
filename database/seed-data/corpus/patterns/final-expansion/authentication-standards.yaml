@@ -1,0 +1,28 @@
+id: authentication-standards
+name: Authentication Standards
+category: comprehensive
+type: standard
+tags:
+- authentication
+summary:
+  short: Authentication Standards and implementation guidelines
+  long: Complete guide to authentication standards
+problem:
+  description: Challenges without proper authentication standards
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement authentication standards
+key_concepts:
+  concept: Authentication Standards
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

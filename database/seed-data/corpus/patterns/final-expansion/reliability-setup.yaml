@@ -1,0 +1,28 @@
+id: reliability-setup
+name: Reliability Setup
+category: comprehensive
+type: standard
+tags:
+- reliability
+summary:
+  short: Reliability Setup and implementation guidelines
+  long: Complete guide to reliability setup
+problem:
+  description: Challenges without proper reliability setup
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement reliability setup
+key_concepts:
+  concept: Reliability Setup
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

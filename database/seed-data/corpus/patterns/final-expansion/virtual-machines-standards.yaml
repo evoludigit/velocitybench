@@ -1,0 +1,28 @@
+id: virtual-machines-standards
+name: Virtual-Machines Standards
+category: comprehensive
+type: standard
+tags:
+- virtual-machines
+summary:
+  short: Virtual-Machines Standards and implementation guidelines
+  long: Complete guide to virtual-machines standards
+problem:
+  description: Challenges without proper virtual-machines standards
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement virtual-machines standards
+key_concepts:
+  concept: Virtual-Machines Standards
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

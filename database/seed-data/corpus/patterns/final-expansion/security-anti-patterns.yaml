@@ -1,0 +1,28 @@
+id: security-anti-patterns
+name: Security Anti Patterns
+category: comprehensive
+type: standard
+tags:
+- security
+summary:
+  short: Security Anti Patterns and implementation guidelines
+  long: Complete guide to security anti patterns
+problem:
+  description: Challenges without proper security anti patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement security anti patterns
+key_concepts:
+  concept: Security Anti Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

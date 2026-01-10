@@ -1,0 +1,28 @@
+id: ops-health-checks
+name: Health Checks Patterns
+category: specialized
+type: standard
+tags:
+- ops
+summary:
+  short: Patterns and practices for health checks patterns
+  long: Comprehensive guide to health checks patterns
+problem:
+  description: Challenges with health checks patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement health checks patterns
+key_concepts:
+  concept: Understanding Health Checks Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Health Checks Patterns
+  intermediate:
+    focus: Implementing Health Checks Patterns
+  advanced:
+    focus: Advanced Health Checks Patterns

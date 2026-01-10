@@ -1,0 +1,28 @@
+id: consistency-approaches
+name: Consistency Approaches
+category: comprehensive
+type: standard
+tags:
+- consistency
+summary:
+  short: Consistency Approaches and implementation guidelines
+  long: Complete guide to consistency approaches
+problem:
+  description: Challenges without proper consistency approaches
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement consistency approaches
+key_concepts:
+  concept: Consistency Approaches
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

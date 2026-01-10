@@ -1,0 +1,31 @@
+id: docker-compose
+name: Docker Compose Integration Patterns
+category: general
+type: standard
+tags:
+- docker
+summary:
+  short: Best practices for docker compose integration patterns
+  long: Comprehensive guide to docker compose integration patterns. This pattern covers
+    implementation details, best practices, and common pitfalls.
+problem:
+  description: Issues without proper docker compose integration patterns
+  symptoms:
+  - Performance issues
+  - Reliability problems
+  - Scalability challenges
+  impact: System degradation
+solution:
+  description: Implement docker compose integration patterns effectively
+key_concepts:
+  concept: Understanding docker compose integration patterns
+best_practices:
+- name: Best practice 1
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Introduction to Docker Compose Integration Patterns
+  intermediate:
+    focus: Implementing Docker Compose Integration Patterns
+  advanced:
+    focus: Advanced Docker Compose Integration Patterns

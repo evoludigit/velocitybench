@@ -1,0 +1,28 @@
+id: hybrid-patterns
+name: Hybrid Patterns
+category: comprehensive
+type: standard
+tags:
+- hybrid
+summary:
+  short: Hybrid Patterns and implementation guidelines
+  long: Complete guide to hybrid patterns
+problem:
+  description: Challenges without proper hybrid patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement hybrid patterns
+key_concepts:
+  concept: Hybrid Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

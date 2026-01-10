@@ -1,0 +1,28 @@
+id: compliance-debugging
+name: Compliance Debugging
+category: comprehensive
+type: standard
+tags:
+- compliance
+summary:
+  short: Compliance Debugging and implementation guidelines
+  long: Complete guide to compliance debugging
+problem:
+  description: Challenges without proper compliance debugging
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement compliance debugging
+key_concepts:
+  concept: Compliance Debugging
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

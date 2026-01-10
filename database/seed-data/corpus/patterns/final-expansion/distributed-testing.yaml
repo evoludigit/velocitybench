@@ -1,0 +1,28 @@
+id: distributed-testing
+name: Distributed Testing
+category: comprehensive
+type: standard
+tags:
+- distributed
+summary:
+  short: Distributed Testing and implementation guidelines
+  long: Complete guide to distributed testing
+problem:
+  description: Challenges without proper distributed testing
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement distributed testing
+key_concepts:
+  concept: Distributed Testing
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

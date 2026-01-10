@@ -1,0 +1,28 @@
+id: reliability-anti-patterns
+name: Reliability Anti Patterns
+category: comprehensive
+type: standard
+tags:
+- reliability
+summary:
+  short: Reliability Anti Patterns and implementation guidelines
+  long: Complete guide to reliability anti patterns
+problem:
+  description: Challenges without proper reliability anti patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement reliability anti patterns
+key_concepts:
+  concept: Reliability Anti Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

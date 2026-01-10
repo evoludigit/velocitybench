@@ -1,0 +1,28 @@
+id: debugging-patterns
+name: Debugging Patterns
+category: comprehensive
+type: standard
+tags:
+- debugging
+summary:
+  short: Debugging Patterns and implementation guidelines
+  long: Complete guide to debugging patterns
+problem:
+  description: Challenges without proper debugging patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement debugging patterns
+key_concepts:
+  concept: Debugging Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

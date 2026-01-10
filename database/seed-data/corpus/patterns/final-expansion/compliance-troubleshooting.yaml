@@ -1,0 +1,28 @@
+id: compliance-troubleshooting
+name: Compliance Troubleshooting
+category: comprehensive
+type: standard
+tags:
+- compliance
+summary:
+  short: Compliance Troubleshooting and implementation guidelines
+  long: Complete guide to compliance troubleshooting
+problem:
+  description: Challenges without proper compliance troubleshooting
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement compliance troubleshooting
+key_concepts:
+  concept: Compliance Troubleshooting
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

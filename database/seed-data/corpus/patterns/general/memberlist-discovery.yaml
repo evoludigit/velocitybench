@@ -1,0 +1,31 @@
+id: memberlist-discovery
+name: Memberlist Discovery Integration Patterns
+category: general
+type: standard
+tags:
+- memberlist
+summary:
+  short: Best practices for memberlist discovery integration patterns
+  long: Comprehensive guide to memberlist discovery integration patterns. This pattern
+    covers implementation details, best practices, and common pitfalls.
+problem:
+  description: Issues without proper memberlist discovery integration patterns
+  symptoms:
+  - Performance issues
+  - Reliability problems
+  - Scalability challenges
+  impact: System degradation
+solution:
+  description: Implement memberlist discovery integration patterns effectively
+key_concepts:
+  concept: Understanding memberlist discovery integration patterns
+best_practices:
+- name: Best practice 1
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Introduction to Memberlist Discovery Integration Patterns
+  intermediate:
+    focus: Implementing Memberlist Discovery Integration Patterns
+  advanced:
+    focus: Advanced Memberlist Discovery Integration Patterns

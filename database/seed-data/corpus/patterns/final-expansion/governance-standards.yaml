@@ -1,0 +1,28 @@
+id: governance-standards
+name: Governance Standards
+category: comprehensive
+type: standard
+tags:
+- governance
+summary:
+  short: Governance Standards and implementation guidelines
+  long: Complete guide to governance standards
+problem:
+  description: Challenges without proper governance standards
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement governance standards
+key_concepts:
+  concept: Governance Standards
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

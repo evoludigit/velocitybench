@@ -1,0 +1,28 @@
+id: monolith-guidelines
+name: Monolith Guidelines
+category: comprehensive
+type: standard
+tags:
+- monolith
+summary:
+  short: Monolith Guidelines and implementation guidelines
+  long: Complete guide to monolith guidelines
+problem:
+  description: Challenges without proper monolith guidelines
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement monolith guidelines
+key_concepts:
+  concept: Monolith Guidelines
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

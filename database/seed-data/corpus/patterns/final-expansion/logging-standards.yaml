@@ -1,0 +1,28 @@
+id: logging-standards
+name: Logging Standards
+category: comprehensive
+type: standard
+tags:
+- logging
+summary:
+  short: Logging Standards and implementation guidelines
+  long: Complete guide to logging standards
+problem:
+  description: Challenges without proper logging standards
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement logging standards
+key_concepts:
+  concept: Logging Standards
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

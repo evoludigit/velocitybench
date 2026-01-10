@@ -1,0 +1,28 @@
+id: backup-best-practices
+name: Backup Best Practices
+category: comprehensive
+type: standard
+tags:
+- backup
+summary:
+  short: Backup Best Practices and implementation guidelines
+  long: Complete guide to backup best practices
+problem:
+  description: Challenges without proper backup best practices
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement backup best practices
+key_concepts:
+  concept: Backup Best Practices
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

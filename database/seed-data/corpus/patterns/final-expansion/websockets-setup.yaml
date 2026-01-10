@@ -1,0 +1,28 @@
+id: websockets-setup
+name: Websockets Setup
+category: comprehensive
+type: standard
+tags:
+- websockets
+summary:
+  short: Websockets Setup and implementation guidelines
+  long: Complete guide to websockets setup
+problem:
+  description: Challenges without proper websockets setup
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement websockets setup
+key_concepts:
+  concept: Websockets Setup
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

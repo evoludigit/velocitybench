@@ -1,0 +1,28 @@
+id: compliance-migration
+name: Compliance Migration
+category: comprehensive
+type: standard
+tags:
+- compliance
+summary:
+  short: Compliance Migration and implementation guidelines
+  long: Complete guide to compliance migration
+problem:
+  description: Challenges without proper compliance migration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement compliance migration
+key_concepts:
+  concept: Compliance Migration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

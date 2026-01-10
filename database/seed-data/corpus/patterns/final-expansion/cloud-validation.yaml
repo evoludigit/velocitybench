@@ -1,0 +1,28 @@
+id: cloud-validation
+name: Cloud Validation
+category: comprehensive
+type: standard
+tags:
+- cloud
+summary:
+  short: Cloud Validation and implementation guidelines
+  long: Complete guide to cloud validation
+problem:
+  description: Challenges without proper cloud validation
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement cloud validation
+key_concepts:
+  concept: Cloud Validation
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

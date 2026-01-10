@@ -1,0 +1,28 @@
+id: privacy-gotchas
+name: Privacy Gotchas
+category: comprehensive
+type: standard
+tags:
+- privacy
+summary:
+  short: Privacy Gotchas and implementation guidelines
+  long: Complete guide to privacy gotchas
+problem:
+  description: Challenges without proper privacy gotchas
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement privacy gotchas
+key_concepts:
+  concept: Privacy Gotchas
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

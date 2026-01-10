@@ -1,0 +1,28 @@
+id: ops-trace-collection
+name: Trace Collection Patterns
+category: specialized
+type: standard
+tags:
+- ops
+summary:
+  short: Patterns and practices for trace collection patterns
+  long: Comprehensive guide to trace collection patterns
+problem:
+  description: Challenges with trace collection patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement trace collection patterns
+key_concepts:
+  concept: Understanding Trace Collection Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Trace Collection Patterns
+  intermediate:
+    focus: Implementing Trace Collection Patterns
+  advanced:
+    focus: Advanced Trace Collection Patterns

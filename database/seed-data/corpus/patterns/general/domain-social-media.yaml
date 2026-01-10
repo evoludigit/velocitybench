@@ -1,0 +1,31 @@
+id: domain-social-media
+name: Social-Media Domain Patterns
+category: general
+type: standard
+tags:
+- domain
+summary:
+  short: Best practices for social-media domain patterns
+  long: Comprehensive guide to social-media domain patterns. This pattern covers implementation
+    details, best practices, and common pitfalls.
+problem:
+  description: Issues without proper social-media domain patterns
+  symptoms:
+  - Performance issues
+  - Reliability problems
+  - Scalability challenges
+  impact: System degradation
+solution:
+  description: Implement social-media domain patterns effectively
+key_concepts:
+  concept: Understanding social-media domain patterns
+best_practices:
+- name: Best practice 1
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Introduction to Social-Media Domain Patterns
+  intermediate:
+    focus: Implementing Social-Media Domain Patterns
+  advanced:
+    focus: Advanced Social-Media Domain Patterns

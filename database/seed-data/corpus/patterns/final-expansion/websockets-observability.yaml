@@ -1,0 +1,28 @@
+id: websockets-observability
+name: Websockets Observability
+category: comprehensive
+type: standard
+tags:
+- websockets
+summary:
+  short: Websockets Observability and implementation guidelines
+  long: Complete guide to websockets observability
+problem:
+  description: Challenges without proper websockets observability
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement websockets observability
+key_concepts:
+  concept: Websockets Observability
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

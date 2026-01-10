@@ -1,0 +1,28 @@
+id: durability-best-practices
+name: Durability Best Practices
+category: comprehensive
+type: standard
+tags:
+- durability
+summary:
+  short: Durability Best Practices and implementation guidelines
+  long: Complete guide to durability best practices
+problem:
+  description: Challenges without proper durability best practices
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement durability best practices
+key_concepts:
+  concept: Durability Best Practices
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

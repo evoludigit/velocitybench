@@ -1,0 +1,28 @@
+id: reliability-patterns
+name: Reliability Patterns
+category: comprehensive
+type: standard
+tags:
+- reliability
+summary:
+  short: Reliability Patterns and implementation guidelines
+  long: Complete guide to reliability patterns
+problem:
+  description: Challenges without proper reliability patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement reliability patterns
+key_concepts:
+  concept: Reliability Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

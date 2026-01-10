@@ -1,0 +1,28 @@
+id: messaging-gotchas
+name: Messaging Gotchas
+category: comprehensive
+type: standard
+tags:
+- messaging
+summary:
+  short: Messaging Gotchas and implementation guidelines
+  long: Complete guide to messaging gotchas
+problem:
+  description: Challenges without proper messaging gotchas
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement messaging gotchas
+key_concepts:
+  concept: Messaging Gotchas
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

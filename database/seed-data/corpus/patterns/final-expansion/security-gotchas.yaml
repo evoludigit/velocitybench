@@ -1,0 +1,28 @@
+id: security-gotchas
+name: Security Gotchas
+category: comprehensive
+type: standard
+tags:
+- security
+summary:
+  short: Security Gotchas and implementation guidelines
+  long: Complete guide to security gotchas
+problem:
+  description: Challenges without proper security gotchas
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement security gotchas
+key_concepts:
+  concept: Security Gotchas
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,28 @@
+id: virtual-machines-maintenance
+name: Virtual-Machines Maintenance
+category: comprehensive
+type: standard
+tags:
+- virtual-machines
+summary:
+  short: Virtual-Machines Maintenance and implementation guidelines
+  long: Complete guide to virtual-machines maintenance
+problem:
+  description: Challenges without proper virtual-machines maintenance
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement virtual-machines maintenance
+key_concepts:
+  concept: Virtual-Machines Maintenance
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

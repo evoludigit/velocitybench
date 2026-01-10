@@ -1,0 +1,28 @@
+id: distributed-standards
+name: Distributed Standards
+category: comprehensive
+type: standard
+tags:
+- distributed
+summary:
+  short: Distributed Standards and implementation guidelines
+  long: Complete guide to distributed standards
+problem:
+  description: Challenges without proper distributed standards
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement distributed standards
+key_concepts:
+  concept: Distributed Standards
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

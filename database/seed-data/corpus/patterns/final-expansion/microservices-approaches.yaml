@@ -1,0 +1,28 @@
+id: microservices-approaches
+name: Microservices Approaches
+category: comprehensive
+type: standard
+tags:
+- microservices
+summary:
+  short: Microservices Approaches and implementation guidelines
+  long: Complete guide to microservices approaches
+problem:
+  description: Challenges without proper microservices approaches
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement microservices approaches
+key_concepts:
+  concept: Microservices Approaches
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,31 @@
+id: github-actions
+name: Github Actions Integration Patterns
+category: general
+type: standard
+tags:
+- github
+summary:
+  short: Best practices for github actions integration patterns
+  long: Comprehensive guide to github actions integration patterns. This pattern covers
+    implementation details, best practices, and common pitfalls.
+problem:
+  description: Issues without proper github actions integration patterns
+  symptoms:
+  - Performance issues
+  - Reliability problems
+  - Scalability challenges
+  impact: System degradation
+solution:
+  description: Implement github actions integration patterns effectively
+key_concepts:
+  concept: Understanding github actions integration patterns
+best_practices:
+- name: Best practice 1
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Introduction to Github Actions Integration Patterns
+  intermediate:
+    focus: Implementing Github Actions Integration Patterns
+  advanced:
+    focus: Advanced Github Actions Integration Patterns

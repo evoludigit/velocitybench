@@ -1,0 +1,28 @@
+id: cloud-best-practices
+name: Cloud Best Practices
+category: comprehensive
+type: standard
+tags:
+- cloud
+summary:
+  short: Cloud Best Practices and implementation guidelines
+  long: Complete guide to cloud best practices
+problem:
+  description: Challenges without proper cloud best practices
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement cloud best practices
+key_concepts:
+  concept: Cloud Best Practices
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

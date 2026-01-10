@@ -1,0 +1,28 @@
+id: governance-conventions
+name: Governance Conventions
+category: comprehensive
+type: standard
+tags:
+- governance
+summary:
+  short: Governance Conventions and implementation guidelines
+  long: Complete guide to governance conventions
+problem:
+  description: Challenges without proper governance conventions
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement governance conventions
+key_concepts:
+  concept: Governance Conventions
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,28 @@
+id: rest-maintenance
+name: Rest Maintenance
+category: comprehensive
+type: standard
+tags:
+- rest
+summary:
+  short: Rest Maintenance and implementation guidelines
+  long: Complete guide to rest maintenance
+problem:
+  description: Challenges without proper rest maintenance
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement rest maintenance
+key_concepts:
+  concept: Rest Maintenance
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

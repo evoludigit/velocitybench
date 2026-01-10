@@ -1,0 +1,28 @@
+id: serverless-optimization
+name: Serverless Optimization
+category: comprehensive
+type: standard
+tags:
+- serverless
+summary:
+  short: Serverless Optimization and implementation guidelines
+  long: Complete guide to serverless optimization
+problem:
+  description: Challenges without proper serverless optimization
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement serverless optimization
+key_concepts:
+  concept: Serverless Optimization
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

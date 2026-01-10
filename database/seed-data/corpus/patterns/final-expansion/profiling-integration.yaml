@@ -1,0 +1,28 @@
+id: profiling-integration
+name: Profiling Integration
+category: comprehensive
+type: standard
+tags:
+- profiling
+summary:
+  short: Profiling Integration and implementation guidelines
+  long: Complete guide to profiling integration
+problem:
+  description: Challenges without proper profiling integration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement profiling integration
+key_concepts:
+  concept: Profiling Integration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

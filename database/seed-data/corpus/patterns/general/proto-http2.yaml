@@ -1,0 +1,31 @@
+id: proto-http2
+name: HTTP2 Protocol Patterns
+category: general
+type: standard
+tags:
+- proto
+summary:
+  short: Best practices for http2 protocol patterns
+  long: Comprehensive guide to http2 protocol patterns. This pattern covers implementation
+    details, best practices, and common pitfalls.
+problem:
+  description: Issues without proper http2 protocol patterns
+  symptoms:
+  - Performance issues
+  - Reliability problems
+  - Scalability challenges
+  impact: System degradation
+solution:
+  description: Implement http2 protocol patterns effectively
+key_concepts:
+  concept: Understanding http2 protocol patterns
+best_practices:
+- name: Best practice 1
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Introduction to HTTP2 Protocol Patterns
+  intermediate:
+    focus: Implementing HTTP2 Protocol Patterns
+  advanced:
+    focus: Advanced HTTP2 Protocol Patterns

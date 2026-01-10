@@ -1,0 +1,28 @@
+id: monitoring-observability
+name: Monitoring Observability
+category: comprehensive
+type: standard
+tags:
+- monitoring
+summary:
+  short: Monitoring Observability and implementation guidelines
+  long: Complete guide to monitoring observability
+problem:
+  description: Challenges without proper monitoring observability
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement monitoring observability
+key_concepts:
+  concept: Monitoring Observability
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

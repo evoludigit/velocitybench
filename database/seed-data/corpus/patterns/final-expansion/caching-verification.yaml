@@ -1,0 +1,28 @@
+id: caching-verification
+name: Caching Verification
+category: comprehensive
+type: standard
+tags:
+- caching
+summary:
+  short: Caching Verification and implementation guidelines
+  long: Complete guide to caching verification
+problem:
+  description: Challenges without proper caching verification
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement caching verification
+key_concepts:
+  concept: Caching Verification
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

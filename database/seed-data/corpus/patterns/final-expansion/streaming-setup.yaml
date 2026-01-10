@@ -1,0 +1,28 @@
+id: streaming-setup
+name: Streaming Setup
+category: comprehensive
+type: standard
+tags:
+- streaming
+summary:
+  short: Streaming Setup and implementation guidelines
+  long: Complete guide to streaming setup
+problem:
+  description: Challenges without proper streaming setup
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement streaming setup
+key_concepts:
+  concept: Streaming Setup
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

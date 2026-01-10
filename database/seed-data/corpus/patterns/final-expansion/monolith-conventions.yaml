@@ -1,0 +1,28 @@
+id: monolith-conventions
+name: Monolith Conventions
+category: comprehensive
+type: standard
+tags:
+- monolith
+summary:
+  short: Monolith Conventions and implementation guidelines
+  long: Complete guide to monolith conventions
+problem:
+  description: Challenges without proper monolith conventions
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement monolith conventions
+key_concepts:
+  concept: Monolith Conventions
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

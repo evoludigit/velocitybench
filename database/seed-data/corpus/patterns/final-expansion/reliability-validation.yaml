@@ -1,0 +1,28 @@
+id: reliability-validation
+name: Reliability Validation
+category: comprehensive
+type: standard
+tags:
+- reliability
+summary:
+  short: Reliability Validation and implementation guidelines
+  long: Complete guide to reliability validation
+problem:
+  description: Challenges without proper reliability validation
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement reliability validation
+key_concepts:
+  concept: Reliability Validation
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,28 @@
+id: signing-validation
+name: Signing Validation
+category: comprehensive
+type: standard
+tags:
+- signing
+summary:
+  short: Signing Validation and implementation guidelines
+  long: Complete guide to signing validation
+problem:
+  description: Challenges without proper signing validation
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement signing validation
+key_concepts:
+  concept: Signing Validation
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

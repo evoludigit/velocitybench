@@ -1,0 +1,28 @@
+id: databases-debugging
+name: Databases Debugging
+category: comprehensive
+type: standard
+tags:
+- databases
+summary:
+  short: Databases Debugging and implementation guidelines
+  long: Complete guide to databases debugging
+problem:
+  description: Challenges without proper databases debugging
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement databases debugging
+key_concepts:
+  concept: Databases Debugging
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

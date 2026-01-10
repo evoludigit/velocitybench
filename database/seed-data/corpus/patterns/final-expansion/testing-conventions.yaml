@@ -1,0 +1,28 @@
+id: testing-conventions
+name: Testing Conventions
+category: comprehensive
+type: standard
+tags:
+- testing
+summary:
+  short: Testing Conventions and implementation guidelines
+  long: Complete guide to testing conventions
+problem:
+  description: Challenges without proper testing conventions
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement testing conventions
+key_concepts:
+  concept: Testing Conventions
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

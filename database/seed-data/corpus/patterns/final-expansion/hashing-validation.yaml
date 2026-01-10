@@ -1,0 +1,28 @@
+id: hashing-validation
+name: Hashing Validation
+category: comprehensive
+type: standard
+tags:
+- hashing
+summary:
+  short: Hashing Validation and implementation guidelines
+  long: Complete guide to hashing validation
+problem:
+  description: Challenges without proper hashing validation
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement hashing validation
+key_concepts:
+  concept: Hashing Validation
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

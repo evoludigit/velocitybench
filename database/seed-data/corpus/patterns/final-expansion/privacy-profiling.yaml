@@ -1,0 +1,28 @@
+id: privacy-profiling
+name: Privacy Profiling
+category: comprehensive
+type: standard
+tags:
+- privacy
+summary:
+  short: Privacy Profiling and implementation guidelines
+  long: Complete guide to privacy profiling
+problem:
+  description: Challenges without proper privacy profiling
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement privacy profiling
+key_concepts:
+  concept: Privacy Profiling
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

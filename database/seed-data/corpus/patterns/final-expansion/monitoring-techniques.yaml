@@ -1,0 +1,28 @@
+id: monitoring-techniques
+name: Monitoring Techniques
+category: comprehensive
+type: standard
+tags:
+- monitoring
+summary:
+  short: Monitoring Techniques and implementation guidelines
+  long: Complete guide to monitoring techniques
+problem:
+  description: Challenges without proper monitoring techniques
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement monitoring techniques
+key_concepts:
+  concept: Monitoring Techniques
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

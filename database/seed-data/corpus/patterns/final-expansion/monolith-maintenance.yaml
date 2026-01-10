@@ -1,0 +1,28 @@
+id: monolith-maintenance
+name: Monolith Maintenance
+category: comprehensive
+type: standard
+tags:
+- monolith
+summary:
+  short: Monolith Maintenance and implementation guidelines
+  long: Complete guide to monolith maintenance
+problem:
+  description: Challenges without proper monolith maintenance
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement monolith maintenance
+key_concepts:
+  concept: Monolith Maintenance
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

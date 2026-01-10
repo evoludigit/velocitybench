@@ -1,0 +1,28 @@
+id: backup-standards
+name: Backup Standards
+category: comprehensive
+type: standard
+tags:
+- backup
+summary:
+  short: Backup Standards and implementation guidelines
+  long: Complete guide to backup standards
+problem:
+  description: Challenges without proper backup standards
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement backup standards
+key_concepts:
+  concept: Backup Standards
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

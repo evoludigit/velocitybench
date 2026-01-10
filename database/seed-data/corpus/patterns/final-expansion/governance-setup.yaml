@@ -1,0 +1,28 @@
+id: governance-setup
+name: Governance Setup
+category: comprehensive
+type: standard
+tags:
+- governance
+summary:
+  short: Governance Setup and implementation guidelines
+  long: Complete guide to governance setup
+problem:
+  description: Challenges without proper governance setup
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement governance setup
+key_concepts:
+  concept: Governance Setup
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

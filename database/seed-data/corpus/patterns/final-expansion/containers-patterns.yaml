@@ -1,0 +1,28 @@
+id: containers-patterns
+name: Containers Patterns
+category: comprehensive
+type: standard
+tags:
+- containers
+summary:
+  short: Containers Patterns and implementation guidelines
+  long: Complete guide to containers patterns
+problem:
+  description: Challenges without proper containers patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement containers patterns
+key_concepts:
+  concept: Containers Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

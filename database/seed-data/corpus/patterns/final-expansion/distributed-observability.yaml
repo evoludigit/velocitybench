@@ -1,0 +1,28 @@
+id: distributed-observability
+name: Distributed Observability
+category: comprehensive
+type: standard
+tags:
+- distributed
+summary:
+  short: Distributed Observability and implementation guidelines
+  long: Complete guide to distributed observability
+problem:
+  description: Challenges without proper distributed observability
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement distributed observability
+key_concepts:
+  concept: Distributed Observability
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

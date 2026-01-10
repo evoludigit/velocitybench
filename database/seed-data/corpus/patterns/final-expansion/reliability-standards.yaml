@@ -1,0 +1,28 @@
+id: reliability-standards
+name: Reliability Standards
+category: comprehensive
+type: standard
+tags:
+- reliability
+summary:
+  short: Reliability Standards and implementation guidelines
+  long: Complete guide to reliability standards
+problem:
+  description: Challenges without proper reliability standards
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement reliability standards
+key_concepts:
+  concept: Reliability Standards
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

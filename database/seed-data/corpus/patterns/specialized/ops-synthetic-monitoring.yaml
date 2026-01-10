@@ -1,0 +1,28 @@
+id: ops-synthetic-monitoring
+name: Synthetic Monitoring Patterns
+category: specialized
+type: standard
+tags:
+- ops
+summary:
+  short: Patterns and practices for synthetic monitoring patterns
+  long: Comprehensive guide to synthetic monitoring patterns
+problem:
+  description: Challenges with synthetic monitoring patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement synthetic monitoring patterns
+key_concepts:
+  concept: Understanding Synthetic Monitoring Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Synthetic Monitoring Patterns
+  intermediate:
+    focus: Implementing Synthetic Monitoring Patterns
+  advanced:
+    focus: Advanced Synthetic Monitoring Patterns

@@ -1,0 +1,28 @@
+id: failover-tuning
+name: Failover Tuning
+category: comprehensive
+type: standard
+tags:
+- failover
+summary:
+  short: Failover Tuning and implementation guidelines
+  long: Complete guide to failover tuning
+problem:
+  description: Challenges without proper failover tuning
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement failover tuning
+key_concepts:
+  concept: Failover Tuning
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

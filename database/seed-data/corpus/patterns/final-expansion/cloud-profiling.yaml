@@ -1,0 +1,28 @@
+id: cloud-profiling
+name: Cloud Profiling
+category: comprehensive
+type: standard
+tags:
+- cloud
+summary:
+  short: Cloud Profiling and implementation guidelines
+  long: Complete guide to cloud profiling
+problem:
+  description: Challenges without proper cloud profiling
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement cloud profiling
+key_concepts:
+  concept: Cloud Profiling
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

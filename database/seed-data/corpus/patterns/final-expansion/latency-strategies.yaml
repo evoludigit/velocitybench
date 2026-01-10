@@ -1,0 +1,28 @@
+id: latency-strategies
+name: Latency Strategies
+category: comprehensive
+type: standard
+tags:
+- latency
+summary:
+  short: Latency Strategies and implementation guidelines
+  long: Complete guide to latency strategies
+problem:
+  description: Challenges without proper latency strategies
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement latency strategies
+key_concepts:
+  concept: Latency Strategies
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

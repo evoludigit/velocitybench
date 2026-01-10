@@ -1,0 +1,28 @@
+id: failover-testing
+name: Failover Testing
+category: comprehensive
+type: standard
+tags:
+- failover
+summary:
+  short: Failover Testing and implementation guidelines
+  long: Complete guide to failover testing
+problem:
+  description: Challenges without proper failover testing
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement failover testing
+key_concepts:
+  concept: Failover Testing
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

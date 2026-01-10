@@ -1,0 +1,28 @@
+id: cloud-guidelines
+name: Cloud Guidelines
+category: comprehensive
+type: standard
+tags:
+- cloud
+summary:
+  short: Cloud Guidelines and implementation guidelines
+  long: Complete guide to cloud guidelines
+problem:
+  description: Challenges without proper cloud guidelines
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement cloud guidelines
+key_concepts:
+  concept: Cloud Guidelines
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

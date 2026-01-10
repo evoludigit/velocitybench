@@ -1,0 +1,28 @@
+id: scaling-monitoring
+name: Scaling Monitoring
+category: comprehensive
+type: standard
+tags:
+- scaling
+summary:
+  short: Scaling Monitoring and implementation guidelines
+  long: Complete guide to scaling monitoring
+problem:
+  description: Challenges without proper scaling monitoring
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement scaling monitoring
+key_concepts:
+  concept: Scaling Monitoring
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

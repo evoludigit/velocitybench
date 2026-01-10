@@ -1,0 +1,28 @@
+id: durability-verification
+name: Durability Verification
+category: comprehensive
+type: standard
+tags:
+- durability
+summary:
+  short: Durability Verification and implementation guidelines
+  long: Complete guide to durability verification
+problem:
+  description: Challenges without proper durability verification
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement durability verification
+key_concepts:
+  concept: Durability Verification
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

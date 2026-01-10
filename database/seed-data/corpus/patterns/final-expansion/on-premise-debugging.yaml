@@ -1,0 +1,28 @@
+id: on-premise-debugging
+name: On-Premise Debugging
+category: comprehensive
+type: standard
+tags:
+- on-premise
+summary:
+  short: On-Premise Debugging and implementation guidelines
+  long: Complete guide to on-premise debugging
+problem:
+  description: Challenges without proper on-premise debugging
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement on-premise debugging
+key_concepts:
+  concept: On-Premise Debugging
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

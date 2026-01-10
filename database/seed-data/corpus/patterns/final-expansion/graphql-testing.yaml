@@ -1,0 +1,28 @@
+id: graphql-testing
+name: Graphql Testing
+category: comprehensive
+type: standard
+tags:
+- graphql
+summary:
+  short: Graphql Testing and implementation guidelines
+  long: Complete guide to graphql testing
+problem:
+  description: Challenges without proper graphql testing
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement graphql testing
+key_concepts:
+  concept: Graphql Testing
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

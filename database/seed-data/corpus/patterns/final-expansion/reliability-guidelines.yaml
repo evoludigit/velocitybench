@@ -1,0 +1,28 @@
+id: reliability-guidelines
+name: Reliability Guidelines
+category: comprehensive
+type: standard
+tags:
+- reliability
+summary:
+  short: Reliability Guidelines and implementation guidelines
+  long: Complete guide to reliability guidelines
+problem:
+  description: Challenges without proper reliability guidelines
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement reliability guidelines
+key_concepts:
+  concept: Reliability Guidelines
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

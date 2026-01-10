@@ -1,0 +1,28 @@
+id: ml-data-labeling
+name: Data Labeling Patterns
+category: specialized
+type: standard
+tags:
+- ml
+summary:
+  short: Patterns and practices for data labeling patterns
+  long: Comprehensive guide to data labeling patterns
+problem:
+  description: Challenges with data labeling patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement data labeling patterns
+key_concepts:
+  concept: Understanding Data Labeling Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Data Labeling Patterns
+  intermediate:
+    focus: Implementing Data Labeling Patterns
+  advanced:
+    focus: Advanced Data Labeling Patterns

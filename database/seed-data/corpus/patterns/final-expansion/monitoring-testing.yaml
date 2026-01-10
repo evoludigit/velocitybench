@@ -1,0 +1,28 @@
+id: monitoring-testing
+name: Monitoring Testing
+category: comprehensive
+type: standard
+tags:
+- monitoring
+summary:
+  short: Monitoring Testing and implementation guidelines
+  long: Complete guide to monitoring testing
+problem:
+  description: Challenges without proper monitoring testing
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement monitoring testing
+key_concepts:
+  concept: Monitoring Testing
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

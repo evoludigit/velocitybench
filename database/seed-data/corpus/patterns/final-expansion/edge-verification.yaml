@@ -1,0 +1,28 @@
+id: edge-verification
+name: Edge Verification
+category: comprehensive
+type: standard
+tags:
+- edge
+summary:
+  short: Edge Verification and implementation guidelines
+  long: Complete guide to edge verification
+problem:
+  description: Challenges without proper edge verification
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement edge verification
+key_concepts:
+  concept: Edge Verification
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

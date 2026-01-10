@@ -1,0 +1,28 @@
+id: scaling-anti-patterns
+name: Scaling Anti Patterns
+category: comprehensive
+type: standard
+tags:
+- scaling
+summary:
+  short: Scaling Anti Patterns and implementation guidelines
+  long: Complete guide to scaling anti patterns
+problem:
+  description: Challenges without proper scaling anti patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement scaling anti patterns
+key_concepts:
+  concept: Scaling Anti Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

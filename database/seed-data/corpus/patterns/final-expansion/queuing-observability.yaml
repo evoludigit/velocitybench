@@ -1,0 +1,28 @@
+id: queuing-observability
+name: Queuing Observability
+category: comprehensive
+type: standard
+tags:
+- queuing
+summary:
+  short: Queuing Observability and implementation guidelines
+  long: Complete guide to queuing observability
+problem:
+  description: Challenges without proper queuing observability
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement queuing observability
+key_concepts:
+  concept: Queuing Observability
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,28 @@
+id: microservices-maintenance
+name: Microservices Maintenance
+category: comprehensive
+type: standard
+tags:
+- microservices
+summary:
+  short: Microservices Maintenance and implementation guidelines
+  long: Complete guide to microservices maintenance
+problem:
+  description: Challenges without proper microservices maintenance
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement microservices maintenance
+key_concepts:
+  concept: Microservices Maintenance
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

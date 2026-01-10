@@ -1,0 +1,28 @@
+id: hybrid-anti-patterns
+name: Hybrid Anti Patterns
+category: comprehensive
+type: standard
+tags:
+- hybrid
+summary:
+  short: Hybrid Anti Patterns and implementation guidelines
+  long: Complete guide to hybrid anti patterns
+problem:
+  description: Challenges without proper hybrid anti patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement hybrid anti patterns
+key_concepts:
+  concept: Hybrid Anti Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

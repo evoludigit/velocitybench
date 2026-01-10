@@ -1,0 +1,28 @@
+id: usecase-recommendation-engines
+name: Recommendation Engines Patterns
+category: specialized
+type: standard
+tags:
+- usecase
+summary:
+  short: Patterns and practices for recommendation engines patterns
+  long: Comprehensive guide to recommendation engines patterns
+problem:
+  description: Challenges with recommendation engines patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement recommendation engines patterns
+key_concepts:
+  concept: Understanding Recommendation Engines Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Recommendation Engines Patterns
+  intermediate:
+    focus: Implementing Recommendation Engines Patterns
+  advanced:
+    focus: Advanced Recommendation Engines Patterns

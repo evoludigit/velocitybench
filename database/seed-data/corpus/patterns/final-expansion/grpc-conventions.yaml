@@ -1,0 +1,28 @@
+id: grpc-conventions
+name: Grpc Conventions
+category: comprehensive
+type: standard
+tags:
+- grpc
+summary:
+  short: Grpc Conventions and implementation guidelines
+  long: Complete guide to grpc conventions
+problem:
+  description: Challenges without proper grpc conventions
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement grpc conventions
+key_concepts:
+  concept: Grpc Conventions
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

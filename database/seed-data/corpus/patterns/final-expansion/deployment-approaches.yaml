@@ -1,0 +1,28 @@
+id: deployment-approaches
+name: Deployment Approaches
+category: comprehensive
+type: standard
+tags:
+- deployment
+summary:
+  short: Deployment Approaches and implementation guidelines
+  long: Complete guide to deployment approaches
+problem:
+  description: Challenges without proper deployment approaches
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement deployment approaches
+key_concepts:
+  concept: Deployment Approaches
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

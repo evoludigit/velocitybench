@@ -1,0 +1,28 @@
+id: serverless-gotchas
+name: Serverless Gotchas
+category: comprehensive
+type: standard
+tags:
+- serverless
+summary:
+  short: Serverless Gotchas and implementation guidelines
+  long: Complete guide to serverless gotchas
+problem:
+  description: Challenges without proper serverless gotchas
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement serverless gotchas
+key_concepts:
+  concept: Serverless Gotchas
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,28 @@
+id: audit-validation
+name: Audit Validation
+category: comprehensive
+type: standard
+tags:
+- audit
+summary:
+  short: Audit Validation and implementation guidelines
+  long: Complete guide to audit validation
+problem:
+  description: Challenges without proper audit validation
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement audit validation
+key_concepts:
+  concept: Audit Validation
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

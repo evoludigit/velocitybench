@@ -1,0 +1,28 @@
+id: cloud-anti-patterns
+name: Cloud Anti Patterns
+category: comprehensive
+type: standard
+tags:
+- cloud
+summary:
+  short: Cloud Anti Patterns and implementation guidelines
+  long: Complete guide to cloud anti patterns
+problem:
+  description: Challenges without proper cloud anti patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement cloud anti patterns
+key_concepts:
+  concept: Cloud Anti Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

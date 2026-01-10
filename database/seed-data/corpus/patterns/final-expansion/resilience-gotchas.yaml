@@ -1,0 +1,28 @@
+id: resilience-gotchas
+name: Resilience Gotchas
+category: comprehensive
+type: standard
+tags:
+- resilience
+summary:
+  short: Resilience Gotchas and implementation guidelines
+  long: Complete guide to resilience gotchas
+problem:
+  description: Challenges without proper resilience gotchas
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement resilience gotchas
+key_concepts:
+  concept: Resilience Gotchas
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

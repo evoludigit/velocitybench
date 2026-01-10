@@ -1,0 +1,28 @@
+id: messaging-monitoring
+name: Messaging Monitoring
+category: comprehensive
+type: standard
+tags:
+- messaging
+summary:
+  short: Messaging Monitoring and implementation guidelines
+  long: Complete guide to messaging monitoring
+problem:
+  description: Challenges without proper messaging monitoring
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement messaging monitoring
+key_concepts:
+  concept: Messaging Monitoring
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

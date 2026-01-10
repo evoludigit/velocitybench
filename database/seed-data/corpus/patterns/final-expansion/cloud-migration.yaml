@@ -1,0 +1,28 @@
+id: cloud-migration
+name: Cloud Migration
+category: comprehensive
+type: standard
+tags:
+- cloud
+summary:
+  short: Cloud Migration and implementation guidelines
+  long: Complete guide to cloud migration
+problem:
+  description: Challenges without proper cloud migration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement cloud migration
+key_concepts:
+  concept: Cloud Migration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

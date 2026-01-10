@@ -1,0 +1,28 @@
+id: encryption-anti-patterns
+name: Encryption Anti Patterns
+category: comprehensive
+type: standard
+tags:
+- encryption
+summary:
+  short: Encryption Anti Patterns and implementation guidelines
+  long: Complete guide to encryption anti patterns
+problem:
+  description: Challenges without proper encryption anti patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement encryption anti patterns
+key_concepts:
+  concept: Encryption Anti Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

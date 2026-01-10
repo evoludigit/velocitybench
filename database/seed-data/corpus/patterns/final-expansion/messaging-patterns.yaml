@@ -1,0 +1,28 @@
+id: messaging-patterns
+name: Messaging Patterns
+category: comprehensive
+type: standard
+tags:
+- messaging
+summary:
+  short: Messaging Patterns and implementation guidelines
+  long: Complete guide to messaging patterns
+problem:
+  description: Challenges without proper messaging patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement messaging patterns
+key_concepts:
+  concept: Messaging Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

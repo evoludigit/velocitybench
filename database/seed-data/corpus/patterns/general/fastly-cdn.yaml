@@ -1,0 +1,31 @@
+id: fastly-cdn
+name: Fastly Cdn Integration Patterns
+category: general
+type: standard
+tags:
+- fastly
+summary:
+  short: Best practices for fastly cdn integration patterns
+  long: Comprehensive guide to fastly cdn integration patterns. This pattern covers
+    implementation details, best practices, and common pitfalls.
+problem:
+  description: Issues without proper fastly cdn integration patterns
+  symptoms:
+  - Performance issues
+  - Reliability problems
+  - Scalability challenges
+  impact: System degradation
+solution:
+  description: Implement fastly cdn integration patterns effectively
+key_concepts:
+  concept: Understanding fastly cdn integration patterns
+best_practices:
+- name: Best practice 1
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Introduction to Fastly Cdn Integration Patterns
+  intermediate:
+    focus: Implementing Fastly Cdn Integration Patterns
+  advanced:
+    focus: Advanced Fastly Cdn Integration Patterns

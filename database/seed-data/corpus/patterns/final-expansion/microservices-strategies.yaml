@@ -1,0 +1,28 @@
+id: microservices-strategies
+name: Microservices Strategies
+category: comprehensive
+type: standard
+tags:
+- microservices
+summary:
+  short: Microservices Strategies and implementation guidelines
+  long: Complete guide to microservices strategies
+problem:
+  description: Challenges without proper microservices strategies
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement microservices strategies
+key_concepts:
+  concept: Microservices Strategies
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

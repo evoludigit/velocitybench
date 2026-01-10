@@ -1,0 +1,28 @@
+id: failover-validation
+name: Failover Validation
+category: comprehensive
+type: standard
+tags:
+- failover
+summary:
+  short: Failover Validation and implementation guidelines
+  long: Complete guide to failover validation
+problem:
+  description: Challenges without proper failover validation
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement failover validation
+key_concepts:
+  concept: Failover Validation
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

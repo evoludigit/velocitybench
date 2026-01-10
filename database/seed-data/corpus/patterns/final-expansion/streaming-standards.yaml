@@ -1,0 +1,28 @@
+id: streaming-standards
+name: Streaming Standards
+category: comprehensive
+type: standard
+tags:
+- streaming
+summary:
+  short: Streaming Standards and implementation guidelines
+  long: Complete guide to streaming standards
+problem:
+  description: Challenges without proper streaming standards
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement streaming standards
+key_concepts:
+  concept: Streaming Standards
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,28 @@
+id: rest-testing
+name: Rest Testing
+category: comprehensive
+type: standard
+tags:
+- rest
+summary:
+  short: Rest Testing and implementation guidelines
+  long: Complete guide to rest testing
+problem:
+  description: Challenges without proper rest testing
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement rest testing
+key_concepts:
+  concept: Rest Testing
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

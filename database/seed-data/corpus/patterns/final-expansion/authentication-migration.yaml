@@ -1,0 +1,28 @@
+id: authentication-migration
+name: Authentication Migration
+category: comprehensive
+type: standard
+tags:
+- authentication
+summary:
+  short: Authentication Migration and implementation guidelines
+  long: Complete guide to authentication migration
+problem:
+  description: Challenges without proper authentication migration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement authentication migration
+key_concepts:
+  concept: Authentication Migration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

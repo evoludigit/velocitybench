@@ -1,0 +1,28 @@
+id: tracing-standards
+name: Tracing Standards
+category: comprehensive
+type: standard
+tags:
+- tracing
+summary:
+  short: Tracing Standards and implementation guidelines
+  long: Complete guide to tracing standards
+problem:
+  description: Challenges without proper tracing standards
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement tracing standards
+key_concepts:
+  concept: Tracing Standards
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

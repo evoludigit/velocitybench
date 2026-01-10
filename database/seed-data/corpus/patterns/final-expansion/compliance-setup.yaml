@@ -1,0 +1,28 @@
+id: compliance-setup
+name: Compliance Setup
+category: comprehensive
+type: standard
+tags:
+- compliance
+summary:
+  short: Compliance Setup and implementation guidelines
+  long: Complete guide to compliance setup
+problem:
+  description: Challenges without proper compliance setup
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement compliance setup
+key_concepts:
+  concept: Compliance Setup
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

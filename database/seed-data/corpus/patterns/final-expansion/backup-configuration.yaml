@@ -1,0 +1,28 @@
+id: backup-configuration
+name: Backup Configuration
+category: comprehensive
+type: standard
+tags:
+- backup
+summary:
+  short: Backup Configuration and implementation guidelines
+  long: Complete guide to backup configuration
+problem:
+  description: Challenges without proper backup configuration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement backup configuration
+key_concepts:
+  concept: Backup Configuration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

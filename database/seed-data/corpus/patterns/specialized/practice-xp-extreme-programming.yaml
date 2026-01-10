@@ -1,0 +1,28 @@
+id: practice-xp-extreme-programming
+name: Xp Extreme Programming Practices
+category: specialized
+type: standard
+tags:
+- practice
+summary:
+  short: Patterns and practices for xp extreme programming practices
+  long: Comprehensive guide to xp extreme programming practices
+problem:
+  description: Challenges with xp extreme programming practices
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement xp extreme programming practices
+key_concepts:
+  concept: Understanding Xp Extreme Programming Practices
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Xp Extreme Programming Practices
+  intermediate:
+    focus: Implementing Xp Extreme Programming Practices
+  advanced:
+    focus: Advanced Xp Extreme Programming Practices

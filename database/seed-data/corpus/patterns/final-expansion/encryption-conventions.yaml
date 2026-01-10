@@ -1,0 +1,28 @@
+id: encryption-conventions
+name: Encryption Conventions
+category: comprehensive
+type: standard
+tags:
+- encryption
+summary:
+  short: Encryption Conventions and implementation guidelines
+  long: Complete guide to encryption conventions
+problem:
+  description: Challenges without proper encryption conventions
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement encryption conventions
+key_concepts:
+  concept: Encryption Conventions
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

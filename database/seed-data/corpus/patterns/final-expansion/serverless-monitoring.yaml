@@ -1,0 +1,28 @@
+id: serverless-monitoring
+name: Serverless Monitoring
+category: comprehensive
+type: standard
+tags:
+- serverless
+summary:
+  short: Serverless Monitoring and implementation guidelines
+  long: Complete guide to serverless monitoring
+problem:
+  description: Challenges without proper serverless monitoring
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement serverless monitoring
+key_concepts:
+  concept: Serverless Monitoring
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

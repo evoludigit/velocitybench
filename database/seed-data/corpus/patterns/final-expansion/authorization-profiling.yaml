@@ -1,0 +1,28 @@
+id: authorization-profiling
+name: Authorization Profiling
+category: comprehensive
+type: standard
+tags:
+- authorization
+summary:
+  short: Authorization Profiling and implementation guidelines
+  long: Complete guide to authorization profiling
+problem:
+  description: Challenges without proper authorization profiling
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement authorization profiling
+key_concepts:
+  concept: Authorization Profiling
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

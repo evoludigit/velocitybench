@@ -1,0 +1,28 @@
+id: latency-verification
+name: Latency Verification
+category: comprehensive
+type: standard
+tags:
+- latency
+summary:
+  short: Latency Verification and implementation guidelines
+  long: Complete guide to latency verification
+problem:
+  description: Challenges without proper latency verification
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement latency verification
+key_concepts:
+  concept: Latency Verification
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

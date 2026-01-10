@@ -1,0 +1,28 @@
+id: hybrid-techniques
+name: Hybrid Techniques
+category: comprehensive
+type: standard
+tags:
+- hybrid
+summary:
+  short: Hybrid Techniques and implementation guidelines
+  long: Complete guide to hybrid techniques
+problem:
+  description: Challenges without proper hybrid techniques
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement hybrid techniques
+key_concepts:
+  concept: Hybrid Techniques
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

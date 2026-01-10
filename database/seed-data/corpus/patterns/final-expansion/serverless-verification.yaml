@@ -1,0 +1,28 @@
+id: serverless-verification
+name: Serverless Verification
+category: comprehensive
+type: standard
+tags:
+- serverless
+summary:
+  short: Serverless Verification and implementation guidelines
+  long: Complete guide to serverless verification
+problem:
+  description: Challenges without proper serverless verification
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement serverless verification
+key_concepts:
+  concept: Serverless Verification
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

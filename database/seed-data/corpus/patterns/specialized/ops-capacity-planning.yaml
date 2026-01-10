@@ -1,0 +1,28 @@
+id: ops-capacity-planning
+name: Capacity Planning Patterns
+category: specialized
+type: standard
+tags:
+- ops
+summary:
+  short: Patterns and practices for capacity planning patterns
+  long: Comprehensive guide to capacity planning patterns
+problem:
+  description: Challenges with capacity planning patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement capacity planning patterns
+key_concepts:
+  concept: Understanding Capacity Planning Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Capacity Planning Patterns
+  intermediate:
+    focus: Implementing Capacity Planning Patterns
+  advanced:
+    focus: Advanced Capacity Planning Patterns

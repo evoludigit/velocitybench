@@ -1,0 +1,28 @@
+id: cloud-observability
+name: Cloud Observability
+category: comprehensive
+type: standard
+tags:
+- cloud
+summary:
+  short: Cloud Observability and implementation guidelines
+  long: Complete guide to cloud observability
+problem:
+  description: Challenges without proper cloud observability
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement cloud observability
+key_concepts:
+  concept: Cloud Observability
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

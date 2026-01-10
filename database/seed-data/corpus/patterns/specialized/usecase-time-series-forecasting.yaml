@@ -1,0 +1,28 @@
+id: usecase-time-series-forecasting
+name: Time Series Forecasting Patterns
+category: specialized
+type: standard
+tags:
+- usecase
+summary:
+  short: Patterns and practices for time series forecasting patterns
+  long: Comprehensive guide to time series forecasting patterns
+problem:
+  description: Challenges with time series forecasting patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement time series forecasting patterns
+key_concepts:
+  concept: Understanding Time Series Forecasting Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Time Series Forecasting Patterns
+  intermediate:
+    focus: Implementing Time Series Forecasting Patterns
+  advanced:
+    focus: Advanced Time Series Forecasting Patterns

@@ -1,0 +1,28 @@
+id: containers-debugging
+name: Containers Debugging
+category: comprehensive
+type: standard
+tags:
+- containers
+summary:
+  short: Containers Debugging and implementation guidelines
+  long: Complete guide to containers debugging
+problem:
+  description: Challenges without proper containers debugging
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement containers debugging
+key_concepts:
+  concept: Containers Debugging
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

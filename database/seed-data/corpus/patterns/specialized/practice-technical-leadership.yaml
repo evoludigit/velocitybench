@@ -1,0 +1,28 @@
+id: practice-technical-leadership
+name: Technical Leadership Practices
+category: specialized
+type: standard
+tags:
+- practice
+summary:
+  short: Patterns and practices for technical leadership practices
+  long: Comprehensive guide to technical leadership practices
+problem:
+  description: Challenges with technical leadership practices
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement technical leadership practices
+key_concepts:
+  concept: Understanding Technical Leadership Practices
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Technical Leadership Practices
+  intermediate:
+    focus: Implementing Technical Leadership Practices
+  advanced:
+    focus: Advanced Technical Leadership Practices

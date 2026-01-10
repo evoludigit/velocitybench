@@ -1,0 +1,28 @@
+id: edge-patterns
+name: Edge Patterns
+category: comprehensive
+type: standard
+tags:
+- edge
+summary:
+  short: Edge Patterns and implementation guidelines
+  long: Complete guide to edge patterns
+problem:
+  description: Challenges without proper edge patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement edge patterns
+key_concepts:
+  concept: Edge Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,28 @@
+id: testing-anti-patterns
+name: Testing Anti Patterns
+category: comprehensive
+type: standard
+tags:
+- testing
+summary:
+  short: Testing Anti Patterns and implementation guidelines
+  long: Complete guide to testing anti patterns
+problem:
+  description: Challenges without proper testing anti patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement testing anti patterns
+key_concepts:
+  concept: Testing Anti Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

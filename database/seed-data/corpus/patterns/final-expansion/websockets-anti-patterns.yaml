@@ -1,0 +1,28 @@
+id: websockets-anti-patterns
+name: Websockets Anti Patterns
+category: comprehensive
+type: standard
+tags:
+- websockets
+summary:
+  short: Websockets Anti Patterns and implementation guidelines
+  long: Complete guide to websockets anti patterns
+problem:
+  description: Challenges without proper websockets anti patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement websockets anti patterns
+key_concepts:
+  concept: Websockets Anti Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

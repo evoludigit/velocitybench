@@ -1,0 +1,28 @@
+id: debugging-anti-patterns
+name: Debugging Anti Patterns
+category: comprehensive
+type: standard
+tags:
+- debugging
+summary:
+  short: Debugging Anti Patterns and implementation guidelines
+  long: Complete guide to debugging anti patterns
+problem:
+  description: Challenges without proper debugging anti patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement debugging anti patterns
+key_concepts:
+  concept: Debugging Anti Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,28 @@
+id: virtual-machines-profiling
+name: Virtual-Machines Profiling
+category: comprehensive
+type: standard
+tags:
+- virtual-machines
+summary:
+  short: Virtual-Machines Profiling and implementation guidelines
+  long: Complete guide to virtual-machines profiling
+problem:
+  description: Challenges without proper virtual-machines profiling
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement virtual-machines profiling
+key_concepts:
+  concept: Virtual-Machines Profiling
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,28 @@
+id: streaming-conventions
+name: Streaming Conventions
+category: comprehensive
+type: standard
+tags:
+- streaming
+summary:
+  short: Streaming Conventions and implementation guidelines
+  long: Complete guide to streaming conventions
+problem:
+  description: Challenges without proper streaming conventions
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement streaming conventions
+key_concepts:
+  concept: Streaming Conventions
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

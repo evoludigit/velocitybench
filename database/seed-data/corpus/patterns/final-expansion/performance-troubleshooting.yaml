@@ -1,0 +1,28 @@
+id: performance-troubleshooting
+name: Performance Troubleshooting
+category: comprehensive
+type: standard
+tags:
+- performance
+summary:
+  short: Performance Troubleshooting and implementation guidelines
+  long: Complete guide to performance troubleshooting
+problem:
+  description: Challenges without proper performance troubleshooting
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement performance troubleshooting
+key_concepts:
+  concept: Performance Troubleshooting
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

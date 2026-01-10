@@ -1,0 +1,28 @@
+id: security-testing
+name: Security Testing
+category: comprehensive
+type: standard
+tags:
+- security
+summary:
+  short: Security Testing and implementation guidelines
+  long: Complete guide to security testing
+problem:
+  description: Challenges without proper security testing
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement security testing
+key_concepts:
+  concept: Security Testing
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,28 @@
+id: scaling-tuning
+name: Scaling Tuning
+category: comprehensive
+type: standard
+tags:
+- scaling
+summary:
+  short: Scaling Tuning and implementation guidelines
+  long: Complete guide to scaling tuning
+problem:
+  description: Challenges without proper scaling tuning
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement scaling tuning
+key_concepts:
+  concept: Scaling Tuning
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

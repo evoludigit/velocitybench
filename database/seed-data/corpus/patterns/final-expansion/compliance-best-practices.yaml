@@ -1,0 +1,28 @@
+id: compliance-best-practices
+name: Compliance Best Practices
+category: comprehensive
+type: standard
+tags:
+- compliance
+summary:
+  short: Compliance Best Practices and implementation guidelines
+  long: Complete guide to compliance best practices
+problem:
+  description: Challenges without proper compliance best practices
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement compliance best practices
+key_concepts:
+  concept: Compliance Best Practices
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

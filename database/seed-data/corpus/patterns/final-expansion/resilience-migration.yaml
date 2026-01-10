@@ -1,0 +1,28 @@
+id: resilience-migration
+name: Resilience Migration
+category: comprehensive
+type: standard
+tags:
+- resilience
+summary:
+  short: Resilience Migration and implementation guidelines
+  long: Complete guide to resilience migration
+problem:
+  description: Challenges without proper resilience migration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement resilience migration
+key_concepts:
+  concept: Resilience Migration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

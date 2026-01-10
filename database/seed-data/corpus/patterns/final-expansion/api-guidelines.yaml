@@ -1,0 +1,28 @@
+id: api-guidelines
+name: Api Guidelines
+category: comprehensive
+type: standard
+tags:
+- api
+summary:
+  short: Api Guidelines and implementation guidelines
+  long: Complete guide to api guidelines
+problem:
+  description: Challenges without proper api guidelines
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement api guidelines
+key_concepts:
+  concept: Api Guidelines
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

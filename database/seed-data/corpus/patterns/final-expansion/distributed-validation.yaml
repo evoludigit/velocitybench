@@ -1,0 +1,28 @@
+id: distributed-validation
+name: Distributed Validation
+category: comprehensive
+type: standard
+tags:
+- distributed
+summary:
+  short: Distributed Validation and implementation guidelines
+  long: Complete guide to distributed validation
+problem:
+  description: Challenges without proper distributed validation
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement distributed validation
+key_concepts:
+  concept: Distributed Validation
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

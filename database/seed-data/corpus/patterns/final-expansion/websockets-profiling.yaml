@@ -1,0 +1,28 @@
+id: websockets-profiling
+name: Websockets Profiling
+category: comprehensive
+type: standard
+tags:
+- websockets
+summary:
+  short: Websockets Profiling and implementation guidelines
+  long: Complete guide to websockets profiling
+problem:
+  description: Challenges without proper websockets profiling
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement websockets profiling
+key_concepts:
+  concept: Websockets Profiling
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

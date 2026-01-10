@@ -1,0 +1,28 @@
+id: cloud-optimization
+name: Cloud Optimization
+category: comprehensive
+type: standard
+tags:
+- cloud
+summary:
+  short: Cloud Optimization and implementation guidelines
+  long: Complete guide to cloud optimization
+problem:
+  description: Challenges without proper cloud optimization
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement cloud optimization
+key_concepts:
+  concept: Cloud Optimization
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

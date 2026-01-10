@@ -1,0 +1,28 @@
+id: compliance-monitoring
+name: Compliance Monitoring
+category: comprehensive
+type: standard
+tags:
+- compliance
+summary:
+  short: Compliance Monitoring and implementation guidelines
+  long: Complete guide to compliance monitoring
+problem:
+  description: Challenges without proper compliance monitoring
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement compliance monitoring
+key_concepts:
+  concept: Compliance Monitoring
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

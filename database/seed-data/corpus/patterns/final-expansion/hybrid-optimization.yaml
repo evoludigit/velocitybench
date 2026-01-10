@@ -1,0 +1,28 @@
+id: hybrid-optimization
+name: Hybrid Optimization
+category: comprehensive
+type: standard
+tags:
+- hybrid
+summary:
+  short: Hybrid Optimization and implementation guidelines
+  long: Complete guide to hybrid optimization
+problem:
+  description: Challenges without proper hybrid optimization
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement hybrid optimization
+key_concepts:
+  concept: Hybrid Optimization
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

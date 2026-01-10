@@ -1,0 +1,28 @@
+id: security-integration
+name: Security Integration
+category: comprehensive
+type: standard
+tags:
+- security
+summary:
+  short: Security Integration and implementation guidelines
+  long: Complete guide to security integration
+problem:
+  description: Challenges without proper security integration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement security integration
+key_concepts:
+  concept: Security Integration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

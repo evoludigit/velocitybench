@@ -1,0 +1,28 @@
+id: monolith-monitoring
+name: Monolith Monitoring
+category: comprehensive
+type: standard
+tags:
+- monolith
+summary:
+  short: Monolith Monitoring and implementation guidelines
+  long: Complete guide to monolith monitoring
+problem:
+  description: Challenges without proper monolith monitoring
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement monolith monitoring
+key_concepts:
+  concept: Monolith Monitoring
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

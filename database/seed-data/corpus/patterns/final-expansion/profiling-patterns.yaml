@@ -1,0 +1,28 @@
+id: profiling-patterns
+name: Profiling Patterns
+category: comprehensive
+type: standard
+tags:
+- profiling
+summary:
+  short: Profiling Patterns and implementation guidelines
+  long: Complete guide to profiling patterns
+problem:
+  description: Challenges without proper profiling patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement profiling patterns
+key_concepts:
+  concept: Profiling Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

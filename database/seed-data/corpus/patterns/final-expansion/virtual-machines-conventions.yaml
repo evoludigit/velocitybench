@@ -1,0 +1,28 @@
+id: virtual-machines-conventions
+name: Virtual-Machines Conventions
+category: comprehensive
+type: standard
+tags:
+- virtual-machines
+summary:
+  short: Virtual-Machines Conventions and implementation guidelines
+  long: Complete guide to virtual-machines conventions
+problem:
+  description: Challenges without proper virtual-machines conventions
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement virtual-machines conventions
+key_concepts:
+  concept: Virtual-Machines Conventions
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

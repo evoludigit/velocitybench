@@ -1,0 +1,28 @@
+id: serverless-guidelines
+name: Serverless Guidelines
+category: comprehensive
+type: standard
+tags:
+- serverless
+summary:
+  short: Serverless Guidelines and implementation guidelines
+  long: Complete guide to serverless guidelines
+problem:
+  description: Challenges without proper serverless guidelines
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement serverless guidelines
+key_concepts:
+  concept: Serverless Guidelines
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

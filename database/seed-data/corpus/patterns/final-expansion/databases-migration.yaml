@@ -1,0 +1,28 @@
+id: databases-migration
+name: Databases Migration
+category: comprehensive
+type: standard
+tags:
+- databases
+summary:
+  short: Databases Migration and implementation guidelines
+  long: Complete guide to databases migration
+problem:
+  description: Challenges without proper databases migration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement databases migration
+key_concepts:
+  concept: Databases Migration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

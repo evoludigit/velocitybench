@@ -1,0 +1,28 @@
+id: resilience-testing
+name: Resilience Testing
+category: comprehensive
+type: standard
+tags:
+- resilience
+summary:
+  short: Resilience Testing and implementation guidelines
+  long: Complete guide to resilience testing
+problem:
+  description: Challenges without proper resilience testing
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement resilience testing
+key_concepts:
+  concept: Resilience Testing
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

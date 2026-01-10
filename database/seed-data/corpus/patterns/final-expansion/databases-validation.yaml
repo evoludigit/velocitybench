@@ -1,0 +1,28 @@
+id: databases-validation
+name: Databases Validation
+category: comprehensive
+type: standard
+tags:
+- databases
+summary:
+  short: Databases Validation and implementation guidelines
+  long: Complete guide to databases validation
+problem:
+  description: Challenges without proper databases validation
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement databases validation
+key_concepts:
+  concept: Databases Validation
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

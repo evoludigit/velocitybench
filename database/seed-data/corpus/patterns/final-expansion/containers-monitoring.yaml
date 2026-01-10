@@ -1,0 +1,28 @@
+id: containers-monitoring
+name: Containers Monitoring
+category: comprehensive
+type: standard
+tags:
+- containers
+summary:
+  short: Containers Monitoring and implementation guidelines
+  long: Complete guide to containers monitoring
+problem:
+  description: Challenges without proper containers monitoring
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement containers monitoring
+key_concepts:
+  concept: Containers Monitoring
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

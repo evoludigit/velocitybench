@@ -1,0 +1,28 @@
+id: optimization-profiling
+name: Optimization Profiling
+category: comprehensive
+type: standard
+tags:
+- optimization
+summary:
+  short: Optimization Profiling and implementation guidelines
+  long: Complete guide to optimization profiling
+problem:
+  description: Challenges without proper optimization profiling
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement optimization profiling
+key_concepts:
+  concept: Optimization Profiling
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

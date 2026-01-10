@@ -1,0 +1,28 @@
+id: failover-setup
+name: Failover Setup
+category: comprehensive
+type: standard
+tags:
+- failover
+summary:
+  short: Failover Setup and implementation guidelines
+  long: Complete guide to failover setup
+problem:
+  description: Challenges without proper failover setup
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement failover setup
+key_concepts:
+  concept: Failover Setup
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

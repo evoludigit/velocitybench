@@ -1,0 +1,28 @@
+id: cloud-setup
+name: Cloud Setup
+category: comprehensive
+type: standard
+tags:
+- cloud
+summary:
+  short: Cloud Setup and implementation guidelines
+  long: Complete guide to cloud setup
+problem:
+  description: Challenges without proper cloud setup
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement cloud setup
+key_concepts:
+  concept: Cloud Setup
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,28 @@
+id: messaging-verification
+name: Messaging Verification
+category: comprehensive
+type: standard
+tags:
+- messaging
+summary:
+  short: Messaging Verification and implementation guidelines
+  long: Complete guide to messaging verification
+problem:
+  description: Challenges without proper messaging verification
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement messaging verification
+key_concepts:
+  concept: Messaging Verification
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

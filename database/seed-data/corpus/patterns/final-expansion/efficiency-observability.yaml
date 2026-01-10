@@ -1,0 +1,28 @@
+id: efficiency-observability
+name: Efficiency Observability
+category: comprehensive
+type: standard
+tags:
+- efficiency
+summary:
+  short: Efficiency Observability and implementation guidelines
+  long: Complete guide to efficiency observability
+problem:
+  description: Challenges without proper efficiency observability
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement efficiency observability
+key_concepts:
+  concept: Efficiency Observability
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

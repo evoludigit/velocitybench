@@ -1,0 +1,28 @@
+id: durability-maintenance
+name: Durability Maintenance
+category: comprehensive
+type: standard
+tags:
+- durability
+summary:
+  short: Durability Maintenance and implementation guidelines
+  long: Complete guide to durability maintenance
+problem:
+  description: Challenges without proper durability maintenance
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement durability maintenance
+key_concepts:
+  concept: Durability Maintenance
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

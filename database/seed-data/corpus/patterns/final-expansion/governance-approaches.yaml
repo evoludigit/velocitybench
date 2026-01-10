@@ -1,0 +1,28 @@
+id: governance-approaches
+name: Governance Approaches
+category: comprehensive
+type: standard
+tags:
+- governance
+summary:
+  short: Governance Approaches and implementation guidelines
+  long: Complete guide to governance approaches
+problem:
+  description: Challenges without proper governance approaches
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement governance approaches
+key_concepts:
+  concept: Governance Approaches
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

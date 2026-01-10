@@ -1,0 +1,28 @@
+id: debugging-integration
+name: Debugging Integration
+category: comprehensive
+type: standard
+tags:
+- debugging
+summary:
+  short: Debugging Integration and implementation guidelines
+  long: Complete guide to debugging integration
+problem:
+  description: Challenges without proper debugging integration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement debugging integration
+key_concepts:
+  concept: Debugging Integration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

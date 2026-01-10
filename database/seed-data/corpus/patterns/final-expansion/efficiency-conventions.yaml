@@ -1,0 +1,28 @@
+id: efficiency-conventions
+name: Efficiency Conventions
+category: comprehensive
+type: standard
+tags:
+- efficiency
+summary:
+  short: Efficiency Conventions and implementation guidelines
+  long: Complete guide to efficiency conventions
+problem:
+  description: Challenges without proper efficiency conventions
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement efficiency conventions
+key_concepts:
+  concept: Efficiency Conventions
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

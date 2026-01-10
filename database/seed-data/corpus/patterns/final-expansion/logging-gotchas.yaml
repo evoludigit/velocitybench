@@ -1,0 +1,28 @@
+id: logging-gotchas
+name: Logging Gotchas
+category: comprehensive
+type: standard
+tags:
+- logging
+summary:
+  short: Logging Gotchas and implementation guidelines
+  long: Complete guide to logging gotchas
+problem:
+  description: Challenges without proper logging gotchas
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement logging gotchas
+key_concepts:
+  concept: Logging Gotchas
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

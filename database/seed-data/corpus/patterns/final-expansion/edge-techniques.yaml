@@ -1,0 +1,28 @@
+id: edge-techniques
+name: Edge Techniques
+category: comprehensive
+type: standard
+tags:
+- edge
+summary:
+  short: Edge Techniques and implementation guidelines
+  long: Complete guide to edge techniques
+problem:
+  description: Challenges without proper edge techniques
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement edge techniques
+key_concepts:
+  concept: Edge Techniques
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

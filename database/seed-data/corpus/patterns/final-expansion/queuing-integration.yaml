@@ -1,0 +1,28 @@
+id: queuing-integration
+name: Queuing Integration
+category: comprehensive
+type: standard
+tags:
+- queuing
+summary:
+  short: Queuing Integration and implementation guidelines
+  long: Complete guide to queuing integration
+problem:
+  description: Challenges without proper queuing integration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement queuing integration
+key_concepts:
+  concept: Queuing Integration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

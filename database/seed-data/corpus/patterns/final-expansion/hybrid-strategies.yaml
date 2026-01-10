@@ -1,0 +1,28 @@
+id: hybrid-strategies
+name: Hybrid Strategies
+category: comprehensive
+type: standard
+tags:
+- hybrid
+summary:
+  short: Hybrid Strategies and implementation guidelines
+  long: Complete guide to hybrid strategies
+problem:
+  description: Challenges without proper hybrid strategies
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement hybrid strategies
+key_concepts:
+  concept: Hybrid Strategies
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,28 @@
+id: debugging-strategies
+name: Debugging Strategies
+category: comprehensive
+type: standard
+tags:
+- debugging
+summary:
+  short: Debugging Strategies and implementation guidelines
+  long: Complete guide to debugging strategies
+problem:
+  description: Challenges without proper debugging strategies
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement debugging strategies
+key_concepts:
+  concept: Debugging Strategies
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

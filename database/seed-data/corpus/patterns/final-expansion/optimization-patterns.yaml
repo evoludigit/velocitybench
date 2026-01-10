@@ -1,0 +1,28 @@
+id: optimization-patterns
+name: Optimization Patterns
+category: comprehensive
+type: standard
+tags:
+- optimization
+summary:
+  short: Optimization Patterns and implementation guidelines
+  long: Complete guide to optimization patterns
+problem:
+  description: Challenges without proper optimization patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement optimization patterns
+key_concepts:
+  concept: Optimization Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

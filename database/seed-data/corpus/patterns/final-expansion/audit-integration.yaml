@@ -1,0 +1,28 @@
+id: audit-integration
+name: Audit Integration
+category: comprehensive
+type: standard
+tags:
+- audit
+summary:
+  short: Audit Integration and implementation guidelines
+  long: Complete guide to audit integration
+problem:
+  description: Challenges without proper audit integration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement audit integration
+key_concepts:
+  concept: Audit Integration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

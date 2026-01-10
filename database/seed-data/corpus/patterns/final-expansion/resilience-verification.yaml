@@ -1,0 +1,28 @@
+id: resilience-verification
+name: Resilience Verification
+category: comprehensive
+type: standard
+tags:
+- resilience
+summary:
+  short: Resilience Verification and implementation guidelines
+  long: Complete guide to resilience verification
+problem:
+  description: Challenges without proper resilience verification
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement resilience verification
+key_concepts:
+  concept: Resilience Verification
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

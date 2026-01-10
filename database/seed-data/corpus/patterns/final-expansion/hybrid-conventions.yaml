@@ -1,0 +1,28 @@
+id: hybrid-conventions
+name: Hybrid Conventions
+category: comprehensive
+type: standard
+tags:
+- hybrid
+summary:
+  short: Hybrid Conventions and implementation guidelines
+  long: Complete guide to hybrid conventions
+problem:
+  description: Challenges without proper hybrid conventions
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement hybrid conventions
+key_concepts:
+  concept: Hybrid Conventions
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,28 @@
+id: backup-migration
+name: Backup Migration
+category: comprehensive
+type: standard
+tags:
+- backup
+summary:
+  short: Backup Migration and implementation guidelines
+  long: Complete guide to backup migration
+problem:
+  description: Challenges without proper backup migration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement backup migration
+key_concepts:
+  concept: Backup Migration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

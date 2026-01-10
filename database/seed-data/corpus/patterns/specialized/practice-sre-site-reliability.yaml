@@ -1,0 +1,28 @@
+id: practice-sre-site-reliability
+name: Sre Site Reliability Practices
+category: specialized
+type: standard
+tags:
+- practice
+summary:
+  short: Patterns and practices for sre site reliability practices
+  long: Comprehensive guide to sre site reliability practices
+problem:
+  description: Challenges with sre site reliability practices
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement sre site reliability practices
+key_concepts:
+  concept: Understanding Sre Site Reliability Practices
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Sre Site Reliability Practices
+  intermediate:
+    focus: Implementing Sre Site Reliability Practices
+  advanced:
+    focus: Advanced Sre Site Reliability Practices

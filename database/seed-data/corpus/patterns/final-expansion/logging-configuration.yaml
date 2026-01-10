@@ -1,0 +1,28 @@
+id: logging-configuration
+name: Logging Configuration
+category: comprehensive
+type: standard
+tags:
+- logging
+summary:
+  short: Logging Configuration and implementation guidelines
+  long: Complete guide to logging configuration
+problem:
+  description: Challenges without proper logging configuration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement logging configuration
+key_concepts:
+  concept: Logging Configuration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

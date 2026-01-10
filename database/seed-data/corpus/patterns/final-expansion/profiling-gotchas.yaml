@@ -1,0 +1,28 @@
+id: profiling-gotchas
+name: Profiling Gotchas
+category: comprehensive
+type: standard
+tags:
+- profiling
+summary:
+  short: Profiling Gotchas and implementation guidelines
+  long: Complete guide to profiling gotchas
+problem:
+  description: Challenges without proper profiling gotchas
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement profiling gotchas
+key_concepts:
+  concept: Profiling Gotchas
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

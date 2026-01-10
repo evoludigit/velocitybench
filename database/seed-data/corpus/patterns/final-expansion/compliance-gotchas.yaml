@@ -1,0 +1,28 @@
+id: compliance-gotchas
+name: Compliance Gotchas
+category: comprehensive
+type: standard
+tags:
+- compliance
+summary:
+  short: Compliance Gotchas and implementation guidelines
+  long: Complete guide to compliance gotchas
+problem:
+  description: Challenges without proper compliance gotchas
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement compliance gotchas
+key_concepts:
+  concept: Compliance Gotchas
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

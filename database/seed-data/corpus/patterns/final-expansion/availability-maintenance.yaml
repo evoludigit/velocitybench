@@ -1,0 +1,28 @@
+id: availability-maintenance
+name: Availability Maintenance
+category: comprehensive
+type: standard
+tags:
+- availability
+summary:
+  short: Availability Maintenance and implementation guidelines
+  long: Complete guide to availability maintenance
+problem:
+  description: Challenges without proper availability maintenance
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement availability maintenance
+key_concepts:
+  concept: Availability Maintenance
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

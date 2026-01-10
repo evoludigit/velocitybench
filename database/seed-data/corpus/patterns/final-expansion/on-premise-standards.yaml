@@ -1,0 +1,28 @@
+id: on-premise-standards
+name: On-Premise Standards
+category: comprehensive
+type: standard
+tags:
+- on-premise
+summary:
+  short: On-Premise Standards and implementation guidelines
+  long: Complete guide to on-premise standards
+problem:
+  description: Challenges without proper on-premise standards
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement on-premise standards
+key_concepts:
+  concept: On-Premise Standards
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced
