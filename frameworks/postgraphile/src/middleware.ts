@@ -7,7 +7,7 @@ export function setupGraphQL(app: Express) {
   app.use(
     postgraphile(
       getPool(),
-      'public', // PostgreSQL schema
+      'benchmark', // PostgreSQL schema (VelocityBench benchmark schema)
       {
         // Performance & behavior
         watchPg: false,
