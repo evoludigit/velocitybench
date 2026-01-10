@@ -19,6 +19,13 @@ CREATE TABLE tb_user (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Hide internal pk_user from GraphQL API
+COMMENT ON COLUMN tb_user.pk_user IS E'@omit all\nInternal primary key for performance.';
+
+-- Hide created_at/updated_at from GraphQL mutations (read-only)
+COMMENT ON COLUMN tb_user.created_at IS E'@omit create,update\nTimestamp when user was created.';
+COMMENT ON COLUMN tb_user.updated_at IS E'@omit create,update\nTimestamp when user was last updated.';
+
 -- tb_post: Posts table (content with relationships, write-side)
 -- Trinity Pattern: pk_post (integer PK) + id (UUID for API) + fk_user (integer FK)
 CREATE TABLE tb_post (
@@ -34,6 +41,14 @@ CREATE TABLE tb_post (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Hide internal pk_post and fk_user from GraphQL API
+COMMENT ON COLUMN tb_post.pk_post IS E'@omit all\nInternal primary key for performance.';
+COMMENT ON COLUMN tb_post.fk_user IS E'@omit all\nInternal foreign key (use author relation instead).';
+
+-- Hide created_at/updated_at from GraphQL mutations (read-only)
+COMMENT ON COLUMN tb_post.created_at IS E'@omit create,update\nTimestamp when post was created.';
+COMMENT ON COLUMN tb_post.updated_at IS E'@omit create,update\nTimestamp when post was last updated.';
+
 -- tb_comment: Comments table (nested relationships, write-side)
 -- Trinity Pattern: pk_comment (integer PK) + id (UUID for API) + fk_post/fk_user (integer FKs)
 CREATE TABLE tb_comment (
@@ -47,6 +62,16 @@ CREATE TABLE tb_comment (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Hide internal pk_comment and fk_* from GraphQL API
+COMMENT ON COLUMN tb_comment.pk_comment IS E'@omit all\nInternal primary key for performance.';
+COMMENT ON COLUMN tb_comment.fk_post IS E'@omit all\nInternal foreign key (use post relation instead).';
+COMMENT ON COLUMN tb_comment.fk_user IS E'@omit all\nInternal foreign key (use author relation instead).';
+COMMENT ON COLUMN tb_comment.fk_parent IS E'@omit all\nInternal foreign key (use parentComment relation instead).';
+
+-- Hide created_at/updated_at from GraphQL mutations (read-only)
+COMMENT ON COLUMN tb_comment.created_at IS E'@omit create,update\nTimestamp when comment was created.';
+COMMENT ON COLUMN tb_comment.updated_at IS E'@omit create,update\nTimestamp when comment was last updated.';
 
 -- Categories/Tags (many-to-many relationships)
 CREATE TABLE categories (
