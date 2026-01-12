@@ -285,12 +285,11 @@ class DatabaseSetup:
             print(f"  ❌ Failed to create database")
             return self._log_failure(framework, 'create_database')
 
-        # Step 3: Create schema
-        print(f"  3️⃣  Creating benchmark schema...")
-        schema_sql = f"CREATE SCHEMA IF NOT EXISTS {self.config.schema};"
-        if not self._run_sql(schema_sql, self._get_framework_connection_string(framework)):
-            print(f"  ❌ Failed to create schema")
-            return self._log_failure(framework, 'create_schema')
+        # Step 3: Apply PostgreSQL extensions (uuid-ossp, pg_stat_statements, etc.)
+        print(f"  3️⃣  Applying PostgreSQL extensions...")
+        if not self._apply_sql_file(db_name, 'database/01-extensions.sql'):
+            print(f"  ❌ Failed to apply extensions")
+            return self._log_failure(framework, 'apply_extensions')
 
         # Step 4: Apply shared Trinity Pattern schema
         print(f"  4️⃣  Applying Trinity Pattern schema...")

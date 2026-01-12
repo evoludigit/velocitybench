@@ -77,10 +77,21 @@ class BlogPostLoader:
         start = time.time()
 
         users = []
+        used_usernames = set()  # Track used usernames to ensure uniqueness
+
         for i in range(self.num_users):
             # Generate user data
             email = self.fake.unique.email()
             username = email.split('@')[0]  # Use email prefix as username
+
+            # Ensure username is unique (append number if needed)
+            if username in used_usernames:
+                counter = 1
+                while f"{username}{counter}" in used_usernames:
+                    counter += 1
+                username = f"{username}{counter}"
+
+            used_usernames.add(username)
             full_name = self.fake.name()
 
             # Split name into first/last (handle single names)
@@ -290,31 +301,25 @@ class BlogPostLoader:
         try:
             with psycopg.connect(connection_string) as conn:
                 with conn.cursor() as cur:
-                    # Disable FK checks during load
-                    cur.execute("SET session_replication_role = 'replica';")
-
-                    # Load users
+                    # Load users first (no FK dependencies)
                     print(f"  Loading {self.stats['users_generated']} users...", flush=True)
                     with open(users_tsv, 'r', encoding='utf-8') as f:
-                        with cur.copy("COPY tb_user (pk_user, id, email, username, first_name, last_name, bio, is_active, created_at, updated_at) FROM STDIN") as copy:
+                        with cur.copy("COPY benchmark.tb_user (pk_user, id, email, username, first_name, last_name, bio, is_active, created_at, updated_at) FROM STDIN") as copy:
                             for line in f:
                                 copy.write(line.encode('utf-8'))
 
-                    # Load posts
+                    # Load posts (FK to users already loaded, so no FK violations)
                     print(f"  Loading {self.stats['parsed']} posts...", flush=True)
                     with open(posts_tsv, 'r', encoding='utf-8') as f:
-                        with cur.copy("COPY tb_post (pk_post, id, title, content, excerpt, fk_author, status, published_at, created_at, updated_at) FROM STDIN") as copy:
+                        with cur.copy("COPY benchmark.tb_post (pk_post, id, title, content, excerpt, fk_author, status, published_at, created_at, updated_at) FROM STDIN") as copy:
                             for line in f:
                                 copy.write(line.encode('utf-8'))
 
-                    # Re-enable FK checks
-                    cur.execute("SET session_replication_role = 'origin';")
-
                     # Validate row counts
-                    cur.execute("SELECT COUNT(*) FROM tb_user;")
+                    cur.execute("SELECT COUNT(*) FROM benchmark.tb_user;")
                     user_count = cur.fetchone()[0]
 
-                    cur.execute("SELECT COUNT(*) FROM tb_post;")
+                    cur.execute("SELECT COUNT(*) FROM benchmark.tb_post;")
                     post_count = cur.fetchone()[0]
 
                     conn.commit()
