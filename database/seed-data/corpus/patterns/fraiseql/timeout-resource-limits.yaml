@@ -1,0 +1,49 @@
+id: timeout-resource-limits
+name: Query Timeout and Resource Limits
+category: fraiseql
+type: standard
+tags:
+- execution
+- performance
+- reliability
+- limits
+summary:
+  short: Enforcing execution time and resource consumption limits
+  long: Queries have maximum execution time and resource consumption limits to prevent
+    runaway queries from consuming resources.
+problem:
+  description: Long-running queries consume excessive resources
+  symptoms:
+  - Server exhaustion from long queries
+  - DoS vulnerability from expensive queries
+  - No way to kill stuck queries
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Query Timeout and Resource Limits effectively
+key_concepts:
+  concept_1: Timeout implementation
+  concept_2: Resource tracking
+  concept_3: Limit enforcement
+implementation_considerations:
+  consideration_1: Graceful timeout handling
+  consideration_2: Partial result on timeout
+  consideration_3: User notification
+best_practices:
+- name: Set timeouts
+  description: Define maximum execution time
+- name: Track resources
+  description: Monitor memory, CPU, I/O
+- name: Kill when over
+  description: Abort queries exceeding limits
+anti_patterns:
+- name: No timeouts
+  consequence: Runaway queries possible
+- name: No limits
+  consequence: Resource exhaustion
+blog_hooks:
+  beginner:
+    focus: Introduction to Query Timeout and Resource Limits
+  intermediate:
+    focus: Implementing Query Timeout and Resource Limits
+  advanced:
+    focus: Advanced Query Timeout and Resource Limits techniques

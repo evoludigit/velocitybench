@@ -1,0 +1,50 @@
+id: authorization-context-extraction
+name: Authorization Context Extraction
+category: fraiseql
+type: standard
+tags:
+- execution
+- authorization
+- security
+- authentication
+summary:
+  short: Parsing JWT claims, session data, and tenant context
+  long: The execution pipeline extracts authorization context from JWT tokens, session
+    data, or other sources, providing role, claims, and tenant information for authorization
+    checks.
+problem:
+  description: Authorization context unclear or incomplete
+  symptoms:
+  - Some required context missing
+  - Claims not properly extracted
+  - Tenant context not propagated
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Authorization Context Extraction effectively
+key_concepts:
+  concept_1: JWT parsing and validation
+  concept_2: Claim extraction
+  concept_3: Tenant context propagation
+implementation_considerations:
+  consideration_1: Context caching
+  consideration_2: Multiple auth sources
+  consideration_3: Default context values
+best_practices:
+- name: Validate tokens
+  description: Verify JWT signatures and expiry
+- name: Extract completely
+  description: Get all relevant claims
+- name: Propagate context
+  description: Make context available to auth rules
+anti_patterns:
+- name: No validation
+  consequence: Untrusted context used in auth
+- name: Missing claims
+  consequence: Auth rules can't evaluate properly
+blog_hooks:
+  beginner:
+    focus: Introduction to Authorization Context Extraction
+  intermediate:
+    focus: Implementing Authorization Context Extraction
+  advanced:
+    focus: Advanced Authorization Context Extraction techniques

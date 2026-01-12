@@ -1,0 +1,58 @@
+id: key-management-patterns
+name: Key Management Patterns
+category: fraiseql
+type: standard
+tags:
+- security
+- encryption
+- kms
+- key-rotation
+- compliance
+summary:
+  short: Multi-provider KMS integration with automated key rotation
+  long: FraiseQL abstracts key management across multiple KMS providers (Vault, AWS
+    KMS, GCP KMS, local) with automated key rotation, backward compatibility, and
+    zero-downtime key updates.
+problem:
+  description: Hard-coded keys and manual rotation create security risks
+  symptoms:
+  - Keys stored in code or configuration
+  - No key rotation strategy
+  - Vendor lock-in to single KMS provider
+  - Downtime during key rotation
+  impact: Security vulnerabilities and operational complexity
+solution:
+  description: Implement Key Management Patterns effectively
+key_concepts:
+  concept_1: Provider abstraction layer
+  concept_2: Key versioning and rotation
+  concept_3: Backward compatibility with old keys
+  concept_4: Automatic key caching
+implementation_considerations:
+  consideration_1: KMS provider API differences
+  consideration_2: Key rotation procedures
+  consideration_3: Cache invalidation on rotation
+  consideration_4: Disaster recovery for keys
+best_practices:
+- name: Abstract providers
+  description: Single interface for all KMS providers
+- name: Version keys
+  description: Support multiple key versions simultaneously
+- name: Rotate regularly
+  description: Automate key rotation schedule
+- name: Cache keys
+  description: Reduce KMS API calls
+anti_patterns:
+- name: Hard-coded keys
+  consequence: Keys leak in version control
+- name: Single provider
+  consequence: Vendor lock-in and migration difficulty
+- name: No versioning
+  consequence: Breaking changes on rotation
+blog_hooks:
+  beginner:
+    focus: Introduction to Key Management Patterns
+  intermediate:
+    focus: Implementing multi-provider KMS integration
+  advanced:
+    focus: Advanced key rotation strategies and disaster recovery

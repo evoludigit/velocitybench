@@ -1,0 +1,58 @@
+id: immutable-context-pattern
+name: Immutable Context Pattern
+category: fraiseql
+type: standard
+tags:
+- security
+- authorization
+- context
+- immutability
+- request-scoped
+summary:
+  short: Request-scoped immutable context preventing privilege escalation
+  long: FraiseQL binds authentication and authorization context once per request as
+    an immutable object, preventing privilege escalation and ensuring consistent authorization
+    decisions throughout query execution.
+problem:
+  description: Mutable context allows privilege escalation during request processing
+  symptoms:
+  - Authorization checks use different user context
+  - Context can be tampered with mid-request
+  - Inconsistent permission decisions
+  - Security audit trails show context changes
+  impact: Security vulnerabilities and authorization bypass risks
+solution:
+  description: Implement Immutable Context Pattern effectively
+key_concepts:
+  concept_1: Context binding at request entry point
+  concept_2: Immutability enforced through language features
+  concept_3: Context propagation through execution pipeline
+  concept_4: Tamper detection via hashing
+implementation_considerations:
+  consideration_1: Context serialization for caching
+  consideration_2: Performance of context validation
+  consideration_3: Context expiration handling
+  consideration_4: Nested context (e.g., service-to-service)
+best_practices:
+- name: Bind once
+  description: Create context at request start, never modify
+- name: Use readonly types
+  description: Leverage language immutability features
+- name: Hash context
+  description: Detect tampering with cryptographic hash
+- name: Audit context changes
+  description: Log any context creation/invalidation
+anti_patterns:
+- name: Mutable context
+  consequence: Privilege escalation vulnerabilities
+- name: Context recreation
+  consequence: Inconsistent authorization decisions
+- name: Global context
+  consequence: Cross-request context pollution
+blog_hooks:
+  beginner:
+    focus: Introduction to Immutable Context Pattern for security
+  intermediate:
+    focus: Implementing immutable context with language features
+  advanced:
+    focus: Context propagation in distributed systems and tamper detection

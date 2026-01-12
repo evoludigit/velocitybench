@@ -1,0 +1,44 @@
+id: entity-update-frequency
+name: Entity Update Frequency
+category: fraiseql
+type: standard
+tags:
+- fraiseql
+- entity
+summary:
+  short: Tracking how often entities change
+  long: Tracking how often entities change
+problem:
+  description: Without entity update frequency, systems face challenges
+  symptoms:
+  - Issue with tracking how often entities change
+  impact: Reduced FraiseQL effectiveness
+solution:
+  description: Implement Entity Update Frequency effectively
+key_concepts:
+  concept_1: Entity Update Frequency fundamentals
+  concept_2: Implementation patterns
+  concept_3: Best practices
+implementation_considerations:
+  consideration_1: Requirements gathering
+  consideration_2: Design decisions
+  consideration_3: Implementation approach
+best_practices:
+- name: Plan carefully
+  description: Think through Entity Update Frequency design
+- name: Test thoroughly
+  description: Validate Entity Update Frequency works
+- name: Monitor
+  description: Track Entity Update Frequency performance
+anti_patterns:
+- name: Ignoring pattern
+  consequence: Entity Update Frequency fails
+- name: Incomplete implementation
+  consequence: Partial benefits only
+blog_hooks:
+  beginner:
+    focus: Introduction to Entity Update Frequency
+  intermediate:
+    focus: Implementing Entity Update Frequency
+  advanced:
+    focus: Advanced Entity Update Frequency techniques

@@ -1,0 +1,50 @@
+id: compilation-validation-engine
+name: Compilation Validation Engine
+category: fraiseql
+type: standard
+tags:
+- compilation
+- validation
+- error-handling
+- quality
+summary:
+  short: Comprehensive validation of schema, bindings, authorization, and capabilities
+  long: The compilation pipeline includes a comprehensive validation engine that checks
+    type closure, binding correctness, authorization rule validity, and database capability
+    matching.
+problem:
+  description: Invalid schemas are compiled and deployed, causing runtime failures
+  symptoms:
+  - Missing type definitions cause resolver errors
+  - Authorization rules reference non-existent fields
+  - WHERE clauses use unsupported operators
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Compilation Validation Engine effectively
+key_concepts:
+  concept_1: Validation rule categories
+  concept_2: Error accumulation and reporting
+  concept_3: Validation phase in compilation
+implementation_considerations:
+  consideration_1: Validation rule extensibility
+  consideration_2: Performance of validation
+  consideration_3: Error message clarity
+best_practices:
+- name: Run validation early
+  description: Catch errors before deployment
+- name: Report all errors
+  description: Don't stop at first error
+- name: Clear messages
+  description: Help developers fix problems
+anti_patterns:
+- name: Partial validation
+  consequence: Some errors slip through
+- name: Stopping on first error
+  consequence: Multiple compilation rounds
+blog_hooks:
+  beginner:
+    focus: Introduction to Compilation Validation Engine
+  intermediate:
+    focus: Implementing Compilation Validation Engine
+  advanced:
+    focus: Advanced Compilation Validation Engine techniques

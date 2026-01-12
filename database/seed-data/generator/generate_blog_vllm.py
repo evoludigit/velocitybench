@@ -1,4 +1,4 @@
-#!/home/lionel/.venv/bin/python
+#!/usr/bin/env python
 """
 Blog Generator using local vLLM
 

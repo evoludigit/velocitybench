@@ -1,0 +1,49 @@
+id: table-naming-with-prefix
+name: Table Naming with tb_* Prefix
+category: fraiseql
+type: standard
+tags:
+- schema
+- naming
+- conventions
+- tables
+summary:
+  short: Prefixing storage tables with tb_* for consistency and clarity
+  long: All storage tables (normalized data) are prefixed with tb_* to distinguish
+    them from views and make their purpose explicit.
+problem:
+  description: Table and view names ambiguous
+  symptoms:
+  - Hard to distinguish tables from views
+  - No clear indication of table purpose
+  - Inconsistent naming across schemas
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Table Naming with tb_* Prefix effectively
+key_concepts:
+  concept_1: Naming convention principles
+  concept_2: Storage vs presentation separation
+  concept_3: Convention enforcement
+implementation_considerations:
+  consideration_1: Legacy table handling
+  consideration_2: Naming consistency
+  consideration_3: Documentation of convention
+best_practices:
+- name: Apply convention
+  description: Prefix all storage tables with tb_
+- name: Enforce everywhere
+  description: Ensure all tables follow pattern
+- name: Document convention
+  description: Clearly explain tb_* pattern
+anti_patterns:
+- name: No prefix
+  consequence: Names ambiguous
+- name: Inconsistent naming
+  consequence: Confusion and mistakes
+blog_hooks:
+  beginner:
+    focus: Introduction to Table Naming with tb_* Prefix
+  intermediate:
+    focus: Implementing Table Naming with tb_* Prefix
+  advanced:
+    focus: Advanced Table Naming with tb_* Prefix techniques

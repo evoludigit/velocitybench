@@ -1,0 +1,49 @@
+id: field-level-authorization
+name: Field-Level Authorization
+category: fraiseql
+type: standard
+tags:
+- execution
+- authorization
+- security
+- field-level
+summary:
+  short: Applying authorization rules per field in response
+  long: Authorization rules can be applied to individual fields, controlling whether
+    each field is included in the response based on user permissions.
+problem:
+  description: Entire queries succeed or fail; can't restrict fields
+  symptoms:
+  - Users see data they shouldn't
+  - Can't use single query for different roles
+  - Hard to implement field-level security
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Field-Level Authorization effectively
+key_concepts:
+  concept_1: Field auth metadata
+  concept_2: Field masking logic
+  concept_3: Nested field auth
+implementation_considerations:
+  consideration_1: Error handling for denied fields
+  consideration_2: Performance of field checking
+  consideration_3: Null vs error for denied fields
+best_practices:
+- name: Define per-field
+  description: Set auth rules per field
+- name: Consistent application
+  description: Apply rules everywhere
+- name: Clear semantics
+  description: Define behavior for denied fields
+anti_patterns:
+- name: No field-level auth
+  consequence: Can't restrict specific fields
+- name: Inconsistent enforcement
+  consequence: Same field protected differently
+blog_hooks:
+  beginner:
+    focus: Introduction to Field-Level Authorization
+  intermediate:
+    focus: Implementing Field-Level Authorization
+  advanced:
+    focus: Advanced Field-Level Authorization techniques

@@ -1,0 +1,44 @@
+id: where-clause-performance
+name: WHERE Clause Performance
+category: fraiseql
+type: standard
+tags:
+- fraiseql
+- where
+summary:
+  short: Different operators for different speeds
+  long: Different operators for different speeds
+problem:
+  description: Without where clause performance, systems face challenges
+  symptoms:
+  - Issue with different operators for different speeds
+  impact: Reduced FraiseQL effectiveness
+solution:
+  description: Implement WHERE Clause Performance effectively
+key_concepts:
+  concept_1: WHERE Clause Performance fundamentals
+  concept_2: Implementation patterns
+  concept_3: Best practices
+implementation_considerations:
+  consideration_1: Requirements gathering
+  consideration_2: Design decisions
+  consideration_3: Implementation approach
+best_practices:
+- name: Plan carefully
+  description: Think through WHERE Clause Performance design
+- name: Test thoroughly
+  description: Validate WHERE Clause Performance works
+- name: Monitor
+  description: Track WHERE Clause Performance performance
+anti_patterns:
+- name: Ignoring pattern
+  consequence: WHERE Clause Performance fails
+- name: Incomplete implementation
+  consequence: Partial benefits only
+blog_hooks:
+  beginner:
+    focus: Introduction to WHERE Clause Performance
+  intermediate:
+    focus: Implementing WHERE Clause Performance
+  advanced:
+    focus: Advanced WHERE Clause Performance techniques

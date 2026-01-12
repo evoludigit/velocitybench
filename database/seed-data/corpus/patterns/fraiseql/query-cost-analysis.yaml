@@ -1,0 +1,58 @@
+id: query-cost-analysis
+name: Query Cost Analysis
+category: fraiseql
+type: standard
+tags:
+- performance
+- security
+- query-complexity
+- cost
+- rate-limiting
+summary:
+  short: Query complexity scoring and cost-based rejection
+  long: FraiseQL implements query cost analysis by scoring queries based on depth,
+    breadth, field count, and database operations, rejecting expensive queries before
+    execution to prevent DoS attacks and protect database resources.
+problem:
+  description: Expensive queries cause database overload
+  symptoms:
+  - Single query consumes all resources
+  - DoS via complex nested queries
+  - No protection against expensive operations
+  - Database becomes unresponsive
+  impact: Service degradation and DoS vulnerability
+solution:
+  description: Implement Query Cost Analysis effectively
+key_concepts:
+  concept_1: Cost scoring algorithm (depth, breadth, fields)
+  concept_2: Maximum cost threshold per query
+  concept_3: Pre-execution cost calculation
+  concept_4: Cost-based rate limiting per user
+implementation_considerations:
+  consideration_1: Cost scoring accuracy
+  consideration_2: Per-user vs per-query limits
+  consideration_3: Admin query exemptions
+  consideration_4: Cost visualization for users
+best_practices:
+- name: Score before execution
+  description: Calculate cost during validation
+- name: Set reasonable limits
+  description: Balance usability and protection
+- name: Provide feedback
+  description: Tell user why query rejected
+- name: Monitor costs
+  description: Track query cost distribution
+anti_patterns:
+- name: No cost limits
+  consequence: DoS via expensive queries
+- name: Runtime detection
+  consequence: Database already under load
+- name: Same limit for all
+  consequence: Inflexible for different users
+blog_hooks:
+  beginner:
+    focus: Introduction to Query Cost Analysis
+  intermediate:
+    focus: Implementing cost scoring and rejection
+  advanced:
+    focus: Advanced cost-based rate limiting and optimization

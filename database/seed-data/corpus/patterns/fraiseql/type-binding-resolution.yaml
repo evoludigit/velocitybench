@@ -1,0 +1,44 @@
+id: type-binding-resolution
+name: Type Binding Resolution
+category: fraiseql
+type: standard
+tags:
+- fraiseql
+- type
+summary:
+  short: Connecting types to data
+  long: Connecting types to data
+problem:
+  description: Without type binding resolution, systems face challenges
+  symptoms:
+  - Issue with connecting types to data
+  impact: Reduced FraiseQL effectiveness
+solution:
+  description: Implement Type Binding Resolution effectively
+key_concepts:
+  concept_1: Type Binding Resolution fundamentals
+  concept_2: Implementation patterns
+  concept_3: Best practices
+implementation_considerations:
+  consideration_1: Requirements gathering
+  consideration_2: Design decisions
+  consideration_3: Implementation approach
+best_practices:
+- name: Plan carefully
+  description: Think through Type Binding Resolution design
+- name: Test thoroughly
+  description: Validate Type Binding Resolution works
+- name: Monitor
+  description: Track Type Binding Resolution performance
+anti_patterns:
+- name: Ignoring pattern
+  consequence: Type Binding Resolution fails
+- name: Incomplete implementation
+  consequence: Partial benefits only
+blog_hooks:
+  beginner:
+    focus: Introduction to Type Binding Resolution
+  intermediate:
+    focus: Implementing Type Binding Resolution
+  advanced:
+    focus: Advanced Type Binding Resolution techniques

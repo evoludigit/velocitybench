@@ -1,0 +1,314 @@
+# Database Capability Manifest (FraiseQL)
+# VelocityBench Knowledge Corpus
+
+id: database-capability-manifest
+name: "Database Capability Manifest and Multi-Target Compilation"
+category: fraiseql
+type: pattern
+severity: high
+tags:
+  - fraiseql
+  - compilation
+  - multi-database
+  - capability-detection
+  - sql-generation
+  - portability
+
+summary:
+  short: "Compile-time capability detection for PostgreSQL, MySQL, SQLite, SQL Server"
+  long: |
+    FraiseQL uses a capability manifest to detect which aggregation operators, functions, and
+    features are available for each database target (PostgreSQL, MySQL, SQLite, SQL Server).
+    Compiler introspects capabilities at compile-time and generates database-specific SQL with
+    fallback strategies (e.g., FILTER → CASE WHEN for MySQL). Ensures correct, portable queries.
+
+problem:
+  description: |
+    Different databases have different SQL features:
+    - PostgreSQL: FILTER clause, STDDEV, PERCENTILE_CONT/DISC, DATE_TRUNC, GIN indexes
+    - MySQL: No FILTER (use CASE WHEN), GROUP_CONCAT, DATE_FORMAT, JSON indexes
+    - SQLite: Limited aggregates (no STDDEV/VARIANCE), strftime, no JSONB indexes
+    - SQL Server: STDEV/VAR naming differences, DATEPART, JSON_VALUE
+
+    Writing portable SQL requires detecting capabilities and generating appropriate syntax.
+
+  symptoms:
+    - name: "SQL syntax errors on different databases"
+      description: "FILTER clause works on PostgreSQL, fails on MySQL"
+      detection: "Runtime errors when switching database targets"
+
+    - name: "Hard-coded database assumptions"
+      description: "Code assumes PostgreSQL-specific features"
+      detection: "Can't compile for MySQL/SQLite without rewriting queries"
+
+    - name: "Manual SQL generation per database"
+      description: "Separate codepaths for each database"
+      detection: "if (db == 'postgres') { ... } else if (db == 'mysql') { ... }"
+
+solution:
+  principle: "Detect capabilities at compile-time, generate database-specific SQL with fallbacks"
+
+  components:
+    - name: "Capability Manifest"
+      type: "JSON/YAML config"
+      purpose: "Define available functions, operators, features per database"
+
+    - name: "Compile-Time Detection"
+      type: "Compiler phase"
+      purpose: "Introspect manifest, validate query compatibility"
+
+    - name: "SQL Lowering"
+      type: "Code generation"
+      purpose: "Generate database-specific SQL with appropriate syntax"
+
+    - name: "Fallback Strategies"
+      type: "Compilation rules"
+      purpose: "Emulate missing features (FILTER → CASE WHEN)"
+
+capability_manifest:
+  postgresql:
+    aggregates_basic: ["COUNT", "COUNT_DISTINCT", "SUM", "AVG", "MIN", "MAX"]
+    aggregates_statistical: ["STDDEV", "STDDEV_POP", "STDDEV_SAMP", "VARIANCE", "VAR_POP", "VAR_SAMP", "PERCENTILE_CONT", "PERCENTILE_DISC"]
+    aggregates_advanced: ["ARRAY_AGG", "JSON_AGG", "JSONB_AGG", "STRING_AGG", "BOOL_AND", "BOOL_OR"]
+    conditional: "FILTER"
+    temporal: "DATE_TRUNC"
+    jsonb: "data->>'field' (native JSONB)"
+    indexes: "GIN, B-tree, BRIN"
+
+  mysql:
+    aggregates_basic: ["COUNT", "COUNT_DISTINCT", "SUM", "AVG", "MIN", "MAX"]
+    aggregates_statistical: ["STDDEV", "VARIANCE"]
+    aggregates_advanced: ["GROUP_CONCAT", "JSON_ARRAYAGG"]
+    conditional: "CASE WHEN (no FILTER)"
+    temporal: "DATE_FORMAT"
+    jsonb: "JSON_UNQUOTE(JSON_EXTRACT(data, '$.field'))"
+    indexes: "B-tree, virtual columns"
+
+  sqlite:
+    aggregates_basic: ["COUNT", "COUNT_DISTINCT", "SUM", "AVG", "MIN", "MAX"]
+    aggregates_statistical: []
+    aggregates_advanced: ["GROUP_CONCAT"]
+    conditional: "CASE WHEN (no FILTER)"
+    temporal: "strftime"
+    jsonb: "json_extract(data, '$.field')"
+    indexes: "B-tree only (no JSON indexes)"
+
+  sqlserver:
+    aggregates_basic: ["COUNT", "COUNT_DISTINCT", "SUM", "AVG", "MIN", "MAX"]
+    aggregates_statistical: ["STDEV", "STDEVP", "VAR", "VARP"]
+    aggregates_advanced: ["STRING_AGG"]
+    conditional: "CASE WHEN (no FILTER)"
+    temporal: "DATEPART, FORMAT, CAST"
+    jsonb: "JSON_VALUE(data, '$.field')"
+    indexes: "B-tree, computed columns"
+
+compilation_strategy:
+  phase_1_introspection:
+    description: "Load capability manifest for target database"
+    steps:
+      - "Read manifest JSON for database (postgresql, mysql, sqlite, sqlserver)"
+      - "Build capability map: { 'STDDEV': true, 'FILTER': true, ... }"
+      - "Store in compiler context"
+
+  phase_2_validation:
+    description: "Validate GraphQL query against capabilities"
+    steps:
+      - "Check if requested aggregates exist in manifest"
+      - "Check if FILTER clause is supported (if used)"
+      - "Check if temporal functions exist (DATE_TRUNC, DATE_FORMAT, etc.)"
+      - "Error if feature unavailable and no fallback"
+
+  phase_3_lowering:
+    description: "Generate database-specific SQL with fallbacks"
+    steps:
+      - "Choose SQL syntax from manifest"
+      - "Apply fallback rules (FILTER → CASE WHEN if needed)"
+      - "Generate correct JSONB extraction syntax"
+      - "Generate correct temporal bucketing syntax"
+
+  fallback_rules:
+    filter_to_case_when:
+      condition: "Database doesn't support FILTER clause"
+      transformation: |
+        -- PostgreSQL (native FILTER)
+        SUM(revenue) FILTER (WHERE status = 'completed')
+
+        -- MySQL/SQLite/SQL Server (CASE WHEN fallback)
+        SUM(CASE WHEN status = 'completed' THEN revenue ELSE 0 END)
+
+    stddev_fallback:
+      condition: "Database doesn't support STDDEV"
+      strategy: "Return error or NULL for STDDEV queries on SQLite"
+
+    date_trunc_to_date_format:
+      condition: "MySQL doesn't have DATE_TRUNC"
+      transformation: |
+        -- PostgreSQL
+        DATE_TRUNC('day', occurred_at)
+
+        -- MySQL
+        DATE_FORMAT(occurred_at, '%Y-%m-%d')
+
+        -- SQLite
+        strftime('%Y-%m-%d', occurred_at)
+
+        -- SQL Server
+        CAST(occurred_at AS DATE)
+
+implementation_example:
+  rust_code: |
+    // Capability detection at compile-time
+    pub struct CapabilityManifest {
+        pub basic_aggregates: Vec<String>,
+        pub statistical_aggregates: Vec<String>,
+        pub has_filter_clause: bool,
+        pub temporal_function: TemporalFunction,
+        pub jsonb_syntax: JsonbSyntax,
+    }
+
+    pub enum TemporalFunction {
+        DateTrunc,      // PostgreSQL
+        DateFormat,     // MySQL
+        Strftime,       // SQLite
+        Datepart,       // SQL Server
+    }
+
+    pub enum JsonbSyntax {
+        Native,         // PostgreSQL: data->>'field'
+        JsonExtract,    // MySQL: JSON_UNQUOTE(JSON_EXTRACT(...))
+        JsonExtractFunc,// SQLite: json_extract(...)
+        JsonValue,      // SQL Server: JSON_VALUE(...)
+    }
+
+    // Lowering logic
+    pub fn lower_conditional_aggregate(
+        aggregate: &AggregateFunction,
+        filter: &Option<FilterCondition>,
+        manifest: &CapabilityManifest,
+    ) -> String {
+        if let Some(filter_cond) = filter {
+            if manifest.has_filter_clause {
+                // PostgreSQL: use native FILTER
+                format!("{}(revenue) FILTER (WHERE {})", aggregate, filter_cond.to_sql())
+            } else {
+                // MySQL/SQLite/SQL Server: fallback to CASE WHEN
+                format!("{}(CASE WHEN {} THEN revenue ELSE 0 END)", aggregate, filter_cond.to_sql())
+            }
+        } else {
+            // No filter
+            format!("{}(revenue)", aggregate)
+        }
+    }
+
+  graphql_to_sql:
+    description: "Example of multi-database SQL generation"
+    graphql: |
+      query {
+        sales_aggregate(
+          groupBy: { occurred_at_day: true }
+        ) {
+          occurred_at_day
+          revenue_sum
+          revenue_stddev
+        }
+      }
+
+    postgresql: |
+      SELECT
+          DATE_TRUNC('day', occurred_at) AS occurred_at_day,
+          SUM(revenue) AS revenue_sum,
+          STDDEV(revenue) AS revenue_stddev
+      FROM tf_sales
+      GROUP BY DATE_TRUNC('day', occurred_at);
+
+    mysql: |
+      SELECT
+          DATE_FORMAT(occurred_at, '%Y-%m-%d') AS occurred_at_day,
+          SUM(revenue) AS revenue_sum,
+          STDDEV(revenue) AS revenue_stddev
+      FROM tf_sales
+      GROUP BY DATE_FORMAT(occurred_at, '%Y-%m-%d');
+
+    sqlite: |
+      SELECT
+          strftime('%Y-%m-%d', occurred_at) AS occurred_at_day,
+          SUM(revenue) AS revenue_sum,
+          NULL AS revenue_stddev  -- STDDEV not supported
+      FROM tf_sales
+      GROUP BY strftime('%Y-%m-%d', occurred_at);
+
+best_practices:
+  - name: "Validate at compile-time, not runtime"
+    description: "Check capabilities during compilation, fail early"
+    rationale: "Catch incompatibilities before deployment"
+
+  - name: "Provide clear fallback strategies"
+    description: "Document what happens when feature unavailable"
+    rationale: "Users know if query will work on target database"
+
+  - name: "Test SQL generation for all targets"
+    description: "Integration tests for PostgreSQL, MySQL, SQLite, SQL Server"
+    rationale: "Ensure generated SQL actually works on each database"
+
+  - name: "Keep manifest up-to-date"
+    description: "Update as database versions add features"
+    rationale: "Leverage new capabilities (MySQL 8.0 added window functions)"
+
+anti_patterns:
+  - name: "Runtime database detection"
+    consequence: "Errors happen in production, not during compilation"
+    example: "Generating PostgreSQL SQL, deploying to MySQL, runtime error"
+
+  - name: "Assuming PostgreSQL everywhere"
+    consequence: "Code doesn't work on other databases"
+    example: "Using data->>'field' syntax without checking database"
+
+  - name: "No fallback for missing features"
+    consequence: "Queries fail instead of degrading gracefully"
+    example: "STDDEV query on SQLite returns error (should return NULL or alternative)"
+
+use_cases:
+  - scenario: "Multi-tenant SaaS with customer choice of database"
+    benefit: "Compile GraphQL schema for customer's database (PostgreSQL or MySQL)"
+
+  - scenario: "Open-source project supporting multiple databases"
+    benefit: "Single codebase generates correct SQL for all supported databases"
+
+  - scenario: "Migration from PostgreSQL to MySQL"
+    benefit: "Compiler detects incompatibilities, suggests alternatives"
+
+related_patterns:
+  - id: "aggregation-model"
+    description: "Aggregation functions with database-specific compilation"
+
+  - id: "conditional-aggregates"
+    description: "FILTER vs CASE WHEN fallback strategy"
+
+  - id: "temporal-bucketing"
+    description: "DATE_TRUNC vs DATE_FORMAT vs strftime"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Capability manifest is like a restaurant menu:
+      - PostgreSQL: Full menu (FILTER, STDDEV, PERCENTILE)
+      - MySQL: Most dishes (no FILTER, use CASE WHEN instead)
+      - SQLite: Basic menu (just COUNT, SUM, AVG)
+
+      Compiler checks menu, orders what's available, substitutes when needed!
+
+  intermediate:
+    focus: "Compile-time detection and SQL lowering"
+    key_points:
+      - "Capability manifest: JSON config per database"
+      - "Compile-time validation: Check features exist"
+      - "SQL lowering: Generate database-specific syntax"
+      - "Fallback rules: FILTER → CASE WHEN, DATE_TRUNC → DATE_FORMAT"
+
+  advanced:
+    focus: "Multi-target compilation architecture"
+    key_points:
+      - "Compiler phases: Introspection → Validation → Lowering"
+      - "Extensibility: Add new databases by updating manifest"
+      - "Performance: Leverage database-specific optimizations"
+      - "Testing strategy: Integration tests for all targets"

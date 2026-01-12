@@ -1,0 +1,361 @@
+# Window Functions in FraiseQL (Phase 5)
+# VelocityBench Knowledge Corpus
+
+id: window-functions-fraiseql
+name: "Window Functions in FraiseQL (Planned Phase 5)"
+category: fraiseql
+type: pattern
+severity: high
+tags:
+  - fraiseql
+  - analytics
+  - window-functions
+  - sql
+  - phase-5
+  - planned
+
+summary:
+  short: "Ranking, LAG/LEAD, running totals without collapsing rows (Phase 5 feature)"
+  long: |
+    Window functions perform calculations across rows related to the current row using OVER
+    clause, without collapsing rows like GROUP BY. Planned for FraiseQL Phase 5: ranking
+    (ROW_NUMBER, RANK, DENSE_RANK), value functions (LAG, LEAD, FIRST_VALUE), and running
+    aggregates (running totals, moving averages). Returns value for EVERY row, not grouped.
+
+problem:
+  description: |
+    Many analytical calculations need context from related rows:
+    - Rank products by sales within category (keep all rows, add rank column)
+    - Compare each month's revenue to previous month (month-over-month growth)
+    - Calculate running total of orders (cumulative sum)
+    - Find top 3 products per category (partition + filter by rank)
+
+    GROUP BY collapses rows, losing detail. Window functions keep all rows + add context.
+
+  symptoms:
+    - name: "Self-joins for running totals"
+      description: "JOIN table to itself to calculate cumulative sums"
+      detection: "Complex self-joins with inequality conditions"
+
+    - name: "Application-side ranking"
+      description: "Fetch all data, calculate ranks in code"
+      detection: "Large result sets, ranking logic in application"
+
+    - name: "Correlated subqueries"
+      description: "Subquery per row referencing outer query"
+      detection: "Slow queries with N subqueries for N rows"
+
+solution:
+  principle: "Calculate rankings, LAG/LEAD, running totals in OVER clause (Phase 5)"
+
+  status: "Planned for Phase 5, not yet implemented in FraiseQL v1 or v2"
+
+  components:
+    - name: "Ranking Functions"
+      type: "ROW_NUMBER, RANK, DENSE_RANK, NTILE"
+      purpose: "Assign ranks within partitions"
+
+    - name: "Value Functions"
+      type: "LAG, LEAD, FIRST_VALUE, LAST_VALUE"
+      purpose: "Access values from other rows in window"
+
+    - name: "Aggregate as Window"
+      type: "SUM, AVG, COUNT, MIN, MAX with OVER"
+      purpose: "Running totals, moving averages"
+
+    - name: "PARTITION BY"
+      type: "Window clause"
+      purpose: "Divide rows into groups (like GROUP BY but keeps rows)"
+
+    - name: "ORDER BY"
+      type: "Window clause"
+      purpose: "Define order within partition"
+
+    - name: "Frame Clause"
+      type: "ROWS / RANGE / GROUPS"
+      purpose: "Define which rows to include in calculation"
+
+proposed_graphql_api:
+  ranking_example: |
+    # Phase 5 proposed API (not yet implemented)
+    query {
+      sales(
+        window: {
+          partitionBy: ["category"],
+          orderBy: [{ revenue: DESC }]
+        }
+      ) {
+        id
+        category
+        revenue
+        row_number
+        rank
+        dense_rank
+      }
+    }
+
+  lag_lead_example: |
+    # Phase 5 proposed API (not yet implemented)
+    query {
+      sales(
+        window: {
+          partitionBy: ["category"],
+          orderBy: [{ occurred_at: ASC }]
+        }
+      ) {
+        id
+        category
+        occurred_at
+        revenue
+        prev_day_revenue: lag(revenue, 1)
+        next_day_revenue: lead(revenue, 1)
+        month_over_month_growth: formula("(revenue - lag(revenue, 1)) / lag(revenue, 1) * 100")
+      }
+    }
+
+  running_total_example: |
+    # Phase 5 proposed API (not yet implemented)
+    query {
+      sales(
+        window: {
+          orderBy: [{ occurred_at: ASC }],
+          frame: { rows: { start: "UNBOUNDED_PRECEDING", end: "CURRENT_ROW" } }
+        }
+      ) {
+        id
+        occurred_at
+        revenue
+        running_total: sum(revenue)
+      }
+    }
+
+sql_examples:
+  ranking_functions:
+    postgresql: |
+      -- ROW_NUMBER: Sequential, no gaps, no ties
+      SELECT
+          data->>'category' AS category,
+          revenue,
+          ROW_NUMBER() OVER (
+              PARTITION BY data->>'category'
+              ORDER BY revenue DESC
+          ) AS row_num
+      FROM tf_sales;
+
+      -- RANK: Gaps for ties (1, 2, 2, 4)
+      SELECT
+          revenue,
+          RANK() OVER (ORDER BY revenue DESC) AS rank
+      FROM tf_sales;
+
+      -- DENSE_RANK: No gaps (1, 2, 2, 3)
+      SELECT
+          revenue,
+          DENSE_RANK() OVER (ORDER BY revenue DESC) AS dense_rank
+      FROM tf_sales;
+
+      -- NTILE: Divide into buckets
+      SELECT
+          revenue,
+          NTILE(4) OVER (ORDER BY revenue DESC) AS quartile
+      FROM tf_sales;
+
+  lag_lead_functions:
+    postgresql: |
+      -- LAG: Previous row value
+      SELECT
+          DATE_TRUNC('day', occurred_at) AS day,
+          SUM(revenue) AS daily_revenue,
+          LAG(SUM(revenue)) OVER (ORDER BY DATE_TRUNC('day', occurred_at)) AS prev_day_revenue,
+          SUM(revenue) - LAG(SUM(revenue)) OVER (ORDER BY DATE_TRUNC('day', occurred_at)) AS day_over_day_change
+      FROM tf_sales
+      GROUP BY DATE_TRUNC('day', occurred_at)
+      ORDER BY day;
+
+      -- LEAD: Next row value
+      SELECT
+          occurred_at,
+          revenue,
+          LEAD(revenue) OVER (ORDER BY occurred_at) AS next_revenue
+      FROM tf_sales;
+
+  running_total:
+    postgresql: |
+      -- Running total
+      SELECT
+          occurred_at,
+          revenue,
+          SUM(revenue) OVER (ORDER BY occurred_at) AS running_total
+      FROM tf_sales;
+
+      -- Running total per category
+      SELECT
+          data->>'category' AS category,
+          occurred_at,
+          revenue,
+          SUM(revenue) OVER (
+              PARTITION BY data->>'category'
+              ORDER BY occurred_at
+          ) AS category_running_total
+      FROM tf_sales;
+
+  moving_average:
+    postgresql: |
+      -- 7-day moving average
+      SELECT
+          DATE_TRUNC('day', occurred_at) AS day,
+          AVG(revenue) OVER (
+              ORDER BY DATE_TRUNC('day', occurred_at)
+              ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
+          ) AS moving_avg_7day
+      FROM tf_sales;
+
+  top_n_per_group:
+    postgresql: |
+      -- Top 3 products per category
+      WITH ranked AS (
+          SELECT
+              data->>'category' AS category,
+              data->>'product_name' AS product_name,
+              revenue,
+              ROW_NUMBER() OVER (
+                  PARTITION BY data->>'category'
+                  ORDER BY revenue DESC
+              ) AS rank
+          FROM tf_sales
+      )
+      SELECT * FROM ranked WHERE rank <= 3;
+
+window_specification:
+  partition_by:
+    description: "Divide rows into partitions (like GROUP BY but keeps rows)"
+    syntax: "PARTITION BY column1, column2"
+    example: "PARTITION BY data->>'category'"
+
+  order_by:
+    description: "Define order within each partition"
+    syntax: "ORDER BY column [ASC|DESC]"
+    example: "ORDER BY revenue DESC, occurred_at ASC"
+
+  frame_clause:
+    types:
+      - type: "ROWS"
+        description: "Physical row count"
+        example: "ROWS BETWEEN 2 PRECEDING AND CURRENT ROW"
+
+      - type: "RANGE"
+        description: "Logical range of values"
+        example: "RANGE BETWEEN INTERVAL '7 days' PRECEDING AND CURRENT ROW"
+
+      - type: "GROUPS"
+        description: "Peer groups (PostgreSQL only)"
+        example: "GROUPS BETWEEN 1 PRECEDING AND 1 FOLLOWING"
+
+database_support:
+  postgresql:
+    ranking: "All functions supported"
+    value: "LAG, LEAD, FIRST_VALUE, LAST_VALUE, NTH_VALUE"
+    frame: "ROWS, RANGE, GROUPS"
+    notes: "Full window function support"
+
+  mysql:
+    ranking: "All functions supported (MySQL 8.0+)"
+    value: "LAG, LEAD, FIRST_VALUE, LAST_VALUE, NTH_VALUE"
+    frame: "ROWS, RANGE (no GROUPS)"
+    notes: "Window functions added in 8.0"
+
+  sqlite:
+    ranking: "All functions supported (SQLite 3.25+)"
+    value: "LAG, LEAD, FIRST_VALUE, LAST_VALUE, NTH_VALUE"
+    frame: "ROWS, RANGE, GROUPS"
+    notes: "Window functions added in 3.25"
+
+  sqlserver:
+    ranking: "All functions supported"
+    value: "LAG, LEAD, FIRST_VALUE, LAST_VALUE"
+    frame: "ROWS, RANGE (no GROUPS)"
+    notes: "NTH_VALUE not supported"
+
+use_cases:
+  - scenario: "E-commerce: Top 3 products per category"
+    pattern: "PARTITION BY category, ROW_NUMBER(), filter rank <= 3"
+    benefit: "Single query for top-N in each category"
+
+  - scenario: "SaaS: Month-over-month growth"
+    pattern: "LAG(revenue) to compare current vs previous month"
+    benefit: "Growth calculations in SQL, not application"
+
+  - scenario: "Finance: Running account balance"
+    pattern: "SUM(amount) OVER (ORDER BY date) for cumulative sum"
+    benefit: "Real-time balance calculation"
+
+  - scenario: "Analytics: 7-day moving average"
+    pattern: "AVG(...) OVER (ROWS BETWEEN 6 PRECEDING AND CURRENT ROW)"
+    benefit: "Smoothed trend analysis"
+
+best_practices:
+  - name: "Index ORDER BY columns"
+    description: "CREATE INDEX on columns used in OVER (ORDER BY ...)"
+    rationale: "Window functions sort by ORDER BY, indexes speed this up"
+
+  - name: "Reuse window definitions"
+    description: "WINDOW w AS (PARTITION BY ... ORDER BY ...), use w in multiple functions"
+    rationale: "Cleaner SQL, database can optimize single window"
+
+  - name: "Filter after window calculation"
+    description: "Use CTE or subquery to filter by rank/row_number"
+    rationale: "Window functions compute BEFORE WHERE, must filter in outer query"
+
+  - name: "Be careful with frame defaults"
+    description: "Default frame: RANGE UNBOUNDED PRECEDING TO CURRENT ROW"
+    rationale: "May not be what you want, explicitly specify ROWS/RANGE"
+
+anti_patterns:
+  - name: "Self-joins for running totals"
+    consequence: "Slow, O(N²) complexity"
+    example: "JOIN sales s2 ON s2.date <= s1.date, then SUM(s2.revenue)"
+    fix: "SUM(revenue) OVER (ORDER BY date)"
+
+  - name: "Application-side ranking"
+    consequence: "Large result sets, ranking logic in code"
+    example: "Fetch all products, rank by revenue in Python/JavaScript"
+    fix: "ROW_NUMBER() OVER (ORDER BY revenue DESC)"
+
+  - name: "Filtering in WHERE on window function"
+    consequence: "SQL error - window functions computed after WHERE"
+    example: "WHERE ROW_NUMBER() OVER (...) = 1 ❌"
+    fix: "Use CTE: WITH ranked AS (...) SELECT * FROM ranked WHERE row_num = 1 ✓"
+
+related_patterns:
+  - id: "aggregation-model"
+    description: "GROUP BY aggregation vs window functions"
+
+  - id: "fact-dimension-pattern"
+    description: "Table structure for window function queries"
+
+  - id: "temporal-bucketing"
+    description: "Combine temporal bucketing with window functions"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Window functions are like looking at a spreadsheet:
+      - GROUP BY: Collapses rows, shows only totals (detail hidden)
+      - Window function: Keeps all rows, adds "running total so far" column
+      You see both individual values AND aggregates for each row!
+
+  intermediate:
+    focus: "Window function categories and PARTITION BY"
+    key_points:
+      - "Ranking: ROW_NUMBER, RANK, DENSE_RANK (top-N per group)"
+      - "Value: LAG, LEAD (compare to previous/next row)"
+      - "Aggregate as window: SUM, AVG (running totals, moving averages)"
+      - "PARTITION BY: Like GROUP BY but keeps all rows"
+
+  advanced:
+    focus: "Frame clauses and performance optimization (Phase 5 planning)"
+    key_points:
+      - "ROWS vs RANGE vs GROUPS frame specifications"
+      - "Index strategy for PARTITION BY + ORDER BY"
+      - "Proposed GraphQL API for FraiseQL Phase 5"
+      - "Database-specific support and limitations"

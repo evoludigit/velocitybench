@@ -1,0 +1,49 @@
+id: deterministic-compilation
+name: Deterministic Compilation
+category: fraiseql
+type: standard
+tags:
+- compilation
+- determinism
+- reproducibility
+- caching
+summary:
+  short: Guaranteed identical output for identical input schema
+  long: 'The compilation pipeline is deterministic: the same input schema always produces
+    the same CompiledSchema artifact, enabling reproducible builds and caching.'
+problem:
+  description: Non-deterministic compilation makes caching and debugging difficult
+  symptoms:
+  - Different compiled schemas from same input
+  - Can't cache compilation results
+  - Difficult to debug non-determinism
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Deterministic Compilation effectively
+key_concepts:
+  concept_1: Determinism guarantees
+  concept_2: Sources of non-determinism
+  concept_3: Testing for determinism
+implementation_considerations:
+  consideration_1: Hash-based caching
+  consideration_2: Dictionary ordering
+  consideration_3: Floating-point operations
+best_practices:
+- name: Sorted output
+  description: Sort all collections in output
+- name: Fixed seeds
+  description: Use deterministic randomization
+- name: Test determinism
+  description: Verify same input produces same output
+anti_patterns:
+- name: Random ordering
+  consequence: Can't rely on output
+- name: No determinism testing
+  consequence: Non-determinism discovered in production
+blog_hooks:
+  beginner:
+    focus: Introduction to Deterministic Compilation
+  intermediate:
+    focus: Implementing Deterministic Compilation
+  advanced:
+    focus: Advanced Deterministic Compilation techniques

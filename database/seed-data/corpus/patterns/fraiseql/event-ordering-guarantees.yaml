@@ -1,0 +1,58 @@
+id: event-ordering-guarantees
+name: Event Ordering Guarantees
+category: fraiseql
+type: standard
+tags:
+- events
+- cdc
+- ordering
+- consistency
+- distributed
+summary:
+  short: Sequence numbers and causal ordering for CDC events
+  long: FraiseQL CDC events include sequence numbers, timestamps, and causal ordering
+    metadata to guarantee deterministic event replay, handle out-of-order delivery,
+    and maintain cross-entity consistency in distributed systems.
+problem:
+  description: Out-of-order events cause state inconsistencies
+  symptoms:
+  - Event replay produces different state
+  - Cascading updates in wrong order
+  - Race conditions in event processing
+  - Lost updates from reordering
+  impact: Data inconsistency and unpredictable behavior
+solution:
+  description: Implement Event Ordering Guarantees effectively
+key_concepts:
+  concept_1: Monotonic sequence numbers per entity
+  concept_2: Timestamp-based ordering
+  concept_3: Causal dependency tracking
+  concept_4: Idempotent event processing
+implementation_considerations:
+  consideration_1: Sequence number generation
+  consideration_2: Clock synchronization across nodes
+  consideration_3: Out-of-order event buffering
+  consideration_4: Gap detection and handling
+best_practices:
+- name: Use sequence numbers
+  description: Monotonic increasing per entity
+- name: Track causality
+  description: Include parent event references
+- name: Buffer out-of-order
+  description: Wait for missing sequence numbers
+- name: Idempotent processing
+  description: Handle duplicate events safely
+anti_patterns:
+- name: Timestamp-only ordering
+  consequence: Clock skew causes misordering
+- name: No sequence gaps
+  consequence: Can't detect lost events
+- name: Non-idempotent processing
+  consequence: Duplicate events corrupt state
+blog_hooks:
+  beginner:
+    focus: Introduction to Event Ordering Guarantees
+  intermediate:
+    focus: Implementing sequence numbers and causal tracking
+  advanced:
+    focus: Advanced out-of-order handling and consistency guarantees

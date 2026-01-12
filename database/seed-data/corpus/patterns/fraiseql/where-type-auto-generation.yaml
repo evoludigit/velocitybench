@@ -1,0 +1,51 @@
+id: where-type-auto-generation
+name: WHERE Type Auto-Generation
+category: fraiseql
+type: standard
+tags:
+- compilation
+- where-types
+- filters
+- operators
+- database-agnostic
+summary:
+  short: Automatically generating WHERE input types from database capabilities
+  long: Instead of hardcoding filter operators, FraiseQL generates WHERE input types
+    based on the database's capability manifest, enabling different operators across
+    databases.
+problem:
+  description: WHERE types are hardcoded and don't match database capabilities
+  symptoms:
+  - Unsupported filters attempted on SQLite
+  - Different WHERE types for different databases
+  - Maintenance burden of manual WHERE type creation
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement WHERE Type Auto-Generation effectively
+key_concepts:
+  concept_1: Database capability manifest structure
+  concept_2: WHERE type generator algorithms
+  concept_3: Operator support matching
+implementation_considerations:
+  consideration_1: Capability manifest discovery
+  consideration_2: Performance of WHERE type generation
+  consideration_3: Handling operator aliases and variants
+best_practices:
+- name: Capability-driven design
+  description: Generate types from capabilities
+- name: Test all databases
+  description: Verify WHERE types on each database
+- name: Document operators
+  description: List supported operators per database
+anti_patterns:
+- name: Hardcoded WHERE types
+  consequence: Inconsistent across databases
+- name: Missing operators
+  consequence: Users can't filter on available columns
+blog_hooks:
+  beginner:
+    focus: Introduction to WHERE Type Auto-Generation
+  intermediate:
+    focus: Implementing WHERE Type Auto-Generation
+  advanced:
+    focus: Advanced WHERE Type Auto-Generation techniques

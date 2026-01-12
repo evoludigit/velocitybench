@@ -1,0 +1,49 @@
+id: result-projection-from-jsonb
+name: Result Projection from JSONB
+category: fraiseql
+type: standard
+tags:
+- execution
+- projection
+- response-formatting
+- jsonb
+summary:
+  short: Extracting and projecting fields from database JSONB responses
+  long: Results from database views are JSONB objects; the projection phase extracts
+    requested fields and constructs the GraphQL response shape.
+problem:
+  description: Hard to extract correct fields from response
+  symptoms:
+  - Response contains unwanted fields
+  - Nested structure doesn't match schema
+  - Missing requested fields
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Result Projection from JSONB effectively
+key_concepts:
+  concept_1: JSONB field extraction
+  concept_2: Path navigation
+  concept_3: Type conversion
+implementation_considerations:
+  consideration_1: Null handling
+  consideration_2: Type coercion
+  consideration_3: Performance of extraction
+best_practices:
+- name: Follow schema
+  description: Only include fields in schema
+- name: Handle nulls
+  description: Correctly handle missing fields
+- name: Type check
+  description: Verify field types match schema
+anti_patterns:
+- name: Include all fields
+  consequence: Unwanted data exposure
+- name: Type mismatch
+  consequence: Invalid response
+blog_hooks:
+  beginner:
+    focus: Introduction to Result Projection from JSONB
+  intermediate:
+    focus: Implementing Result Projection from JSONB
+  advanced:
+    focus: Advanced Result Projection from JSONB techniques

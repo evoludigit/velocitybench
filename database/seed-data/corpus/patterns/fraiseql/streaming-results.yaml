@@ -1,0 +1,49 @@
+id: streaming-results
+name: Streaming Large Result Sets
+category: fraiseql
+type: standard
+tags:
+- execution
+- performance
+- pagination
+- streaming
+summary:
+  short: Memory-efficient handling of large paginated result sets
+  long: Large result sets are streamed to clients with pagination, avoiding loading
+    entire results into memory.
+problem:
+  description: Large queries consume excessive memory or timeout
+  symptoms:
+  - Out-of-memory errors on large queries
+  - Query timeouts
+  - Slow client response
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Streaming Large Result Sets effectively
+key_concepts:
+  concept_1: Pagination strategies
+  concept_2: Stream handling
+  concept_3: Cursor design
+implementation_considerations:
+  consideration_1: Cursor encoding
+  consideration_2: Page size optimization
+  consideration_3: Sort stability
+best_practices:
+- name: Paginate results
+  description: Return data in pages
+- name: Efficient cursors
+  description: Use efficient cursor encoding
+- name: Memory efficient
+  description: Stream data, don't load all at once
+anti_patterns:
+- name: Load all results
+  consequence: Memory exhaustion
+- name: No pagination
+  consequence: Timeouts on large datasets
+blog_hooks:
+  beginner:
+    focus: Introduction to Streaming Large Result Sets
+  intermediate:
+    focus: Implementing Streaming Large Result Sets
+  advanced:
+    focus: Advanced Streaming Large Result Sets techniques

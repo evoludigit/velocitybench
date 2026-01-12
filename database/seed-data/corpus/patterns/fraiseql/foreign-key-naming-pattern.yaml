@@ -1,0 +1,58 @@
+id: foreign-key-naming-pattern
+name: Foreign Key Naming Pattern (fk_*)
+category: fraiseql
+type: standard
+tags:
+- database
+- naming
+- foreign-keys
+- conventions
+- relationships
+summary:
+  short: Foreign key naming with fk_* prefix for clarity and performance
+  long: FraiseQL uses fk_* prefix for all foreign key columns, always referencing
+    pk_* surrogate keys (INTEGER) rather than UUID columns, optimizing JOIN performance
+    while maintaining clear relationship semantics.
+problem:
+  description: Unclear foreign key relationships and poor JOIN performance
+  symptoms:
+  - Can't identify foreign keys by name
+  - UUID foreign keys cause slow JOINs
+  - Unclear which table column references
+  - No naming consistency
+  impact: Schema confusion and query performance issues
+solution:
+  description: Implement Foreign Key Naming Pattern effectively
+key_concepts:
+  concept_1: fk_* prefix for all foreign keys
+  concept_2: Reference pk_* (INTEGER) not id (UUID)
+  concept_3: Name indicates target entity
+  concept_4: Composite FKs use fk_* prefix
+implementation_considerations:
+  consideration_1: Naming for multiple FKs to same table
+  consideration_2: Composite foreign key handling
+  consideration_3: Self-referential FKs
+  consideration_4: Cascade behavior configuration
+best_practices:
+- name: Use fk_ prefix
+  description: All foreign keys start with fk_
+- name: Reference pk_*
+  description: Always reference INTEGER pk_*, never UUID
+- name: Descriptive names
+  description: fk_author, fk_parent_category, etc.
+- name: Consistent suffixes
+  description: Use same suffix for multiple FKs (fk_author, fk_editor)
+anti_patterns:
+- name: UUID foreign keys
+  consequence: 3-10x slower JOINs
+- name: No naming convention
+  consequence: Unclear relationships
+- name: Generic names
+  consequence: Hard to understand references
+blog_hooks:
+  beginner:
+    focus: Introduction to Foreign Key Naming Pattern
+  intermediate:
+    focus: Implementing fk_* conventions and performance
+  advanced:
+    focus: Advanced relationship modeling and composite keys

@@ -1,0 +1,49 @@
+id: multi-database-execution
+name: Multi-Database Execution
+category: fraiseql
+type: standard
+tags:
+- execution
+- multi-database
+- adapters
+- compatibility
+summary:
+  short: Adapting execution engine for different database targets
+  long: The execution engine adapts for different databases (PostgreSQL, SQLite, Oracle,
+    MySQL, SQL Server), using database-specific SQL and features.
+problem:
+  description: Execution fails when targeting different database
+  symptoms:
+  - Queries work on PostgreSQL but fail on SQLite
+  - Performance varies widely across databases
+  - Can't use database-specific features
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Multi-Database Execution effectively
+key_concepts:
+  concept_1: Database adapter pattern
+  concept_2: Feature capability checking
+  concept_3: Dialect translation
+implementation_considerations:
+  consideration_1: Performance per database
+  consideration_2: Feature availability
+  consideration_3: Testing coverage
+best_practices:
+- name: Database adapters
+  description: Separate adapter per database
+- name: Capability detection
+  description: Check before using features
+- name: Test on all DBs
+  description: Run tests on every target database
+anti_patterns:
+- name: Database-specific code
+  consequence: Can't switch databases
+- name: No adapters
+  consequence: Features don't work on all DBs
+blog_hooks:
+  beginner:
+    focus: Introduction to Multi-Database Execution
+  intermediate:
+    focus: Implementing Multi-Database Execution
+  advanced:
+    focus: Advanced Multi-Database Execution techniques

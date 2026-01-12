@@ -1,0 +1,49 @@
+id: null-handling-projections
+name: Null Handling in Projections
+category: fraiseql
+type: standard
+tags:
+- execution
+- projection
+- null-handling
+- type-safety
+summary:
+  short: Correctly handling missing or null JSONB fields in response
+  long: Projection logic handles null values, missing fields, and type conversions
+    for GraphQL response construction.
+problem:
+  description: Null handling inconsistent or produces invalid responses
+  symptoms:
+  - Null values in unexpected places
+  - Missing fields not defaulted
+  - Type mismatches with nulls
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Null Handling in Projections effectively
+key_concepts:
+  concept_1: Null semantics
+  concept_2: Default value handling
+  concept_3: Type coercion with nulls
+implementation_considerations:
+  consideration_1: Non-null field handling
+  consideration_2: Nested null propagation
+  consideration_3: Client expectations
+best_practices:
+- name: Clear null semantics
+  description: Define null behavior per field
+- name: Test nulls
+  description: Test all null scenarios
+- name: Type safe
+  description: Ensure type safety with nulls
+anti_patterns:
+- name: Loose null handling
+  consequence: Unexpected null values
+- name: No default values
+  consequence: Missing required fields
+blog_hooks:
+  beginner:
+    focus: Introduction to Null Handling in Projections
+  intermediate:
+    focus: Implementing Null Handling in Projections
+  advanced:
+    focus: Advanced Null Handling in Projections techniques

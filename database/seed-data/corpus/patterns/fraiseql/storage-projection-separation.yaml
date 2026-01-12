@@ -1,0 +1,58 @@
+id: storage-projection-separation
+name: Storage-Projection Separation
+category: fraiseql
+type: standard
+tags:
+- architecture
+- database
+- views
+- schema-design
+- separation-of-concerns
+summary:
+  short: Separating storage tables (tb_*) from API projections (v_*) for independent evolution
+  long: FraiseQL separates normalized storage tables (tb_* owned by DBAs) from denormalized
+    view projections (v_* owned by API designers), enabling independent schema evolution
+    and multiple API shapes from the same data.
+problem:
+  description: Exposing storage tables directly in API couples data model to API contract
+  symptoms:
+  - API changes require database migrations
+  - Can't support multiple API versions
+  - DBA and API designer workflows conflict
+  - No flexibility in denormalization
+  impact: Reduced schema evolution flexibility and API design options
+solution:
+  description: Implement Storage-Projection Separation effectively
+key_concepts:
+  concept_1: Storage layer (tb_*) for normalized data persistence
+  concept_2: Projection layer (v_*) for denormalized API shapes
+  concept_3: Ownership boundaries (DBA vs API designer)
+  concept_4: Multiple projections from single storage
+implementation_considerations:
+  consideration_1: View maintenance overhead
+  consideration_2: Materialized vs regular views
+  consideration_3: Permission mapping across layers
+  consideration_4: Performance of view queries
+best_practices:
+- name: Never expose tb_* in GraphQL
+  description: Always bind types to v_* views
+- name: Denormalize in views
+  description: Include JOINs and aggregations in views
+- name: Document ownership
+  description: Clear DBA (tb_*) vs API designer (v_*) responsibilities
+- name: Version views
+  description: Create v2_* views for API v2
+anti_patterns:
+- name: Direct table exposure
+  consequence: API coupled to storage schema
+- name: View duplication
+  consequence: Maintenance burden of similar views
+- name: Complex view logic
+  consequence: Performance degradation
+blog_hooks:
+  beginner:
+    focus: Introduction to Storage-Projection Separation pattern
+  intermediate:
+    focus: Implementing storage and projection layers with views
+  advanced:
+    focus: Multi-version API support and view composition strategies

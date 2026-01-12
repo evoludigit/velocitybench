@@ -1,0 +1,49 @@
+id: execution-plan-caching
+name: Execution Plan Caching
+category: fraiseql
+type: standard
+tags:
+- execution
+- performance
+- caching
+- optimization
+summary:
+  short: Reusing pre-computed execution plans across requests
+  long: Execution plans compiled at build time are cached and reused across requests,
+    avoiding repeated planning overhead.
+problem:
+  description: Plans recalculated for each request
+  symptoms:
+  - Repeated planning overhead
+  - Variable execution performance
+  - Wasted CPU on planning
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Execution Plan Caching effectively
+key_concepts:
+  concept_1: Plan cache key design
+  concept_2: Cache invalidation
+  concept_3: Cache hit tracking
+implementation_considerations:
+  consideration_1: Cache size limits
+  consideration_2: Plan age limits
+  consideration_3: Cache statistics
+best_practices:
+- name: Pre-compile plans
+  description: Generate plans at build time
+- name: Cache plans
+  description: Store plans for reuse
+- name: Monitor cache
+  description: Track cache hit rates
+anti_patterns:
+- name: Runtime planning
+  consequence: Overhead per request
+- name: No caching
+  consequence: Repeated planning costs
+blog_hooks:
+  beginner:
+    focus: Introduction to Execution Plan Caching
+  intermediate:
+    focus: Implementing Execution Plan Caching
+  advanced:
+    focus: Advanced Execution Plan Caching techniques

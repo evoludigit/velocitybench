@@ -1,0 +1,59 @@
+id: graceful-shutdown-pattern
+name: Graceful Shutdown Pattern
+category: fraiseql
+type: standard
+tags:
+- observability
+- operations
+- shutdown
+- kubernetes
+- zero-downtime
+summary:
+  short: SIGTERM handling with connection draining and in-flight completion
+  long: FraiseQL implements graceful shutdown on SIGTERM by stopping accepting new
+    requests, draining existing connections, completing in-flight operations within
+    timeout, and cleanly closing database/cache connections for zero-downtime deployments.
+problem:
+  description: Immediate shutdown causes dropped requests and data corruption
+  symptoms:
+  - Client connection errors during deploy
+  - Incomplete database transactions
+  - Cache corruption from unclean shutdown
+  - 502 errors during rolling updates
+  impact: Service disruption and data integrity issues
+solution:
+  description: Implement Graceful Shutdown Pattern effectively
+key_concepts:
+  concept_1: SIGTERM signal handling
+  concept_2: Stop accepting new connections
+  concept_3: Drain existing connections
+  concept_4: Complete in-flight operations
+  concept_5: Timeout for forced shutdown
+implementation_considerations:
+  consideration_1: Shutdown timeout configuration
+  consideration_2: Connection pool cleanup
+  consideration_3: Cache flush strategy
+  consideration_4: Kubernetes terminationGracePeriodSeconds
+best_practices:
+- name: Handle SIGTERM
+  description: Register SIGTERM handler
+- name: Stop health checks
+  description: Fail readiness immediately
+- name: Drain connections
+  description: Allow in-flight requests to complete
+- name: Timeout protection
+  description: Force shutdown after timeout (30s)
+anti_patterns:
+- name: Immediate exit
+  consequence: Dropped requests and corruption
+- name: No timeout
+  consequence: Hung processes prevent rolling updates
+- name: Skip cleanup
+  consequence: Resource leaks and corruption
+blog_hooks:
+  beginner:
+    focus: Introduction to Graceful Shutdown Pattern
+  intermediate:
+    focus: Implementing SIGTERM handling and draining
+  advanced:
+    focus: Advanced timeout strategies and Kubernetes integration

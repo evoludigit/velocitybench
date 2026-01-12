@@ -1,0 +1,54 @@
+# Blog Posts Dataset
+# VelocityBench Knowledge Corpus
+
+id: blog
+name: "Blog Posts"
+description: "Generated blog posts for VelocityBench framework benchmarking"
+
+counts:
+  users: 5000        # Faker-generated users (most are commenters, not blog authors)
+  posts: 2243        # All generated blog posts
+  comments: 0        # No comments (yet - future enhancement)
+  categories: 20     # Pattern categories (from corpus/patterns)
+
+distributions:
+  posts_by_type:
+    tutorials: ~750       # beginner/intermediate/advanced
+    reference: ~750
+    troubleshooting: ~750
+
+  posts_by_difficulty:
+    beginner: ~750
+    intermediate: ~750
+    advanced: ~750
+
+  posts_per_user:
+    average: 0.45     # 2243 posts / 5000 users ≈ 0.45 posts/user
+    note: "Most users (4700+) have 0 posts - they are future commenters"
+    blog_authors: ~300  # Rough estimate of users with 1+ posts (round-robin distribution)
+
+  user_distribution:
+    with_posts: ~300     # Users who have written 1+ blog posts
+    commenters_only: ~4700  # Users with 0 posts (ready for future comment generation)
+
+performance_expectations:
+  load_time: "30-45 seconds"
+  database_size: "~150 MB"  # ~100 MB for 5K users with bios + ~50 MB for posts
+  users_tsv_size: "~2 MB"
+  posts_tsv_size: "~50 MB"
+
+use_cases:
+  - scenario: "Framework speed comparison"
+    benefit: "Realistic dataset for GraphQL framework benchmarking"
+
+  - scenario: "Comment generation foundation"
+    benefit: "Large user pool (5000) enables realistic comment distribution"
+
+  - scenario: "Search and filtering benchmarks"
+    benefit: "2243 posts with full-text content for search performance testing"
+
+notes:
+  - "Users generated with Faker (reproducible with seed 42)"
+  - "Blog posts parsed from markdown files in output/blog/"
+  - "Authors assigned via round-robin (most users have 0 posts)"
+  - "Ready for future comment generation (large user pool)"

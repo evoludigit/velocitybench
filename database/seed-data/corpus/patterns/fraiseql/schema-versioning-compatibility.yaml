@@ -1,0 +1,49 @@
+id: schema-versioning-compatibility
+name: Schema Versioning and Compatibility
+category: fraiseql
+type: standard
+tags:
+- compilation
+- versioning
+- compatibility
+- evolution
+summary:
+  short: Tracking schema versions and managing forward/backward compatibility
+  long: FraiseQL schemas are versioned to track changes, and the compiler validates
+    that schema changes maintain compatibility with existing clients and servers.
+problem:
+  description: Schema changes break clients without warning
+  symptoms:
+  - Deployed schemas break existing clients
+  - Can't track when schema changed
+  - No way to support multiple versions
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Schema Versioning and Compatibility effectively
+key_concepts:
+  concept_1: Version numbering schemes
+  concept_2: Compatibility checking algorithms
+  concept_3: Version metadata tracking
+implementation_considerations:
+  consideration_1: Semantic versioning
+  consideration_2: Migration path support
+  consideration_3: Client version negotiation
+best_practices:
+- name: Semantic versioning
+  description: Use major.minor.patch versioning
+- name: Compatibility checks
+  description: Validate changes are compatible
+- name: Version metadata
+  description: Store version with compiled schema
+anti_patterns:
+- name: No versioning
+  consequence: No way to track changes
+- name: No compatibility checking
+  consequence: Breaking changes deployed
+blog_hooks:
+  beginner:
+    focus: Introduction to Schema Versioning and Compatibility
+  intermediate:
+    focus: Implementing Schema Versioning and Compatibility
+  advanced:
+    focus: Advanced Schema Versioning and Compatibility techniques

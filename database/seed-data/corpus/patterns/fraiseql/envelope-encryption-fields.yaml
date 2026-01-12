@@ -1,0 +1,58 @@
+id: envelope-encryption-fields
+name: Envelope Encryption for Fields
+category: fraiseql
+type: standard
+tags:
+- security
+- encryption
+- kms
+- field-level
+- compliance
+summary:
+  short: Field-level envelope encryption with AES-256-GCM and KMS integration
+  long: FraiseQL supports field-level encryption using envelope encryption pattern
+    (AES-256-GCM for data, KMS for keys) with support for multiple KMS providers
+    (Vault, AWS KMS, GCP KMS) and zero-downtime key rotation.
+problem:
+  description: Sensitive data stored in plaintext violates compliance requirements
+  symptoms:
+  - PII/PHI visible in database
+  - Can't meet GDPR/HIPAA encryption requirements
+  - Key management is manual and error-prone
+  - No key rotation strategy
+  impact: Compliance violations and security risks
+solution:
+  description: Implement Envelope Encryption for Fields effectively
+key_concepts:
+  concept_1: Data encrypted with Data Encryption Keys (DEKs)
+  concept_2: DEKs encrypted with Key Encryption Keys (KEKs)
+  concept_3: KEKs managed by external KMS
+  concept_4: Key rotation without data re-encryption
+implementation_considerations:
+  consideration_1: Performance overhead of encryption/decryption
+  consideration_2: KMS provider integration
+  consideration_3: Key rotation procedures
+  consideration_4: Backward compatibility with old keys
+best_practices:
+- name: Use envelope pattern
+  description: Never store KEKs in database
+- name: Rotate regularly
+  description: Implement automated key rotation
+- name: Multi-provider support
+  description: Abstract KMS provider interface
+- name: Cache decrypted DEKs
+  description: Reduce KMS calls with caching
+anti_patterns:
+- name: Direct encryption
+  consequence: Key rotation requires data re-encryption
+- name: Keys in database
+  consequence: Compromised database exposes keys
+- name: No rotation
+  consequence: Long-lived key exposure risk
+blog_hooks:
+  beginner:
+    focus: Introduction to Envelope Encryption for Fields
+  intermediate:
+    focus: Implementing envelope encryption with KMS
+  advanced:
+    focus: Advanced key rotation and multi-provider strategies

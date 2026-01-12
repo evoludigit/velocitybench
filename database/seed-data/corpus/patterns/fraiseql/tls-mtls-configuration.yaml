@@ -1,0 +1,58 @@
+id: tls-mtls-configuration
+name: TLS/mTLS Configuration
+category: fraiseql
+type: standard
+tags:
+- deployment
+- security
+- tls
+- mtls
+- encryption
+summary:
+  short: TLS for clients, mTLS for service-to-service with cert rotation
+  long: FraiseQL supports TLS for client connections and mutual TLS (mTLS) for service-to-service
+    communication with automatic certificate rotation, service mesh integration, and
+    certificate validation.
+problem:
+  description: Unencrypted traffic exposes sensitive data
+  symptoms:
+  - GraphQL queries sent in plaintext
+  - Service-to-service traffic unencrypted
+  - Manual certificate rotation
+  - Certificate expiry causes outages
+  impact: Data exposure and compliance violations
+solution:
+  description: Implement TLS/mTLS Configuration effectively
+key_concepts:
+  concept_1: TLS 1.3 for client connections
+  concept_2: mTLS for service mesh communication
+  concept_3: Automatic certificate rotation
+  concept_4: Certificate validation and pinning
+implementation_considerations:
+  consideration_1: Certificate management (cert-manager)
+  consideration_2: Service mesh integration (Istio, Linkerd)
+  consideration_3: Performance overhead of encryption
+  consideration_4: Certificate revocation handling
+best_practices:
+- name: Use TLS 1.3
+  description: Disable older TLS versions
+- name: Automate rotation
+  description: Use cert-manager for auto-renewal
+- name: mTLS for services
+  description: Encrypt service-to-service traffic
+- name: Monitor expiry
+  description: Alert on certificate expiration
+anti_patterns:
+- name: No encryption
+  consequence: Data exposure in transit
+- name: Manual rotation
+  consequence: Certificate expiry outages
+- name: Self-signed only
+  consequence: Trust management complexity
+blog_hooks:
+  beginner:
+    focus: Introduction to TLS/mTLS Configuration
+  intermediate:
+    focus: Implementing TLS with cert-manager
+  advanced:
+    focus: Advanced mTLS with service mesh and certificate pinning

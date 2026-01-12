@@ -1,0 +1,49 @@
+id: procedure-signature-validation
+name: Procedure Signature Validation
+category: fraiseql
+type: standard
+tags:
+- compilation
+- validation
+- database
+- procedures
+summary:
+  short: Verifying stored procedure signatures match mutation contracts
+  long: The compiler validates that stored procedures used for mutations have the
+    correct signatures (parameters and return types) matching the mutation contract.
+problem:
+  description: Stored procedure calls fail due to signature mismatch
+  symptoms:
+  - Wrong number of parameters passed
+  - Wrong data types for parameters
+  - Return type doesn't match response contract
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Procedure Signature Validation effectively
+key_concepts:
+  concept_1: Procedure metadata extraction
+  concept_2: Signature matching algorithms
+  concept_3: Contract validation
+implementation_considerations:
+  consideration_1: Parameter name matching
+  consideration_2: Optional vs required parameters
+  consideration_3: Return type polymorphism
+best_practices:
+- name: Validate parameters
+  description: Check parameter count and types
+- name: Validate return
+  description: Check return type matches contract
+- name: Clear errors
+  description: Show signature mismatches
+anti_patterns:
+- name: No signature checking
+  consequence: Runtime procedure call failures
+- name: Loose matching
+  consequence: Type errors at execution
+blog_hooks:
+  beginner:
+    focus: Introduction to Procedure Signature Validation
+  intermediate:
+    focus: Implementing Procedure Signature Validation
+  advanced:
+    focus: Advanced Procedure Signature Validation techniques

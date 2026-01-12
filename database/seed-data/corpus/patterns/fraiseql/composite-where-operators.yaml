@@ -1,0 +1,59 @@
+id: composite-where-operators
+name: Composite WHERE Operators
+category: fraiseql
+type: standard
+tags:
+- operators
+- filtering
+- logical
+- composition
+- query-complexity
+summary:
+  short: AND, OR, NOT composition for complex filter logic
+  long: FraiseQL supports composing WHERE operators using AND, OR, and NOT logical
+    operators with arbitrary nesting depth, enabling complex filter expressions while
+    tracking query complexity for cost-based rejection.
+problem:
+  description: Simple equality filters insufficient for real-world queries
+  symptoms:
+  - Can't express "age > 18 AND (status = active OR is_verified)"
+  - Multiple separate queries required
+  - Client-side filter composition
+  - No way to express negation
+  impact: Poor query expressiveness and client complexity
+solution:
+  description: Implement Composite WHERE Operators effectively
+key_concepts:
+  concept_1: AND operator for conjunction
+  concept_2: OR operator for disjunction
+  concept_3: NOT operator for negation
+  concept_4: Arbitrary nesting depth
+  concept_5: Query complexity scoring
+implementation_considerations:
+  consideration_1: SQL generation from nested operators
+  consideration_2: Query complexity limits
+  consideration_3: Performance of complex filters
+  consideration_4: Parenthesis handling
+best_practices:
+- name: Use composition
+  description: Express complex logic with operators
+- name: Limit depth
+  description: Prevent excessive nesting
+- name: Track complexity
+  description: Score and reject expensive queries
+- name: Use indexes
+  description: Optimize for common filter combinations
+anti_patterns:
+- name: Flat filters only
+  consequence: Can't express complex logic
+- name: Unlimited nesting
+  consequence: Extremely slow queries
+- name: No complexity limits
+  consequence: DoS via expensive queries
+blog_hooks:
+  beginner:
+    focus: Introduction to Composite WHERE Operators
+  intermediate:
+    focus: Building complex filters with AND/OR/NOT
+  advanced:
+    focus: Query complexity analysis and optimization

@@ -1,0 +1,59 @@
+id: prometheus-metrics-patterns
+name: Prometheus Metrics Patterns
+category: fraiseql
+type: standard
+tags:
+- observability
+- metrics
+- prometheus
+- monitoring
+- performance
+summary:
+  short: 15+ Prometheus metric types for GraphQL operations
+  long: FraiseQL exposes 15+ Prometheus metrics including query latency histograms,
+    mutation counters, cache hit rates, database call counts, and error rates with
+    proper label cardinality for effective monitoring and alerting.
+problem:
+  description: Black-box GraphQL server with no operational visibility
+  symptoms:
+  - Can't measure query performance
+  - No visibility into cache effectiveness
+  - Unknown error rates by operation
+  - Can't detect performance regressions
+  impact: Blind operations and difficult troubleshooting
+solution:
+  description: Implement Prometheus Metrics Patterns effectively
+key_concepts:
+  concept_1: Query latency histograms by operation
+  concept_2: Cache hit/miss counters by layer
+  concept_3: Database call counts and durations
+  concept_4: Error counters by type and operation
+  concept_5: Label cardinality management
+implementation_considerations:
+  consideration_1: Metric naming conventions
+  consideration_2: Label explosion prevention
+  consideration_3: Histogram bucket configuration
+  consideration_4: Performance overhead of metrics
+best_practices:
+- name: Use histograms
+  description: Latency as histograms, not gauges
+- name: Limit labels
+  description: Prevent high-cardinality label explosion
+- name: Standardize names
+  description: Follow Prometheus naming conventions
+- name: Include help text
+  description: Document what each metric measures
+anti_patterns:
+- name: Too many labels
+  consequence: Cardinality explosion and memory issues
+- name: No metrics
+  consequence: Blind operations
+- name: Gauge for latency
+  consequence: Can't calculate percentiles
+blog_hooks:
+  beginner:
+    focus: Introduction to Prometheus Metrics Patterns
+  intermediate:
+    focus: Implementing comprehensive metrics with labels
+  advanced:
+    focus: Advanced alerting rules and metric optimization

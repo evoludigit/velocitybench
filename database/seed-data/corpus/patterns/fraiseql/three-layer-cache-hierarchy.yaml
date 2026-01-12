@@ -1,0 +1,59 @@
+id: three-layer-cache-hierarchy
+name: Three-Layer Cache Hierarchy
+category: fraiseql
+type: standard
+tags:
+- caching
+- performance
+- architecture
+- redis
+- multi-tier
+summary:
+  short: L1 (in-memory <1ms) → L2 (Redis 1-5ms) → L3 (database 10-50ms) caching
+  long: FraiseQL implements a three-layer cache hierarchy with in-memory caching for
+    ultra-fast lookups, Redis for distributed caching, and database as final source
+    of truth. Each layer has specific TTL strategies and invalidation patterns.
+problem:
+  description: Single-layer caching leads to cache stampedes or stale data
+  symptoms:
+  - Cache misses cause database overload
+  - No shared cache across application instances
+  - Inconsistent read performance
+  - Complex invalidation logic
+  impact: Reduced query performance and scalability issues
+solution:
+  description: Implement Three-Layer Cache Hierarchy effectively
+key_concepts:
+  concept_1: L1 in-memory cache with request-level scope
+  concept_2: L2 Redis cache with tenant isolation
+  concept_3: L3 database queries with materialized views
+  concept_4: Cache key generation with query fingerprinting
+  concept_5: TTL strategies per operation type
+implementation_considerations:
+  consideration_1: Cache key collision prevention
+  consideration_2: Tenant isolation in cache keys
+  consideration_3: Invalidation cascade on mutations
+  consideration_4: Memory limits and eviction policies
+best_practices:
+- name: Layer-specific TTLs
+  description: L1 (request), L2 (minutes-hours), L3 (permanent with refresh)
+- name: Tenant-scoped keys
+  description: Include tenant_id in all cache keys
+- name: Mutation invalidation
+  description: Clear affected cache entries on writes
+- name: Cache warming
+  description: Pre-populate L2 cache for common queries
+anti_patterns:
+- name: No cache layers
+  consequence: Database becomes bottleneck
+- name: Shared L1 cache
+  consequence: Memory bloat and stale data across requests
+- name: Missing invalidation
+  consequence: Serving stale data indefinitely
+blog_hooks:
+  beginner:
+    focus: Introduction to Three-Layer Cache Hierarchy
+  intermediate:
+    focus: Implementing Three-Layer Cache Hierarchy with tenant isolation
+  advanced:
+    focus: Advanced cache invalidation patterns and performance tuning

@@ -1,0 +1,59 @@
+id: query-operator-taxonomy
+name: Query Operator Taxonomy
+category: fraiseql
+type: standard
+tags:
+- operators
+- filtering
+- where-clause
+- database-capabilities
+- taxonomy
+summary:
+  short: 150+ WHERE clause operators across 14 categories
+  long: FraiseQL provides 150+ WHERE clause operators organized into 14 categories
+    (basic comparison, string/text, arrays, JSONB, date/time, network, geographic,
+    vector, LTree, full-text, numeric, UUID, enum, boolean) with database-specific
+    availability.
+problem:
+  description: Limited filtering operators force workarounds in client code
+  symptoms:
+  - Can't express complex filters in GraphQL
+  - Client-side filtering performance issues
+  - Database-specific features unavailable
+  - Inconsistent operator availability
+  impact: Poor query expressiveness and performance
+solution:
+  description: Implement Query Operator Taxonomy effectively
+key_concepts:
+  concept_1: 14 operator categories
+  concept_2: Database capability-driven availability
+  concept_3: Type-specific operator selection
+  concept_4: Operator composition with AND/OR/NOT
+implementation_considerations:
+  consideration_1: Operator performance characteristics
+  consideration_2: Index support for operators
+  consideration_3: Null handling in operators
+  consideration_4: Database compatibility matrix
+best_practices:
+- name: Use appropriate operators
+  description: Match operator to use case
+- name: Document availability
+  description: Show which database supports operator
+- name: Provide fallbacks
+  description: Handle missing operators gracefully
+- name: Index for operators
+  description: Create indexes for common operators
+anti_patterns:
+- name: Limited operators
+  consequence: Forces client-side filtering
+- name: Database-specific operators
+  consequence: Queries fail on other databases
+- name: No documentation
+  consequence: Users don't know what's available
+blog_hooks:
+  beginner:
+    focus: Introduction to Query Operator Taxonomy
+  intermediate:
+    focus: Using operators for complex filtering
+  advanced:
+    focus: Advanced operator composition and performance tuning

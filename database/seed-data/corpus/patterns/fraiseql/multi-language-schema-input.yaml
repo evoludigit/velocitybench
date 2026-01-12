@@ -1,0 +1,50 @@
+id: multi-language-schema-input
+name: Multi-Language Schema Input
+category: fraiseql
+type: standard
+tags:
+- compilation
+- schema-authoring
+- polyglot
+- formats
+summary:
+  short: Supporting schema definition in Python, YAML, GraphQL SDL, and TypeScript
+  long: FraiseQL's compilation pipeline accepts schemas from multiple languages and
+    formats, translating them to a language-agnostic intermediate representation for
+    compilation.
+problem:
+  description: Teams are forced to choose one schema language
+  symptoms:
+  - Different teams have different language preferences
+  - Polyglot development teams need flexibility
+  - Legacy systems use different formats
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Multi-Language Schema Input effectively
+key_concepts:
+  concept_1: Intermediate representation design
+  concept_2: Format translation and normalization
+  concept_3: Semantic equivalence across formats
+implementation_considerations:
+  consideration_1: Parser implementation for each language
+  consideration_2: Format feature parity and gaps
+  consideration_3: Circular reference handling
+best_practices:
+- name: Choose consistently
+  description: Use one format per project
+- name: Document format mapping
+  description: Clearly show how formats map
+- name: Test all formats
+  description: Validate each format's compilation
+anti_patterns:
+- name: Mixing formats
+  consequence: Maintenance nightmare and confusion
+- name: Format gaps
+  consequence: Some features unavailable in some formats
+blog_hooks:
+  beginner:
+    focus: Introduction to Multi-Language Schema Input
+  intermediate:
+    focus: Implementing Multi-Language Schema Input
+  advanced:
+    focus: Advanced Multi-Language Schema Input techniques

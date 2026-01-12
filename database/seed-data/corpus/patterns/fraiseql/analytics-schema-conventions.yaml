@@ -1,0 +1,395 @@
+# Analytics Schema Conventions (FraiseQL)
+# VelocityBench Knowledge Corpus
+
+id: analytics-schema-conventions
+name: "Analytics Schema Conventions and Best Practices"
+category: fraiseql
+type: pattern
+severity: medium
+tags:
+  - fraiseql
+  - schema-design
+  - naming-conventions
+  - best-practices
+  - indexes
+  - jsonb
+
+summary:
+  short: "Table naming (tf_/ta_), column conventions, indexing strategy for analytics"
+  long: |
+    FraiseQL uses strict naming conventions for analytics tables: tf_* (fact tables),
+    ta_* (aggregate tables). Measures are SQL columns (numeric types), dimensions live in
+    JSONB data column, filter columns are indexed SQL types. GIN indexes for JSONB, B-tree
+    for filters, BRIN for time-series. Consistent conventions enable compiler introspection.
+
+problem:
+  description: |
+    Without clear schema conventions:
+    - Compiler can't distinguish fact tables from other tables
+    - Mixing measures (SQL columns) with dimensions (JSONB) is unclear
+    - Developers don't know which columns to index
+    - Inconsistent naming makes codebase hard to navigate
+
+    FraiseQL enforces conventions that enable compiler magic and consistent performance.
+
+  symptoms:
+    - name: "Compiler can't detect fact tables"
+      description: "Manual configuration needed for every table"
+      detection: "No auto-generated GraphQL schema for analytics"
+
+    - name: "Inconsistent performance"
+      description: "Some queries fast, others slow (missing indexes)"
+      detection: "Wide performance variance for similar queries"
+
+    - name: "Unclear schema organization"
+      description: "Mix of operational and analytical tables"
+      detection: "Confusion about which tables to use for analytics"
+
+solution:
+  principle: "Strict naming and structure conventions enable compiler introspection and consistent performance"
+
+  components:
+    - name: "Table Naming Prefixes"
+      type: "Convention"
+      purpose: "tf_* for facts, ta_* for aggregates"
+
+    - name: "Column Type Rules"
+      type: "Convention"
+      purpose: "Measures as SQL columns, dimensions in JSONB"
+
+    - name: "Index Strategy"
+      type: "Performance"
+      purpose: "GIN for JSONB, B-tree for filters, BRIN for time-series"
+
+    - name: "JSONB Path Conventions"
+      type: "Structure"
+      purpose: "Flat paths, consistent naming"
+
+table_naming:
+  fact_tables:
+    prefix: "tf_"
+    description: "Transactional fact tables (raw events)"
+    examples:
+      - "tf_sales"
+      - "tf_orders"
+      - "tf_events"
+      - "tf_page_views"
+      - "tf_api_requests"
+
+  aggregate_tables:
+    prefix: "ta_"
+    description: "Pre-computed aggregate tables (rollups)"
+    examples:
+      - "ta_sales_by_day"
+      - "ta_sales_by_month"
+      - "ta_events_by_hour"
+      - "ta_api_requests_by_day"
+
+  naming_pattern:
+    fact: "tf_{entity}"
+    aggregate: "ta_{entity}_by_{time_bucket}"
+
+column_conventions:
+  primary_key:
+    name: "id"
+    type: "BIGSERIAL (PostgreSQL) or UUID"
+    purpose: "Unique identifier for each fact"
+    example: "id BIGSERIAL PRIMARY KEY"
+
+  measures:
+    description: "Numeric columns for aggregation"
+    types: ["INT", "BIGINT", "DECIMAL", "FLOAT", "NUMERIC"]
+    naming: "snake_case descriptive names"
+    examples:
+      - "revenue DECIMAL(10,2)"
+      - "quantity INT"
+      - "cost DECIMAL(10,2)"
+      - "duration_ms INT"
+      - "error_count INT"
+      - "request_size BIGINT"
+
+  dimensions:
+    description: "JSONB column for flexible grouping attributes"
+    column_name: "data (default, configurable)"
+    type: "JSONB (PostgreSQL) or JSON (MySQL/SQL Server)"
+    examples:
+      - "data JSONB NOT NULL"
+      - "metadata JSONB (alternative name)"
+
+  filter_columns:
+    description: "Denormalized foreign keys for fast WHERE filtering"
+    types: ["UUID", "VARCHAR", "DATE", "TIMESTAMPTZ", "ENUM", "INT"]
+    naming: "snake_case, typically {entity}_id or {timestamp}_at"
+    examples:
+      - "customer_id UUID NOT NULL"
+      - "product_id UUID NOT NULL"
+      - "occurred_at TIMESTAMPTZ NOT NULL"
+      - "status VARCHAR(50) NOT NULL"
+
+  timestamps:
+    description: "Record creation and event occurrence times"
+    names:
+      - "created_at TIMESTAMPTZ DEFAULT NOW()"
+      - "occurred_at TIMESTAMPTZ NOT NULL"
+      - "updated_at TIMESTAMPTZ"
+
+jsonb_conventions:
+  structure:
+    description: "Flat key-value structure preferred over deep nesting"
+    good: |
+      {
+        "category": "Electronics",
+        "region": "North America",
+        "channel": "Online",
+        "customer_segment": "Enterprise"
+      }
+    bad: |
+      {
+        "product": {
+          "details": {
+            "category": "Electronics"
+          }
+        },
+        "location": {
+          "region": "North America"
+        }
+      }
+
+  key_naming:
+    style: "snake_case"
+    examples:
+      - "category"
+      - "region"
+      - "customer_segment"
+      - "product_name"
+      - "error_type"
+
+  nested_paths:
+    description: "Use sparingly, only when logical grouping benefits"
+    example: |
+      {
+        "client": {
+          "type": "mobile",
+          "version": "1.2.3",
+          "os": "iOS"
+        }
+      }
+
+indexing_strategy:
+  gin_index_jsonb:
+    description: "Generalized Inverted Index for JSONB columns (PostgreSQL)"
+    creation: "CREATE INDEX idx_{table}_data_gin ON {table} USING GIN(data);"
+    benefit: "10-100x speedup for GROUP BY on JSONB paths"
+    cost: "30-50% additional storage"
+    examples:
+      - "CREATE INDEX idx_sales_data_gin ON tf_sales USING GIN(data);"
+      - "CREATE INDEX idx_events_data_gin ON tf_events USING GIN(data);"
+
+  btree_index_filters:
+    description: "B-tree indexes for filter columns"
+    creation: "CREATE INDEX idx_{table}_{column} ON {table}({column});"
+    benefit: "Fast WHERE clause filtering (equality, range)"
+    examples:
+      - "CREATE INDEX idx_sales_customer ON tf_sales(customer_id);"
+      - "CREATE INDEX idx_sales_product ON tf_sales(product_id);"
+      - "CREATE INDEX idx_sales_occurred ON tf_sales(occurred_at);"
+
+  composite_indexes:
+    description: "Multi-column indexes for common query patterns"
+    creation: "CREATE INDEX idx_{table}_{col1}_{col2} ON {table}({col1}, {col2});"
+    benefit: "Optimizes WHERE + ORDER BY patterns"
+    examples:
+      - "CREATE INDEX idx_sales_customer_occurred ON tf_sales(customer_id, occurred_at DESC);"
+      - "CREATE INDEX idx_events_status_occurred ON tf_events(status, occurred_at);"
+
+  brin_index_timeseries:
+    description: "Block Range Index for time-series data (PostgreSQL)"
+    creation: "CREATE INDEX idx_{table}_{column}_brin ON {table} USING BRIN({column});"
+    benefit: "1000x smaller than B-tree, fast range scans on chronological data"
+    use_case: "Large append-only fact tables (100M+ rows)"
+    examples:
+      - "CREATE INDEX idx_sales_occurred_brin ON tf_sales USING BRIN(occurred_at);"
+
+example_schema:
+  complete_fact_table: |
+    -- Complete fact table following all conventions
+    CREATE TABLE tf_sales (
+        -- Primary key
+        id BIGSERIAL PRIMARY KEY,
+
+        -- Measures (SQL columns for fast aggregation)
+        revenue DECIMAL(10,2) NOT NULL,
+        quantity INT NOT NULL,
+        cost DECIMAL(10,2) NOT NULL,
+        discount DECIMAL(10,2) DEFAULT 0,
+        profit DECIMAL(10,2) GENERATED ALWAYS AS (revenue - cost) STORED,
+
+        -- Dimensions (JSONB for flexible grouping)
+        data JSONB NOT NULL,
+        -- Expected structure:
+        -- {
+        --   "category": "Electronics",
+        --   "region": "North America",
+        --   "product_name": "Laptop Pro",
+        --   "customer_segment": "Enterprise",
+        --   "sales_channel": "Online"
+        -- }
+
+        -- Filter columns (indexed for fast WHERE)
+        customer_id UUID NOT NULL,
+        product_id UUID NOT NULL,
+        occurred_at TIMESTAMPTZ NOT NULL,
+        status VARCHAR(50) NOT NULL,
+
+        -- Timestamps
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+
+        -- Constraints
+        CHECK (revenue >= 0),
+        CHECK (quantity > 0),
+        CHECK (status IN ('pending', 'completed', 'cancelled', 'refunded'))
+    );
+
+    -- Indexes for performance
+    CREATE INDEX idx_sales_customer ON tf_sales(customer_id);
+    CREATE INDEX idx_sales_product ON tf_sales(product_id);
+    CREATE INDEX idx_sales_occurred ON tf_sales(occurred_at);
+    CREATE INDEX idx_sales_status ON tf_sales(status);
+    CREATE INDEX idx_sales_data_gin ON tf_sales USING GIN(data);
+    CREATE INDEX idx_sales_customer_occurred ON tf_sales(customer_id, occurred_at DESC);
+
+    -- Optional: BRIN for time-series (large tables)
+    -- CREATE INDEX idx_sales_occurred_brin ON tf_sales USING BRIN(occurred_at);
+
+  complete_aggregate_table: |
+    -- Daily aggregate following same conventions
+    CREATE TABLE ta_sales_by_day (
+        id BIGSERIAL PRIMARY KEY,
+
+        -- Aggregated measures (same structure as fact table)
+        revenue DECIMAL(10,2) NOT NULL,
+        quantity INT NOT NULL,
+        cost DECIMAL(10,2) NOT NULL,
+        order_count INT NOT NULL,
+
+        -- Dimensions (same structure as fact table)
+        data JSONB NOT NULL,
+
+        -- Time bucket
+        occurred_at DATE NOT NULL,
+
+        -- Metadata
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE INDEX idx_sales_by_day_date ON ta_sales_by_day(occurred_at);
+    CREATE INDEX idx_sales_by_day_data_gin ON ta_sales_by_day USING GIN(data);
+
+compiler_introspection:
+  detection_rules:
+    - rule: "Tables prefixed with tf_ are fact tables"
+      action: "Enable aggregation, grouping, window functions"
+
+    - rule: "Tables prefixed with ta_ are aggregate tables"
+      action: "Treat as queryable aggregates (same API as fact tables)"
+
+    - rule: "JSONB column named 'data' contains dimensions"
+      action: "Enable GROUP BY on JSONB paths"
+
+    - rule: "Numeric columns are measures"
+      action: "Generate aggregate functions (SUM, AVG, MIN, MAX)"
+
+    - rule: "UUID/TIMESTAMPTZ columns are filters"
+      action: "Enable WHERE clause filtering"
+
+best_practices:
+  - name: "Always use tf_/ta_ prefixes"
+    description: "Enables compiler auto-detection"
+    rationale: "Compiler generates GraphQL schema automatically"
+
+  - name: "One JSONB column per table"
+    description: "Single 'data' column for all dimensions"
+    rationale: "Consistent structure, easier to query"
+
+  - name: "Create GIN index on JSONB column"
+    description: "Always CREATE INDEX ... USING GIN(data)"
+    rationale: "10-100x speedup for GROUP BY on JSONB"
+
+  - name: "Index all filter columns"
+    description: "B-tree indexes on customer_id, product_id, occurred_at, etc."
+    rationale: "Fast WHERE clause filtering"
+
+  - name: "Use BRIN for large time-series"
+    description: "BRIN index on occurred_at for 100M+ row tables"
+    rationale: "1000x smaller index, same performance for range queries"
+
+anti_patterns:
+  - name: "Generic table names"
+    consequence: "Compiler can't auto-detect fact tables"
+    example: "sales (should be tf_sales)"
+
+  - name: "Measures in JSONB"
+    consequence: "10-100x slower aggregation"
+    example: "data->>'revenue' (should be revenue DECIMAL column)"
+
+  - name: "Deep JSONB nesting"
+    consequence: "Slow extraction, hard to query"
+    example: "data->'a'->'b'->'c'->>'d'"
+
+  - name: "Missing indexes"
+    consequence: "Slow queries, full table scans"
+    example: "No GIN index on data, no B-tree on customer_id"
+
+  - name: "Wrong index types"
+    consequence: "Large indexes, no performance gain"
+    example: "B-tree on JSONB column (should be GIN)"
+
+use_cases:
+  - scenario: "E-commerce analytics platform"
+    tables: "tf_sales, tf_orders, ta_sales_by_day, ta_orders_by_month"
+    benefit: "Consistent schema, auto-generated GraphQL"
+
+  - scenario: "SaaS API monitoring"
+    tables: "tf_api_requests, ta_api_requests_by_hour"
+    benefit: "Fast queries with proper indexes"
+
+  - scenario: "Time-series event logging"
+    tables: "tf_events, ta_events_by_day"
+    benefit: "BRIN indexes for billion-row fact tables"
+
+related_patterns:
+  - id: "fact-dimension-pattern"
+    description: "Core pattern that these conventions support"
+
+  - id: "aggregation-model"
+    description: "Compiler introspection based on conventions"
+
+  - id: "aggregate-table-strategy"
+    description: "ta_* tables follow same conventions"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Schema conventions are like file naming rules:
+      - tf_* = "Transactions folder" (raw data)
+      - ta_* = "Totals folder" (summaries)
+      - Measures = spreadsheet columns (numbers to sum)
+      - Dimensions = sticky notes (categories to group by)
+
+      Consistent naming → computer knows what to do automatically!
+
+  intermediate:
+    focus: "Table structure and indexing strategy"
+    key_points:
+      - "tf_* for facts, ta_* for aggregates"
+      - "Measures as SQL columns, dimensions in JSONB"
+      - "GIN index for JSONB, B-tree for filters"
+      - "Compiler introspects structure automatically"
+
+  advanced:
+    focus: "Performance optimization and compiler design"
+    key_points:
+      - "Compiler detection rules based on conventions"
+      - "BRIN indexes for billion-row time-series"
+      - "Composite indexes for multi-column patterns"
+      - "Trade-offs: GIN vs B-tree vs BRIN"

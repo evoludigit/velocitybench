@@ -1,0 +1,49 @@
+id: compilation-error-reporting
+name: Compilation Error Reporting
+category: fraiseql
+type: standard
+tags:
+- compilation
+- error-handling
+- diagnostics
+- developer-experience
+summary:
+  short: Accumulating and formatting validation errors for developer feedback
+  long: The compilation pipeline accumulates all errors (not just stopping at the
+    first) and formats them with line numbers, suggestions, and context for easy debugging.
+problem:
+  description: Single error stops compilation and requires multiple rounds to fix
+  symptoms:
+  - Multiple compilation rounds to find all errors
+  - Unclear error messages
+  - No suggestions for fixes
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Compilation Error Reporting effectively
+key_concepts:
+  concept_1: Error accumulation patterns
+  concept_2: Error formatting and context
+  concept_3: Error categorization
+implementation_considerations:
+  consideration_1: Error message clarity
+  consideration_2: Suggestion accuracy
+  consideration_3: Line number accuracy
+best_practices:
+- name: Accumulate errors
+  description: Report all problems at once
+- name: Clear messages
+  description: Explain what went wrong and why
+- name: Suggestions
+  description: Help developers fix problems
+anti_patterns:
+- name: First-error stopping
+  consequence: Multiple compilation rounds
+- name: Vague messages
+  consequence: Hard to debug
+blog_hooks:
+  beginner:
+    focus: Introduction to Compilation Error Reporting
+  intermediate:
+    focus: Implementing Compilation Error Reporting
+  advanced:
+    focus: Advanced Compilation Error Reporting techniques

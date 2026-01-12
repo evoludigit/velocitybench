@@ -1,0 +1,58 @@
+id: schema-snapshot-diffing
+name: Schema Snapshot Diffing
+category: fraiseql
+type: standard
+tags:
+- schema
+- versioning
+- breaking-changes
+- migration
+- safety
+summary:
+  short: Detecting breaking changes through schema comparison
+  long: FraiseQL provides schema snapshot diffing to automatically detect breaking
+    changes (removed fields, type changes, required fields) between schema versions,
+    supporting safe schema evolution and automated migration planning.
+problem:
+  description: Breaking changes deployed without detection
+  symptoms:
+  - Client queries break after deployment
+  - Type changes cause runtime errors
+  - Required fields break existing clients
+  - No visibility into schema changes
+  impact: Client application failures and production incidents
+solution:
+  description: Implement Schema Snapshot Diffing effectively
+key_concepts:
+  concept_1: Schema versioning with snapshots
+  concept_2: Automated breaking change detection
+  concept_3: Safe vs breaking change classification
+  concept_4: Migration path generation
+implementation_considerations:
+  consideration_1: Snapshot storage and retention
+  consideration_2: Diff algorithm complexity
+  consideration_3: False positive handling
+  consideration_4: Integration with CI/CD
+best_practices:
+- name: Snapshot on compile
+  description: Save schema JSON on every compilation
+- name: Diff in CI
+  description: Detect breaking changes in CI pipeline
+- name: Block deployment
+  description: Fail CI on breaking changes
+- name: Document changes
+  description: Generate changelog from diffs
+anti_patterns:
+- name: No diffing
+  consequence: Breaking changes deployed unknowingly
+- name: Manual review only
+  consequence: Human error misses changes
+- name: No blocking
+  consequence: Breaking changes reach production
+blog_hooks:
+  beginner:
+    focus: Introduction to Schema Snapshot Diffing
+  intermediate:
+    focus: Implementing automated breaking change detection
+  advanced:
+    focus: Advanced diff algorithms and migration planning

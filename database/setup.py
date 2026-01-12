@@ -19,6 +19,7 @@ Dataset sizes:
     xs     - 100 users, 500 posts (default, <1 second load)
     medium - 10K users, 50K posts (30-60 second load, N+1 visible)
     large  - 100K users, 500K posts (5-15 minute load, stress testing)
+    blog   - 5000 users, 2243 blog posts (30-45 second load, Faker-generated users)
 
 Environment variables:
     DB_HOST              - PostgreSQL host (default: localhost)
@@ -80,7 +81,7 @@ FRAMEWORKS = [
 
 
 # Valid seed data sizes
-SEED_SIZES = ['xs', 'medium', 'large']
+SEED_SIZES = ['xs', 'medium', 'large', 'blog']
 DEFAULT_SEED_SIZE = 'xs'
 
 
@@ -308,20 +309,64 @@ class DatabaseSetup:
             print(f"  5️⃣  No framework-specific extensions found (skipping)")
 
         # Step 6: Load seed data (size-appropriate from corpus)
-        seed_file = f'database/seed-data/output/sql/03-data-{self.config.seed_size}.sql'
-        seed_path = self.project_root / seed_file
+        if self.config.seed_size == 'blog':
+            # Use blog post loader (generates Faker users + loads blog posts)
+            print(f"  6️⃣  Loading blog dataset (5000 users, 2243 posts)...")
+            loader_path = self.project_root / 'database' / 'seed-data' / 'generator' / 'load_blog_posts.py'
 
-        # Generate seed data if it doesn't exist
-        if not seed_path.exists():
-            print(f"  6️⃣  Generating seed data ({self.config.seed_size})...")
-            if not self._generate_seed_data(self.config.seed_size):
-                # Fall back to legacy seed file if generation fails
-                seed_file = 'database/03-data.sql'
-                print(f"  ⚠️  Generation failed, trying legacy seed file...")
+            if not loader_path.exists():
+                print(f"  ❌ Blog loader not found: {loader_path}")
+                print(f"  ⚠️  Failed to load blog data")
+            else:
+                try:
+                    # Use uv run to execute with the database/.venv environment
+                    result = subprocess.run(
+                        [
+                            'uv',
+                            'run',
+                            '--directory',
+                            str(self.project_root / 'database'),
+                            'python',
+                            str(loader_path),
+                            '--connection',
+                            self._get_framework_connection_string(framework)
+                        ],
+                        capture_output=True,
+                        text=True,
+                        timeout=120  # 2 minutes timeout for blog loading
+                    )
 
-        print(f"  6️⃣  Loading seed data ({self.config.seed_size})...")
-        if not self._apply_sql_file(db_name, seed_file):
-            print(f"  ⚠️  Failed to load seed data (continuing anyway)")
+                    if result.returncode != 0:
+                        print(f"  ❌ Blog post loading failed:")
+                        print(f"     {result.stderr}")
+                        print(f"  ⚠️  Failed to load seed data (continuing anyway)")
+                    else:
+                        print(f"  ✓ Blog posts loaded successfully")
+                        # Print summary from loader
+                        if "SUMMARY" in result.stdout:
+                            summary_lines = result.stdout.split("SUMMARY")[1].split("TSV files")[0]
+                            print(f"     {summary_lines.strip()}")
+
+                except subprocess.TimeoutExpired:
+                    print(f"  ⚠️  Blog loading timed out (continuing anyway)")
+                except Exception as e:
+                    print(f"  ⚠️  Blog loading error: {e}")
+        else:
+            # Standard SQL-based seed data (xs, medium, large)
+            seed_file = f'database/seed-data/output/sql/03-data-{self.config.seed_size}.sql'
+            seed_path = self.project_root / seed_file
+
+            # Generate seed data if it doesn't exist
+            if not seed_path.exists():
+                print(f"  6️⃣  Generating seed data ({self.config.seed_size})...")
+                if not self._generate_seed_data(self.config.seed_size):
+                    # Fall back to legacy seed file if generation fails
+                    seed_file = 'database/03-data.sql'
+                    print(f"  ⚠️  Generation failed, trying legacy seed file...")
+
+            print(f"  6️⃣  Loading seed data ({self.config.seed_size})...")
+            if not self._apply_sql_file(db_name, seed_file):
+                print(f"  ⚠️  Failed to load seed data (continuing anyway)")
 
         # Success
         print(f"✅ {framework} database ready ({db_name})")
@@ -412,7 +457,7 @@ def main():
         '--size',
         choices=SEED_SIZES,
         default=DEFAULT_SEED_SIZE,
-        help=f'Dataset size: xs (100 users), medium (10K users), large (100K users). Default: {DEFAULT_SEED_SIZE}'
+        help=f'Dataset size: xs (100 users), medium (10K users), large (100K users), blog (5K users + 2243 posts). Default: {DEFAULT_SEED_SIZE}'
     )
     parser.add_argument(
         '--generate-only',

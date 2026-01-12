@@ -1,0 +1,58 @@
+id: health-check-endpoints
+name: Health Check Endpoints
+category: fraiseql
+type: standard
+tags:
+- observability
+- health-checks
+- kubernetes
+- readiness
+- liveness
+summary:
+  short: /health/live and /health/ready endpoints for Kubernetes probes
+  long: FraiseQL provides separate liveness (/health/live) and readiness (/health/ready)
+    endpoints with comprehensive dependency checks (database, Redis, external services)
+    for proper Kubernetes integration and graceful degradation.
+problem:
+  description: No standardized way to check service health
+  symptoms:
+  - Kubernetes restarts healthy pods
+  - Traffic sent to unhealthy instances
+  - Cascading failures from dependencies
+  - No dependency health visibility
+  impact: Service instability and poor availability
+solution:
+  description: Implement Health Check Endpoints effectively
+key_concepts:
+  concept_1: Liveness probe for process health
+  concept_2: Readiness probe for traffic acceptance
+  concept_3: Dependency health checks (DB, Redis, etc.)
+  concept_4: Timeout and retry configuration
+implementation_considerations:
+  consideration_1: Check timeout configuration
+  consideration_2: Dependency check depth
+  consideration_3: Caching health results
+  consideration_4: Graceful degradation on failures
+best_practices:
+- name: Separate endpoints
+  description: /health/live for liveness, /health/ready for readiness
+- name: Fast liveness
+  description: Liveness should be <100ms
+- name: Comprehensive readiness
+  description: Check all critical dependencies
+- name: Return details
+  description: Include dependency status in response
+anti_patterns:
+- name: Same endpoint
+  consequence: Can't distinguish liveness vs readiness
+- name: Slow checks
+  consequence: Probe timeouts and false failures
+- name: No dependency checks
+  consequence: Traffic to unhealthy instances
+blog_hooks:
+  beginner:
+    focus: Introduction to Health Check Endpoints
+  intermediate:
+    focus: Implementing liveness and readiness probes
+  advanced:
+    focus: Advanced dependency health checks and graceful degradation

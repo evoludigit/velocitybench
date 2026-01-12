@@ -1,0 +1,49 @@
+id: request-tracing-execution
+name: Request Tracing Through Execution
+category: fraiseql
+type: standard
+tags:
+- execution
+- observability
+- tracing
+- debugging
+summary:
+  short: Correlation IDs tracking requests through execution pipeline
+  long: Requests are assigned correlation IDs that follow them through all execution
+    phases, enabling request tracing and debugging.
+problem:
+  description: Hard to follow request through execution
+  symptoms:
+  - Can't correlate logs across phases
+  - Difficult to debug request flow
+  - No visibility into request path
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Request Tracing Through Execution effectively
+key_concepts:
+  concept_1: Correlation ID generation
+  concept_2: ID propagation
+  concept_3: Request lifecycle tracking
+implementation_considerations:
+  consideration_1: Distributed tracing
+  consideration_2: Log aggregation
+  consideration_3: ID uniqueness
+best_practices:
+- name: Generate IDs
+  description: Create unique ID per request
+- name: Propagate everywhere
+  description: Include in all logs
+- name: Aggregate logs
+  description: Collect by correlation ID
+anti_patterns:
+- name: No correlation
+  consequence: Logs scattered across files
+- name: Inconsistent IDs
+  consequence: Tracing doesn't work
+blog_hooks:
+  beginner:
+    focus: Introduction to Request Tracing Through Execution
+  intermediate:
+    focus: Implementing Request Tracing Through Execution
+  advanced:
+    focus: Advanced Request Tracing Through Execution techniques

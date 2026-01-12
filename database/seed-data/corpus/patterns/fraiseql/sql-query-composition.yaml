@@ -1,0 +1,58 @@
+id: sql-query-composition
+name: SQL Query Composition
+category: fraiseql
+type: standard
+tags:
+- sql-generation
+- query-planning
+- joins
+- composition
+- optimization
+summary:
+  short: Composing complex SQL from nested GraphQL queries with optimal JOINs
+  long: FraiseQL composes nested GraphQL queries into single optimized SQL queries
+    using intelligent JOIN strategies, CTEs, and subqueries, eliminating N+1 problems
+    and leveraging database query optimizers.
+problem:
+  description: Naive SQL generation creates N+1 queries or inefficient JOINs
+  symptoms:
+  - Multiple database round trips for nested data
+  - Cartesian product explosions in JOINs
+  - Slow queries with many relationships
+  - Database query optimizer can't help
+  impact: Poor query performance and database overload
+solution:
+  description: Implement SQL Query Composition effectively
+key_concepts:
+  concept_1: Single SQL query for entire GraphQL operation
+  concept_2: LEFT JOIN vs INNER JOIN selection
+  concept_3: CTE usage for complex subqueries
+  concept_4: JSONB aggregation for nested arrays
+implementation_considerations:
+  consideration_1: JOIN order optimization
+  consideration_2: Subquery vs JOIN trade-offs
+  consideration_3: Database-specific optimizations
+  consideration_4: Query complexity limits
+best_practices:
+- name: Single query per operation
+  description: Compose entire GraphQL query into one SQL
+- name: Use CTEs for clarity
+  description: Break complex queries into readable CTEs
+- name: JSONB for arrays
+  description: Aggregate nested arrays with JSONB functions
+- name: Limit depth
+  description: Prevent excessive JOIN depth
+anti_patterns:
+- name: N+1 queries
+  consequence: Database overload and slow responses
+- name: Cartesian products
+  consequence: Exploding result sets and slow queries
+- name: Nested subqueries
+  consequence: Poor query optimizer performance
+blog_hooks:
+  beginner:
+    focus: Introduction to SQL Query Composition from GraphQL
+  intermediate:
+    focus: Implementing efficient JOIN strategies and CTEs
+  advanced:
+    focus: Advanced query optimization and database-specific techniques

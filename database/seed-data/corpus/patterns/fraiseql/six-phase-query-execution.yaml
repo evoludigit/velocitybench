@@ -1,0 +1,50 @@
+id: six-phase-query-execution
+name: Six-Phase Query Execution Pipeline
+category: fraiseql
+type: standard
+tags:
+- execution
+- pipeline
+- phases
+- architecture
+summary:
+  short: Validation, Authorization, Planning, Execution, Projection, and Error Handling
+  long: 'GraphQL queries go through six phases: request validation against schema,
+    authorization rule checking, query plan optimization, database execution, result
+    projection, and error handling.'
+problem:
+  description: Unclear query execution flow and responsibility
+  symptoms:
+  - Difficult to debug query execution
+  - Authorization decisions unclear
+  - Performance bottlenecks hard to identify
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Six-Phase Query Execution Pipeline effectively
+key_concepts:
+  concept_1: Execution phase separation
+  concept_2: Data flow between phases
+  concept_3: Phase responsibilities
+implementation_considerations:
+  consideration_1: Phase ordering optimization
+  consideration_2: Error handling across phases
+  consideration_3: Observability in each phase
+best_practices:
+- name: Clear phases
+  description: Each phase has single responsibility
+- name: Phase boundaries
+  description: Clear input/output contracts
+- name: Observability
+  description: Instrument each phase
+anti_patterns:
+- name: Mixed phases
+  consequence: Hard to understand execution
+- name: No instrumentation
+  consequence: Can't debug issues
+blog_hooks:
+  beginner:
+    focus: Introduction to Six-Phase Query Execution Pipeline
+  intermediate:
+    focus: Implementing Six-Phase Query Execution Pipeline
+  advanced:
+    focus: Advanced Six-Phase Query Execution Pipeline techniques

@@ -1,0 +1,332 @@
+# Aggregate Table Strategy (FraiseQL)
+# VelocityBench Knowledge Corpus
+
+id: aggregate-table-strategy
+name: "Aggregate Tables for Pre-Computed Rollups (ta_*)"
+category: fraiseql
+type: pattern
+severity: high
+tags:
+  - fraiseql
+  - analytics
+  - performance
+  - pre-aggregation
+  - materialized-views
+  - optimization
+
+summary:
+  short: "Pre-compute daily/hourly rollups in ta_* tables for instant query performance"
+  long: |
+    Aggregate tables (ta_* prefix) store pre-computed rollups at different granularities
+    (hourly, daily, monthly) with the same structure as fact tables (measures as SQL columns,
+    dimensions in JSONB). Queries hit pre-aggregated data for 100-1000x faster performance.
+    Trade storage space for query speed. Essential for billion-row fact tables.
+
+problem:
+  description: |
+    Querying large fact tables for every dashboard refresh is slow:
+    - 1B row fact table → 5-10 second GROUP BY queries
+    - Daily/monthly reports re-aggregate same data repeatedly
+    - Peak load on database during business hours
+    - Can't scale to real-time dashboards with large datasets
+
+    Aggregate tables pre-compute common aggregations for instant queries.
+
+  symptoms:
+    - name: "Slow dashboard loading"
+      description: "5-10 second delays for simple daily/monthly charts"
+      detection: "High query latency during peak hours"
+
+    - name: "Repeated aggregations"
+      description: "Same GROUP BY query runs 1000s of times per day"
+      detection: "Query log shows identical expensive aggregations"
+
+    - name: "Database CPU saturation"
+      description: "Aggregation queries consume all CPU"
+      detection: "High CPU usage, slow queries across all users"
+
+solution:
+  principle: "Pre-compute common aggregations in separate tables, query rollups instead of raw facts"
+
+  components:
+    - name: "Aggregate Tables (ta_*)"
+      type: "Pre-computed rollups"
+      purpose: "Store hourly/daily/monthly aggregations"
+
+    - name: "ETL Pipeline"
+      type: "Batch job"
+      purpose: "Populate aggregate tables from fact tables"
+
+    - name: "Query Router"
+      type: "Intelligent query planning"
+      purpose: "Route queries to appropriate granularity (fact vs aggregate)"
+
+    - name: "Incremental Updates"
+      type: "Optimization"
+      purpose: "Update only new periods, not full recalculation"
+
+table_structure:
+  fact_table:
+    example: |
+      -- tf_sales: Raw transactional data (1B rows)
+      CREATE TABLE tf_sales (
+          id BIGSERIAL PRIMARY KEY,
+          revenue DECIMAL(10,2) NOT NULL,
+          quantity INT NOT NULL,
+          cost DECIMAL(10,2) NOT NULL,
+          data JSONB NOT NULL,
+          customer_id UUID NOT NULL,
+          occurred_at TIMESTAMPTZ NOT NULL
+      );
+
+  daily_aggregate:
+    example: |
+      -- ta_sales_by_day: Daily rollup (365 rows per year)
+      CREATE TABLE ta_sales_by_day (
+          id BIGSERIAL PRIMARY KEY,
+
+          -- Aggregated measures (same as fact table)
+          revenue DECIMAL(10,2) NOT NULL,
+          quantity INT NOT NULL,
+          cost DECIMAL(10,2) NOT NULL,
+          order_count INT NOT NULL,
+
+          -- Dimensions (same structure as fact table)
+          data JSONB NOT NULL,
+
+          -- Time bucket (what we aggregated by)
+          occurred_at DATE NOT NULL,
+
+          -- Metadata
+          created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE INDEX idx_sales_by_day_date ON ta_sales_by_day(occurred_at);
+      CREATE INDEX idx_sales_by_day_data_gin ON ta_sales_by_day USING GIN(data);
+
+  monthly_aggregate:
+    example: |
+      -- ta_sales_by_month: Monthly rollup (12 rows per year)
+      CREATE TABLE ta_sales_by_month (
+          id BIGSERIAL PRIMARY KEY,
+          revenue DECIMAL(10,2) NOT NULL,
+          quantity INT NOT NULL,
+          cost DECIMAL(10,2) NOT NULL,
+          order_count INT NOT NULL,
+          data JSONB NOT NULL,
+          occurred_at DATE NOT NULL,  -- First day of month
+          created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+etl_strategy:
+  batch_population:
+    description: "Populate aggregate table from fact table"
+    sql: |
+      -- Daily rollup: Aggregate tf_sales → ta_sales_by_day
+      INSERT INTO ta_sales_by_day (revenue, quantity, cost, order_count, data, occurred_at)
+      SELECT
+          SUM(revenue) AS revenue,
+          SUM(quantity) AS quantity,
+          SUM(cost) AS cost,
+          COUNT(*) AS order_count,
+          jsonb_build_object(
+              'category', data->>'category',
+              'region', data->>'region'
+          ) AS data,
+          DATE_TRUNC('day', occurred_at)::DATE AS occurred_at
+      FROM tf_sales
+      WHERE occurred_at >= CURRENT_DATE - INTERVAL '7 days'
+      GROUP BY
+          DATE_TRUNC('day', occurred_at),
+          data->>'category',
+          data->>'region';
+
+  incremental_update:
+    description: "Update only new periods, not full recalculation"
+    sql: |
+      -- Delete yesterday's aggregate (if exists)
+      DELETE FROM ta_sales_by_day
+      WHERE occurred_at = CURRENT_DATE - INTERVAL '1 day';
+
+      -- Insert fresh aggregate for yesterday
+      INSERT INTO ta_sales_by_day (...)
+      SELECT ...
+      FROM tf_sales
+      WHERE occurred_at >= CURRENT_DATE - INTERVAL '1 day'
+        AND occurred_at < CURRENT_DATE
+      GROUP BY ...;
+
+  scheduled_job:
+    description: "Run ETL pipeline daily (e.g., 2am)"
+    example: |
+      # Cron job (daily at 2am)
+      0 2 * * * /usr/local/bin/update_daily_aggregates.sh
+
+      # Script: update_daily_aggregates.sh
+      #!/bin/bash
+      psql -d analytics -f /sql/update_ta_sales_by_day.sql
+      psql -d analytics -f /sql/update_ta_sales_by_month.sql
+
+query_routing:
+  manual_routing:
+    description: "Developer chooses which table to query"
+    example: |
+      # Query daily aggregate for last 30 days (fast)
+      query {
+        sales_by_day_aggregate(
+          where: { occurred_at_gte: "2024-01-01" }
+        ) {
+          occurred_at
+          revenue
+        }
+      }
+
+      # Query fact table for real-time data (slower)
+      query {
+        sales_aggregate(
+          where: { occurred_at_gte: "2024-01-01" }
+          groupBy: { occurred_at_day: true }
+        ) {
+          occurred_at_day
+          revenue_sum
+        }
+      }
+
+  intelligent_routing:
+    description: "Framework automatically chooses table based on query"
+    rules:
+      - condition: "Query range > 30 days, daily granularity"
+        action: "Route to ta_sales_by_day"
+
+      - condition: "Query range > 1 year, monthly granularity"
+        action: "Route to ta_sales_by_month"
+
+      - condition: "Query needs real-time data (today)"
+        action: "Route to tf_sales (fact table)"
+
+      - condition: "Query has complex WHERE filters"
+        action: "Route to tf_sales (aggregate may not have filter dimensions)"
+
+performance_comparison:
+  fact_table_query:
+    table: "tf_sales (1B rows)"
+    query: "Daily revenue last 365 days"
+    performance: "5-10 seconds"
+    cost: "Full table scan + GROUP BY"
+
+  daily_aggregate_query:
+    table: "ta_sales_by_day (365 rows)"
+    query: "Daily revenue last 365 days"
+    performance: "~5-10ms (1000x faster)"
+    cost: "Index scan + simple SELECT"
+
+  monthly_aggregate_query:
+    table: "ta_sales_by_month (12 rows)"
+    query: "Monthly revenue last year"
+    performance: "~1-2ms (5000x faster)"
+    cost: "Tiny table, instant lookup"
+
+storage_tradeoff:
+  fact_table:
+    size: "1B rows × 200 bytes = 200 GB"
+    query_speed: "Slow (5-10s for daily aggregations)"
+
+  daily_aggregate:
+    size: "365 days × 10 dimensions × 200 bytes = 0.7 MB (0.0003% of fact table)"
+    query_speed: "Fast (5-10ms)"
+    tradeoff: "Tiny storage cost for 1000x speedup"
+
+  monthly_aggregate:
+    size: "12 months × 10 dimensions × 200 bytes = 24 KB (negligible)"
+    query_speed: "Instant (1-2ms)"
+    tradeoff: "Essentially free storage for 5000x speedup"
+
+best_practices:
+  - name: "Same structure as fact table"
+    description: "Measures as SQL columns, dimensions in JSONB"
+    rationale: "Consistent query interface, reuse same GraphQL schema"
+
+  - name: "Incremental updates only"
+    description: "Update only new/changed periods, not full recalculation"
+    rationale: "ETL completes in minutes, not hours"
+
+  - name: "Multiple granularities"
+    description: "Hourly, daily, weekly, monthly aggregate tables"
+    rationale: "Query appropriate granularity for each use case"
+
+  - name: "Keep recent fact data queryable"
+    description: "Last 7-30 days from fact table for real-time updates"
+    rationale: "Balance speed (aggregates) with freshness (facts)"
+
+  - name: "Document query routing logic"
+    description: "Clear rules for when to use fact vs aggregate tables"
+    rationale: "Developers know which table to query"
+
+anti_patterns:
+  - name: "Over-aggregation"
+    consequence: "Too many aggregate tables, complex ETL"
+    example: "Aggregate tables for every possible dimension combination"
+
+  - name: "Stale aggregates"
+    consequence: "Dashboard shows yesterday's data"
+    example: "ETL job fails, aggregate tables not updated"
+
+  - name: "Wrong granularity"
+    consequence: "Query still slow despite aggregate table"
+    example: "Using daily aggregate for hourly chart (have to aggregate again)"
+
+  - name: "No incremental updates"
+    consequence: "ETL takes hours, full table recalculation"
+    example: "DELETE * FROM ta_sales_by_day; INSERT ... (all data)"
+
+use_cases:
+  - scenario: "E-commerce: Daily sales dashboard"
+    fact_table: "tf_sales (100M orders)"
+    aggregate_table: "ta_sales_by_day (365 rows)"
+    speedup: "1000x (10s → 10ms)"
+
+  - scenario: "SaaS: Monthly recurring revenue"
+    fact_table: "tf_subscriptions (50M events)"
+    aggregate_table: "ta_subscriptions_by_month (12 rows)"
+    speedup: "5000x (5s → 1ms)"
+
+  - scenario: "Analytics: Hourly error rate"
+    fact_table: "tf_events (1B log entries)"
+    aggregate_table: "ta_events_by_hour (8760 rows per year)"
+    speedup: "500x (20s → 40ms)"
+
+related_patterns:
+  - id: "fact-dimension-pattern"
+    description: "Aggregate tables use same structure as fact tables"
+
+  - id: "temporal-bucketing"
+    description: "Aggregate by time periods (day, week, month)"
+
+  - id: "aggregation-model"
+    description: "Same aggregate functions work on fact and aggregate tables"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Aggregate tables are like summary reports:
+      - Fact table = every transaction receipt (millions)
+      - Daily aggregate = daily summary report (365 per year)
+      - Monthly aggregate = monthly summary report (12 per year)
+
+      You don't re-count all receipts every time - just read the summary!
+
+  intermediate:
+    focus: "ETL pipeline and query routing"
+    key_points:
+      - "Pre-compute common aggregations in ta_* tables"
+      - "Incremental updates (only new periods)"
+      - "1000x speedup for tiny storage cost"
+      - "Query routing: fact table (real-time) vs aggregate (historical)"
+
+  advanced:
+    focus: "Optimization strategies and intelligent routing"
+    key_points:
+      - "Multiple granularities (hourly, daily, monthly)"
+      - "Automatic query routing based on time range"
+      - "Combining fact + aggregate for recent + historical data"
+      - "Partitioning strategies for billion-row aggregates"

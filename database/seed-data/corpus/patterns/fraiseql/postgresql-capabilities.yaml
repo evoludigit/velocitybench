@@ -1,0 +1,44 @@
+id: postgresql-capabilities
+name: PostgreSQL Capabilities
+category: fraiseql
+type: standard
+tags:
+- fraiseql
+- postgresql
+summary:
+  short: PostgreSQL-specific features
+  long: PostgreSQL-specific features
+problem:
+  description: Without postgresql capabilities, systems face challenges
+  symptoms:
+  - Issue with postgresql-specific features
+  impact: Reduced FraiseQL effectiveness
+solution:
+  description: Implement PostgreSQL Capabilities effectively
+key_concepts:
+  concept_1: PostgreSQL Capabilities fundamentals
+  concept_2: Implementation patterns
+  concept_3: Best practices
+implementation_considerations:
+  consideration_1: Requirements gathering
+  consideration_2: Design decisions
+  consideration_3: Implementation approach
+best_practices:
+- name: Plan carefully
+  description: Think through PostgreSQL Capabilities design
+- name: Test thoroughly
+  description: Validate PostgreSQL Capabilities works
+- name: Monitor
+  description: Track PostgreSQL Capabilities performance
+anti_patterns:
+- name: Ignoring pattern
+  consequence: PostgreSQL Capabilities fails
+- name: Incomplete implementation
+  consequence: Partial benefits only
+blog_hooks:
+  beginner:
+    focus: Introduction to PostgreSQL Capabilities
+  intermediate:
+    focus: Implementing PostgreSQL Capabilities
+  advanced:
+    focus: Advanced PostgreSQL Capabilities techniques

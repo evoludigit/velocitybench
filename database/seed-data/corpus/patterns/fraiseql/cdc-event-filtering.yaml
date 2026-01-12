@@ -1,0 +1,44 @@
+id: cdc-event-filtering
+name: CDC Event Filtering
+category: fraiseql
+type: standard
+tags:
+- fraiseql
+- cdc
+summary:
+  short: Filtering events for subscriptions
+  long: Filtering events for subscriptions
+problem:
+  description: Without cdc event filtering, systems face challenges
+  symptoms:
+  - Issue with filtering events for subscriptions
+  impact: Reduced FraiseQL effectiveness
+solution:
+  description: Implement CDC Event Filtering effectively
+key_concepts:
+  concept_1: CDC Event Filtering fundamentals
+  concept_2: Implementation patterns
+  concept_3: Best practices
+implementation_considerations:
+  consideration_1: Requirements gathering
+  consideration_2: Design decisions
+  consideration_3: Implementation approach
+best_practices:
+- name: Plan carefully
+  description: Think through CDC Event Filtering design
+- name: Test thoroughly
+  description: Validate CDC Event Filtering works
+- name: Monitor
+  description: Track CDC Event Filtering performance
+anti_patterns:
+- name: Ignoring pattern
+  consequence: CDC Event Filtering fails
+- name: Incomplete implementation
+  consequence: Partial benefits only
+blog_hooks:
+  beginner:
+    focus: Introduction to CDC Event Filtering
+  intermediate:
+    focus: Implementing CDC Event Filtering
+  advanced:
+    focus: Advanced CDC Event Filtering techniques

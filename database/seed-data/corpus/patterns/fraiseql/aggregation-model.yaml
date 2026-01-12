@@ -1,0 +1,409 @@
+# Aggregation Model (FraiseQL)
+# VelocityBench Knowledge Corpus
+
+id: aggregation-model
+name: "FraiseQL Aggregation Model"
+category: fraiseql
+type: pattern
+severity: high
+tags:
+  - fraiseql
+  - analytics
+  - aggregation
+  - group-by
+  - sql-generation
+  - performance
+
+summary:
+  short: "Database-native aggregations with GROUP BY and HAVING support"
+  long: |
+    FraiseQL v2 compiles GraphQL aggregate queries into database-native SQL aggregations,
+    supporting COUNT, SUM, AVG, MIN, MAX, and database-specific extensions (STDDEV, PERCENTILE).
+    All aggregations execute server-side with GROUP BY on JSONB dimensions and HAVING filters.
+    No joins - dimensions must be denormalized into JSONB at ETL time.
+
+problem:
+  description: |
+    Application-side aggregations are slow and resource-intensive:
+    - Fetching all rows to calculate SUM/AVG in code
+    - Network transfer of large result sets
+    - Memory consumption for in-memory grouping
+    - Lost opportunity to leverage database query optimizer
+
+    FraiseQL solves this by generating optimized SQL aggregations that execute server-side.
+
+  symptoms:
+    - name: "High memory usage"
+      description: "Application loads millions of rows to calculate totals"
+      detection: "OOM errors, large heap allocations during analytics queries"
+
+    - name: "Slow response times"
+      description: "Multi-second delays for simple SUM/COUNT operations"
+      detection: "GraphQL resolvers taking 5-10 seconds for aggregate queries"
+
+    - name: "Network saturation"
+      description: "Transferring GB of data for aggregation"
+      detection: "High bandwidth usage, slow query results over network"
+
+solution:
+  principle: "Compile GraphQL aggregates to database-native SQL GROUP BY with server-side execution"
+
+  components:
+    - name: "Aggregate Functions"
+      type: "SQL functions"
+      purpose: "COUNT, SUM, AVG, MIN, MAX, STDDEV, VARIANCE, PERCENTILE"
+
+    - name: "GROUP BY with JSONB"
+      type: "Dimension extraction"
+      purpose: "Extract JSONB dimensions (data->>'field') for grouping"
+
+    - name: "HAVING Clause"
+      type: "Post-aggregation filter"
+      purpose: "Filter grouped results (e.g., revenue_sum > 10000)"
+
+    - name: "Temporal Bucketing"
+      type: "Time-series grouping"
+      purpose: "DATE_TRUNC, DATE_FORMAT, strftime for daily/weekly/monthly aggregation"
+
+aggregate_functions:
+  basic:
+    description: "Supported by all databases (PostgreSQL, MySQL, SQLite, SQL Server)"
+    functions:
+      - name: "COUNT(*)"
+        sql: "COUNT(*)"
+        return_type: "Int"
+        description: "Count all rows"
+
+      - name: "COUNT(field)"
+        sql: "COUNT(field)"
+        return_type: "Int"
+        description: "Count non-null values"
+
+      - name: "COUNT(DISTINCT field)"
+        sql: "COUNT(DISTINCT field)"
+        return_type: "Int"
+        description: "Count unique values"
+
+      - name: "SUM(field)"
+        sql: "SUM(field)"
+        return_type: "Numeric"
+        description: "Sum all values"
+
+      - name: "AVG(field)"
+        sql: "AVG(field)"
+        return_type: "Float"
+        description: "Average of values"
+
+      - name: "MIN(field)"
+        sql: "MIN(field)"
+        return_type: "Same as input"
+        description: "Minimum value"
+
+      - name: "MAX(field)"
+        sql: "MAX(field)"
+        return_type: "Same as input"
+        description: "Maximum value"
+
+  postgresql_extensions:
+    description: "PostgreSQL-specific aggregate functions"
+    functions:
+      - name: "STDDEV(field)"
+        sql: "STDDEV(field)"
+        return_type: "Float"
+        description: "Standard deviation (sample)"
+
+      - name: "VARIANCE(field)"
+        sql: "VARIANCE(field)"
+        return_type: "Float"
+        description: "Variance (sample)"
+
+      - name: "PERCENTILE_CONT(fraction)"
+        sql: "PERCENTILE_CONT(fraction) WITHIN GROUP (ORDER BY field)"
+        return_type: "Float"
+        description: "Continuous percentile (interpolated)"
+
+      - name: "PERCENTILE_DISC(fraction)"
+        sql: "PERCENTILE_DISC(fraction) WITHIN GROUP (ORDER BY field)"
+        return_type: "Same as input"
+        description: "Discrete percentile (actual value)"
+
+  mysql_extensions:
+    description: "MySQL-specific aggregate functions"
+    functions:
+      - name: "GROUP_CONCAT(field)"
+        sql: "GROUP_CONCAT(field SEPARATOR ',')"
+        return_type: "String"
+        description: "Concatenate values with delimiter"
+
+      - name: "STDDEV(field)"
+        sql: "STDDEV(field)"
+        return_type: "Float"
+        description: "Standard deviation (limited support)"
+
+  sqlserver_extensions:
+    description: "SQL Server-specific aggregate functions"
+    functions:
+      - name: "STDEV(field)"
+        sql: "STDEV(field)"
+        return_type: "Float"
+        description: "Standard deviation (sample)"
+
+      - name: "STDEVP(field)"
+        sql: "STDEVP(field)"
+        return_type: "Float"
+        description: "Standard deviation (population)"
+
+      - name: "VAR(field)"
+        sql: "VAR(field)"
+        return_type: "Float"
+        description: "Variance (sample)"
+
+      - name: "VARP(field)"
+        sql: "VARP(field)"
+        return_type: "Float"
+        description: "Variance (population)"
+
+implementation:
+  simple_aggregation:
+    graphql: |
+      query {
+        sales_aggregate {
+          count
+          revenue_sum
+          revenue_avg
+          revenue_min
+          revenue_max
+        }
+      }
+
+    postgresql: |
+      SELECT
+          COUNT(*) AS count,
+          SUM(revenue) AS revenue_sum,
+          AVG(revenue) AS revenue_avg,
+          MIN(revenue) AS revenue_min,
+          MAX(revenue) AS revenue_max
+      FROM tf_sales;
+
+    performance: "~0.2ms for 1M rows (uses table statistics)"
+
+  group_by_single_dimension:
+    graphql: |
+      query {
+        sales_aggregate(groupBy: { category: true }) {
+          category
+          revenue_sum
+          count
+        }
+      }
+
+    postgresql: |
+      SELECT
+          data->>'category' AS category,
+          SUM(revenue) AS revenue_sum,
+          COUNT(*) AS count
+      FROM tf_sales
+      GROUP BY data->>'category';
+
+    performance: "~1-2ms for 1M rows (with GIN index on data)"
+
+  group_by_multiple_dimensions:
+    graphql: |
+      query {
+        sales_aggregate(
+          groupBy: {
+            category: true,
+            region: true
+          }
+        ) {
+          category
+          region
+          revenue_sum
+          quantity_sum
+        }
+      }
+
+    postgresql: |
+      SELECT
+          data->>'category' AS category,
+          data->>'region' AS region,
+          SUM(revenue) AS revenue_sum,
+          SUM(quantity) AS quantity_sum
+      FROM tf_sales
+      GROUP BY data->>'category', data->>'region';
+
+    performance: "~2-3ms for 1M rows"
+
+  having_clause:
+    graphql: |
+      query {
+        sales_aggregate(
+          groupBy: { category: true },
+          having: { revenue_sum_gt: 10000 }
+        ) {
+          category
+          revenue_sum
+        }
+      }
+
+    postgresql: |
+      SELECT
+          data->>'category' AS category,
+          SUM(revenue) AS revenue_sum
+      FROM tf_sales
+      GROUP BY data->>'category'
+      HAVING SUM(revenue) > $1;
+      -- Parameters: [10000]
+
+    performance: "~1-2ms for 1M rows"
+
+  temporal_bucketing:
+    graphql: |
+      query {
+        sales_aggregate(
+          groupBy: { occurred_at_day: true }
+        ) {
+          occurred_at_day
+          revenue_sum
+          count
+        }
+      }
+
+    postgresql: |
+      SELECT
+          DATE_TRUNC('day', occurred_at) AS occurred_at_day,
+          SUM(revenue) AS revenue_sum,
+          COUNT(*) AS count
+      FROM tf_sales
+      GROUP BY DATE_TRUNC('day', occurred_at)
+      ORDER BY occurred_at_day;
+
+    mysql: |
+      SELECT
+          DATE_FORMAT(occurred_at, '%Y-%m-%d') AS occurred_at_day,
+          SUM(revenue) AS revenue_sum,
+          COUNT(*) AS count
+      FROM tf_sales
+      GROUP BY DATE_FORMAT(occurred_at, '%Y-%m-%d')
+      ORDER BY occurred_at_day;
+
+    sqlite: |
+      SELECT
+          strftime('%Y-%m-%d', occurred_at) AS occurred_at_day,
+          SUM(revenue) AS revenue_sum,
+          COUNT(*) AS count
+      FROM tf_sales
+      GROUP BY strftime('%Y-%m-%d', occurred_at)
+      ORDER BY occurred_at_day;
+
+    performance: "~5-10ms for 1M rows (with index on occurred_at)"
+
+compilation_strategy:
+  steps:
+    - step: "Introspect table structure"
+      details: "Identify measure columns (numeric types), data JSONB column, filter columns"
+
+    - step: "Parse GraphQL aggregate query"
+      details: "Extract groupBy dimensions, aggregate functions, having filters"
+
+    - step: "Generate SQL SELECT"
+      details: "Build SELECT with JSONB extraction, aggregate functions, GROUP BY, HAVING"
+
+    - step: "Lower to database dialect"
+      details: "PostgreSQL: data->>'field', MySQL: JSON_UNQUOTE(JSON_EXTRACT(data, '$.field'))"
+
+    - step: "Execute on database"
+      details: "Server-side aggregation with database query optimizer"
+
+    - step: "Return results"
+      details: "Map SQL result rows to GraphQL response"
+
+best_practices:
+  - name: "Use measure columns for aggregation"
+    description: "Store numeric data as SQL columns (INT, DECIMAL), not in JSONB"
+    rationale: "10-100x faster aggregation than JSONB extraction"
+
+  - name: "Add GIN index for JSONB grouping"
+    description: "CREATE INDEX ... USING GIN(data) for PostgreSQL"
+    rationale: "Speeds up GROUP BY on JSONB paths from 100ms+ to 1-3ms"
+
+  - name: "Use HAVING for post-aggregation filters"
+    description: "Filter on aggregated results (revenue_sum > X) with HAVING, not WHERE"
+    rationale: "WHERE filters before aggregation, HAVING filters after"
+
+  - name: "Leverage database-specific extensions"
+    description: "Use STDDEV, PERCENTILE on PostgreSQL for advanced analytics"
+    rationale: "Native database functions are optimized and well-tested"
+
+anti_patterns:
+  - name: "Application-side aggregation"
+    consequence: "Slow, memory-intensive, network-heavy"
+    example: "Fetching all rows, calculating SUM in JavaScript/Python"
+
+  - name: "WHERE on aggregated results"
+    consequence: "Wrong results - WHERE filters before aggregation, not after"
+    example: "WHERE revenue_sum > 10000 (should be HAVING)"
+
+  - name: "Aggregating JSONB fields"
+    consequence: "10-100x slower than SQL columns"
+    example: "SUM(CAST(data->>'revenue' AS DECIMAL)) instead of SUM(revenue)"
+
+  - name: "Missing GROUP BY dimensions"
+    consequence: "SQL error or wrong results"
+    example: "SELECT category, SUM(revenue) without GROUP BY category"
+
+use_cases:
+  - scenario: "E-commerce dashboards"
+    query: "Total revenue, orders, average order value by category and region"
+    aggregates: "SUM(revenue), COUNT(*), AVG(revenue)"
+    grouping: "data->>'category', data->>'region'"
+
+  - scenario: "SaaS usage metrics"
+    query: "API requests, errors, average latency by customer and endpoint"
+    aggregates: "COUNT(*), SUM(error_count), AVG(duration_ms)"
+    grouping: "customer_id, data->>'endpoint'"
+
+  - scenario: "Time-series analytics"
+    query: "Daily active users, session count, average session duration"
+    aggregates: "COUNT(DISTINCT user_id), COUNT(*), AVG(duration)"
+    grouping: "DATE_TRUNC('day', occurred_at)"
+
+related_patterns:
+  - id: "fact-dimension-pattern"
+    description: "Table structure with measures as SQL columns, dimensions as JSONB"
+
+  - id: "having-clause-filtering"
+    description: "Post-aggregation filters for grouped results"
+
+  - id: "temporal-bucketing"
+    description: "Time-series grouping with DATE_TRUNC and similar functions"
+
+  - id: "conditional-aggregates"
+    description: "FILTER clause and CASE WHEN for conditional aggregation"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Aggregation is like using a calculator on a spreadsheet:
+      - SUM: Add up all numbers in a column
+      - AVG: Calculate average (sum ÷ count)
+      - GROUP BY: Subtotals by category (like pivot tables)
+      - HAVING: Filter subtotals (show only categories > $10k)
+
+      FraiseQL does this math in the database (fast!) instead of in your app (slow!).
+
+  intermediate:
+    focus: "GROUP BY with JSONB dimensions and HAVING filters"
+    key_points:
+      - "Server-side aggregation: 100x faster than application-side"
+      - "GROUP BY extracts JSONB dimensions (data->>'field')"
+      - "HAVING filters aggregated results after GROUP BY"
+      - "Measure columns must be SQL types for fast aggregation"
+
+  advanced:
+    focus: "Database-specific optimizations and compilation strategy"
+    key_points:
+      - "PostgreSQL FILTER clause vs CASE WHEN emulation"
+      - "Compiler introspection and SQL generation"
+      - "Query optimizer leveraging GIN and B-tree indexes"
+      - "PERCENTILE_CONT for advanced statistical analysis"

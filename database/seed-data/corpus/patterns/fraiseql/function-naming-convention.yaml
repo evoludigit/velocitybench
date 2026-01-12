@@ -1,0 +1,58 @@
+id: function-naming-convention
+name: Function Naming Convention (fn_*)
+category: fraiseql
+type: standard
+tags:
+- database
+- naming
+- functions
+- stored-procedures
+- mutations
+summary:
+  short: Function naming with fn_{action}_{entity} pattern
+  long: FraiseQL uses fn_* prefix for all database functions and stored procedures
+    with pattern fn_{action}_{entity} (e.g., fn_create_user, fn_update_post) for
+    clear intent and mutation mapping.
+problem:
+  description: Unclear function purpose and inconsistent naming
+  symptoms:
+  - Can't identify functions by name
+  - No naming consistency
+  - Hard to map mutations to functions
+  - Unclear function parameters
+  impact: Schema confusion and maintenance difficulty
+solution:
+  description: Implement Function Naming Convention effectively
+key_concepts:
+  concept_1: fn_* prefix for all functions
+  concept_2: Action verb in name (create, update, delete, archive)
+  concept_3: Entity name indicates target
+  concept_4: Mutation-to-function mapping
+implementation_considerations:
+  consideration_1: Naming for complex operations
+  consideration_2: Function overloading patterns
+  consideration_3: Return type conventions
+  consideration_4: Parameter naming consistency
+best_practices:
+- name: Use fn_ prefix
+  description: All functions start with fn_
+- name: Action verbs
+  description: create, update, delete, archive, restore
+- name: Entity suffix
+  description: Clearly indicate target entity
+- name: Document signature
+  description: Clear parameter and return types
+anti_patterns:
+- name: No naming convention
+  consequence: Unclear function purpose
+- name: Verb-less names
+  consequence: Hard to understand operation
+- name: Generic names
+  consequence: Name collisions and confusion
+blog_hooks:
+  beginner:
+    focus: Introduction to Function Naming Convention
+  intermediate:
+    focus: Implementing fn_* pattern for mutations
+  advanced:
+    focus: Advanced function design and overloading strategies

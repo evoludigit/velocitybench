@@ -1,0 +1,49 @@
+id: schema-authoring-with-graphql-sdl
+name: Schema Authoring with GraphQL SDL
+category: fraiseql
+type: standard
+tags:
+- compilation
+- graphql-sdl
+- schema-authoring
+- standards
+summary:
+  short: Using GraphQL Schema Definition Language for schema definition
+  long: GraphQL SDL provides a standard syntax for defining GraphQL schemas that is
+    language-agnostic and widely understood by the GraphQL community.
+problem:
+  description: Different teams use different schema definition approaches
+  symptoms:
+  - Inconsistent schema definitions across teams
+  - Difficulty integrating with GraphQL tooling
+  - Compatibility issues with GraphQL clients
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Schema Authoring with GraphQL SDL effectively
+key_concepts:
+  concept_1: GraphQL SDL syntax and semantics
+  concept_2: Type system representation in SDL
+  concept_3: Directive usage and custom directives
+implementation_considerations:
+  consideration_1: GraphQL version compatibility
+  consideration_2: Custom directive support
+  consideration_3: Tooling ecosystem integration
+best_practices:
+- name: Follow conventions
+  description: Adhere to SDL naming conventions
+- name: Use directives
+  description: Leverage directives for metadata
+- name: Document types
+  description: Add descriptions to all types and fields
+anti_patterns:
+- name: Ignoring directives
+  consequence: Loss of metadata and context
+- name: Non-standard SDL
+  consequence: Incompatibility with tools
+blog_hooks:
+  beginner:
+    focus: Introduction to Schema Authoring with GraphQL SDL
+  intermediate:
+    focus: Implementing Schema Authoring with GraphQL SDL
+  advanced:
+    focus: Advanced Schema Authoring with GraphQL SDL techniques

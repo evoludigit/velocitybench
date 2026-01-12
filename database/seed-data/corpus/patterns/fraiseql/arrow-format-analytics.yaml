@@ -1,0 +1,58 @@
+id: arrow-format-analytics
+name: Arrow Format Analytics (av_*)
+category: fraiseql
+type: standard
+tags:
+- analytics
+- arrow
+- columnar
+- performance
+- integration
+summary:
+  short: Columnar views (av_*) for analytics tool integration
+  long: FraiseQL supports Arrow format views (av_* prefix) that expose data in columnar
+    format optimized for analytics tools (Tableau, PowerBI, Apache Arrow), with compression
+    and efficient scanning for analytical workloads.
+problem:
+  description: Row-based formats inefficient for analytical queries
+  symptoms:
+  - Slow aggregations and analytics
+  - High bandwidth for large exports
+  - Analytics tools can't leverage columnar format
+  - Excessive I/O for column scans
+  impact: Poor analytics performance and tool integration
+solution:
+  description: Implement Arrow Format Analytics effectively
+key_concepts:
+  concept_1: av_* prefix for arrow views
+  concept_2: Columnar data layout
+  concept_3: Compression optimization
+  concept_4: Integration with analytics tools
+implementation_considerations:
+  consideration_1: Column selection for views
+  consideration_2: Compression algorithms
+  consideration_3: Update frequency for analytical views
+  consideration_4: Tool-specific format requirements
+best_practices:
+- name: Use av_ prefix
+  description: Clearly mark arrow format views
+- name: Select relevant columns
+  description: Include only analytical columns
+- name: Enable compression
+  description: Use appropriate compression for data types
+- name: Materialize for performance
+  description: Consider materialized arrow views
+anti_patterns:
+- name: Row format for analytics
+  consequence: Slow analytical queries
+- name: All columns
+  consequence: Excessive data transfer
+- name: No compression
+  consequence: Large data sizes
+blog_hooks:
+  beginner:
+    focus: Introduction to Arrow Format Analytics
+  intermediate:
+    focus: Implementing arrow views for analytics tools
+  advanced:
+    focus: Advanced compression and performance optimization

@@ -1,0 +1,62 @@
+id: common-migration-pitfalls
+name: Common Migration Pitfalls
+category: fraiseql
+type: standard
+tags:
+- migration
+- anti-patterns
+- gotchas
+- refactoring
+- legacy
+summary:
+  short: Pitfalls when migrating from traditional GraphQL to FraiseQL
+  long: Migrating from resolver-based GraphQL servers (Apollo, GraphQL-Yoga, Hot
+    Chocolate) to FraiseQL requires mindset shifts in data fetching, authorization,
+    and schema design. Common pitfalls include resolver translation attempts, maintaining
+    runtime auth, and improper view design.
+problem:
+  description: Direct translation of resolver patterns to FraiseQL fails
+  symptoms:
+  - Trying to convert resolvers to stored procedures
+  - Runtime authorization logic in functions
+  - One view per resolver pattern
+  - N+1 problems persist after migration
+  - Schema doesn't leverage database features
+  impact: Failed migration and poor FraiseQL adoption
+solution:
+  description: Understand fundamental architectural differences
+key_concepts:
+  concept_1: Paradigm shift from resolvers to SQL composition
+  concept_2: Authorization at compile-time not runtime
+  concept_3: Views as API projections not resolver wrappers
+  concept_4: Database as query engine not data source
+implementation_considerations:
+  consideration_1: Incremental migration strategy
+  consideration_2: Team training and onboarding
+  consideration_3: Legacy system compatibility
+  consideration_4: Performance comparison benchmarks
+best_practices:
+- name: Rethink schema
+  description: Design for SQL composition not resolvers
+- name: Declarative auth
+  description: Move authorization to compile-time rules
+- name: View-first design
+  description: Think database projections
+- name: Benchmark early
+  description: Validate performance gains
+anti_patterns:
+- name: Resolver translation
+  consequence: Misses FraiseQL architectural benefits
+- name: Runtime auth
+  consequence: Defeats compilation advantages
+- name: One-to-one views
+  consequence: No leverage of database features
+- name: Big bang migration
+  consequence: High risk and long timeline
+blog_hooks:
+  beginner:
+    focus: Introduction to migration from traditional GraphQL
+  intermediate:
+    focus: Incremental migration strategies and patterns
+  advanced:
+    focus: Advanced refactoring and coexistence patterns
