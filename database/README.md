@@ -50,7 +50,7 @@ python seed-data/generator/load_blog_posts.py --dry-run
 # Setup all frameworks with XS dataset (default)
 python setup.py
 
-# Setup with blog dataset (5000 users, 2243 posts)
+# Setup with blog dataset (5000 users, ~2500 posts)
 python setup.py --size blog
 
 # Setup specific framework
@@ -64,15 +64,15 @@ python setup.py fraiseql --size blog
 | `xs` | 100 | 500 | <1s | Development |
 | `medium` | 10K | 50K | 30-60s | N+1 testing |
 | `large` | 100K | 500K | 5-15min | Stress testing |
-| `blog` | 5000 | 2243 | 30-45s | Real blog posts with Faker users |
+| `blog` | 5000 | ~2500 | ~3s | Real blog posts with Faker users |
 
 ## Blog Post Loader
 
 The blog dataset uses a specialized loader that:
-1. Generates 5000 realistic users with Faker
-2. Parses 2,243 markdown blog posts
+1. Generates 5000 realistic users with Faker (unique emails and usernames)
+2. Parses ~2500 markdown blog posts
 3. Assigns authors via round-robin (most users have 0 posts for future comments)
-4. Bulk loads via PostgreSQL COPY command
+4. Bulk loads via PostgreSQL COPY command (~3 seconds)
 
 ### Usage
 

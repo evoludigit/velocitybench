@@ -19,7 +19,7 @@ Dataset sizes:
     xs     - 100 users, 500 posts (default, <1 second load)
     medium - 10K users, 50K posts (30-60 second load, N+1 visible)
     large  - 100K users, 500K posts (5-15 minute load, stress testing)
-    blog   - 5000 users, 2243 blog posts (30-45 second load, Faker-generated users)
+    blog   - 5000 users, ~2500 blog posts (~3 second load, Faker-generated users)
 
 Environment variables:
     DB_HOST              - PostgreSQL host (default: localhost)
@@ -310,7 +310,7 @@ class DatabaseSetup:
         # Step 6: Load seed data (size-appropriate from corpus)
         if self.config.seed_size == 'blog':
             # Use blog post loader (generates Faker users + loads blog posts)
-            print(f"  6️⃣  Loading blog dataset (5000 users, 2243 posts)...")
+            print(f"  6️⃣  Loading blog dataset (5000 users, ~2500 posts)...")
             loader_path = self.project_root / 'database' / 'seed-data' / 'generator' / 'load_blog_posts.py'
 
             if not loader_path.exists():
@@ -456,7 +456,7 @@ def main():
         '--size',
         choices=SEED_SIZES,
         default=DEFAULT_SEED_SIZE,
-        help=f'Dataset size: xs (100 users), medium (10K users), large (100K users), blog (5K users + 2243 posts). Default: {DEFAULT_SEED_SIZE}'
+        help=f'Dataset size: xs (100 users), medium (10K users), large (100K users), blog (5K users + ~2500 posts). Default: {DEFAULT_SEED_SIZE}'
     )
     parser.add_argument(
         '--generate-only',
