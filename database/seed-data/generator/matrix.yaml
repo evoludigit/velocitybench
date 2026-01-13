@@ -9,11 +9,23 @@ blog_generation:
   patterns:
     - trinity-pattern
     - n-plus-one
+    # FraiseQL-specific patterns:
+    - compiled-graphql-execution
+    - sql-generation-optimization
+    - streaming-json-results
+    # Analytics enrichment patterns:
+    - analytics-schema-conventions       # Enhanced with best practices
+    - analytics-fact-table-date-info     # NEW: Pre-computed temporal dimensions
+    - analytics-optimized-dimensions     # NEW: Flat dimension structure
+    - analytics-complete-fact-table      # NEW: Hybrid optimized schema
+    - analytics-column-naming-convention # NEW: Fact table column naming best practices (data → dimensions)
     # Add more as they're created:
     # - cqrs
     # - dataloader-pattern
     # - pagination
     # - soft-deletes
+    # - connection-pooling-patterns
+    # - query-caching-strategies
 
   # Blog post types
   types:
@@ -41,6 +53,28 @@ blog_generation:
     - frameworks: [hot-chocolate, graphql-net]
       patterns: [trinity-pattern]
 
+    # FraiseQL comparisons (compiled vs interpreted)
+    - frameworks: [fraiseql, apollo-server]
+      patterns: [compiled-graphql-execution, sql-generation-optimization]
+      focus: "compiled vs interpreted execution"
+
+    - frameworks: [fraiseql, postgraphile]
+      patterns: [streaming-json-results, sql-generation-optimization]
+      focus: "database-first approaches with streaming"
+
+    - frameworks: [fraiseql, strawberry]
+      patterns: [compiled-graphql-execution]
+      focus: "performance: compiled Rust vs interpreted Python"
+
+    # Analytics-specific comparisons
+    - frameworks: [fraiseql, apollo-server]
+      patterns: [analytics-schema-conventions, analytics-fact-table-date-info]
+      focus: "analytics performance: compiled GraphQL vs traditional"
+
+    - frameworks: [fraiseql, postgraphile]
+      patterns: [analytics-optimized-dimensions, analytics-complete-fact-table]
+      focus: "analytics at scale: FraiseQL vs database-first"
+
   # Model assignment for different content types
   model_assignment:
     tutorial:
@@ -58,6 +92,48 @@ blog_generation:
 
     reference:
       all: vllm               # Structured output, repetitive
+
+    # FraiseQL-specific patterns require Claude for nuance
+    compiled-graphql-execution:
+      beginner: opencode
+      intermediate: claude-code  # Architecture understanding needed
+      advanced: claude-code      # Compiler internals
+
+    sql-generation-optimization:
+      beginner: vllm          # Structured reference material
+      intermediate: claude-code  # Strategic SQL decisions
+      advanced: claude-code      # Advanced optimization
+
+    streaming-json-results:
+      beginner: opencode
+      intermediate: opencode
+      advanced: claude-code   # fraiseql-wire internals
+
+    # Analytics patterns - enriched with date_info and dimensions
+    analytics-schema-conventions:
+      beginner: opencode      # Table naming basics
+      intermediate: opencode  # Column structure and indexing
+      advanced: claude-code   # Compiler introspection
+
+    analytics-fact-table-date-info:
+      beginner: opencode      # What and why pre-compute
+      intermediate: claude-code  # Implementation strategy
+      advanced: claude-code   # Performance optimization (7-10x speedup)
+
+    analytics-optimized-dimensions:
+      beginner: opencode      # Flat vs nested structure
+      intermediate: opencode  # Design patterns and naming
+      advanced: claude-code   # Complex multi-dimension scenarios
+
+    analytics-complete-fact-table:
+      beginner: opencode      # Overview of hybrid approach
+      intermediate: claude-code  # Architecture design
+      advanced: claude-code   # Performance profiling and scaling
+
+    analytics-column-naming-convention:
+      beginner: opencode      # Why naming matters for schemas
+      intermediate: opencode  # Best practices and examples
+      advanced: claude-code   # Migration strategy and trade-offs
 
 # ============================================================
 # SQL GENERATION MATRIX
@@ -150,9 +226,11 @@ frameworks:
     rust:
       - async-graphql
       - juniper
+      - fraiseql        # Runtime component
+      - fraiseql-wire   # Backend streaming engine
 
     custom:
-      - fraiseql
+      - fraiseql        # Compiled GraphQL execution engine
 
 # ============================================================
 # GENERATION STATISTICS (EXPECTED)
