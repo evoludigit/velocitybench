@@ -14,11 +14,15 @@ blog_generation:
     - sql-generation-optimization
     - streaming-json-results
     # Analytics enrichment patterns:
-    - analytics-schema-conventions       # Enhanced with best practices
-    - analytics-fact-table-date-info     # NEW: Pre-computed temporal dimensions
-    - analytics-optimized-dimensions     # NEW: Flat dimension structure
-    - analytics-complete-fact-table      # NEW: Hybrid optimized schema
-    - analytics-column-naming-convention # NEW: Fact table column naming best practices (data → dimensions)
+    - analytics-schema-conventions
+    # NEW: Pre-computed temporal dimensions
+    - analytics-fact-table-date-info
+    # NEW: Flat dimension structure
+    - analytics-optimized-dimensions
+    # NEW: Hybrid optimized schema
+    - analytics-complete-fact-table
+    # NEW: Fact table column naming best practices (data → dimensions)
+    - analytics-column-naming-convention
     # Add more as they're created:
     # - cqrs
     # - dataloader-pattern
@@ -226,11 +230,11 @@ frameworks:
     rust:
       - async-graphql
       - juniper
-      - fraiseql        # Runtime component
-      - fraiseql-wire   # Backend streaming engine
+      - fraiseql
+      - fraiseql-wire
 
     custom:
-      - fraiseql        # Compiled GraphQL execution engine
+      - fraiseql
 
 # ============================================================
 # GENERATION STATISTICS (EXPECTED)
