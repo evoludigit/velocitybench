@@ -37,6 +37,14 @@ distributions:
     column_naming: ~50        # Column naming best practices (dimensions vs data)
     query_optimization: ~75   # Index strategies, GIN/B-tree/BRIN
 
+  roadmap_phases_8_6_to_8_10:
+    advanced_query_features: ~28  # Phase 8.6 - Window functions, optimization hints
+    streaming_enhancements: ~24   # Phase 8.7 - Backpressure, adaptive chunking
+    connection_pooling: ~20       # Phase 8.8 - Pool management, health checking
+    performance_optimization: ~28 # Phase 8.9 - Query plan caching, compression
+    error_handling: ~16           # Phase 8.10 - Retry policies, circuit breaker
+    roadmap_total: ~116           # Total posts for Phases 8.6-8.10
+
   posts_per_user:
     average: 0.45     # 2243 posts / 5000 users ≈ 0.45 posts/user
     note: "Most users (4700+) have 0 posts - they are future commenters"

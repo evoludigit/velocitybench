@@ -23,13 +23,37 @@ blog_generation:
     - analytics-complete-fact-table
     # NEW: Fact table column naming best practices (data → dimensions)
     - analytics-column-naming-convention
-    # Add more as they're created:
+    # FraiseQL Roadmap Phases 8.6-8.10:
+    # Advanced Query Features Phase 8.6
+    - advanced-query-features
+    - window-functions-performance
+    - query-optimization-hints
+    - prepared-statements-caching
+    # Streaming Enhancements Phase 8.7
+    - streaming-backpressure-handling
+    - adaptive-chunking-memory
+    - stream-pause-resume
+    - multi-query-orchestration
+    # Connection Pooling Phase 8.8
+    - connection-pool-management
+    - pool-health-checking
+    - connection-reuse-optimization
+    - pool-statistics-monitoring
+    # Performance Optimization Phase 8.9
+    - query-plan-caching
+    - result-materialization-strategies
+    - compression-optimization
+    - zero-copy-optimizations
+    # Error Handling Phase 8.10
+    - retry-policies-backoff
+    - circuit-breaker-pattern
+    - graceful-degradation
+    - error-recovery-strategies
+    # Future patterns:
     # - cqrs
     # - dataloader-pattern
     # - pagination
     # - soft-deletes
-    # - connection-pooling-patterns
-    # - query-caching-strategies
 
   # Blog post types
   types:
@@ -138,6 +162,112 @@ blog_generation:
       beginner: opencode      # Why naming matters for schemas
       intermediate: opencode  # Best practices and examples
       advanced: claude-code   # Migration strategy and trade-offs
+
+    # Phases 8.6-8.10 Roadmap Patterns
+    # Phase 8.6: Advanced Query Features
+    advanced-query-features:
+      beginner: opencode      # Introduction to window functions
+      intermediate: claude-code  # Window function implementation
+      advanced: claude-code   # Complex query optimization
+
+    window-functions-performance:
+      beginner: opencode      # What are window functions
+      intermediate: opencode  # Common window function patterns
+      advanced: claude-code   # Performance tuning window queries
+
+    query-optimization-hints:
+      beginner: vllm          # Hint syntax reference
+      intermediate: claude-code  # When and how to use hints
+      advanced: claude-code   # Optimizer internals
+
+    prepared-statements-caching:
+      beginner: opencode      # Prepared statement basics
+      intermediate: opencode  # Statement pooling strategies
+      advanced: claude-code   # Cache coherency and performance
+
+    # Phase 8.7: Streaming Enhancements
+    streaming-backpressure-handling:
+      beginner: opencode      # Backpressure concepts
+      intermediate: claude-code  # Implementation patterns
+      advanced: claude-code   # Advanced backpressure scenarios
+
+    adaptive-chunking-memory:
+      beginner: opencode      # Memory pressure concepts
+      intermediate: claude-code  # Adaptive chunking algorithm
+      advanced: claude-code   # Memory profiling and optimization
+
+    stream-pause-resume:
+      beginner: opencode      # Pause/resume API
+      intermediate: opencode  # State management patterns
+      advanced: claude-code   # Complex pause scenarios
+
+    multi-query-orchestration:
+      beginner: opencode      # Multi-query basics
+      intermediate: claude-code  # Resource allocation
+      advanced: claude-code   # Concurrent optimization
+
+    # Phase 8.8: Connection Pooling
+    connection-pool-management:
+      beginner: opencode      # Pool concepts and configuration
+      intermediate: opencode  # Pool sizing and tuning
+      advanced: claude-code   # Advanced pool strategies
+
+    pool-health-checking:
+      beginner: opencode      # Health check types
+      intermediate: opencode  # Health check configuration
+      advanced: claude-code   # Failure detection patterns
+
+    connection-reuse-optimization:
+      beginner: opencode      # Connection reuse basics
+      intermediate: opencode  # Optimization techniques
+      advanced: claude-code   # Performance profiling
+
+    pool-statistics-monitoring:
+      beginner: vllm          # Monitoring metrics reference
+      intermediate: opencode  # Dashboard setup
+      advanced: claude-code   # Advanced diagnostics
+
+    # Phase 8.9: Performance Optimization
+    query-plan-caching:
+      beginner: opencode      # Query plan caching concepts
+      intermediate: claude-code  # Cache implementation
+      advanced: claude-code   # Cache coherency and invalidation
+
+    result-materialization-strategies:
+      beginner: opencode      # Materialization overview
+      intermediate: opencode  # Strategy selection
+      advanced: claude-code   # Memory-efficient materialization
+
+    compression-optimization:
+      beginner: vllm          # Compression algorithm reference
+      intermediate: opencode  # When to use compression
+      advanced: claude-code   # Compression performance tuning
+
+    zero-copy-optimizations:
+      beginner: opencode      # Zero-copy concepts
+      intermediate: claude-code  # Implementation techniques
+      advanced: claude-code   # Memory architecture optimization
+
+    # Phase 8.10: Error Handling
+    retry-policies-backoff:
+      beginner: opencode      # Retry policy basics
+      intermediate: opencode  # Exponential backoff patterns
+      advanced: claude-code   # Adaptive retry strategies
+
+    circuit-breaker-pattern:
+      beginner: opencode      # Circuit breaker concept
+      intermediate: opencode  # Implementation patterns
+      advanced: claude-code   # Circuit breaker tuning
+
+    graceful-degradation:
+      beginner: opencode      # Degradation strategies
+      intermediate: opencode  # Fallback implementation
+      advanced: claude-code   # Partial result handling
+
+    error-recovery-strategies:
+      beginner: opencode      # Recovery basics
+      intermediate: opencode  # Common recovery patterns
+      advanced: claude-code   # Complex recovery scenarios
 
 # ============================================================
 # SQL GENERATION MATRIX
