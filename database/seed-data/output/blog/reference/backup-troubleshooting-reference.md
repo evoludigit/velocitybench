@@ -1,206 +1,171 @@
----
-
 # **[Pattern] Backup Troubleshooting Reference Guide**
-*Ensure reliable data recovery by diagnosing and resolving common backup failures, verification issues, and restore complexities.*
 
 ---
 
 ## **Overview**
-Backup failures can disrupt business continuity, leading to lost data or prolonged downtime. This guide outlines systematic troubleshooting approaches for identifying root causes of backup failures, validating backup integrity, and restoring data efficiently. Whether troubleshooting **full/partial failures**, **corrupt backups**, or **slow restore operations**, this pattern provides structured steps to isolate issues using logs, diagnostics, and verification tools. It also covers common pitfalls (e.g., insufficient storage, network throttling) and best practices for proactive monitoring.
+This reference guide provides a structured approach to diagnosing and resolving backup failures in enterprise systems, ensuring minimal data loss and operational downtime. Covered are common failure modes, diagnostic methods, and remediation steps for backup platforms (e.g., traditional tape/NAS, SaaS-backed solutions, or hybrid models). The guide follows a **logical troubleshooting workflow**:
+   1. **Identify the failure** (e.g., backup job hung, incomplete restore).
+   2. **Gather diagnostic data** (logs, metrics, configuration).
+   3. **Apply targeted fixes** (configuration tweaks, retries, or rollback).
+   4. **Validate resolution** and monitor long-term stability.
 
----
-
-## **Implementation Details**
-Troubleshooting backups involves three core phases:
-1. **Pre-Failure Analysis**: Verify backup health and logs before issues escalate.
-2. **Root Cause Diagnosis**: Use logs, metrics, and validation tools to pinpoint failures.
-3. **Remediation**: Apply fixes, retest, and implement preventive measures.
-
-Key components include:
-- **Backup Agent/Server Logs**: Detailed records of job execution, errors, and warnings.
-- **Verification Utilities**: Tools to test backup integrity (e.g., checksum validation, file restoration tests).
-- **Performance Metrics**: Monitoring storage I/O, network bandwidth, and job duration.
-- **Restore Simulations**: Dry-run restores to validate backup recoverability.
+Best suited for administrators, DevOps engineers, and SREs, this guide assumes familiarity with backup infrastructure components (agents, repositories, consoles) but abstracts vendor-specific details where possible.
 
 ---
 
 ## **Schema Reference**
-Below are critical components and their attributes for troubleshooting.
+Use the following schema to standardize troubleshooting efforts. Columns marked `*` are required.
 
-| **Component**               | **Attributes**                                                                 | **Purpose**                                                                 |
-|-----------------------------|-------------------------------------------------------------------------------|-----------------------------------------------------------------------------|
-| **Backup Job**              | - `JobID` (string) <br> - `Status` (enum: *Success/Failed/Partial*) <br> - `StartTime` (timestamp) <br> - `EndTime` (timestamp) <br> - `Duration` (seconds) <br> - `Source` (path) <br> - `Destination` (path) | Track job execution and identify anomalies in timing or status.             |
-| **Error Log Entry**         | - `LogID` (string) <br> - `Severity` (enum: *Critical/Warn/Info*) <br> - `Timestamp` (timestamp) <br> - `Message` (string) <br> - `Code` (string, e.g., `ERR_1002`) | Filter errors by severity and code to isolate specific issues.               |
-| **Validation Check**        | - `CheckType` (enum: *Integrity/Completeness/Performance*) <br> - `Pass/Fail` (boolean) <br> - `Metrics` (object: { `FileCount`: int, `BytesScanned`: int }) | Validate backup data integrity and performance bottlenecks.                   |
-| **Restore Operation**       | - `RestoreID` (string) <br> - `SourceBackupID` (string) <br> - `TargetPath` (string) <br> - `Speed` (MB/s) <br> - `Errors` (array of objects) | Diagnose slow or failed restores by analyzing speed and error patterns.       |
-| **Dependency**              | - `Type` (enum: *Storage/Network/ExternalAPI*) <br> - `Status` (string) <br> - `Latency` (ms) | Identify throttled or failed dependencies (e.g., SAN latency, API timeouts). |
-| **Alert Rule**              | - `RuleName` (string, e.g., *BackupFailureAlert*) <br> - `Threshold` (e.g., *3 consecutive failures*) <br> - `TriggeredAt` (timestamp) | Proactively detect recurrent issues via predefined thresholds.               |
+| **Field**               | **Description**                                                                 | **Example Value**                          | **Required\*** |
+|--------------------------|---------------------------------------------------------------------------------|--------------------------------------------|----------------|
+| `failure_type`           | Category of failure (e.g., agent, network, storage).                            | `storage_capacity`                         | Yes            |
+| `backup_job_name`        | Name of the affected backup job.                                                | `prod_db_weekly`                           | Yes            |
+| `last_run_status`        | Output from the backup job’s final status field.                                | `CRITICAL: "Disk full in /backup/repo"`    | Yes            |
+| `timestamp`              | UTC timestamp of failure discovery.                                             | `2024-01-15T08:45:00Z`                     | Yes            |
+| `diagnostic_method`      | Tools/logs used (e.g., `repository_logs`, `network_latency_test`).              | `repository_logs + disk_health_check`      | No             |
+| `root_cause`             | Root cause as identified (e.g., `stale_certs`, `throttled_repository`).         | `repository_throttling`                    | Yes            |
+| `proposed_fix`           | Step-by-step actions to resolve.                                                | `1. Contact storage admin to increase I/O; 2. Retry job with --retry-limit 5` | Yes       |
+| `verification_step`      | How to confirm the fix worked.                                                 | ``Check backup job status for `SUCCESS` after 24 hours`` | Yes          |
+| `mitigation_mechanism`    | Short-term workaround (if applicable).                                         | `Use local backup repo until permanent fix` | No             |
+| `preventive_action`      | Long-term fix to avoid recurrence.                                              | `Schedule monthly storage capacity reviews` | No             |
+
+---
+
+## **Key Troubleshooting Patterns**
+This section categorizes failures by root cause and provides step-by-step resolution.
+
+---
+
+### **1. Agent/Client-Side Failures**
+**Common Symptoms:**
+- Backups report `TIMEOUT` or `CONNECTION_REFUSED`.
+- Agent logs show `SSL handshake failure` or `authentication declined`.
+
+#### **Diagnostic Steps**
+| **Step** | **Action**                                                                                     | **Tools/Commands**                                                                 |
+|----------|------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------|
+| 1        | Verify agent connectivity to the backup server.                                               | `telnet backup-server.example.com 443`                                            |
+| 2        | Check agent logs for authentication/SSL errors in `/var/log/backup-agent/agent.log`.          | `grep "ERROR" /var/log/backup-agent/agent.log`                                     |
+| 3        | Confirm client certs haven’t expired.                                                          | `openssl x509 -noout -dates -in /etc/ssl/certs/client-cert.pem`                   |
+
+#### **Common Fixes**
+| **Root Cause**               | **Remediation**                                                                         | **Preventive Action**                          |
+|------------------------------|-----------------------------------------------------------------------------------------|-----------------------------------------------|
+| Invalid credentials          | Reset credentials via console or `bkp-cli update-account --token <new_token>`.           | Enforce credential rotation policies.          |
+| Expired SSL certs            | Renew certs using `certbot` or vendor’s CA.                                             | Set calendar alerts for cert expiration.       |
+| Firewall port blocking       | Whitelist ports `80/443` and `9000` (agent protocol) in firewall rules.                  | Document ports used by backup agents.          |
+
+---
+
+### **2. Repository (Storage)-Level Failures**
+**Common Symptoms:**
+- Backups fail with `STORAGE_ERROR` or `QUOTA_EXCEEDED`.
+- Restores take significantly longer than usual.
+
+#### **Diagnostic Steps**
+| **Step** | **Action**                                                                                     | **Tools/Commands**                                                                 |
+|----------|------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------|
+| 1        | Check repository disk space.                                                                 | `df -h /backup/repo`                                                               |
+| 2        | Monitor repository I/O latency with `iotop` or `vmstat`.                                       | `iotop -o`                                                                         |
+| 3        | Review repository logs for errors.                                                            | `journalctl -u backup-repo.service` or `rsync -av --info=stats3 /backup/repo`    |
+
+#### **Common Fixes**
+| **Root Cause**               | **Remediation**                                                                         | **Preventive Action**                          |
+|------------------------------|-----------------------------------------------------------------------------------------|-----------------------------------------------|
+| Repository full              | Move old backups to archive storage or delete via console.                              | Set up alerts at 80% capacity.                 |
+| High I/O contention          | Restructure repository into separate directories per backup type.                      | Distribute I/O load across disks.              |
+| Throttled repository         | Increase throughput with vendor-specific settings (e.g., `--max-rps 1000`).              | Monitor repository performance weekly.         |
+
+---
+
+### **3. Network-Related Failures**
+**Common Symptoms:**
+- Backups fail with `NETWORK_TIMEOUT` or `DNS_FAILURE`.
+- Restores are slow or intermittent.
+
+#### **Diagnostic Steps**
+| **Step** | **Action**                                                                                     | **Tools/Commands**                                                                 |
+|----------|------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------|
+| 1        | Ping backup server from agent host.                                                           | `ping -c 5 backup-server.example.com`                                              |
+| 2        | Test DNS resolution.                                                                        | `dig backup-server.example.com`                                                     |
+| 3        | Measure round-trip time (RTT) and packet loss.                                               | `mtr --report backup-server.example.com`                                           |
+
+#### **Common Fixes**
+| **Root Cause**               | **Remediation**                                                                         | **Preventive Action**                          |
+|------------------------------|-----------------------------------------------------------------------------------------|-----------------------------------------------|
+| Poor DNS configuration      | Update `/etc/resolv.conf` with correct DNS servers (e.g., `8.8.8.8`).                   | Validate DNS before major outages.              |
+| High latency                 | Use VPN or prioritize backup traffic with QoS policies.                                   | Schedule backups during off-peak hours.         |
+| Firewall ACL misconfiguration | Add `allow tcp 9000` rules on all hop routers.                                           | Document network paths for backup traffic.      |
+
+---
+
+### **4. Job Configuration Errors**
+**Common Symptoms:**
+- Backups fail with `CONFIG_INVALID` or exclude critical data.
+- Jitter in backup durations (some jobs take minutes longer).
+
+#### **Diagnostic Steps**
+| **Step** | **Action**                                                                                     | **Tools/Commands**                                                                 |
+|----------|------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------|
+| 1        | Validate job configuration via `bkp-cli validate-job`.                                         | `bkp-cli validate-job prod_db_backup`                                               |
+| 2        | Audit log retention policies.                                                                 | `grep "retention" /etc/backup/job-config.yaml`                                     |
+| 3        | Check for overlapping backup windows.                                                        | Query backup scheduler logs.                                                        |
+
+#### **Common Fixes**
+| **Root Cause**               | **Remediation**                                                                         | **Preventive Action**                          |
+|------------------------------|-----------------------------------------------------------------------------------------|-----------------------------------------------|
+| Missing exclusions           | Update job config to exclude `/var/log/` or `/tmp/`.                                    | Document file patterns to exclude.             |
+| Overlapping windows          | Stagger job schedules by `±15 minutes`.                                                  | Use backup scheduling tools (e.g., Ansible).   |
+| Stale config                 | Reapply config via `bkp-cli apply-job-config`.                                          | Automate config versioning.                     |
 
 ---
 
 ## **Query Examples**
-Use these queries (pseudo-code) to extract troubleshooting data from logs, databases, or monitoring tools.
-
-### **1. Identify Failed Backups in the Last 24 Hours**
+### **1. Find Failed Backups in the Last 7 Days**
 ```sql
 SELECT
-  JobID,
-  Status,
-  Source,
-  Destination,
-  COUNT(ErrorLog.LogID) AS ErrorCount
-FROM BackupJob
-JOIN ErrorLog ON BackupJob.JobID = ErrorLog.JobID
-WHERE Status = 'Failed'
-  AND EndTime >= NOW() - INTERVAL '24 HOUR'
-GROUP BY JobID, Status, Source, Destination
-ORDER BY ErrorCount DESC;
+    backup_job_name,
+    last_run_status,
+    timestamp,
+    root_cause
+FROM backup_troubleshooting_logs
+WHERE
+    timestamp > CURRENT_TIMESTAMP - INTERVAL '7 days'
+    AND last_run_status NOT LIKE '%SUCCESS%';
 ```
-**Output Interpretation**:
-- Jobs with high `ErrorCount` require deep diving into `ErrorLog.Message`.
-- Correlate `Source`/`Destination` paths with storage/network issues.
 
----
-
-### **2. Filter Critical Errors by Type**
+### **2. Identify High-Latency Repository Queries**
 ```sql
 SELECT
-  Message,
-  COUNT(*) AS Occurrences,
-  STRING_AGG(DISTINCT Code, ', ') AS ErrorCodes
-FROM ErrorLog
-WHERE Severity = 'Critical'
-  AND Timestamp >= NOW() - INTERVAL '7 DAY'
-GROUP BY Message
-HAVING Occurrences > 3;
+    repository_name,
+    AVG(rt_time_ms) AS avg_latency
+FROM repository_latency_metrics
+WHERE
+    rt_time_ms > 5000  -- Threshold of 5s
+GROUP BY repository_name
+ORDER BY avg_latency DESC;
 ```
-**Output Interpretation**:
-- Frequent `ERR_1002` (e.g., "Disk full") may indicate misconfigured quotas.
-- Group by `Code` to apply vendor-specific fixes (e.g., patch update).
 
----
-
-### **3. Validate Backup Integrity for a Specific Job**
+### **3. Check Agent Health**
 ```bash
-# Example using a backup tool's CLI (e.g., Veeam, Commvault)
-./validate-backup --job-id JOB12345 --checksum --file-count
+# List all agents with failed logins
+bkp-cli list-agents --filter "last_login_status=FAILED"
+
+# Check agent resource usage
+docker stats backup-agent-container
 ```
-**Expected Output**:
-```
-Validation for JOB12345:
-- Integrity: PASS (0 mismatches)
-- File Count: 1024/1024 (100%)
-- Performance: 500 MB/s (Target: >= 300 MB/s)
-```
-**Troubleshooting Steps if Failed**:
-1. Re-run with `--verbose` to isolate corruption.
-2. Check storage for bad sectors (`smartctl` for HDDs/SSDs).
-3. Compare with a previous successful backup’s `Metrics`.
-
----
-
-### **4. Analyze Restore Performance Bottlenecks**
-```sql
-SELECT
-  RestoreID,
-  SourceBackupID,
-  TargetPath,
-  Speed,
-  AVG(Errors.Length) AS AvgErrorSize
-FROM RestoreOperation
-WHERE Speed < (SELECT AVG(Speed) * 0.7 FROM RestoreOperation)
-ORDER BY Speed ASC;
-```
-**Output Interpretation**:
-- Low `Speed` + small `AvgErrorSize` → Network bottleneck (e.g., VPN throttling).
-- Large `AvgErrorSize` → Corrupted files in backup (re-run validation).
-
----
-
-### **5. List Storage-Dependency Latency Spikes**
-```sql
-SELECT
-  Dependency.Type,
-  AVG(Dependency.Latency) AS AvgLatency,
-  MAX(Dependency.Latency) AS PeakLatency
-FROM BackupJob
-JOIN Dependency ON BackupJob.JobID = Dependency.JobID
-WHERE Latency > 500  -- Threshold (ms)
-GROUP BY Dependency.Type;
-```
-**Output Interpretation**:
-- `Type: Storage` with `PeakLatency: 2000ms` → Check SAN health or backup window timing.
-- `Type: Network` → Isolate ISP or firewall issues.
-
----
-
-## **Step-by-Step Troubleshooting Workflow**
-Follow this structured approach for systematic diagnosis:
-
-### **1. Verify Logs for Patterns**
-- **Check**:
-  - `BackupJob.Status` for `Failed`/`Partial`.
-  - `ErrorLog` for recurring `Code` (e.g., `ERR_2001` = "Permission denied").
-  - `Dependency.Status` for `Timeout` or `ConnectionLost`.
-- **Action**:
-  - Use vendor-specific tools to decode error codes (e.g., "Veeam Error Code 0xC0000005").
-
-### **2. Validate Backup Data**
-- **Tools**:
-  - **Integrity Check**: Compare checksums of source and backup.
-  - **File-Level Test**: Restore a single critical file to a known good location.
-  - **Performance Test**: Measure restore speed against baseline.
-- **Example Command**:
-  ```bash
-  # Compare checksums (Linux/macOS)
-  cmp --silent /backup/source.txt /restore/source.txt || echo "Checksum mismatch"
-  ```
-
-### **3. Isolate Root Cause**
-| **Symptom**               | **Possible Cause**                          | **Diagnostic Query**                          | **Fix**                                  |
-|---------------------------|--------------------------------------------|-----------------------------------------------|------------------------------------------|
-| Backup hangs at 95%       | Storage throttle                           | Analyze `Dependency.Latency` for `Storage`    | Increase storage bandwidth or schedule. |
-| Restore fails intermittently | Corrupted backup data                     | Run `validate-backup --integrity`              | Recreate backup incrementally.          |
-| Slow performance          | Network saturation                         | Check `RestoreOperation.Speed` < threshold    | Offload to direct-attached storage.     |
-| Job marked as "Partial"   | Permission issues                          | Filter `ErrorLog` by `ERR_2001`               | Update backup agent permissions.         |
-
-### **4. Apply Fixes and Retest**
-- **Common Fixes**:
-  - **Storage**: Clean up old backups, expand volume, or upgrade hardware.
-  - **Network**: Prioritize backup traffic or switch to LAN/WAN optimization.
-  - **Agent**: Update backup software or reconfigure retries.
-- **Retest**:
-  - Run a small-scale backup/restore test.
-  - Monitor `BackupJob.Duration` for regression.
-
-### **5. Prevent Recurrence**
-- **Proactive Measures**:
-  - **Alerting**: Set up `AlertRule` for `Status = 'Failed'` with `Threshold = 2`.
-  - **Capacity Planning**: Monitor `Destination` storage usage trends.
-  - **Documentation**: Add notes to `BackupJob` for known issues (e.g., "Avoid backing up DB1 after 3 AM").
 
 ---
 
 ## **Related Patterns**
-1. **[Backup Automation]**
-   - *Automate backup job scheduling and failover triggers to reduce manual intervention.*
-   - **Link**: [`/patterns/backup-automation`](#)
-
-2. **[Disaster Recovery Planning]**
-   - *Design recovery strategies (RTO/RPO) and offsite backup replication to mitigate data loss.*
-   - **Link**: [`/patterns/disaster-recovery`](#)
-
-3. **[Data Integrity Validation]**
-   - *Implement continuous checksum validation for real-time data consistency checks.*
-   - **Link**: [`/patterns/data-integrity`](#)
-
-4. **[Performance Optimization]**
-   - *Tune backup jobs for speed (e.g., parallelism, compression) without compromising reliability.*
-   - **Link**: [`/patterns/performance-tuning`](#)
-
-5. **[Security Hardening]**
-   - *Secure backup media and encrypt data at rest/in-transit to prevent unauthorized access.*
-   - **Link**: [`/patterns/security-backup`](#)
+| **Pattern Name**               | **Description**                                                                                     | **Dependency**                                      |
+|---------------------------------|-----------------------------------------------------------------------------------------------------|----------------------------------------------------|
+| [Backup Validation](link)       | Automate post-backup integrity checks (e.g., checksum validation).                                 | Backup Troubleshooting                            |
+| [Disaster Recovery Plan](link) | Step-by-step guide for restoring from backup in a crisis.                                           | Backup Troubleshooting                            |
+| [Monitoring for Backup Health](link) | Set up alerts for backup failures, repository health, and agent connectivity.                 | Backup Troubleshooting + Observability Patterns   |
+| [Backup Automation](link)      | Script backup jobs using CI/CD tools (e.g., GitLab CI, ArgoCD).                                     | Backup Troubleshooting (post-failure workflows)   |
 
 ---
-**Note**: For vendor-specific tools (e.g., Veritas, Acronis), consult their documentation for toolchain-specific error codes and CLI commands. Always test fixes in a non-production environment first.
+**Notes:**
+- Replace `link` with actual pattern references.
+- For vendor-specific details (e.g., Veeam, AWS Backup), include a **Vendor-Specific Notes** section.

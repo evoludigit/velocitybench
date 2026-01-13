@@ -1,242 +1,336 @@
 # **Debugging Availability Troubleshooting: A Practical Guide**
-*Ensure your system remains resilient under load, failures, and unexpected traffic spikes.*
 
-## **1. Introduction**
-Availability is the cornerstone of reliable systems. Downtime, slow response times, or cascading failures can severely impact user experience and business operations. This guide provides a structured approach to diagnosing and resolving availability issues efficiently.
+## **Introduction**
+Availability issues in distributed systems can lead to degraded performance, timeouts, or complete system outages. This guide focuses on **quickly diagnosing and resolving** availability problems, ensuring minimal downtime.
+
+---
+## **Symptom Checklist**
+Before diving into fixes, confirm the issue matches these symptoms:
+
+✅ **High Latency / Timeouts** – Requests slow down or fail after a delay.
+✅ **Failed Requests** – HTTP 5xx, connection refused, or connection timeouts.
+✅ **Error Spikes** – Sudden increase in errors in logs/monitoring tools.
+✅ **Resource Exhaustion** – High CPU, memory, or disk usage.
+✅ **Service Unavailability** – Entire service or microservice becomes unresponsive.
+✅ **Network Issues** – Inter-service communication failures (DNS, network partitions).
+✅ **Dependency Failures** – External APIs, databases, or caches failing.
+
+---
+## **Common Issues & Fixes**
+### **1. High Latency / Timeouts**
+#### **Root Cause:**
+- Database queries taking too long.
+- Slow third-party API responses.
+- Network congestion between services.
+- Insufficient instance scaling.
+
+#### **Quick Fixes:**
+- **Database Optimization:**
+  ```sql
+  -- Check slow queries (PostgreSQL example)
+  SELECT query, total_time, calls
+  FROM pg_stat_statements
+  ORDER BY total_time DESC
+  LIMIT 10;
+  ```
+  - Add indexes to frequently queried columns.
+  - Consider connection pooling (e.g., **PgBouncer** for PostgreSQL).
+
+- **API Response Timeouts:**
+  ```yaml
+  # Example in Node.js (Express + Axios timeout)
+  const axios = require('axios');
+  axios.get('https://slow-api.example.com/data', {
+    timeout: 5000, // 5s timeout
+  });
+  ```
+  - Implement **circuit breakers** (e.g., **Resilience4j** for Java, **Hystrix** alternative).
+
+- **Network Optimization:**
+  - Use **load balancers** (NGINX, AWS ALB) to distribute traffic.
+  - Check **MTU** issues (fragmentation) if packets are dropping.
+
+- **Scaling:**
+  ```bash
+  # Example Kubernetes horizontal pod autoscaler
+  kubectl autoscale deployment my-service --cpu-percent=80 --min=3 --max=10
+  ```
 
 ---
 
-## **2. Symptom Checklist**
-Before diving into debugging, quickly verify these common symptoms:
+### **2. Failed Requests (5xx Errors)**
+#### **Root Cause:**
+- **CrashLoopBackOff** (Kubernetes) → Pod crashes repeatedly.
+- **Out-of-memory (OOM) kills** → Container restarts but fails again.
+- **Permission issues** → Service lacks access to databases/storage.
 
-| **Symptom**                     | **Description**                                                                 | **How to Check?**                                                                 |
-|---------------------------------|---------------------------------------------------------------------------------|---------------------------------------------------------------------------------|
-| **High Latency**                | Slow response times (e.g., API requests taking >1s).                         | Monitor response times in logs/API gateways (e.g., Prometheus, Datadog).         |
-| **Error Spikes**                | Sudden increase in 5xx errors (e.g., 503, 504).                               | Check application logs, APM tools (New Relic, Datadog).                          |
-| **Resource Exhaustion**         | CPU, memory, or disk usage at 95%+ capacity.                                   | Use `top`, `htop`, `dmesg`, or cloud monitoring (AWS CloudWatch, GCP Stackdriver). |
-| **Connection Drops**            | Clients losing connections (e.g., TCP timeouts, WebSocket disconnections).    | Check syslogs (`journalctl`, `netstat -s`), firewall rules.                      |
-| **Service Degradation**         | Some but not all services failing (e.g., only `/health` endpoints work).       | Test individual endpoints manually; check service mesh logs (Istio, Linkerd).    |
-| **Backpressure in Queue Systems**| Message brokers (Kafka, RabbitMQ) backlogging or dropping messages.          | Check broker metrics (Kafka lag, RabbitMQ queue depth).                         |
-| **Geographic Outages**          | Failures in specific regions (e.g., EU but not US).                         | Verify DNS records, load balancer health checks, regional failover.              |
-| **Dependency Failures**         | External APIs, databases, or third-party services timing out.                 | Test dependencies locally; check rate limits (e.g., Stripe API).                |
+#### **Quick Fixes:**
+- **Check CrashLoopBackOff:**
+  ```bash
+  kubectl describe pod <pod-name> | grep CrashLoopBackOff
+  ```
+  - Fix app errors (check logs: `kubectl logs <pod-name>`).
+  - Increase memory limits in deployment:
+    ```yaml
+    resources:
+      limits:
+        memory: "512Mi"
+    ```
 
----
+- **OOM Issues:**
+  - Reduce memory usage in code (e.g., avoid loading large datasets).
+  - Adjust JVM heap size (for Java):
+    ```bash
+    -Xms512m -Xmx1024m
+    ```
+  - Use **stateless services** where possible to avoid memory leaks.
 
-## **3. Common Issues and Fixes**
-
-### **3.1 High Latency (Slow Responses)**
-**Symptoms:**
-- API endpoints respond in 2s+ (SLI violation).
-- Users report lag in real-time systems (chat, gaming, financial transactions).
-
-**Root Causes & Fixes:**
-| **Root Cause**                          | **Debugging Steps**                                                                 | **Fix**                                                                           |
-|-----------------------------------------|------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------|
-| **Database Bottleneck**                 | Query execution >500ms; slow joins or full scans.                                    | - Add indexes (`EXPLAIN ANALYZE` SQL queries).                                  |
-|                                         |                                                                                   | - Shard or denormalize data.                                                    |
-| **I/O Bound Operations**               | Too many disk reads/writes (e.g., unoptimized file operations).                     | - Use in-memory caches (Redis, Memcached).                                      |
-|                                         |                                                                                   | - Offload to async workers (Celery, Kafka Streams).                             |
-| **Network Overhead**                    | High TTFB (Time to First Byte) due to slow DNS, CDN, or proxy.                     | - Enable HTTP/2 or gRPC for multiplexing.                                       |
-|                                         |                                                                                   | - Warm up cold caches (e.g., pre-fetch popular data).                            |
-| **Unoptimized Code**                   | Blocking synchronous operations (e.g., JavaScript `while` loops in Node.js).       | - Use `setTimeout` or non-blocking I/O (e.g., `fs.readFile` with callbacks).     |
-|                                         |                                                                                   | - Profile with `pprof` (Go), `node --inspect` (Node.js).                         |
-
-**Example (Database Optimization in PostgreSQL):**
-```sql
--- Check slow queries
-SELECT * FROM pg_stat_statements ORDER BY total_time DESC LIMIT 10;
-
--- Add an index if a column is frequently queried
-CREATE INDEX idx_user_email ON users(email);
-```
+- **Permission Errors:**
+  ```bash
+  # Check AWS IAM roles (if using ECS/EKS)
+  aws iam get-role --role-name my-service-role
+  ```
+  - Grant `AmazonDynamoDBReadWriteAccess` or equivalent permissions.
 
 ---
 
-### **3.2 Resource Exhaustion (CPU/Memory/Disk)**
-**Symptoms:**
-- System crashes with `Out of Memory` or `OOM Killer` messages.
-- High CPU usage >80% for extended periods.
+### **3. Error Spikes in Logs**
+#### **Root Cause:**
+- **Burst traffic** → DB overload, API rate limits.
+- **Bug in new release** → Regression in error handling.
+- **Third-party outages** → External API failures.
 
-**Root Causes & Fixes:**
-| **Root Cause**                          | **Debugging Steps**                                                                 | **Fix**                                                                           |
-|-----------------------------------------|------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------|
-| **Memory Leaks**                        | Gradual increase in heap usage over time.                                           | - Use `heapdump` (Java), `gperftools` (C++), `--inspect` (Node.js).              |
-|                                         |                                                                                   | - Implement garbage collection tuning (e.g., `--max-heap-size` in Java).           |
-| **Too Many Open Files/Connections**     | `ulimit -n` hits limits; too many DB connections.                                  | - Increase OS limits (`ulimit -n 65535`).                                        |
-|                                         |                                                                                   | - Use connection pooling (HikariCP, PgBouncer).                                  |
-| **Disk I/O Saturation**                 | `iostat -x 1` shows high %util on disks.                                           | - Add more disks or use SSDs.                                                    |
-|                                         |                                                                                   | - Enable compression for logs/files.                                             |
-| **Thundering Herd Problem**             | Sudden traffic spike overwhelming backend.                                         | - Implement rate limiting (Redis + NGINX).                                       |
-|                                         |                                                                                   | - Use auto-scaling (Kubernetes HPA, AWS ALB).                                   |
+#### **Quick Fixes:**
+- **Rate Limiting (APIs):**
+  ```python
+  # Flask rate limiting example
+  from flask_limiter import Limiter
+  limiter = Limiter(app, key_func=get_remote_address)
+  @app.route('/api/data')
+  @limiter.limit("100 per minute")
+  def get_data():
+      return "Data"
+  ```
 
-**Example (Debugging Memory Issues in Python):**
-```python
-import tracemalloc
+- **Monitor & Alert Early:**
+  - Use **Prometheus + Grafana** to track error rates:
+    ```promql
+    rate(http_requests_total{status=~"5.."}[5m]) > 0.1  # Alert if >10% errors
+    ```
 
-tracemalloc.start()
-snapshot = tracemalloc.take_snapshot()
-for stat in snapshot.statistics('lineno')[:10]:
-    print(stat)  # Shows the largest memory blocks
-```
-
----
-
-### **3.3 Cascading Failures**
-**Symptoms:**
-- Failure in one service brings down dependent services.
-- Database overloads due to unoptimized queries from multiple apps.
-
-**Root Causes & Fixes:**
-| **Root Cause**                          | **Debugging Steps**                                                                 | **Fix**                                                                           |
-|-----------------------------------------|------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------|
-| **Tight Coupling**                      | Service A calls Service B, which calls Service C in a synchronous chain.            | - Refactor to event-driven (Kafka, RabbitMQ).                                     |
-|                                         |                                                                                   | - Use circuit breakers (Hystrix, Resilience4j).                                  |
-| **No Retries with Exponential Backoff** | Repeated failed requests exhaust backend resources.                                | - Implement retry logic with jitter:                                            |
-```java
-// Spring Retry Example
-@Retryable(value = {TimeoutException.class}, maxAttempts = 3, backoff = @Backoff(delay = 1000))
-public void callExternalAPI() { ... }
-```
-|                                         |                                                                                   | - Use bulkheads (isolate critical paths).                                      |
-| **No Graceful Degradation**            | System crashes instead of falling back to backup.                                    | - Implement feature flags (LaunchDarkly, Unleash).                             |
-|                                         |                                                                                   | - Cache responses with TTL.                                                      |
+- **Rollback Deployments:**
+  ```bash
+  # If using Docker/Kubernetes
+  kubectl rollout undo deployment my-service
+  ```
 
 ---
 
-### **3.4 Dependency Failures (External APIs/DB)**
-**Symptoms:**
-- `503 Service Unavailable` when calling external APIs.
-- Database connection errors (`ConnectionRefused`).
+### **4. Resource Exhaustion (CPU/Memory/Disk)**
+#### **Root Cause:**
+- **Unbounded loops** → CPU spikes.
+- **Large logs** → Disk fills up.
+- **Database table bloat** → Slow queries + high I/O.
 
-**Root Causes & Fixes:**
-| **Root Cause**                          | **Debugging Steps**                                                                 | **Fix**                                                                           |
-|-----------------------------------------|------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------|
-| **Rate Limiting**                       | API provider throttling requests (e.g., Stripe, Twilio).                          | - Implement exponential backoff in client code.                                 |
-|                                         |                                                                                   | - Cache responses (Redis + TTL).                                                 |
-| **Database Connection Pool Exhaustion** | All connections are used; new ones are blocked.                                     | - Increase pool size (e.g., HikariCP `maximumPoolSize`).                         |
-|                                         |                                                                                   | - Use connection multiplexing (HTTP/2).                                          |
-| **DNS Misconfiguration**                | Incorrect DNS records causing requests to go to the wrong endpoint.                | - Validate DNS (`dig`, `nslookup`).                                               |
-|                                         |                                                                                   | - Use service discovery (Consul, Eureka).                                        |
+#### **Quick Fixes:**
+- **CPU Throttling:**
+  - Use **CPU affinity** (Kubernetes):
+    ```yaml
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: "kubernetes.io/arch"
+              operator: In
+              values: ["amd64"]
+    ```
+  - Profile CPU-heavy code (e.g., **pprof** for Go):
+    ```bash
+    go tool pprof http://localhost:6060/debug/pprof/profile
+    ```
 
-**Example (Handling Rate Limits in Python):**
-```python
-import requests
-from time import sleep
+- **Disk Space Issues:**
+  - Check for log bloating (`/var/log`):
+    ```bash
+    du -sh /var/log/* | sort -h
+    ```
+  - Rotate logs with **Logrotate**:
+    ```conf
+    /var/log/myapp/*.log {
+      daily
+      missingok
+      rotate 7
+      compress
+      delaycompress
+      notifempty
+      create 640 myuser mygroup
+    }
+    ```
 
-def call_api_with_backoff(url, max_retries=3):
-    retry_count = 0
-    while retry_count < max_retries:
-        try:
-            response = requests.get(url)
-            if response.status_code == 429:
-                retry_after = int(response.headers.get('Retry-After', 5))
-                sleep(retry_after)
-                retry_count += 1
-            else:
-                return response
-        except requests.exceptions.RequestException:
-            sleep(2 ** retry_count)  # Exponential backoff
-            retry_count += 1
-    return None
-```
-
----
-
-## **4. Debugging Tools and Techniques**
-
-### **4.1 Observability Stack**
-| **Tool**               | **Purpose**                                                                                     | **Example Command/Usage**                          |
-|------------------------|-------------------------------------------------------------------------------------------------|---------------------------------------------------|
-| **Prometheus + Grafana** | Metrics collection and visualization (CPU, latency, error rates).                             | `node_exporter` + `prometheus.yml` + Grafana dashboards. |
-| **ELK Stack**          | Log aggregation (Elasticsearch, Logstash, Kibana).                                             | `filebeat` + `logstash.conf` for parsing logs.     |
-| **APM Tools**          | Distributed tracing (New Relic, Datadog, Jaeger).                                             | Instrument code with `@ Trace` (OpenTelemetry).    |
-| **Load Testing Tools** | Simulate traffic to find bottlenecks (Locust, k6, Gatling).                                  | `locust -f script.py --headless --users 1000`.     |
-| **Network Tools**      | Diagnose connectivity (Wireshark, `tcpdump`, `curl -v`).                                       | `tcpdump -i eth0 port 80` for HTTP traffic.       |
-| **Database Tools**     | Analyze queries (pgBadger, MySQL Slow Query Log).                                             | `pgBadger /var/log/postgresql/postgresql.log`.   |
-
-### **4.2 Distributed Tracing**
-If your system spans microservices, use:
-```bash
-# Generate a Jaeger trace with OpenTelemetry (Python)
-from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
-
-trace.set_tracer_provider(TracerProvider())
-trace.get_tracer_provider().add_span_processor(
-    BatchSpanProcessor(ConsoleSpanExporter())
-)
-
-tracer = trace.get_tracer(__name__)
-with tracer.start_as_current_span("database_query"):
-    # Your DB query here
-```
-
-### **4.3 Chaos Engineering**
-Proactively test resilience with:
-- **Chaos Mesh** (Kubernetes-based chaos engineering).
-- **Gremlin** (simulate node/container failures).
-- **Netflix Simian Army** (chaos games like `Chaos Monkey`).
-
-**Example (Chaos Mesh Pod Failure):**
-```yaml
-# chaos-mesh-pod-failure.yaml
-apiVersion: chaos-mesh.org/v1alpha1
-kind: PodChaos
-metadata:
-  name: kill-pod
-spec:
-  action: pod-kill
-  mode: one
-  selector:
-    namespaces:
-      - default
-    labelSelectors:
-      app: my-app
-```
+- **Database Cleanup:**
+  ```sql
+  -- Example: Truncate old logs (PostgreSQL)
+  TRUNCATE TABLE logs WHERE created_at < NOW() - INTERVAL '30 days';
+  ```
 
 ---
 
-## **5. Prevention Strategies**
-To minimize future availability issues:
+### **5. Network Issues (DNS, Partitioning, Timeouts)**
+#### **Root Cause:**
+- **DNS failures** → Services can’t resolve hostnames.
+- **Network partitions** → Services lose connectivity.
+- **Firewall/ACLs blocking traffic.**
 
-### **5.1 Architectural Best Practices**
-✅ **Stateless Services** – Use containers (Docker, Kubernetes) for horizontal scaling.
-✅ **Circuit Breakers** – Isolate failures (Resilience4j, Hystrix).
-✅ **Auto-Scaling** – Scale out under load (Kubernetes HPA, AWS Auto Scaling).
-✅ **Multi-Region Deployment** – Deploy in multiple availability zones (AWS, GCP).
-✅ **Chaos Testing** – Regularly inject failures (Gremlin, Chaos Mesh).
+#### **Quick Fixes:**
+- **Test DNS Resolution:**
+  ```bash
+  dig example.com  # Check if DNS resolves
+  nslookup my-db-service
+  ```
 
-### **5.2 Observability & Monitoring**
-✅ **SLOs & SLIs** – Define error budgets (e.g., 99.9% uptime).
-✅ **Anomaly Detection** – Set up alerts for unusual traffic/errors (Prometheus Alertmanager).
-✅ **Synthetic Monitoring** – Simulate user requests globally (Datadog, Pingdom).
+- **Network Partition Debugging:**
+  - Use `ping` and `traceroute`:
+    ```bash
+    ping my-db-service
+    traceroute my-db-service
+    ```
+  - Check **kube-dns** (if on Kubernetes):
+    ```bash
+    kubectl get pods -n kube-system | grep dns
+    ```
 
-### **5.3 Performance Optimization**
-✅ **Caching** – Redis/Memcached for repeated queries.
-✅ **Async Processing** – Offload long tasks (Kafka, Celery).
-✅ **Database Optimization** – Indexing, sharding, read replicas.
+- **Firewall Rules:**
+  ```bash
+  # Check AWS Security Groups (if using EC2)
+  aws ec2 describe-security-groups --group-ids sg-123456
+  ```
+  - Ensure inbound/outbound rules allow necessary ports (e.g., **443, 80, 5432**).
 
-### **5.4 Failure Recovery Playbook**
-| **Scenario**               | **Action Plan**                                                                 |
-|----------------------------|----------------------------------------------------------------------------------|
-| **Database Crash**         | Switch to read replica; restore from backup.                                    |
-| **API Rate Limit Hit**     | Implement retry with backoff; cache responses.                                 |
-| **Kubernetes Node Failure** | Check `kubectl get events`; scale up if needed.                                 |
-| **DNS Outage**             | Failover to secondary DNS provider.                                              |
+---
+
+### **6. Dependency Failures**
+#### **Root Cause:**
+- **Database down** → App fails.
+- **Queue service deadlocked** → Messages pile up.
+- **Cache hit ratio too low** → Performance degrades.
+
+#### **Quick Fixes:**
+- **Database Failover:**
+  - Use **read replicas** (PostgreSQL example):
+    ```sql
+    SELECT * FROM pg_readall_distance(); -- Check replication lag
+    ```
+  - Failover if primary node fails:
+    ```bash
+    pg_ctl promote /path/to/standby_data  # PostgreSQL
+    ```
+
+- **Queue Deadlocks (Kafka/RabbitMQ):**
+  ```bash
+  # Check RabbitMQ queue length
+  rabbitmqctl list_queues name messages_ready messages_unacknowledged
+  ```
+  - **Consume messages manually** (e.g., `rabbitmqadmin`) to unblock.
+
+- **Cache Warmup:**
+  ```python
+  # Example: Pre-load cache on startup (Python + Redis)
+  import redis
+  r = redis.Redis()
+  for key in cached_keys:
+      if not r.exists(key):
+          r.set(key, fetch_from_db(key))
+  ```
 
 ---
 
-## **6. Conclusion**
-Availability issues are often **symptomatic**—they reveal deeper problems in architecture, monitoring, or scaling. Follow this guide to:
-1. **Quickly identify symptoms** (logs, metrics, traces).
-2. **Isolate root causes** (database, network, dependencies).
-3. **Apply fixes** (caching, retries, scaling).
-4. **Prevent recurrences** (chaos testing, SLOs, observability).
+## **Debugging Tools & Techniques**
+| **Tool**               | **Purpose**                          | **Example Usage**                     |
+|------------------------|--------------------------------------|---------------------------------------|
+| **Prometheus + Grafana** | Metrics & alerting                   | `http_request_duration_seconds`        |
+| **Kubernetes `kubectl`** | Pod/Service debugging               | `kubectl logs`, `kubectl describe pod` |
+| **Netdata**            | Real-time system monitoring          | `netdata logs`                        |
+| **Jaeger/Tracing**     | Distributed tracing                  | `jaeger query --service=my-service`   |
+| **`strace`/`tcpdump`** | Low-level network debugging           | `strace -p <PID>`                     |
+| **`perf`**             | CPU profiling                        | `perf top`                            |
+| **`ttl; rm -rf ~`**    | Emergency cleanup                    | (Never do this, but useful for panic!) |
 
-**Key Takeaway:** *"Fail fast, recover faster."* Use the tools and techniques here to build resilient systems that handle failures gracefully.
+### **Debugging Workflow:**
+1. **Check Logs** (`kubectl logs`, `journalctl`, Sentry).
+2. **Monitor Metrics** (Prometheus, Datadog).
+3. **Isolate the Issue** (Is it a single pod, DB, or external API?).
+4. **Apply Fixes** (Scale up, patch code, adjust configs).
+5. **Verify** (Check metrics, roll back if needed).
 
 ---
-**Need more help?** Check:
-- [Google SRE Book (Availability)](https://sre.google/sre-book/table-of-contents/)
-- [Chaos Engineering Handbook](https://www.chaosengineering.io/)
+
+## **Prevention Strategies**
+### **1. Infrastructure Resilience**
+- **Multi-AZ Deployments** (AWS RDS, Kubernetes clusters).
+- **Auto-Scaling** (Kubernetes HPA, AWS Auto Scaling).
+- **Circuit Breakers** (Resilience4j, Hystrix).
+
+### **2. Observability**
+- **Centralized Logging** (ELK Stack, Loki).
+- **Distributed Tracing** (Jaeger, OpenTelemetry).
+- **S Synthetic Monitoring** (Pingdom, New Relic).
+
+### **3. Code-Level Safeguards**
+- **Graceful Degradation** (Fallbacks for failed dependencies).
+  ```python
+  # Example: Fallback to cache if DB fails
+  def get_data():
+      data = cache.get("data")
+      if data is None:
+          try:
+              data = db.query("SELECT * FROM table")
+          except:
+              return cache.get("data")  # Return stale data
+      cache.set("data", data)
+      return data
+  ```
+- **Idempotency** (Ensure retries don’t cause duplicate actions).
+- **Rate Limiting** (Prevent API abuse).
+
+### **4. Chaos Engineering**
+- **Chaos Mesh (Kubernetes)** – Inject failures for testing.
+  ```yaml
+  # Example: Chaos Mesh pod kill
+  apiVersion: chaos-mesh.org/v1alpha1
+  kind: PodChaos
+  metadata:
+    name: pod-kill
+  spec:
+    action: pod-kill
+    mode: one
+    selector:
+      namespaces:
+        - default
+      labelSelectors:
+        app: my-service
+  ```
+- **Netflix Simian Army** (Chaos Monkey, Latency Monkey).
+
+### **5. Disaster Recovery Plan**
+- **Backup Strategy** (Regular DB snapshots, Immutable Backups).
+- **RTO/RPO** (Recovery Time Objective, Recovery Point Objective).
+  - Example: **RTO = 15 mins**, **RPO = 5 mins**.
+
+---
+## **Final Checklist Before Going Live**
+✅ **Load Test** (Locust, JMeter) under expected traffic.
+✅ **Chaos Testing** (Random failures in staging).
+✅ **Rollback Plan** (Test rollback in production).
+✅ **Alerting** (Slack/PagerDuty for critical failures).
+✅ **Documentation** (Runbooks for common outages).
+
+---
+## **Conclusion**
+Availability issues are often **symptom-driven**, meaning quick checks in the right order save time. Focus on:
+1. **Logs & Metrics** (Where is it failing?).
+2. **Dependencies** (Is it the DB, API, or network?).
+3. **Resources** (Are pods crashing due to OOM?).
+4. **Prevention** (Chaos testing, auto-scaling, observability).
+
+By following this guide, you can **diagnose and resolve availability issues efficiently**, minimizing downtime. 🚀

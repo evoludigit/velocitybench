@@ -1,163 +1,204 @@
----
-# **[Pattern] Availability Troubleshooting Reference Guide**
+# **[Availability Troubleshooting] Reference Guide**
 
 ---
 
 ## **Overview**
-This guide provides a structured approach to diagnosing, analyzing, and resolving availability-related issues in distributed systems, microservices architectures, or cloud-native applications. The **Availability Troubleshooting Pattern** helps identify root causes of downtime, degraded performance, high latency, or unavailability by focusing on system components, dependencies, and operational metrics. It combines **proactive monitoring**, **reactive diagnostics**, and **root-cause analysis (RCA)** to minimize downtime and improve resilience. This pattern is applicable across **on-premises, hybrid, and cloud environments** and leverages observability tools, logging, and metrics to streamline troubleshooting workflows.
+This guide provides a structured approach to diagnosing and resolving availability issues in distributed systems, cloud services, or on-premises infrastructure. Availability troubleshooting involves identifying root causes (e.g., component failures, resource exhaustion, misconfigurations) and mitigating their impact on uptime and performance. This pattern covers **proactive monitoring, reactive diagnosis, and recovery strategies** while ensuring minimal downtime. It applies to **services, APIs, databases, microservices, or entire infrastructure layers**.
 
----
+Key focus areas:
+- **Root cause analysis (RCA)** – Isolating failures from logs, metrics, and events.
+- **Dependency mapping** – Tracing failures across services, networks, or third-party integrations.
+- **Mitigation strategies** – Applying fixes (rollbacks, scaling, failovers) with minimal disruption.
+- **Prevention** – Adjusting configurations, alerts, and resilience mechanisms.
 
-## **Key Concepts & Implementation Details**
-
-### **1. Core Principles**
-| **Concept**               | **Description**                                                                                                                                 |
-|---------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Observability**         | Relies on **metrics, logs, and traces** to detect anomalies in latency, error rates, throughput, and resource utilization.                       |
-| **SLOs/SLIs/SLAs**        | Uses **Service Level Objectives (SLOs)**, **Service Level Indicators (SLIs)**, and **Service Level Agreements (SLAs)** to define availability thresholds. |
-| **Dependency Mapping**    | Identifies critical dependencies (e.g., databases, APIs, external services) to isolate failures.                                                   |
-| **Failure Modes**         | Classifies failures as **transient, intermittent, or permanent** to determine appropriate remediation strategies.                          |
-| **Chaos Engineering**     | Proactively tests resilience by injecting failures (e.g., using tools like **Chaos Mesh, Gremlin, or Chaos Monkey**).                          |
-
----
-
-### **2. Troubleshooting Phases**
-The pattern follows a **structured troubleshooting workflow**:
-
-#### **Phase 1: Detection & Alerting**
-- **Purpose**: Identify anomalies via **automated alerts** (e.g., Prometheus, Datadog, New Relic).
-- **Key Actions**:
-  - Check **error rates** (e.g., HTTP 5xx, connection timeouts).
-  - Monitor **latency spikes** (e.g., 99th percentile response time).
-  - Review **resource saturation** (CPU, memory, disk I/O).
-- **Tools**: Alert managers (e.g., **PagerDuty, Opsgenie**), APM tools (e.g., **Dynatrace, ELK Stack**).
-
-#### **Phase 2: Isolation & Diagnosis**
-- **Purpose**: Narrow down the scope of the issue.
-- **Key Actions**:
-  - Use **dependency graphs** (e.g., **Kiali for service meshes, Cloud Map for AWS**) to trace failures.
-  - Correlate **logs** (e.g., `error: "connection refused"`) with **traces** (e.g., **Jaeger, Zipkin**).
-  - Check **replica health** (e.g., Kubernetes pods, database instances).
-- **Commands/Queries**:
-  ```sh
-  # Example: Check Kubernetes pod health
-  kubectl get pods --all-namespaces -o wide | grep -v "Running"
-
-  # Example: Query Prometheus for latency spikes
-  prometheus query "http_request_duration_seconds{job='api-service'}" > 5
-  ```
-
-#### **Phase 3: Root-Cause Analysis (RCA)**
-- **Purpose**: Determine the underlying cause (e.g., misconfiguration, bug, external failure).
-- **Key Actions**:
-  - Review **relevant metrics** (e.g., high GC pauses in Java apps).
-  - Examine **configuration drifts** (e.g., misset `max_connections` in a database).
-  - Test **theory of failure** (e.g., simulate load to confirm bottleneck).
-- **Templates**:
-  - **Bug**: *"Service X fails when Y occurs due to Z."*
-  - **Configuration**: *"Parameter A was set to B instead of C, causing D."*
-  - **Dependency**: *"External API timeout triggers cascading failures."*
-
-#### **Phase 4: Resolution & Verification**
-- **Purpose**: Apply fixes and validate success.
-- **Key Actions**:
-  - Deploy **patches** (e.g., code changes, config updates).
-  - Roll out **rollbacks** (e.g., Kubernetes `Scaledown`, database rollback).
-  - Monitor **SLO recovery** (e.g., reduce error rate to <1%).
-- **Postmortem**: Document findings in a **blameless format** (e.g., **Google’s Postmortem Template**).
-
----
-
-### **3. Common Failure Patterns & Mitigations**
-| **Failure Type**          | **Symptoms**                          | **Root Causes**                          | **Mitigations**                                                                 |
-|---------------------------|---------------------------------------|------------------------------------------|---------------------------------------------------------------------------------|
-| **Service Unavailable**   | HTTP 503, connection refused         | CrashLoopBackOff, resource starvation    | Auto-scaling, resource quotas, health checks                                    |
-| **Thundering Herd**       | Sudden traffic spike                   | Lack of rate limiting                    | Circuit breakers (e.g., **Hystrix, Resilience4j**), adaptive throttling           |
-| **Cascading Failures**    | Dependency timeouts                   | No retries/polling                       | Exponential backoff, bulkheads, dependency isolation                              |
-| **Data Corruption**       | Inconsistent reads/writes             | Transaction rollback, network partitions | Idempotency, eventual consistency, strong retry policies                         |
-| **Configuration Drift**   | Unexpected behavior                   | Manual overrides, CI/CD misconfigs       | Immutable infrastructure, GitOps (e.g., **ArgoCD**), policy-as-code (e.g., **Open Policy Agent**) |
+This guide assumes familiarity with **observability tools** (logs, metrics, traces), **infrastructure as code (IaC)**, and **cloud provider APIs**.
 
 ---
 
 ## **Schema Reference**
-Below is a structured schema for tracking availability incidents. Use this template in **Jira, Confluence, or a custom tool**.
+Below are key objects, events, and attributes used in availability troubleshooting.
 
-| **Field**               | **Type**       | **Description**                                                                                     | **Example Values**                          |
-|-------------------------|----------------|-----------------------------------------------------------------------------------------------------|---------------------------------------------|
-| `IncidentID`            | String         | Unique identifier for the incident.                                                                | `AV-2024-0042`                              |
-| `DetectionTime`         | Timestamp      | When the issue was first detected.                                                                  | `2024-05-15T14:30:00Z`                     |
-| `Severity`              | Enum           | Critical/High/Medium/Low based on impact.                                                            | `High`                                      |
-| `AffectedComponent`     | String[]       | Services, databases, or endpoints impacted.                                                        | `["api-service", "redis-cache"]`            |
-| `RootCause`             | String         | Categorized cause (e.g., `Configuration`, `Dependency`, `Bug`).                                    | `Dependency: Database connection timeout`   |
-| `MetricsAffected`       | Object[]       | Key metrics violating SLOs (e.g., `error_rate`, `latency`).                                      | `{ "metric": "http_errors", "threshold": 1 }`|
-| `Dependencies`          | String[]       | External systems failing (e.g., payment gateway, CDN).                                            | `["stripe-api", "cloudflare"]`              |
-| `ResolutionTime`        | Timestamp      | When the issue was resolved.                                                                      | `2024-05-15T14:45:00Z`                     |
-| `MTTR`                  | Duration       | Mean Time to Recovery (calculated from detection to resolution).                                  | `PT15M` (15 minutes)                        |
-| `PostmortemLink`        | URL            | Link to the documented analysis.                                                                  | `https://confluence.example.com/docs/av-2024-0042` |
-| `AffectedUsers`         | Integer        | Estimated number of users impacted.                                                                 | `5000`                                      |
+| **Category**               | **Schema Name**               | **Description**                                                                                     | **Example Attributes**                                                                 |
+|----------------------------|-------------------------------|-----------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
+| **Monitoring Signals**     | `ServiceMetric`               | Metrics (CPU, latency, error rates) indicating degraded performance or failures.                   | `metric_name: "request_latency_p99", value: 5000ms, threshold: 2s, timestamp: 2024-01-01T12:00:00Z` |
+|                            | `LogEntry`                    | Structured or unstructured logs from applications, middleware, or infrastructure.                | `"level": "ERROR", "message": "Connection timeout to DB", "service": "user-service"`   |
+|                            | `AlertEvent`                  | Alerts from monitoring systems (e.g., Prometheus, Datadog, AWS CloudWatch).                       | `severity: CRITICAL, rule: "HighErrorRate", affected_service: "auth-api"`              |
+| **Dependencies**           | `ServiceDependency`           | Graph of service-to-service or service-to-infra relationships (e.g., API → Database → Load Balancer). | `depends_on: ["db-primary", "cache-cluster"]`                                           |
+| **Incident States**        | `IncidentRecord`              | Tracker for incidents (status, assignee, resolution time).                                         | `id: "INC-20240101-001", status: "IN_PROGRESS", root_cause: "DiskFull"`               |
+| **Mitigation Actions**     | `RemediationPlan`             | Predefined or ad-hoc fixes (e.g., rollback, scale-up, patch).                                      | `action: "restart_k8s_pod", target: "order-service-v1", executed_at: "2024-01-01T13:15:00Z"` |
+| **Performance Baselines**  | `ServiceBaseline`             | Historical averages for latency, throughput, or error rates to detect anomalies.                 | `p99_latency: 300ms, error_rate: 0.01%, baseline_window: "2023-12-01–2023-12-31"`    |
 
 ---
 
 ## **Query Examples**
-### **1. Detecting High Error Rates (Prometheus)**
-```promql
-# Alert if error rate exceeds 1% in the last 5 minutes
-sum(rate(http_requests_total{status=~"5.."}[5m])) by (service)
-  > (0.01 * sum(rate(http_requests_total[5m])) by (service))
-```
+Use these queries (in SQL, PromQL, or Elasticsearch DSL) to diagnose availability issues.
 
-### **2. Identifying Slow Endpoints (Metrics + Logs)**
-```bash
-# Filter slow API responses (latency > 1s) in logs
-grep "duration_ms>" /var/log/api-service.log | awk '{if ($3 > 1000) print $0}'
-```
+---
 
-### **3. Kubernetes Pod Crashes (CLI)**
-```sh
-# List crashing pods with crash loop backoff
-kubectl get pods --field-selector=status.phase=CrashLoopBackOff -A
-```
+### **1. Identifying High-Error Rates**
+**Scenario**: A spike in 5xx errors for an API endpoint.
+**Tools**: Prometheus, Datadog, or CloudWatch Metrics.
 
-### **4. Database Connection Pool Exhaustion (PostgreSQL)**
+**PromQL Query**:
 ```sql
-# Check active connections in PostgreSQL
-SELECT usename, count(*) as connections
-FROM pg_stat_activity
-GROUP BY usename
-ORDER BY count(*) DESC;
+rate(http_requests_total{status=~"5.."}[1m])
+  > on(instance) group_left
+  cluster:rate(http_requests_total[1m])
+  and
+  cluster:sum(rate(http_requests_total[1m]))
+    by (cluster)
+```
+**Output Interpretation**:
+- Identify clusters or endpoints with error rates exceeding thresholds (e.g., >1%).
+- Cross-reference with `ServiceDependency` to trace upstream/downstream impacts.
+
+**Elasticsearch Query (Kibana)**:
+```json
+GET /logs-* /_search
+{
+  "query": {
+    "bool": {
+      "must": [
+        { "term": { "level": "ERROR" } },
+        { "range": { "@timestamp": { "gte": "now-1h" } } }
+      ]
+    }
+  },
+  "aggs": {
+    "by_service": { "terms": { "field": "service.name" } }
+  }
+}
 ```
 
-### **5. External API Latency (cURL + jq)**
-```bash
-# Measure latency to an external API
-time curl -s -o /dev/null -w "API Latency: %{time_total}s\n" https://api.example.com/health
+---
+
+### **2. Tracing Latency Spikes**
+**Scenario**: End-to-end request latency exceeds SLA (e.g., >1s for 99% of requests).
+**Tools**: OpenTelemetry, Jaeger, or AWS X-Ray.
+
+**OpenTelemetry Query (Grafana)**:
+```sql
+select
+  service_name,
+  span_name,
+  avg(duration) as avg_duration,
+  percentile(duration, 99) as p99_duration
+from traces
+where timestamp > now() - 1h
+group by service_name, span_name
+order by p99_duration desc
+limit 10
 ```
+
+**AWS CloudWatch Logs Insights**:
+```sql
+stats avg(@duration) as p99 by @service
+| filter @duration > 1000
+| sort @p99 desc
+```
+
+---
+
+### **3. Dependency Analysis**
+**Scenario**: A database outage cascades to multiple services.
+**Tools**: Custom dependency graphs (e.g., using Python’s `networkx`) or tools like **Grafana Tempo**.
+
+**Python Example (Dependency Graph)**:
+```python
+import networkx as nx
+
+# Build graph from monitoring data
+G = nx.DiGraph()
+G.add_node("db-primary", type="database")
+G.add_node("user-service", type="service")
+G.add_edge("user-service", "db-primary", weight=90)  # 90% requests go to DB
+
+# Detect disrupted edges (e.g., DB health < 90%)
+disrupted_edges = [edge for edge in G.edges() if G.nodes[edge[1]]["health"] < 0.9]
+print("Potential cascading failures:", disrupted_edges)
+```
+
+---
+
+### **4. Incident Root Cause Analysis**
+**Scenario**: Service degraded after a deployment. Use **postmortem data** to correlate events.
+**Tools**: Jira, PagerDuty, or custom dashboards.
+
+**SQL Query (Postgres)**:
+```sql
+SELECT
+  i.incident_id,
+  i.timestamp,
+  s.service_name,
+  a.severity,
+  l.message,
+  COUNT(*) OVER (PARTITION BY i.incident_id) as log_count
+FROM incidents i
+JOIN alerts a ON i.incident_id = a.incident_id
+JOIN logs l ON i.incident_id = l.incident_id
+WHERE i.timestamp > NOW() - INTERVAL '1 day'
+  AND a.severity = 'CRITICAL'
+ORDER BY i.timestamp DESC
+LIMIT 50;
+```
+
+---
+
+### **5. Preventive Checks**
+**Scenario**: Proactively identify misconfigurations before failures.
+**Tools**: Infrastructure-as-Code (IaC) validators (e.g., **Terraform + TFLint**).
+
+**Terraform Validation Example**:
+```hcl
+# Check for under-replicated replicas in Kubernetes
+data "kubernetes_namespace" "default" {
+  metadata {
+    name = "default"
+  }
+}
+resource "kubectl_manifest" "pod_replicas" {
+  yaml_body = file("${path.module}/pod-check.yaml")
+}
+# Output: Pods with replica count < desired (e.g., 0/1)
+```
+
+---
+
+## **Mitigation Strategies**
+Apply these patterns during troubleshooting:
+
+| **Strategy**               | **When to Use**                          | **Example Actions**                                                                 |
+|----------------------------|------------------------------------------|------------------------------------------------------------------------------------|
+| **Isolation**              | Single component failure (e.g., pod crash). | Cordon faulty nodes in Kubernetes; disable problematic microservice.              |
+| **Rollback**               | Deployment caused outage.                 | Revert to previous container image version or IaC template.                        |
+| **Scaling**                | Resource exhaustion (CPU/memory).         | Auto-scale pods horizontally (K8s HPA) or vertically (resize VMs).                |
+| **Failover**               | Primary service unavailable.              | Switch to read replicas (Postgres); route traffic to backup regions (AWS Global Accelerator). |
+| **Circuit Breaking**       | Upstream service degraded.                | Enable Hystrix/Resilience4j in microservices to throttle calls.                     |
+| **Configuration Fix**      | Misconfiguration (e.g., timeouts).       | Adjust API Gateway timeouts; update DB connection pool settings.                  |
 
 ---
 
 ## **Related Patterns**
-To complement **Availability Troubleshooting**, leverage these patterns:
-
-| **Pattern**                          | **Purpose**                                                                 | **Tools/Frameworks**                          |
-|--------------------------------------|-----------------------------------------------------------------------------|---------------------------------------------|
-| **[Resilience Testing]**             | Proactively test system resilience with chaos experiments.                  | Chaos Mesh, Gremlin, Fault Injection Simulator |
-| **[Distributed Tracing]**            | Trace requests across microservices to identify latency bottlenecks.       | Jaeger, Zipkin, OpenTelemetry               |
-| **[Circuit Breaker]**                | Prevent cascading failures by limiting calls to unstable services.         | Hystrix, Resilience4j, Envoy               |
-| **[Auto-Scaling]**                   | Dynamically adjust resources based on load.                                  | Kubernetes HPA, AWS Auto Scaling            |
-| **[Chaos Engineering]**               | Deliberately introduce failures to improve fault tolerance.                 | Chaos Monkey, Chaos Gorilla                 |
-| **[Service Mesh Observability]**     | Centralized monitoring of service-to-service traffic.                       | Istio, Linkerd, Consul                       |
-| **[Golden Signals]**                 | Focus on **latency, traffic, errors, saturation** for observability.       | SRE Book (Google)                            |
-
----
-
-## **Best Practices**
-1. **Automate Alerting**: Define **SLO-based alerts** (e.g., error budget alerts).
-2. **Centralize Logs**: Use **ELK Stack, Loki, or Datadog** for cross-service log analysis.
-3. **Document Failures**: Maintain a **blameless postmortem repository** (e.g., GitHub Wiki).
-4. **Simulate Failures**: Run **chaos experiments** during non-peak hours.
-5. **Review Dependencies**: Regularly audit **external API contracts** and SLAs.
-6. **Capacity Planning**: Use **forecasting tools** (e.g., **Prometheus Forecast**) to anticipate scaling needs.
+1. **[Observability Patterns](https://example.com/observability)**
+   - *Why*: Availability troubleshooting relies on logs, metrics, and traces. Reference this for **instrumentation strategies**.
+2. **[Chaos Engineering](https://example.com/chaos)**
+   - *Why*: Simulate failures to validate resilience. Use **Gremlin** or **Chaos Mesh** to test availability under stress.
+3. **[Self-Healing Systems](https://example.com/self-healing)**
+   - *Why*: Automate recovery (e.g., Kubernetes **PodDisruptionBudgets**, **Liveness Probes**).
+4. **[Multi-Region Architecture](https://example.com/multi-region)**
+   - *Why*: Reduce single-point failures with **active-active deployments** (e.g., AWS Global Accelerator).
+5. **[Capacity Planning](https://example.com/capacity)**
+   - *Why*: Prevent resource exhaustion with **load testing** (e.g., Locust, k6) and forecasting.
 
 ---
-**Last Updated**: `[Insert Date]`
-**Version**: `1.2`
+## **Next Steps**
+1. **Instrument**: Ensure all services emit metrics/logs to a central system (e.g., Prometheus + Grafana).
+2. **Automate**: Use **SLOs** (Service Level Objectives) to trigger alerts (e.g., "99.9% availability").
+3. **Document**: Maintain a **runbook** for common outages (e.g., "How to handle DB replica lag").
+4. **Review**: Conduct **postmortems** to update mitigation plans.
+
+---
+**References**:
+- [Google SRE Book (Chapter 4: Measurement)](https://sre.google/sre-book/monitoring-distributed-systems/)
+- [AWS Well-Architected Framework (Reliability Pillar)](https://aws.amazon.com/architecture/well-architected/)
+- [Chaos Engineering Handbook](https://www.oreilly.com/library/view/chaos-engineering-handbook/9781492078372/)
