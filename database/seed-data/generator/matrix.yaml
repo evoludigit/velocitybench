@@ -23,32 +23,23 @@ blog_generation:
     - analytics-complete-fact-table
     # NEW: Fact table column naming best practices (data → dimensions)
     - analytics-column-naming-convention
-    # FraiseQL Roadmap Phases 8.6-8.10:
-    # Advanced Query Features Phase 8.6
-    - advanced-query-features
-    - window-functions-performance
-    - query-optimization-hints
-    - prepared-statements-caching
-    # Streaming Enhancements Phase 8.7
-    - streaming-backpressure-handling
-    - adaptive-chunking-memory
-    - stream-pause-resume
-    - multi-query-orchestration
-    # Connection Pooling Phase 8.8
-    - connection-pool-management
-    - pool-health-checking
-    - connection-reuse-optimization
-    - pool-statistics-monitoring
-    # Performance Optimization Phase 8.9
-    - query-plan-caching
-    - result-materialization-strategies
-    - compression-optimization
-    - zero-copy-optimizations
-    # Error Handling Phase 8.10
-    - retry-policies-backoff
-    - circuit-breaker-pattern
-    - graceful-degradation
-    - error-recovery-strategies
+    # Core Capabilities Patterns:
+    # Query Capabilities
+    - window-functions
+    - query-optimization
+    - prepared-statements
+    # Streaming Capabilities
+    - streaming-performance
+    - streaming-memory-efficiency
+    - result-streaming
+    # Production Capabilities
+    - connection-pooling
+    - query-caching
+    - error-handling
+    # Performance Capabilities
+    - latency-optimization
+    - throughput-optimization
+    - memory-optimization
     # Future patterns:
     # - cqrs
     # - dataloader-pattern
@@ -163,111 +154,70 @@ blog_generation:
       intermediate: opencode  # Best practices and examples
       advanced: claude-code   # Migration strategy and trade-offs
 
-    # Phases 8.6-8.10 Roadmap Patterns
-    # Phase 8.6: Advanced Query Features
-    advanced-query-features:
-      beginner: opencode      # Introduction to window functions
-      intermediate: claude-code  # Window function implementation
-      advanced: claude-code   # Complex query optimization
-
-    window-functions-performance:
+    # Core Capability Patterns - User-Facing Features
+    # Query Capabilities (enables complex analytics and reporting)
+    window-functions:
       beginner: opencode      # What are window functions
       intermediate: opencode  # Common window function patterns
-      advanced: claude-code   # Performance tuning window queries
+      advanced: claude-code   # Performance tuning and optimization
 
-    query-optimization-hints:
-      beginner: vllm          # Hint syntax reference
-      intermediate: claude-code  # When and how to use hints
-      advanced: claude-code   # Optimizer internals
+    query-optimization:
+      beginner: vllm          # Optimization hints and syntax
+      intermediate: claude-code  # When and how to optimize
+      advanced: claude-code   # Optimizer internals and trade-offs
 
-    prepared-statements-caching:
+    prepared-statements:
       beginner: opencode      # Prepared statement basics
-      intermediate: opencode  # Statement pooling strategies
-      advanced: claude-code   # Cache coherency and performance
+      intermediate: opencode  # Statement pooling and reuse
+      advanced: claude-code   # Caching, coherency, and performance
 
-    # Phase 8.7: Streaming Enhancements
-    streaming-backpressure-handling:
-      beginner: opencode      # Backpressure concepts
-      intermediate: claude-code  # Implementation patterns
-      advanced: claude-code   # Advanced backpressure scenarios
+    # Streaming Capabilities (enables real-time data, memory efficiency)
+    streaming-performance:
+      beginner: opencode      # Streaming basics and throughput
+      intermediate: opencode  # Performance characteristics
+      advanced: claude-code   # Benchmarking and optimization (2nd order: impacts memory usage)
 
-    adaptive-chunking-memory:
-      beginner: opencode      # Memory pressure concepts
-      intermediate: claude-code  # Adaptive chunking algorithm
-      advanced: claude-code   # Memory profiling and optimization
+    streaming-memory-efficiency:
+      beginner: opencode      # Memory concepts in streaming
+      intermediate: claude-code  # Backpressure and adaptive chunking
+      advanced: claude-code   # Zero-copy techniques, profiling (3rd order: enables concurrent queries)
 
-    stream-pause-resume:
-      beginner: opencode      # Pause/resume API
-      intermediate: opencode  # State management patterns
-      advanced: claude-code   # Complex pause scenarios
+    result-streaming:
+      beginner: opencode      # Streaming result sets
+      intermediate: opencode  # Pause/resume operations
+      advanced: claude-code   # Complex orchestration scenarios
 
-    multi-query-orchestration:
-      beginner: opencode      # Multi-query basics
-      intermediate: claude-code  # Resource allocation
-      advanced: claude-code   # Concurrent optimization
-
-    # Phase 8.8: Connection Pooling
-    connection-pool-management:
+    # Production Capabilities (enables reliable, scalable deployments)
+    connection-pooling:
       beginner: opencode      # Pool concepts and configuration
       intermediate: opencode  # Pool sizing and tuning
-      advanced: claude-code   # Advanced pool strategies
+      advanced: claude-code   # Advanced strategies (2nd order: reduces latency, improves throughput)
 
-    pool-health-checking:
-      beginner: opencode      # Health check types
-      intermediate: opencode  # Health check configuration
-      advanced: claude-code   # Failure detection patterns
+    query-caching:
+      beginner: opencode      # Caching basics and concepts
+      intermediate: claude-code  # Cache implementation and invalidation
+      advanced: claude-code   # Cache coherency and performance (3rd order: enables higher concurrency)
 
-    connection-reuse-optimization:
-      beginner: opencode      # Connection reuse basics
-      intermediate: opencode  # Optimization techniques
-      advanced: claude-code   # Performance profiling
+    error-handling:
+      beginner: opencode      # Error handling basics
+      intermediate: opencode  # Retry policies and circuit breakers
+      advanced: claude-code   # Graceful degradation and recovery (2nd order: improves availability)
 
-    pool-statistics-monitoring:
-      beginner: vllm          # Monitoring metrics reference
-      intermediate: opencode  # Dashboard setup
-      advanced: claude-code   # Advanced diagnostics
+    # Performance Capabilities (reduces latency, increases throughput)
+    latency-optimization:
+      beginner: opencode      # Latency concepts and measurement
+      intermediate: claude-code  # Optimization strategies
+      advanced: claude-code   # Profiling, tracing, and trade-offs (2nd order: enables higher user concurrency)
 
-    # Phase 8.9: Performance Optimization
-    query-plan-caching:
-      beginner: opencode      # Query plan caching concepts
-      intermediate: claude-code  # Cache implementation
-      advanced: claude-code   # Cache coherency and invalidation
+    throughput-optimization:
+      beginner: opencode      # Throughput concepts and measurement
+      intermediate: opencode  # Batching and parallelization
+      advanced: claude-code   # Resource allocation and scaling (3rd order: enables larger deployments)
 
-    result-materialization-strategies:
-      beginner: opencode      # Materialization overview
-      intermediate: opencode  # Strategy selection
-      advanced: claude-code   # Memory-efficient materialization
-
-    compression-optimization:
-      beginner: vllm          # Compression algorithm reference
-      intermediate: opencode  # When to use compression
-      advanced: claude-code   # Compression performance tuning
-
-    zero-copy-optimizations:
-      beginner: opencode      # Zero-copy concepts
-      intermediate: claude-code  # Implementation techniques
-      advanced: claude-code   # Memory architecture optimization
-
-    # Phase 8.10: Error Handling
-    retry-policies-backoff:
-      beginner: opencode      # Retry policy basics
-      intermediate: opencode  # Exponential backoff patterns
-      advanced: claude-code   # Adaptive retry strategies
-
-    circuit-breaker-pattern:
-      beginner: opencode      # Circuit breaker concept
-      intermediate: opencode  # Implementation patterns
-      advanced: claude-code   # Circuit breaker tuning
-
-    graceful-degradation:
-      beginner: opencode      # Degradation strategies
-      intermediate: opencode  # Fallback implementation
-      advanced: claude-code   # Partial result handling
-
-    error-recovery-strategies:
-      beginner: opencode      # Recovery basics
-      intermediate: opencode  # Common recovery patterns
-      advanced: claude-code   # Complex recovery scenarios
+    memory-optimization:
+      beginner: opencode      # Memory profiling and concepts
+      intermediate: opencode  # Memory reduction techniques
+      advanced: claude-code   # Architecture optimization and trade-offs (2nd order: reduces infrastructure costs)
 
 # ============================================================
 # SQL GENERATION MATRIX

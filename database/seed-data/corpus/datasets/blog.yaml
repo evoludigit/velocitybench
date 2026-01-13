@@ -37,13 +37,12 @@ distributions:
     column_naming: ~50        # Column naming best practices (dimensions vs data)
     query_optimization: ~75   # Index strategies, GIN/B-tree/BRIN
 
-  roadmap_phases_8_6_to_8_10:
-    advanced_query_features: ~28  # Phase 8.6 - Window functions, optimization hints
-    streaming_enhancements: ~24   # Phase 8.7 - Backpressure, adaptive chunking
-    connection_pooling: ~20       # Phase 8.8 - Pool management, health checking
-    performance_optimization: ~28 # Phase 8.9 - Query plan caching, compression
-    error_handling: ~16           # Phase 8.10 - Retry policies, circuit breaker
-    roadmap_total: ~116           # Total posts for Phases 8.6-8.10
+  core_capabilities_distribution:
+    query_capabilities: ~21       # Window functions, query optimization, prepared statements (7 posts × 3 patterns)
+    streaming_capabilities: ~21   # Streaming performance, memory efficiency, result streaming (7 posts × 3 patterns)
+    production_capabilities: ~21  # Connection pooling, query caching, error handling (7 posts × 3 patterns)
+    performance_capabilities: ~21 # Latency optimization, throughput optimization, memory optimization (7 posts × 3 patterns)
+    capabilities_total: ~84       # Total posts for core capabilities (new, plus existing FraiseQL/analytics)
 
   posts_per_user:
     average: 0.45     # 2243 posts / 5000 users ≈ 0.45 posts/user
