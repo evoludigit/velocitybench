@@ -1,0 +1,568 @@
+# Git Provider Abstraction Pattern (Fraisier)
+# VelocityBench Knowledge Corpus
+
+id: git-provider-abstraction
+name: "Fraisier: Git Provider Abstraction and Multi-Provider Support"
+category: fraiseql
+type: pattern
+severity: high
+tags:
+  - fraisier
+  - git-providers
+  - abstraction
+  - multi-provider
+  - github
+  - gitlab
+  - gitea
+  - bitbucket
+
+summary:
+  short: "Support multiple Git providers (GitHub, GitLab, Gitea, Bitbucket) with unified interface"
+  long: |
+    Fraisier abstracts Git provider differences behind a common interface.
+    Webhook signature verification, event parsing, and webhook configuration all vary by provider.
+    Fraisier handles these differences internally, exposing a single unified API to users.
+    Supports per-fraise provider override - one Fraisier config can manage services across different Git platforms.
+
+problem:
+  description: |
+    Each Git provider has different webhook formats and signatures:
+    - GitHub uses X-Hub-Signature-256, other providers use different headers
+    - Event JSON structures differ (repository vs path_with_namespace, etc)
+    - Webhook endpoints and configuration steps differ per provider
+    - No easy way to switch providers or manage multiple providers
+
+    Deployment tooling shouldn't be tied to one Git platform.
+
+  symptoms:
+    - name: "Git provider lock-in"
+      description: "Tool only works with GitHub, can't migrate to GitLab"
+      detection: "Difficult or impossible to use alternative Git providers"
+
+    - name: "Provider-specific logic scattered"
+      description: "If statements checking provider type throughout code"
+      detection: "Hard to add new provider, easy to miss edge cases"
+
+    - name: "Different webhook logic per provider"
+      description: "Separate code paths for GitHub vs GitLab signature verification"
+      detection: "Code is complex and hard to maintain"
+
+    - name: "Can't support mixed environments"
+      description: "Can't use GitHub for one team and GitLab for another"
+      detection: "Teams are forced to use same Git provider"
+
+solution:
+  principle: "Abstract provider differences, expose unified interface"
+
+  components:
+    - name: "GitProvider Interface"
+      type: "Abstract base class"
+      purpose: "Define common methods all providers must implement"
+
+    - name: "Provider Implementations"
+      type: "Concrete classes"
+      purpose: "Implement provider-specific logic (GitHub, GitLab, Gitea, Bitbucket)"
+
+    - name: "Provider Registry"
+      type: "Factory/registry pattern"
+      purpose: "Map provider name to implementation class"
+
+    - name: "Webhook Event Normalization"
+      type: "Adapter pattern"
+      purpose: "Convert provider-specific events to common format"
+
+    - name: "Signature Verification"
+      type: "Strategy pattern"
+      purpose: "Verify signatures using provider-specific algorithms"
+
+provider_interface:
+  description: "Common interface all providers must implement"
+  methods: |
+    class GitProvider:
+        name: str                          # "github", "gitlab", "gitea", "bitbucket"
+
+        def verify_webhook_signature(
+            payload: bytes,
+            headers: dict,
+            secret: str
+        ) -> bool:
+            """Verify webhook signature using provider's algorithm"""
+
+        def parse_webhook_event(
+            headers: dict,
+            payload: dict
+        ) -> WebhookEvent:
+            """Parse provider-specific event format to common format"""
+
+        def get_repository_url(repository: dict) -> str:
+            """Extract repository URL from event"""
+
+        def get_branch(ref: str) -> str:
+            """Extract branch name from Git ref (e.g., refs/heads/main → main)"""
+
+        def get_commits(payload: dict) -> list[Commit]:
+            """Extract commit list from event"""
+
+        def get_pusher(payload: dict) -> str:
+            """Extract pusher username from event"""
+
+supported_providers:
+  - name: "GitHub"
+    description: "GitHub.com or GitHub Enterprise"
+    webhook_header: "X-Hub-Signature-256"
+    signature_algorithm: "HMAC-SHA256"
+    config: |
+      git:
+        provider: github
+        github:
+          base_url: https://github.com  # or github.mycompany.com
+          webhook_secret: ${FRAISIER_WEBHOOK_SECRET}
+    event_sample: |
+      {
+        "ref": "refs/heads/main",
+        "repository": {
+          "name": "my-api",
+          "full_name": "myorg/my-api",
+          "clone_url": "https://github.com/myorg/my-api.git"
+        },
+        "pusher": {"name": "alice", "email": "alice@example.com"},
+        "commits": [{...}]
+      }
+    key_features:
+      - Webhook auto-detection (GitHub headers are unique)
+      - Enterprise support (self-hosted)
+      - Organization repositories
+
+  - name: "GitLab"
+    description: "GitLab.com or self-hosted GitLab"
+    webhook_header: "X-Gitlab-Token"
+    signature_algorithm: "HMAC-SHA256"
+    config: |
+      git:
+        provider: gitlab
+        gitlab:
+          base_url: https://gitlab.com  # or gitlab.mycompany.com
+          secret_token: ${FRAISIER_WEBHOOK_SECRET}
+    event_sample: |
+      {
+        "ref": "refs/heads/main",
+        "repository": {
+          "name": "my-api",
+          "path_with_namespace": "myorg/my-api",
+          "git_http_url": "https://gitlab.com/myorg/my-api.git"
+        },
+        "user_name": "alice",
+        "total_commits_count": 1,
+        "commits": [{...}]
+      }
+    key_features:
+      - Multiple instances support
+      - Group repositories
+      - Different event format than GitHub
+
+  - name: "Gitea / Forgejo"
+    description: "Gitea and Forgejo self-hosted"
+    webhook_header: "X-Gitea-Signature"
+    signature_algorithm: "HMAC-SHA256"
+    config: |
+      git:
+        provider: gitea
+        gitea:
+          base_url: https://git.mycompany.com
+          webhook_secret: ${FRAISIER_WEBHOOK_SECRET}
+    event_sample: |
+      {
+        "ref": "refs/heads/main",
+        "repository": {
+          "name": "my-api",
+          "owner": {"login": "myorg"}
+        },
+        "pusher": {"login": "alice"}
+      }
+    key_features:
+      - Minimal self-hosted alternative
+      - Similar to GitHub but simpler
+      - Good for small teams/homelab
+
+  - name: "Bitbucket"
+    description: "Bitbucket Cloud or Server/Data Center"
+    webhook_header: "X-Hub-Signature"
+    signature_algorithm: "HMAC-SHA256"
+    config: |
+      git:
+        provider: bitbucket
+        bitbucket:
+          base_url: https://bitbucket.org  # or bitbucket.mycompany.com
+          server: false  # true for Bitbucket Server/Data Center
+          webhook_secret: ${FRAISIER_WEBHOOK_SECRET}
+    event_sample: |
+      {
+        "push": {
+          "changes": [{
+            "new": {"name": "main"},
+            "commits": [{...}]
+          }]
+        },
+        "repository": {
+          "name": "my-api",
+          "full_slug": "myorg/my-api"
+        },
+        "actor": {"username": "alice"}
+      }
+    key_features:
+      - Cloud and self-hosted support
+      - Different event structure from GitHub/GitLab
+      - Workspace-based organization
+
+webhook_event_normalization:
+  description: "Convert provider-specific events to common format"
+
+  common_event_format: |
+    class WebhookEvent:
+        branch: str                    # "main", "dev", "feature/auth"
+        repository: str                # "myorg/my-api"
+        repository_url: str            # "https://github.com/myorg/my-api.git"
+        pusher: str                    # "alice"
+        commit_count: int              # number of commits
+        commits: list[Commit]          # [Commit(...), Commit(...)]
+        timestamp: datetime            # when push occurred
+        provider: str                  # "github", "gitlab", "gitea", "bitbucket"
+
+  github_to_common: |
+    # GitHub raw event
+    {
+      "ref": "refs/heads/main",
+      "repository": {"full_name": "myorg/my-api"},
+      "pusher": {"name": "alice"},
+      "commits": [...]
+    }
+
+    # Normalized to common format
+    WebhookEvent(
+      branch="main",                              # parse from ref
+      repository="myorg/my-api",
+      repository_url="https://github.com/...",
+      pusher="alice",
+      commit_count=1,
+      commits=[...],
+      provider="github"
+    )
+
+  gitlab_to_common: |
+    # GitLab raw event
+    {
+      "ref": "refs/heads/main",
+      "repository": {"path_with_namespace": "myorg/my-api"},
+      "user_name": "alice",
+      "total_commits_count": 1,
+      "commits": [...]
+    }
+
+    # Normalized to common format
+    WebhookEvent(
+      branch="main",
+      repository="myorg/my-api",
+      repository_url="https://gitlab.com/...",
+      pusher="alice",
+      commit_count=1,
+      commits=[...],
+      provider="gitlab"
+    )
+
+signature_verification_by_provider:
+  description: "Each provider verifies differently"
+
+  github_verification: |
+    import hmac
+    import hashlib
+
+    signature_header = request.headers["X-Hub-Signature-256"]
+    payload_bytes = request.body
+    secret = os.environ["FRAISIER_WEBHOOK_SECRET"]
+
+    # GitHub format: sha256=<hash>
+    expected_signature = "sha256=" + hmac.new(
+        secret.encode(),
+        payload_bytes,
+        hashlib.sha256
+    ).hexdigest()
+
+    is_valid = hmac.compare_digest(signature_header, expected_signature)
+
+  gitlab_verification: |
+    import hmac
+    import hashlib
+
+    token_header = request.headers["X-Gitlab-Token"]
+    payload_bytes = request.body
+    secret = os.environ["FRAISIER_WEBHOOK_SECRET"]
+
+    # GitLab format: just the token
+    expected_token = secret
+
+    is_valid = hmac.compare_digest(token_header, expected_token)
+
+  gitea_verification: |
+    import hmac
+    import hashlib
+
+    signature_header = request.headers["X-Gitea-Signature"]
+    payload_bytes = request.body
+    secret = os.environ["FRAISIER_WEBHOOK_SECRET"]
+
+    # Gitea format: <hash> (no prefix)
+    expected_signature = hmac.new(
+        secret.encode(),
+        payload_bytes,
+        hashlib.sha256
+    ).hexdigest()
+
+    is_valid = hmac.compare_digest(signature_header, expected_signature)
+
+  bitbucket_verification: |
+    import hmac
+    import hashlib
+
+    signature_header = request.headers["X-Hub-Signature"]
+    payload_bytes = request.body
+    secret = os.environ["FRAISIER_WEBHOOK_SECRET"]
+
+    # Bitbucket format: sha256=<hash>
+    expected_signature = "sha256=" + hmac.new(
+        secret.encode(),
+        payload_bytes,
+        hashlib.sha256
+    ).hexdigest()
+
+    is_valid = hmac.compare_digest(signature_header, expected_signature)
+
+provider_registry:
+  description: "Register and instantiate providers"
+  pattern: |
+    class GitProviderRegistry:
+        _providers = {}
+
+        @classmethod
+        def register(cls, provider_class):
+            cls._providers[provider_class.name] = provider_class
+            return provider_class
+
+        @classmethod
+        def get(cls, provider_name: str) -> GitProvider:
+            if provider_name not in cls._providers:
+                raise ValueError(f"Unknown provider: {provider_name}")
+            return cls._providers[provider_name]()
+
+    # Register all providers
+    @GitProviderRegistry.register
+    class GitHubProvider(GitProvider):
+        name = "github"
+        ...
+
+    @GitProviderRegistry.register
+    class GitLabProvider(GitProvider):
+        name = "gitlab"
+        ...
+
+    # Usage
+    provider = GitProviderRegistry.get("github")
+    event = provider.parse_webhook_event(headers, payload)
+
+per_fraise_provider_override:
+  description: "Different fraises can use different providers"
+  example: |
+    git:
+      provider: github  # Default provider
+
+      github:
+        webhook_secret: ${FRAISIER_WEBHOOK_SECRET}
+
+      gitlab:
+        base_url: https://gitlab.mycompany.com
+        secret_token: ${FRAISIER_WEBHOOK_SECRET}
+
+    fraises:
+      api:
+        type: api
+        # Uses default GitHub provider
+        environments:
+          production:
+            branch: main
+
+      internal_api:
+        type: api
+        # Override to use GitLab instead
+        git:
+          provider: gitlab
+          base_url: https://gitlab.mycompany.com
+        environments:
+          production:
+            branch: main
+
+      homelab_api:
+        type: api
+        # Override to use Gitea
+        git:
+          provider: gitea
+          base_url: https://git.homelab.local
+        environments:
+          production:
+            branch: main
+
+webhook_provider_detection:
+  description: "Auto-detect provider from webhook headers"
+
+  github_detection: |
+    if "X-Hub-Signature-256" in headers or "X-GitHub-Event" in headers:
+        provider = "github"
+
+  gitlab_detection: |
+    if "X-Gitlab-Token" in headers or "X-Gitlab-Event" in headers:
+        provider = "gitlab"
+
+  gitea_detection: |
+    if "X-Gitea-Signature" in headers:
+        provider = "gitea"
+
+  bitbucket_detection: |
+    if request_path.startswith("/v2/hooks/") or "X-Hub-Signature" in headers:
+        provider = "bitbucket"
+
+  fallback: |
+    if provider_query_param:
+        provider = request.args.get("provider")  # Explicit: /webhook?provider=gitlab
+    elif auto_detected:
+        provider = auto_detected
+    else:
+        provider = default_provider  # GitHub is typical default
+
+custom_provider_implementation:
+  description: "Add support for new Git provider"
+  example: |
+    from fraisier.git import GitProvider, GitProviderRegistry, WebhookEvent
+
+    @GitProviderRegistry.register
+    class MyGitProvider(GitProvider):
+        name = "mygit"
+
+        def verify_webhook_signature(self, payload, headers, secret):
+            # Your signature verification logic
+            expected_sig = compute_signature(payload, secret)
+            actual_sig = headers.get("X-MyGit-Signature")
+            return hmac.compare_digest(expected_sig, actual_sig)
+
+        def parse_webhook_event(self, headers, payload):
+            # Parse provider-specific format
+            branch = payload["metadata"]["branch"]
+            repository = payload["repo"]["full_name"]
+            pusher = payload["author"]["login"]
+
+            return WebhookEvent(
+                branch=branch,
+                repository=repository,
+                pusher=pusher,
+                # ... other fields
+            )
+
+        # Implement other required methods...
+
+best_practices:
+  - name: "Use provider abstraction consistently"
+    description: "Never hardcode provider-specific logic in main code"
+    rationale: "Easy to add new providers, change providers, or test"
+
+  - name: "Normalize webhook events early"
+    description: "Convert to common format as soon as event arrives"
+    rationale: "Rest of code doesn't need to know about provider differences"
+
+  - name: "Auto-detect provider when possible"
+    description: "Use webhook headers to detect provider automatically"
+    rationale: "Users don't need to specify provider in webhook URL"
+
+  - name: "Allow explicit provider override"
+    description: "Support ?provider=gitlab in webhook URL"
+    rationale: "Fallback when auto-detection fails"
+
+  - name: "Support per-fraise provider overrides"
+    description: "Let services use different providers in same config"
+    rationale: "Flexibility for teams using mixed Git platforms"
+
+  - name: "Store provider name in webhook events"
+    description: "Record which provider sent the event"
+    rationale: "Helpful for debugging and audit logging"
+
+anti_patterns:
+  - name: "Provider-specific logic in main code"
+    consequence: "Hard to add new provider, easy to miss edge cases"
+    example: "if provider == 'github': ... elif provider == 'gitlab': ..."
+
+  - name: "No provider abstraction"
+    consequence: "Tool is locked to one Git platform"
+    example: "Hardcoded GitHub webhook parsing"
+
+  - name: "No event normalization"
+    consequence: "Different code paths for each provider"
+    example: "GitHub code doesn't work with GitLab events"
+
+  - name: "No provider auto-detection"
+    consequence: "Users must specify provider in webhook URL"
+    example: "Always require ?provider=github parameter"
+
+use_cases:
+  - scenario: "Company using GitHub but team wants GitLab"
+    setup: |
+      - Main infrastructure on GitHub
+      - One team uses internal GitLab
+      - Single Fraisier config supports both
+    benefit: "Teams not locked into same provider"
+
+  - scenario: "Migrating from GitHub to GitLab"
+    setup: |
+      - Some services still on GitHub
+      - New services on GitLab
+      - One Fraisier instance manages both
+    benefit: "No tool changes during migration"
+
+  - scenario: "Open source on GitHub + enterprise on Gitea"
+    setup: |
+      - Public library on GitHub
+      - Company-internal tools on Gitea
+      - Fraisier manages both
+    benefit: "Different platforms for different purposes"
+
+related_patterns:
+  - id: "webhook-event-driven-deployment"
+    description: "Webhook parsing and event routing"
+
+  - id: "fraisier-deployment-orchestration"
+    description: "Overall deployment orchestration"
+
+  - id: "deployment-history-tracking"
+    description: "Recording provider-specific deployment events"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Provider abstraction is like a universal adapter:
+      - Different countries have different plug types
+      - Adapter lets you use same device anywhere
+      - You don't need to change the device for each country
+      - Fraisier is the adapter for Git providers
+
+  intermediate:
+    focus: "Multi-provider webhook support"
+    key_points:
+      - "Each provider has different webhook format/signature"
+      - "Fraisier normalizes all to common format"
+      - "One config can manage GitHub and GitLab services"
+      - "Auto-detect or explicit provider specification"
+      - "Easy to add new providers"
+
+  advanced:
+    focus: "Extensible provider architecture"
+    key_points:
+      - "Registry pattern for provider registration"
+      - "Provider-specific signature verification strategies"
+      - "Webhook event normalization and mapping"
+      - "Per-fraise provider overrides for flexibility"
+      - "Custom provider implementation for proprietary platforms"

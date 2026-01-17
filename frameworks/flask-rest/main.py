@@ -123,8 +123,26 @@ def ping():
 
 @app.route("/users")
 def list_users():
-    """List users (basic info only)"""
+    """List users (basic info only) or batch fetch by IDs"""
     REQUEST_COUNT.labels(method="GET", endpoint="/users").inc()
+
+    # Check for batch fetch by IDs
+    ids = request.args.get("ids")
+    if ids:
+        id_list = [id.strip() for id in ids.split(",") if id.strip()]
+        if not id_list:
+            return jsonify({"users": []})
+
+        # Use ANY array for batch fetch
+        users = execute_query(
+            """
+            SELECT id, username, full_name, bio, avatar_url
+            FROM benchmark.tb_user
+            WHERE id = ANY(%s::uuid[])
+        """,
+            (id_list,),
+        )
+        return jsonify({"users": users})
 
     limit = int(request.args.get("limit", 10))
     users = execute_query(
@@ -341,6 +359,30 @@ def get_comment(comment_id):
         return jsonify({"error": "Comment not found"}), 404
 
     return jsonify(comment[0])
+
+
+@app.route("/posts/<post_id>/comments")
+def get_post_comments(post_id):
+    """Get comments for a specific post"""
+    REQUEST_COUNT.labels(method="GET", endpoint="/posts/{id}/comments").inc()
+
+    limit = int(request.args.get("limit", 10))
+
+    comments = execute_query(
+        """
+        SELECT c.id, c.content, c.created_at, c.is_approved,
+               u.id as author_id, u.username as author_username, u.avatar_url as author_avatar
+        FROM benchmark.tb_comment c
+        JOIN benchmark.tb_post p ON c.fk_post = p.pk_post
+        JOIN benchmark.tb_user u ON c.fk_author = u.pk_user
+        WHERE p.id = %s
+        ORDER BY c.created_at DESC
+        LIMIT %s
+    """,
+        (post_id, limit),
+    )
+
+    return jsonify(comments)
 
 
 @app.route("/health")

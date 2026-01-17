@@ -1,0 +1,515 @@
+# Webhook Event-Driven Deployment Pattern (Fraisier)
+# VelocityBench Knowledge Corpus
+
+id: webhook-event-driven-deployment
+name: "Fraisier: Webhook Event-Driven Deployment"
+category: fraiseql
+type: pattern
+severity: high
+tags:
+  - fraisier
+  - webhooks
+  - event-driven
+  - continuous-deployment
+  - git
+  - automation
+
+summary:
+  short: "Automatically trigger deployments from Git push events via webhooks"
+  long: |
+    Fraisier webhook server listens for push events from Git providers (GitHub, GitLab, Gitea, Bitbucket).
+    When a push occurs on a mapped branch, the webhook automatically routes to the correct fraise/environment
+    and executes the deployment without manual intervention. Supports provider signature verification for security.
+
+problem:
+  description: |
+    Manual deployments are error-prone and slow:
+    - Developer pushes code but deployment is manual SSH + script
+    - No automatic detection of which service needs to be deployed
+    - Hard to coordinate deployments across multiple services
+    - No audit trail of what triggered the deployment
+
+    Webhook-driven CD eliminates manual steps and provides automatic routing.
+
+  symptoms:
+    - name: "Manual deployment process"
+      description: "Developer has to SSH and run deploy script"
+      detection: "Deployment takes 10+ minutes, requires manual steps"
+
+    - name: "Deployment delays"
+      description: "Developers have to wait for ops to deploy"
+      detection: "Hours between push and production deployment"
+
+    - name: "Wrong service deployed"
+      description: "Manually deploy wrong service by mistake"
+      detection: "Wrong code in production"
+
+    - name: "No audit trail"
+      description: "Can't trace which push triggered deployment"
+      detection: "No deployment history, hard to debug"
+
+solution:
+  principle: "Automatic deployment triggered by Git push events via webhook"
+
+  components:
+    - name: "Webhook Server"
+      type: "HTTP listener"
+      purpose: "Receive POST events from Git providers"
+
+    - name: "Signature Verification"
+      type: "Security"
+      purpose: "Verify webhook came from authorized Git provider"
+
+    - name: "Branch Mapping"
+      type: "Routing logic"
+      purpose: "Map Git branches to fraise/environment"
+
+    - name: "Event Parser"
+      type: "Provider abstraction"
+      purpose: "Parse different webhook formats (GitHub vs GitLab vs etc)"
+
+    - name: "Deployment Executor"
+      type: "Action"
+      purpose: "Execute deployment for matched fraise/environment"
+
+webhook_server_setup:
+  description: "Running the Fraisier webhook server"
+  startup: |
+    # Start webhook server
+    export FRAISIER_WEBHOOK_SECRET=your-secret-key
+    export FRAISIER_GIT_PROVIDER=github  # optional, auto-detected
+    export FRAISIER_HOST=0.0.0.0
+    export FRAISIER_PORT=8080
+    fraisier-webhook
+
+  endpoints: |
+    POST /webhook              # Universal endpoint (auto-detects provider)
+    POST /webhook?provider=github  # Explicit provider
+    GET /providers             # List supported providers
+    GET /health                # Health check
+
+  webhook_configuration:
+    github: |
+      # GitHub Settings → Webhooks → Add webhook
+      Payload URL: https://your-server.com/webhook
+      Content type: application/json
+      Secret: FRAISIER_WEBHOOK_SECRET
+      Events: Just the push event
+
+    gitlab: |
+      # Project Settings → Webhooks
+      URL: https://your-server.com/webhook?provider=gitlab
+      Secret: FRAISIER_WEBHOOK_SECRET
+      Trigger: Push events
+
+    gitea: |
+      # Repository Settings → Webhooks
+      Target URL: https://your-server.com/webhook?provider=gitea
+      Secret: FRAISIER_WEBHOOK_SECRET
+      Events: Push events
+
+    bitbucket: |
+      # Repository Settings → Webhooks → Add webhook
+      URL: https://your-server.com/webhook?provider=bitbucket
+      Events: Repository push
+
+signature_verification:
+  description: "Verify webhook authenticity by verifying signature"
+  security_benefit: "Prevent unauthorized deployments from unsigned requests"
+
+  github_verification: |
+    # GitHub uses HMAC-SHA256
+    signature = HMAC-SHA256(payload, webhook_secret)
+    request_header = X-Hub-Signature-256
+    verify: signature == request_header
+
+  gitlab_verification: |
+    # GitLab uses HMAC-SHA256
+    signature = HMAC-SHA256(payload, secret_token)
+    request_header = X-Gitlab-Token
+    verify: signature == request_header
+
+  gitea_verification: |
+    # Gitea uses HMAC-SHA256
+    signature = HMAC-SHA256(payload, webhook_secret)
+    request_header = X-Gitea-Signature
+    verify: signature == request_header
+
+  bitbucket_verification: |
+    # Bitbucket uses HMAC-SHA256
+    signature = HMAC-SHA256(payload, webhook_secret)
+    request_header = X-Hub-Signature
+    verify: signature == request_header
+
+event_parsing:
+  description: "Parse provider-specific webhook formats"
+
+  github_event: |
+    {
+      "ref": "refs/heads/main",
+      "repository": {
+        "name": "my-api",
+        "full_name": "myorg/my-api"
+      },
+      "pusher": {
+        "name": "alice",
+        "email": "alice@example.com"
+      },
+      "commits": [
+        {
+          "id": "abc123...",
+          "message": "Fix auth bug",
+          "author": {"name": "alice"}
+        }
+      ]
+    }
+
+    # Parse: branch = "main", commits = 1
+
+  gitlab_event: |
+    {
+      "ref": "refs/heads/main",
+      "repository": {
+        "name": "my-api",
+        "path_with_namespace": "myorg/my-api"
+      },
+      "user_name": "alice",
+      "total_commits_count": 1,
+      "commits": [
+        {
+          "id": "abc123...",
+          "message": "Fix auth bug",
+          "author": {"name": "alice"}
+        }
+      ]
+    }
+
+    # Parse: branch = "main", commits = 1
+
+  gitea_event: |
+    {
+      "ref": "refs/heads/main",
+      "repository": {
+        "name": "my-api"
+      },
+      "pusher": {
+        "login": "alice"
+      }
+    }
+
+    # Parse: branch = "main"
+
+branch_mapping:
+  description: "Route branches to fraise/environment"
+  example: |
+    branch_mapping:
+      dev:
+        fraise: api
+        environment: development
+      staging:
+        fraise: api
+        environment: staging
+      main:
+        fraise: api
+        environment: production
+
+  matching_rules: |
+    1. Extract branch from webhook event (e.g., "refs/heads/main" → "main")
+    2. Look up branch in branch_mapping
+    3. If found: route to specified fraise/environment
+    4. If not found: log and skip (no deployment)
+
+  example_flow: |
+    Developer pushes to main
+    ↓
+    GitHub sends webhook to https://your-server/webhook
+    ↓
+    Fraisier verifies HMAC signature
+    ↓
+    Fraisier parses event: branch = "main"
+    ↓
+    Fraisier looks up "main" in branch_mapping
+    ↓
+    Found: api → production
+    ↓
+    Fraisier triggers: fraisier deploy api production
+    ↓
+    Deployment starts automatically
+    ↓
+    Health check verifies success
+    ↓
+    Slack notification sent
+
+deployment_flow_from_webhook:
+  description: "Complete flow from webhook event to running service"
+  steps:
+    - name: "1. Webhook Received"
+      action: "Git provider sends POST to /webhook"
+      example: "GitHub sends push event"
+
+    - name: "2. Signature Verification"
+      action: "Verify HMAC signature matches"
+      example: "X-Hub-Signature-256 matches computed hash"
+
+    - name: "3. Parse Event"
+      action: "Extract branch, commits, repository"
+      example: "refs/heads/main → branch = main"
+
+    - name: "4. Branch Lookup"
+      action: "Find fraise/environment in branch_mapping"
+      example: "main → api/production"
+
+    - name: "5. Get Service Config"
+      action: "Load fraise config from fraises.yaml"
+      example: "api.environments.production"
+
+    - name: "6. Git Operations"
+      action: "Pull latest code, checkout branch"
+      example: "cd /var/www/api && git pull origin main"
+
+    - name: "7. Database Migrations"
+      action: "Run migrations (strategy: apply or rebuild)"
+      example: "psql -f /migrations/001_add_column.sql"
+
+    - name: "8. Service Restart"
+      action: "Restart systemd service"
+      example: "systemctl restart api.service"
+
+    - name: "9. Health Check"
+      action: "Verify service is responding"
+      example: "curl https://api.myapp.io/health → 200 OK"
+
+    - name: "10. Notification"
+      action: "Send deployment result notification"
+      example: "Slack: Deployed api to production ✓"
+
+    - name: "11. History Recording"
+      action: "Record deployment in SQLite database"
+      example: "INSERT INTO tb_deployment ..."
+
+webhook_security:
+  signature_verification: |
+    Every webhook request must have a valid signature.
+    - Extract signature from request header (provider-specific)
+    - Compute HMAC-SHA256 of request body using shared secret
+    - Compare: request signature == computed signature
+    - Reject if mismatch (return 401 Unauthorized)
+
+  secret_management: |
+    # Environment variable (never hardcode)
+    export FRAISIER_WEBHOOK_SECRET="very-long-random-string"
+
+    # Fraisier reads from environment
+    secret = os.environ["FRAISIER_WEBHOOK_SECRET"]
+
+    # Git provider configured with same secret
+    # (in GitHub/GitLab/Gitea settings)
+
+  https_requirement: |
+    Webhook endpoint must use HTTPS (not HTTP).
+    - Prevents man-in-the-middle attacks
+    - Protects webhook payload and signature in transit
+    - Required by all major Git providers
+
+  rate_limiting: |
+    Implement rate limiting to prevent abuse:
+    - Max N deployments per minute
+    - Max M concurrent deployments
+    - Queue excessive requests for later processing
+
+error_handling:
+  signature_mismatch: |
+    HTTP 401 Unauthorized
+    Log: Invalid webhook signature from <provider>
+    Action: Webhook rejected, no deployment
+
+  branch_not_mapped: |
+    HTTP 202 Accepted (received but no action)
+    Log: Branch 'feature/xyz' not in branch_mapping
+    Action: No deployment triggered (expected for feature branches)
+
+  deployment_failure: |
+    HTTP 500 Internal Server Error
+    Log: Deployment failed - health check timeout
+    Action: Slack notification with error details
+    Recovery: Manual intervention required
+
+  invalid_event_format: |
+    HTTP 400 Bad Request
+    Log: Cannot parse webhook event from <provider>
+    Action: No deployment, investigate provider format change
+
+custom_branch_routing:
+  description: "Advanced routing patterns"
+
+  wildcard_branches: |
+    branch_mapping:
+      dev:
+        fraise: api
+        environment: development
+      "feature/*":        # Match any feature branch
+        fraise: api
+        environment: development
+      "hotfix/*":         # Match any hotfix branch
+        fraise: api
+        environment: staging
+      main:
+        fraise: api
+        environment: production
+
+  conditional_deployment: |
+    branch_mapping:
+      main:
+        fraise: api
+        environment: production
+        # Only deploy if commit message contains [deploy]
+        require_commit_message: "[deploy]"
+
+  multi_service_deployment: |
+    # Single push triggers multiple services
+    branch_mapping:
+      main:
+        fraise:
+          - api          # Deploy API
+          - worker       # Deploy worker too
+          - scheduler    # Deploy scheduler too
+        environment: production
+
+best_practices:
+  - name: "Verify all webhook signatures"
+    description: "Never skip signature verification"
+    rationale: "Prevent unauthorized deployments from malicious actors"
+
+  - name: "Use HTTPS for webhook endpoint"
+    description: "Always use https://, never http://"
+    rationale: "Protect webhook payload and signature from interception"
+
+  - name: "Keep webhook secret secure"
+    description: "Store in environment variable, never in code"
+    rationale: "Prevent secret leakage if code is compromised"
+
+  - name: "Log all webhook events"
+    description: "Record every webhook received (success or failure)"
+    rationale: "Audit trail for debugging deployment issues"
+
+  - name: "Handle branch not in mapping gracefully"
+    description: "Return 202 Accepted, log event, no deployment"
+    rationale: "Feature branches shouldn't trigger deployments"
+
+  - name: "Include detailed webhook logs"
+    description: "Log branch, fraise, environment, timestamp, result"
+    rationale: "Easy debugging when something goes wrong"
+
+  - name: "Monitor webhook endpoint"
+    description: "Alert if webhook server is down"
+    rationale: "Deployments silently fail if webhook endpoint unreachable"
+
+anti_patterns:
+  - name: "Trusting webhook without signature verification"
+    consequence: "Unauthorized deployments from forged webhook requests"
+    example: "Skip signature check to 'save time'"
+
+  - name: "Hard-coded webhook secret in code"
+    consequence: "Secret leakage when code is public"
+    example: "webhook_secret = '12345' in config.yaml"
+
+  - name: "Using HTTP instead of HTTPS"
+    consequence: "Webhook payload and signature intercepted"
+    example: "http://my-server.com/webhook (unencrypted)"
+
+  - name: "Deploying on every push to every branch"
+    consequence: "Feature branches cause unexpected deployments"
+    example: "No branch_mapping, deploy on any branch"
+
+  - name: "No error handling"
+    consequence: "Silent failures, users notice before ops"
+    example: "Webhook runs but fails halfway, no notification"
+
+  - name: "Storing webhook logs nowhere"
+    consequence: "No audit trail for debugging"
+    example: "No logging of webhook events"
+
+use_cases:
+  - scenario: "Automatic production deployment on main push"
+    workflow: |
+      Developer pushes to main
+      ↓
+      GitHub webhook triggered
+      ↓
+      Fraisier deploys api to production
+      ↓
+      Health checks verify success
+      ↓
+      Slack notifies: "Production deployed ✓"
+
+  - scenario: "Feature branch testing in dev"
+    workflow: |
+      Developer pushes to feature/auth-refactor
+      ↓
+      GitHub webhook triggered
+      ↓
+      branch_mapping not found (feature/* pattern)
+      ↓
+      Fraisier accepts but doesn't deploy
+      ↓
+      Developer manually deploys to dev for testing
+      ↓
+      When ready, creates PR, merges to dev branch
+      ↓
+      dev branch webhook triggers dev deployment
+
+  - scenario: "Multi-service coordinated deployment"
+    workflow: |
+      Developer pushes to main
+      ↓
+      Webhook matches branch_mapping.main
+      ↓
+      Triggers 3 deployments:
+        - api to production
+        - worker to production
+        - scheduler to production
+      ↓
+      All 3 services deploy in parallel
+      ↓
+      Health checks verify all are up
+
+related_patterns:
+  - id: "fraisier-deployment-orchestration"
+    description: "Overall deployment orchestration system"
+
+  - id: "fraisier-multi-environment"
+    description: "Environment-specific webhook routing"
+
+  - id: "git-provider-abstraction"
+    description: "Support multiple Git providers in webhook"
+
+  - id: "deployment-history-tracking"
+    description: "Record webhook-triggered deployments"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Webhooks are like doorbells for your repository:
+      - Developer makes changes (presses doorbell)
+      - Fraisier hears the bell (webhook server)
+      - Fraisier knows who's at the door (signature verification)
+      - Fraisier routes to right apartment (branch mapping)
+      - Apartment door opens (deployment runs)
+
+  intermediate:
+    focus: "Webhook-driven CD pipeline"
+    key_points:
+      - "Git push triggers webhook automatically"
+      - "Fraisier verifies webhook signature"
+      - "Branch mapping routes to correct fraise/environment"
+      - "No manual deployment steps"
+      - "Deployment history recorded automatically"
+
+  advanced:
+    focus: "Multi-provider webhook security and coordination"
+    key_points:
+      - "Support GitHub, GitLab, Gitea, Bitbucket"
+      - "Provider-specific signature verification"
+      - "Multi-service coordinated deployment"
+      - "Conditional deployment (commit message checks)"
+      - "Rate limiting and error handling"

@@ -1,0 +1,476 @@
+# Fraisier Deployment Orchestration Pattern
+# VelocityBench Knowledge Corpus
+
+id: fraisier-deployment-orchestration
+name: "Fraisier: Multi-Service Deployment Orchestration"
+category: fraiseql
+type: pattern
+severity: high
+tags:
+  - fraisier
+  - deployment
+  - orchestration
+  - multi-service
+  - devops
+  - infrastructure
+
+summary:
+  short: "Orchestrate deployment of multiple services (fraises) with unified configuration and webhook-driven CD"
+  long: |
+    Fraisier (strawberry plant) manages the deployment of multiple fraises (services).
+    A single fraises.yaml configuration file describes all services, environments, and Git providers.
+    Webhook events from Git automatically trigger deployments based on branch mapping.
+    Supports GitHub, GitLab, Gitea, Bitbucket (cloud and self-hosted).
+    Written in Python, integrates with systemd, health checks, and database migrations.
+
+problem:
+  description: |
+    Managing multiple services across development, staging, and production environments is complex:
+    - Each service needs separate deployment configuration
+    - No unified way to track deployment history
+    - Webhook integration scattered across multiple tools
+    - Difficult to support multiple Git providers (GitHub vs GitLab vs Gitea)
+    - Manual deployment orchestration error-prone
+
+    Fraisier provides unified configuration + automated webhook-driven CD for all services.
+
+  symptoms:
+    - name: "Deployment configuration scattered"
+      description: "Each service has separate webhook, systemd configs, health checks"
+      detection: "Multiple deployment tools, inconsistent naming, hard to track state"
+
+    - name: "Manual deployments"
+      description: "SSH into server, run scripts, manually verify health checks"
+      detection: "No webhook integration, no deployment history"
+
+    - name: "Git provider lock-in"
+      description: "Deployment tool only supports GitHub, can't use GitLab or self-hosted Git"
+      detection: "Difficult to integrate new Git provider or move repositories"
+
+    - name: "No deployment history"
+      description: "Can't track what was deployed, when, or what changed"
+      detection: "No audit trail of deployments"
+
+solution:
+  principle: "Unified service configuration + webhook-driven CD with multi-provider Git support"
+
+  components:
+    - name: "fraises.yaml Configuration"
+      type: "Unified config"
+      purpose: "Single source of truth for all services, environments, and Git providers"
+
+    - name: "Fraisier CLI"
+      type: "Command-line tool"
+      purpose: "Deploy, status, history commands"
+
+    - name: "Webhook Server"
+      type: "Event-driven deployment"
+      purpose: "Listen for Git push events, trigger deployments automatically"
+
+    - name: "Git Provider Abstraction"
+      type: "Multi-provider support"
+      purpose: "Support GitHub, GitLab, Gitea, Bitbucket with unified interface"
+
+    - name: "Deployment History DB"
+      type: "SQLite database"
+      purpose: "Track all deployments, status, timing, results"
+
+configuration:
+  fraises_yaml_structure:
+    description: "Single configuration file for all services"
+    example: |
+      # fraises.yaml: Central deployment configuration
+      git:
+        provider: github
+        github:
+          base_url: https://github.com
+          webhook_secret: ${FRAISIER_WEBHOOK_SECRET}
+        gitlab:
+          base_url: https://gitlab.mycompany.com
+          secret_token: ${FRAISIER_WEBHOOK_SECRET}
+
+      fraises:
+        api:
+          type: api
+          environments:
+            development:
+              name: api.dev
+              branch: dev
+              app_path: /var/www/api.dev
+              systemd_service: api-dev.service
+              health_check:
+                url: https://api.dev/health
+            production:
+              name: api.prod
+              branch: main
+              app_path: /var/www/api.prod
+              systemd_service: api-prod.service
+              health_check:
+                url: https://api.prod/health
+
+        worker:
+          type: etl
+          environments:
+            production:
+              app_path: /var/www/api.prod
+              script_path: scripts/worker.sh
+
+      branch_mapping:
+        dev:
+          fraise: api
+          environment: development
+        main:
+          fraise: api
+          environment: production
+
+  fraise_types:
+    - name: "api"
+      description: "Web services and APIs"
+      features:
+        - systemd service management
+        - health checks
+        - database migrations
+        - systemd timers for scheduled tasks
+      example: |
+        my_api:
+          type: api
+          environments:
+            production:
+              name: api.myapp.io
+              branch: main
+              app_path: /var/www/api
+              systemd_service: api.service
+              database:
+                name: myapp_prod
+                strategy: apply  # safe migrations
+              health_check:
+                url: https://api.myapp.io/health
+
+    - name: "etl"
+      description: "Data pipelines and batch jobs"
+      features:
+        - script execution
+        - shared code with other fraises
+        - database access
+        - success/failure notifications
+      example: |
+        etl_job:
+          type: etl
+          environments:
+            production:
+              app_path: /var/www/api
+              script_path: scripts/etl/run.sh
+              database:
+                name: myapp_prod
+              notifications:
+                on_success: scripts/notify_success.sh
+                on_failure: scripts/notify_failure.sh
+
+    - name: "scheduled"
+      description: "Cron jobs and systemd timers"
+      features:
+        - systemd timer integration
+        - cron schedule syntax
+        - periodic execution
+      example: |
+        daily_stats:
+          type: scheduled
+          environments:
+            production:
+              jobs:
+                stats:
+                  name: myapp-stats
+                  systemd_service: myapp-stats.service
+                  systemd_timer: myapp-stats.timer
+                  schedule: "0 2 * * *"  # Daily at 2am
+
+    - name: "backup"
+      description: "Backup jobs with retention and remote sync"
+      features:
+        - backup scheduling
+        - retention policies
+        - remote sync (S3, etc)
+        - job dependencies
+      example: |
+        backup:
+          type: backup
+          environments:
+            production:
+              jobs:
+                local:
+                  name: db-backup
+                  script_path: scripts/backup.sh
+                  schedule: "0 */6 * * *"  # Every 6 hours
+                  retention_days: 7
+                sync:
+                  name: backup-to-s3
+                  schedule: "0 * * * *"  # Hourly
+                  depends_on: local
+
+  git_providers:
+    - name: "GitHub"
+      description: "GitHub.com or GitHub Enterprise"
+      config: |
+        git:
+          provider: github
+          github:
+            base_url: https://github.com
+            webhook_secret: ${FRAISIER_WEBHOOK_SECRET}
+      supports:
+        - public repositories
+        - private repositories
+        - GitHub Enterprise (self-hosted)
+
+    - name: "GitLab"
+      description: "GitLab.com or self-hosted GitLab"
+      config: |
+        git:
+          provider: gitlab
+          gitlab:
+            base_url: https://gitlab.mycompany.com
+            secret_token: ${FRAISIER_WEBHOOK_SECRET}
+      supports:
+        - cloud and self-hosted
+        - multiple instances
+
+    - name: "Gitea/Forgejo"
+      description: "Gitea and Forgejo self-hosted"
+      config: |
+        git:
+          provider: gitea
+          gitea:
+            base_url: https://git.mycompany.com
+            webhook_secret: ${FRAISIER_WEBHOOK_SECRET}
+
+    - name: "Bitbucket"
+      description: "Bitbucket Cloud and Server"
+      config: |
+        git:
+          provider: bitbucket
+          bitbucket:
+            base_url: https://bitbucket.org
+            server: false  # true for Bitbucket Server
+            webhook_secret: ${FRAISIER_WEBHOOK_SECRET}
+
+  multi_provider_support:
+    description: "Override provider per fraise"
+    example: |
+      fraises:
+        # Uses default GitHub
+        api:
+          type: api
+          environments:
+            production:
+              branch: main
+
+        # Overrides to use internal GitLab
+        internal_api:
+          type: api
+          git:
+            provider: gitlab
+            base_url: https://gitlab.mycompany.com
+          environments:
+            production:
+              branch: main
+
+        # Overrides to use Gitea
+        homelab_api:
+          type: api
+          git:
+            provider: gitea
+            base_url: https://git.homelab.local
+          environments:
+            production:
+              branch: main
+
+deployment_flow:
+  webhook_trigger:
+    description: "Push event → webhook → deployment"
+    steps:
+      - name: "Git event"
+        description: "Developer pushes to branch (e.g., dev or main)"
+
+      - name: "Webhook sent"
+        description: "Git provider (GitHub/GitLab/etc) sends POST to webhook endpoint"
+
+      - name: "Webhook received"
+        description: "Fraisier webhook server receives event"
+
+      - name: "Provider verification"
+        description: "Verify webhook signature (provider-specific)"
+
+      - name: "Branch routing"
+        description: "Look up branch_mapping to find fraise and environment"
+
+      - name: "Deployment"
+        description: "Execute deployment (git pull, migrations, systemd restart, health check)"
+
+  cli_commands:
+    - command: "fraisier list"
+      description: "List all configured fraises"
+
+    - command: "fraisier deploy API development"
+      description: "Deploy specific fraise to environment"
+
+    - command: "fraisier status API development"
+      description: "Check deployment status and health"
+
+    - command: "fraisier history"
+      description: "View deployment history and audit trail"
+
+    - command: "fraisier history API development"
+      description: "View deployment history for specific fraise/environment"
+
+health_checks:
+  description: "Verify deployment success by checking HTTP endpoint"
+  example: |
+    environments:
+      production:
+        health_check:
+          url: https://api.myapp.io/health
+          timeout: 30  # seconds
+          expected_status: 200  # HTTP status code
+  purpose:
+    - Confirm service is running after deployment
+    - Detect failed deployments immediately
+    - Automatic rollback on health check failure
+
+database_migrations:
+  description: "Manage schema changes during deployment"
+  strategies:
+    - strategy: "rebuild"
+      description: "Drop and recreate database (dev/test only)"
+      use_case: "Development environment"
+      sql: "DROP DATABASE; CREATE DATABASE;"
+
+    - strategy: "apply"
+      description: "Apply safe migrations only (production)"
+      use_case: "Production environment"
+      sql: "ALTER TABLE ... ADD COLUMN ... (no destructive changes)"
+
+    - strategy: "backup_before_apply"
+      description: "Backup database before migrations (production)"
+      steps:
+        - Backup current database state
+        - Apply migrations
+        - Verify health checks
+        - Keep backup for rollback
+
+best_practices:
+  - name: "One fraises.yaml for all services"
+    description: "Single source of truth for deployment configuration"
+    rationale: "Consistent deployment behavior, easier to audit"
+
+  - name: "Use environment-specific configuration"
+    description: "Development, staging, production have different settings"
+    rationale: "Dev can use 'rebuild' strategy, prod uses safe 'apply'"
+
+  - name: "Always include health checks"
+    description: "Verify service is running after deployment"
+    rationale: "Catch failures immediately instead of silent outages"
+
+  - name: "Branch mapping for webhook routing"
+    description: "Map Git branches to fraise/environment"
+    rationale: "Automatic deployments without manual intervention"
+
+  - name: "Support multiple Git providers"
+    description: "Don't lock into one Git hosting platform"
+    rationale: "Freedom to migrate or use different providers per team"
+
+  - name: "Track deployment history"
+    description: "Keep SQLite database with all deployments"
+    rationale: "Audit trail, rollback capability, debugging"
+
+anti_patterns:
+  - name: "Separate deployment tool per service"
+    consequence: "Inconsistent deployments, hard to maintain"
+    example: "One tool for API, different tool for worker, manual cron jobs"
+
+  - name: "Hard-coded webhook logic"
+    consequence: "Difficult to add new Git provider"
+    example: "If provider == 'github': ... elif provider == 'gitlab': ..."
+
+  - name: "No health checks"
+    consequence: "Silent failures, users notice before ops"
+    example: "Deploy, restart service, don't verify it's up"
+
+  - name: "Manual deployment commands"
+    consequence: "Error-prone, inconsistent"
+    example: "SSH, run scripts, forget to verify, repeat"
+
+  - name: "No deployment history"
+    consequence: "Can't track what changed or when"
+    example: "No audit trail, difficult to rollback"
+
+use_cases:
+  - scenario: "Multi-service application with 3 environments"
+    setup: |
+      - One API (dev/staging/prod)
+      - One worker (prod only)
+      - One scheduled jobs (prod only)
+      - GitHub webhooks for auto-deploy
+    benefit: "Single fraises.yaml, automatic deployments on push"
+
+  - scenario: "Team using internal GitLab + public GitHub"
+    setup: |
+      - Internal API on GitLab
+      - Public library on GitHub
+      - One Fraisier configuration with mixed providers
+    benefit: "No tool switching, unified deployment interface"
+
+  - scenario: "Microservices across multiple teams"
+    setup: |
+      - Team A manages API (GitHub)
+      - Team B manages Worker (self-hosted Gitea)
+      - Team C manages Admin panel (GitLab)
+    benefit: "Each team owns their fraise config, all deploy through Fraisier"
+
+  - scenario: "Backup and sync pipeline"
+    setup: |
+      - Local database backups every 6 hours
+      - Sync to S3 every hour
+      - Retention of 7 days
+    benefit: "Scheduled jobs with dependencies, automatic cleanup"
+
+related_patterns:
+  - id: "webhook-event-driven-deployment"
+    description: "Event-driven deployments via Git webhooks"
+
+  - id: "fraisier-multi-environment"
+    description: "Configuration for multiple environments (dev/staging/prod)"
+
+  - id: "git-provider-abstraction"
+    description: "Support multiple Git providers with unified interface"
+
+  - id: "deployment-history-tracking"
+    description: "Track all deployments in SQLite database"
+
+  - id: "fraisier-cqrs-deployment"
+    description: "CQRS pattern for deployment state tracking"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Fraisier is like a gardener managing a strawberry field:
+      - Fraises (services) are the individual strawberry plants
+      - Fraisier (the garden) orchestrates planting, watering, harvesting
+      - One garden (Fraisier) produces many strawberries (services)
+      - Webhooks are like rain sensors that automatically water when needed
+
+  intermediate:
+    focus: "Configuration-driven deployment with webhook automation"
+    key_points:
+      - "Single fraises.yaml for all services and environments"
+      - "Webhook-driven CD: push → deploy → health check"
+      - "Support multiple Git providers (GitHub/GitLab/Gitea/Bitbucket)"
+      - "Database migrations with environment-specific strategies"
+      - "Deployment history and audit trail"
+
+  advanced:
+    focus: "Multi-team deployment orchestration and provider extensibility"
+    key_points:
+      - "Per-fraise Git provider override for flexibility"
+      - "Health check integration for deployment verification"
+      - "Scheduled jobs and backup pipelines"
+      - "Custom Git provider implementation"
+      - "Deployment coordination across microservices"

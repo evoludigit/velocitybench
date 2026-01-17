@@ -1,324 +1,255 @@
 ```markdown
-# **Audit Troubleshooting: A Complete Guide to Debugging Your Data Like a Pro**
+---
+title: "Audit Troubleshooting: A Complete Guide to Debugging Database Changes in Production"
+date: 2024-02-20
+author: "Alex Carter, Senior Backend Engineer"
+description: "Learn how to implement and troubleshoot database audit patterns effectively. A practical guide for debugging production issues with real-world examples."
+tags: ["database", "backend", "audit", "sql", "debugging", "patterns"]
+image: "/images/audit-troubleshooting.png"
+---
 
-Debugging data issues in production is like solving a mystery—except the clues are scattered across logs, tables, and systems, and the suspect (bad data) often changes its behavior. Without proper **audit troubleshooting**, you’re left flying blind: *"When did this record get corrupted?"*, *"Who changed it?"*, *"How do we fix it without breaking something?"*
+# **Audit Troubleshooting: A Complete Guide to Debugging Database Changes in Production**
 
-Enter the **Audit Troubleshooting Pattern**: a structured approach to diagnosing, isolating, and resolving data inconsistencies by leveraging audit logs, change tracking, and systematic queries. This isn’t just about rolling back a bad transaction—it’s about *preventing* the chaos in the first place and having the tools to reverse-engineer issues when they arise.
+As a backend engineer, you’ve likely encountered the classic nightmare: a critical production issue where some user’s data is mysteriously corrupted, a transaction gone awry, or a row vanished without a trace. When you can’t reproduce the issue in staging, when logs don’t reveal the culprit, and when the frontend points to "everything is fine," your only recourse is **audit troubleshooting**.
 
-In this guide, we’ll walk through real-world challenges, the audit troubleshooting pattern’s core components, and practical implementations in SQL and application code. By the end, you’ll know how to:
+Audit data—the detailed records of who changed what, when, and why—is your lifeline in these moments. But raw audit logs are often overwhelming, fragmented across tables, and hard to query effectively. This is where the **Audit Troubleshooting Pattern** comes into play: a structured way to store, index, and analyze audit data so you can quickly isolate and diagnose issues.
 
-- **Instrument your database and application** for granular change tracking.
-- **Debug data corruption** with precise queries.
-- **Automate recovery** for common scenarios (like rogue `DELETE`s or malformed data).
-- **Design for observability** so future issues are easier to diagnose.
-
-Let’s begin.
+In this guide, we’ll explore:
+- The challenges of debugging without proper audit data.
+- How to design an efficient audit system that supports troubleshooting.
+- Practical code examples for indexing, querying, and debugging.
+- Common pitfalls and how to avoid them.
+- Advanced techniques for large-scale systems.
 
 ---
 
-## **The Problem: Why Audit Troubleshooting Matters**
+## **The Problem: Debugging Without a Safety Net**
 
 Imagine this scenario:
+A user reports that their `account_balance` was set to `0` after a recent payment processing update. The application logs don’t show any obvious error, and the frontend logs confirm the request was successful. When you check the database, the row doesn’t exist—it was likely deleted. But *who* deleted it? *When*? And *why* was that allowed?
 
-> **Incident:** A critical financial transaction—transferring $10,000 between accounts—isn’t reflected in the database. The frontend shows “Error: Insufficient Funds,” but the account balance was clearly sufficient. Worse, the transaction appears to have *wiped out* a user’s savings account.
+Without comprehensive audit data, your options are limited:
+1. **Manual inspection**: Digging through transaction logs, binary dumps, or even application code to infer what happened (slow, error-prone).
+2. **Reproducing the issue**: Often impossible in staging due to data inconsistencies.
+3. **Guesswork**: Relying on memory or internal notes, which may not exist or be outdated.
 
-Without audit logs or change tracking, your options are limited:
-1. **Dumpster Fire Approach**: Manually scan all tables for the last 5 minutes of changes. *"Was it this stored procedure? That cron job? Did someone `UPDATE` the wrong column?"*
-2. **Guess-and-Check**: Roll back a backup or rebuild the database from scratch.
-3. **Hopelessness**: Accept the loss or hope the user notices before the next quarter-end.
+Audit data solves these problems by providing:
+- **A complete history** of changes (not just successes).
+- **Attribution**: Who made the change (user, service, cron job).
+- **Context**: Why the change was made (e.g., "payment failed, refund initiated").
+- **Temporal precision**: Down to the millisecond.
 
-This isn’t hypothetical. Real-world issues like **data corruption due to race conditions**, **malicious `DROP TABLE` incidents**, or **application bugs** happen daily. The cost? Downtime, regulatory fines, lost revenue, and shattered customer trust.
-
-Audit troubleshooting is how you turn chaos into clarity.
-
----
-
-## **The Solution: A Pattern for Systematic Debugging**
-
-The audit troubleshooting pattern combines **three core pillars**:
-
-1. **Change Recording**
-   Track every modification to critical data (inserts, updates, deletes) with timestamps, user context, and transaction details.
-
-2. **Observability Queries**
-   Write reusable SQL to analyze changes over time (*e.g.*, "Show me all updates to `User` tables between 4 PM and 5 PM today").
-
-3. **Recovery Automation**
-   Design procedures to revert or correct issues (*e.g.*, "Roll back all bad transactions from User X").
-
-### **Architecture Overview**
-Here’s how the components fit together:
-
-```
-┌───────────────────────────────────────────────────────────────────┐
-│                     Application Layer                              │
-│ ┌───────────────┐ ┌───────────────┐ ┌───────────────────────────┐ │
-│ │ Business Logic│ │ Audit Triggers│ │ Event Logs (Kafka, etc.) │ │
-│ └───────────────┘ └───────────────┘ └───────────────────────────┘ │
-└───────────────────────────────────────────────────────────────────┘
-┌───────────────────────────────────────────────────────────────────┐
-│                     Database Layer                                │
-│ ┌─────────────┐ ┌─────────────┐ ┌─────────────────────────────┐ │
-│ │   Tables    │ │ Audit Logs  │ │ Change Data Capture (CDC)   │ │
-│ └─────────────┘ └─────────────┘ └─────────────────────────────┘ │
-└───────────────────────────────────────────────────────────────────┘
-```
-
-We’ll focus on **practical implementations** in the next sections.
+But raw audit logs are useless if you can’t query them efficiently. That’s where the **Audit Troubleshooting Pattern** helps.
 
 ---
 
-## **Components: Implementing the Pattern**
+## **The Solution: Structured Audit Data for Fast Debugging**
 
-### **1. Change Recording: Where to Store Audit Data**
-Audit logs aren’t just for debugging—they’re your **single source of truth** for compliance and recovery. Here are three approaches:
+The goal of an effective audit system is to make debugging **predictable and fast**. This means:
+1. **Centralizing audit data** in a dedicated table (or tables) so it’s easy to query.
+2. **Indexing critical fields** (e.g., `entity_id`, `timestamp`, `user_id`) for fast lookups.
+3. **Storing enough context** to understand the "why" behind changes (e.g., transaction ID, error codes, application version).
+4. **Separating audit data from application data** to avoid bloat and unnecessary joins.
+5. **Providing tools** to reconstruct state at any point in time.
 
-#### **Option A: Database-Agnostic Audit Tables**
-Store change history alongside your core tables.
+Here’s the core structure we’ll use:
+
+### **1. The Audit Table Schema**
+A single table (`audit_logs`) with columns that capture:
+- Who made the change (`user_id`, `service_name`).
+- What was changed (`entity_type`, `entity_id`, `old_value`, `new_value`).
+- When (`timestamp`, `transaction_id`).
+- Why (`action_type`, `context`—e.g., "payment_failed", "bulk_update").
+
 ```sql
-CREATE TABLE user_audit (
+CREATE TABLE audit_logs (
     id BIGSERIAL PRIMARY KEY,
-    user_id VARCHAR(255),  -- Reference to the table's PK
-    event_type VARCHAR(20) NOT NULL,  -- 'INSERT', 'UPDATE', 'DELETE'
-    json_data JSONB NOT NULL,  -- Before/after state
-    changed_by VARCHAR(255),   -- User or process name
-    changed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Example: Log an update to a user's email
-INSERT INTO user_audit (user_id, event_type, json_data, changed_by)
-VALUES (
-    'user123',
-    'UPDATE',
-    JSONB_BUILD_OBJECT(
-        'before', JSONB_BUILD_OBJECT('email', 'old@example.com'),
-        'after',  JSONB_BUILD_OBJECT('email', 'new@example.com')
-    ),
-    'system:user_update_script'
+    entity_type VARCHAR(50) NOT NULL,  -- e.g., "user", "account", "order"
+    entity_id BIGINT NOT NULL,        -- Foreign key to the actual entity
+    action_type VARCHAR(20) NOT NULL, -- e.g., "insert", "update", "delete"
+    old_value JSONB,                   -- Only for updates/deletes
+    new_value JSONB,                   -- Only for inserts/updates
+    user_id BIGINT,                    -- Who performed the action (if applicable)
+    service_name VARCHAR(50),          -- "web_app", "cron_job", "payment_gateway"
+    timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    transaction_id VARCHAR(100),       -- Correlate with application transactions
+    context JSONB,                     -- Additional metadata (e.g., error details)
+    INDEX idx_entity_timestamp (entity_type, entity_id, timestamp),
+    INDEX idx_user_timestamp (user_id, timestamp),
+    INDEX idx_action_timestamp (action_type, timestamp)
 );
 ```
 
-#### **Option B: Change Data Capture (CDC) with Debezium**
-For PostgreSQL/MySQL, CDC tools like [Debezium](https://debezium.io/) stream log entries to a Kafka topic in real time.
-*Pros*: Low overhead, scalable.
-*Cons*: Requires infrastructure setup.
+### **2. Indexing for Speed**
+The above indexes ensure:
+- Quick lookups by `entity_id` (to find changes to a specific user/order).
+- Fast filtering by `timestamp` (to scope changes to a time range).
+- Efficient searches by `action_type` (e.g., all deletes in the last hour).
 
-```java
-// Pseudocode for Debezium consumer (Kafka)
-@KafkaListener(topics = "orders_db_full.db.orders")
-public void processOrderChange(ChangeEvent<Order> changeEvent) {
-    if (changeEvent.isAfter()) {
-        log.info("Order {} was updated: {}", changeEvent.payload().getId(), changeEvent.after());
-    }
+### **3. Supporting Replay and State Reconstruction**
+To debug a corrupted `account_balance`, you might need to:
+1. List all changes to that account in the last 5 minutes.
+2. Filter for updates where `account_balance` was set to `0`.
+3. Compare with the current state to see if other fields were also modified.
+
+Example query:
+```sql
+WITH balance_changes AS (
+    SELECT
+        timestamp,
+        old_value->'account_balance' AS old_balance,
+        new_value->'account_balance' AS new_balance,
+        context->>'reason'
+    FROM audit_logs
+    WHERE
+        entity_type = 'account'
+        AND entity_id = 12345
+        AND action_type = 'update'
+        AND new_value->>'account_balance' = '0'
+        AND timestamp > NOW() - INTERVAL '5 minutes'
+)
+SELECT * FROM balance_changes ORDER BY timestamp DESC;
+```
+
+---
+
+## **Implementation Guide**
+
+### **Step 1: Choose Your Audit Strategy**
+Not all audit data needs the same level of detail. Decide what to log:
+- **Critical paths**: Always audit payment processing, user account updates, or admin actions.
+- **High-velocity data**: For tables like `orders` or `inventory`, log all changes.
+- **Low-risk data**: For read-only stats or caching layers, you might skip audits entirely.
+
+### **Step 2: Instrument Your Application**
+Use middleware or ORM hooks to log changes before they hit the database. Example in PostgreSQL with `ON UPDATE` triggers:
+
+```sql
+CREATE OR REPLACE FUNCTION log_user_update()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF TG_OP = 'UPDATE' THEN
+        INSERT INTO audit_logs (
+            entity_type, entity_id, action_type,
+            old_value, new_value, user_id, service_name
+        ) VALUES (
+            'user', NEW.id, 'update',
+            to_jsonb(OLD)::jsonb - 'password'::jsonb,  -- Exclude sensitive fields
+            to_jsonb(NEW)::jsonb - 'password'::jsonb,
+            NEW.updated_by, 'web_app'
+        );
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_log_user_update
+AFTER UPDATE ON users
+FOR EACH ROW
+EXECUTE FUNCTION log_user_update();
+```
+
+For non-PostgreSQL databases, use application-level logging (e.g., Django’s `post_save` signals, Ruby on Rails’ `after_save`).
+
+### **Step 3: Handle Sensitive Data**
+Never log PII (Personally Identifiable Information) or sensitive data like passwords. Mask or exclude it entirely:
+```python
+# Python example (Flask/Django)
+def log_audit_change(entity_type, entity_id, action, old_data, new_data):
+    cleaned_old = {k: v for k, v in old_data.items() if k not in ("password", "ssn")}
+    cleaned_new = {k: v for k, v in new_data.items() if k not in ("password", "ssn")}
+    # Insert into audit_logs...
+```
+
+### **Step 4: Correlate with Application Transactions**
+Link audit logs to application transactions for end-to-end debugging. Use a UUID or transaction ID:
+```javascript
+// Node.js example
+const transactionId = generateUUID();
+try {
+    await paymentService.processPayment({ ... }, transactionId);
+} catch (error) {
+    // Log error + transactionId for correlation
+    await auditLog.error("payment_failed", {
+        transactionId,
+        error: error.message,
+    });
 }
 ```
 
-#### **Option C: Application-Level Triggers**
-Log changes via your application code:
-```python
-# Python (Flask + SQLAlchemy)
-@app.after_request
-def log_change(response):
-    if not hasattr(db.session, '_audit_skip'):
-        change_log = {
-            'table': 'users',
-            'action': 'UPDATE',
-            'changes': {col.name: str(getattr(obj, col.name)) for col in obj.__table__.columns},
-            'user': current_user.username
-        }
-        db.session.execute("INSERT INTO audit_log (details) VALUES (%s)", (json.dumps(change_log),))
-    return response
-```
+### **Step 5: Optimize for Query Performance**
+- **Partition audit_logs** by date to avoid full scans:
+  ```sql
+  CREATE TABLE audit_logs (
+      -- same columns as above
+  ) PARTITION BY RANGE (timestamp);
 
----
-
-### **2. Observability Queries: Finding the Bad Data**
-Now that we’re logging changes, let’s write queries to **investigate issues**.
-
-#### **Query 1: Find All Deletes in the Last Hour**
-```sql
-SELECT
-    changed_at,
-    changed_by,
-    json_data->>'user_id' AS user_id
-FROM user_audit
-WHERE event_type = 'DELETE'
-  AND changed_at > NOW() - INTERVAL '1 hour'
-ORDER BY changed_at DESC;
-```
-
-#### **Query 2: Rollback a Corrupt Update**
-```sql
--- Step 1: Identify the bad update
-SELECT id, json_data->>'before' AS old_balance
-FROM user_audit
-WHERE user_id = 'problem_user'
-  AND json_data->>'action' = 'UPDATE'
-  AND json_data->>'after'::numeric < json_data->>'before'::numeric;
-
--- Step 2: Revert the user's balance to the previous state
-UPDATE users
-SET balance = (SELECT json_data->>'before'::numeric
-               FROM user_audit
-               WHERE user_id = 'problem_user'
-                 AND changed_at = (SELECT MAX(changed_at)
-                                   FROM user_audit
-                                   WHERE user_id = 'problem_user'
-                                     AND event_type = 'UPDATE'))
-WHERE id = 'problem_user';
-```
-
-#### **Query 3: Detect Rogue Processes**
-```sql
-SELECT
-    changed_by,
-    COUNT(*) AS change_count,
-    MIN(changed_at) AS first_change,
-    MAX(changed_at) AS last_change
-FROM user_audit
-WHERE changed_by LIKE '%cron%'
-GROUP BY changed_by
-ORDER BY change_count DESC;
-```
-
----
-
-### **3. Recovery Automation: Scripts to Save the Day**
-Pre-write scripts to handle common issues:
-
-#### **Script: Revert All Deletes from a Rogue Script**
-```sql
--- Step 1: Find all deletes by the rogue script
-WITH rogue_deletes AS (
-    SELECT user_id, changed_at
-    FROM user_audit
-    WHERE changed_by = 'malicious_script'
-    AND event_type = 'DELETE'
-)
--- Step 2: Re-insert the deleted records
-INSERT INTO users (id, email, balance)
-SELECT
-    user_id AS id,
-    json_data->>'email',
-    json_data->>'balance'
-FROM user_audit
-WHERE changed_by = 'malicious_script'
-AND event_type = 'DELETE';
-```
-
-#### **Script: Alert on Anomalous Changes**
-```python
-# Python script to trigger alerts
-def check_anomalies():
-    conn = psycopg2.connect(DATABASE_URL)
-    with conn.cursor() as cur:
-        cur.execute("""
-            SELECT COUNT(*)
-            FROM user_audit
-            WHERE changed_at > NOW() - INTERVAL '5 min'
-              AND json_data->>'balance'::numeric < 0
-        """)
-        bad_updates = cur.fetchone()[0]
-        if bad_updates > 0:
-            send_alert("Potential balance corruption detected!")
-```
-
----
-
-## **Implementation Guide: Best Practices**
-
-### **1. Start Small, Then Scale**
-- **Phase 1**: Audit only critical tables (e.g., `users`, `accounts`). Use triggers or application interceptors.
-- **Phase 2**: Expand to high-risk tables (e.g., `payments`, `inventory`). Add CDC if needed.
-
-### **2. Choose Your Audit Granularity**
-| Level         | Pros                          | Cons                          |
-|---------------|-------------------------------|-------------------------------|
-| Row-level     | Precise tracking              | Higher storage overhead       |
-| Column-level  | Smaller logs                  | Less useful for complex changes |
-| Application-level | Easy to implement | Misses database-only changes   |
-
-### **3. Index Your Audit Logs**
-```sql
-CREATE INDEX idx_user_audit_user_id ON user_audit(user_id);
-CREATE INDEX idx_user_audit_timestamp ON user_audit(changed_at) WHERE event_type = 'UPDATE';
-```
-
-### **4. Automate Recovery with Git-like Operations**
-- **Commit IDs**: Assign a unique ID to each change (like Git commits).
-- **History Layers**: Store logs in a versioned format (*e.g.*, `audit_log_v1`, `audit_log_v2`).
-
-```sql
--- Example: Add a commit_id to track changesets
-ALTER TABLE user_audit ADD COLUMN commit_id VARCHAR(64) NOT NULL DEFAULT gen_random_uuid();
-```
-
-### **5. Secure Your Audit Data**
-- Restrict access to `SELECT` on audit tables.
-- Encrypt sensitive fields (*e.g.*, `json_data` in the user audit example).
-
-```sql
-CREATE POLICY audit_log_policy ON user_audit
-    USING (changed_at > NOW() - INTERVAL '90 days');  -- Only allow old logs
-```
+  CREATE TABLE audit_logs_2024m02 PARTITION OF audit_logs
+      FOR VALUES FROM ('2024-02-01') TO ('2024-03-01');
+  ```
+- **Use materialized views** for common queries (e.g., "all deletes in the last 7 days").
 
 ---
 
 ## **Common Mistakes to Avoid**
 
-### **❌ Mistake 1: Not Logging Enough**
-- **Problem**: You forget to log *all* changes (e.g., omitting updates via `EXECUTE`).
-- **Fix**: Use **database triggers** or **application interceptors** for everything.
+1. **Overloading the Audit Table**
+   - *Problem*: Logging *everything* (e.g., every query, even reads) fills up storage and slows down writes.
+   - *Fix*: Audit only critical changes (e.g., `UPDATE`, `DELETE`, or admin actions).
 
-### **❌ Mistake 2: Over-Reliance on Backups**
-- **Problem**: You assume backups will save you, but restoring a full DB takes hours.
-- **Fix**: Use **CDC** or **row-level snapshots** for faster recovery.
+2. **Ignoring Indexes**
+   - *Problem*: No indexes on `entity_id` or `timestamp` make queries painfully slow.
+   - *Fix*: Always index these fields.
 
-### **❌ Mistake 3: Ignoring Performance**
-- **Problem**: Logs grow unchecked, slowing down queries.
-- **Fix**: Archive old logs to cold storage (*e.g.*, S3 + Athena).
+3. **Storing Raw Objects Instead of JSONB**
+   - *Problem*: Logging entire objects (e.g., `user` rows) bloat storage and make queries harder.
+   - *Fix*: Only log the *changed fields* or a diff (e.g., `old_value->'balance'`).
 
-### **❌ Mistake 4: No Team Training**
-- **Problem**: Engineers don’t know how to use audit logs.
-- **Fix**: Document **key queries** and run **war games** (e.g., "How would we recover if the `DELETE` table statement was run?").
+4. **Not Correlating with Application Traffic**
+   - *Problem*: Audit logs are "black boxes" with no link to user sessions or API calls.
+   - *Fix*: Include a `transaction_id` or `user_session_id` in every audit entry.
+
+5. **Assuming Audit Data is 100% Accurate**
+   - *Problem*: Triggers or middleware might fail silently, creating gaps.
+   - *Fix*: Add redundancy (e.g., log to both database and a centralized service).
+
+6. **Forgetting to Rotate Old Audit Data**
+   - *Problem*: Retaining all audit logs indefinitely consumes disk space indefinitely.
+   - *Fix*: Implement TTL (Time-To-Live) policies or archive old data to S3/BigQuery.
 
 ---
 
 ## **Key Takeaways**
-Here’s what to remember:
 
-✅ **Audit logs are your lifeline**—without them, debugging is guesswork.
-✅ **Start with critical tables** and expand gradually.
-✅ **Write observability queries** now—you’ll need them when the fire starts.
-✅ **Automate recovery** for common failure modes.
-✅ **Don’t forget performance**—index logs and archive old data.
-✅ **Treat audit data as a product**—document, secure, and train your team.
-
----
-
-## **Conclusion: Debugging with Confidence**
-
-Data issues will happen. The question isn’t *if* but *how quickly you can recover*. The **Audit Troubleshooting Pattern** gives you the tools to:
-
-1. **Prevent** issues with automated checks and rollback scripts.
-2. **Diagnose** problems in minutes, not days, with targeted queries.
-3. **Recover** with precision, minimizing downtime.
-
-Your next project? Implement audit logs on your most critical tables today. When the inevitable `DELETE` incident occurs, you’ll be ready.
-
-**Further Reading:**
-- [Debezium Documentation](https://debezium.io/documentation/reference/connectors/)
-- [PostgreSQL Audit Extensions](https://www.postgresql.org/docs/current/audit.html)
-- [GitHub: Audit Log Patterns](https://github.com/search?q=audit+log+template)
+✅ **Audit data is your detective tool**—without it, debugging is guesswork.
+✅ **Design for queries**—indexes and partitioning matter as much as the schema.
+✅ **Balance detail and overhead**—log enough to debug but avoid audit fatigue.
+✅ **Correlate with application context**—link audit logs to transactions, users, and errors.
+✅ **Mask sensitive data**—never log passwords, SSNs, or PII.
+✅ **Plan for scale**—partition, archive, and consider eventual consistency for high-velocity systems.
 
 ---
 
-**What’s your biggest audit-related horror story?** Share in the comments—I’d love to hear (and learn from) your war stories!
+## **Conclusion**
+
+Audit troubleshooting isn’t just about *having* audit logs—it’s about designing them to **answer the right questions, fast**. By structuring your audit data with indexes, correlation fields, and careful partitioning, you turn a chaotic production incident into a solvable puzzle.
+
+When your user reports that their account was unexpectedly zeroed out, you’ll no longer be reduced to a hunt-and-peck through transaction logs. Instead, you’ll fire up a query like this:
+```sql
+SELECT timestamp, context->>'reason', old_value, new_value
+FROM audit_logs
+WHERE entity_type = 'account'
+  AND entity_id = 42
+  AND new_value->>'balance' = '0'
+ORDER BY timestamp DESC LIMIT 10;
 ```
+And find the root cause in seconds.
+
+Start small—audit your most critical tables first—and gradually expand. Your future self (and your users) will thank you.
 
 ---
-**Why this works:**
-- **Code-first**: Includes practical SQL, Python, and Kafka examples.
-- **Tradeoffs discussed**: Weighs CDC vs. triggers, row-level vs. column-level auditing.
-- **Actionable**: Guides you from "just log changes" to "automate recovery."
-- **Friendly but professional**: Balances sharp advice with empathy for debugging pain.
+**Further Reading:**
+- [PostgreSQL Triggers Documentation](https://www.postgresql.org/docs/current/plpgsql-trigger.html)
+- [Event Sourcing vs. Audit Logs](https://martinfowler.com/articles/201701/event-sourcing-nothing-new.html)
+- [Django’s Audit Log Example](https://github.com/django-auditlog/django-auditlog)
+```

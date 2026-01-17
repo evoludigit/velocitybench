@@ -81,13 +81,33 @@ async def ping():
 
 
 @app.get("/users")
-async def list_users(limit: int = Query(10, ge=1, le=100), include: str | None = None):
-    """List users with optional includes"""
+async def list_users(
+    limit: int = Query(10, ge=1, le=100),
+    include: str | None = None,
+    ids: str | None = Query(None, description="Comma-separated list of user IDs for batch fetch"),
+):
+    """List users with optional includes or batch fetch by IDs"""
     REQUEST_COUNT.labels(method="GET", endpoint="/users").inc()
 
     db = get_db()
 
-    # Base query
+    # Batch fetch by IDs if provided
+    if ids:
+        id_list = [id.strip() for id in ids.split(",") if id.strip()]
+        if not id_list:
+            return {"users": []}
+
+        users = await db.fetch(
+            """
+            SELECT id, username, full_name, bio, avatar_url
+            FROM benchmark.tb_user
+            WHERE id = ANY($1::uuid[])
+        """,
+            id_list,
+        )
+        return {"users": users}
+
+    # Base query for listing
     query = """
         SELECT id, username, full_name, bio
         FROM benchmark.tb_user
@@ -353,6 +373,34 @@ async def get_post(post_id: str = Path(...), include: str | None = None):
         post_data["comments"] = comments
 
     return post_data
+
+
+@app.get("/posts/{post_id}/comments")
+async def get_post_comments(
+    post_id: str = Path(...),
+    limit: int = Query(10, ge=1, le=100),
+):
+    """Get comments for a specific post"""
+    REQUEST_COUNT.labels(method="GET", endpoint="/posts/{id}/comments").inc()
+
+    db = get_db()
+
+    comments = await db.fetch(
+        """
+        SELECT c.id, c.content, c.created_at, c.is_approved,
+               u.id as author_id, u.username as author_username, u.avatar_url as author_avatar
+        FROM benchmark.tb_comment c
+        JOIN benchmark.tb_post p ON c.fk_post = p.pk_post
+        JOIN benchmark.tb_user u ON c.fk_author = u.pk_user
+        WHERE p.id = $1
+        ORDER BY c.created_at DESC
+        LIMIT $2
+    """,
+        post_id,
+        limit,
+    )
+
+    return [dict(c) for c in comments]
 
 
 @app.get("/health")
