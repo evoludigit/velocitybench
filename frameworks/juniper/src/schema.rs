@@ -143,7 +143,7 @@ impl QueryRoot {
     }
 
     async fn user(context: &Context, id: ID) -> FieldResult<Option<User>> {
-        let user_id = Uuid::parse_str(id.as_str())
+        let user_id = Uuid::parse_str(&id.to_string())
             .map_err(|e| juniper::FieldError::new(format!("Invalid UUID: {}", e), juniper::Value::null()))?;
 
         let client = context.db.pool().get().await
@@ -199,7 +199,7 @@ impl QueryRoot {
     }
 
     async fn post(context: &Context, id: ID) -> FieldResult<Option<Post>> {
-        let post_id = Uuid::parse_str(id.as_str())
+        let post_id = Uuid::parse_str(&id.to_string())
             .map_err(|e| juniper::FieldError::new(format!("Invalid UUID: {}", e), juniper::Value::null()))?;
 
         context
@@ -260,7 +260,7 @@ pub struct MutationRoot;
 #[graphql_object(context = Context)]
 impl MutationRoot {
     async fn update_user(context: &Context, id: ID, input: UpdateUserInput) -> FieldResult<User> {
-        let user_id = Uuid::parse_str(id.as_str())
+        let user_id = Uuid::parse_str(&id.to_string())
             .map_err(|e| juniper::FieldError::new(format!("Invalid UUID: {}", e), juniper::Value::null()))?;
 
         let client = context.db.pool().get().await
@@ -314,7 +314,7 @@ impl MutationRoot {
     }
 
     async fn update_post(context: &Context, id: ID, input: UpdatePostInput) -> FieldResult<Post> {
-        let post_id = Uuid::parse_str(id.as_str())
+        let post_id = Uuid::parse_str(&id.to_string())
             .map_err(|e| juniper::FieldError::new(format!("Invalid UUID: {}", e), juniper::Value::null()))?;
 
         let client = context.db.pool().get().await

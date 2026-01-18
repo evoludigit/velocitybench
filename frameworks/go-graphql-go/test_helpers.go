@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"yourmodule/internal/graphql"
+	"github.com/benchmark/go-graphql-go/internal/graphql"
 )
 
 // TestFactory provides helper methods for creating test data

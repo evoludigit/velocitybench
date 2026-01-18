@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"yourmodule/graph/model"
+	"github.com/benchmark/go-gqlgen/graph/model"
 )
 
 // TestFactory provides helper methods for creating test data
