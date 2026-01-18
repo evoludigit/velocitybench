@@ -1,42 +1,54 @@
 import { Pool, PoolClient } from 'pg';
 
 export class TestFactory {
-  private testClient: PoolClient | null = null;
+  private createdUsers: number[] = [];
+  private createdPosts: number[] = [];
+  private createdComments: number[] = [];
 
   constructor(private pool: Pool) {}
 
   /**
-   * Start a test transaction for isolation
-   * Each test gets its own transaction that can be rolled back
+   * Start a test - no-op for PostGraphile since we need committed data
+   * PostGraphile uses a separate connection pool, so transactions won't be visible
    */
   async startTransaction() {
-    this.testClient = await this.pool.connect();
-    await this.testClient.query('BEGIN ISOLATION LEVEL READ COMMITTED');
+    // No-op: PostGraphile requires committed data
+    // We'll track created IDs and delete them in cleanup instead
   }
 
   /**
-   * Rollback the test transaction
-   * All test data is automatically cleaned up
+   * Clean up test data by deleting created records
+   * Order matters: comments -> posts -> users (due to FK constraints)
    */
-  async rollbackTransaction() {
-    if (this.testClient) {
-      try {
-        await this.testClient.query('ROLLBACK');
-      } finally {
-        this.testClient.release();
-        this.testClient = null;
+  async cleanup() {
+    const client = await this.pool.connect();
+    try {
+      // Delete in reverse order of dependencies
+      if (this.createdComments.length > 0) {
+        await client.query(
+          `DELETE FROM benchmark.tb_comment WHERE pk_comment = ANY($1)`,
+          [this.createdComments]
+        );
       }
+      if (this.createdPosts.length > 0) {
+        await client.query(
+          `DELETE FROM benchmark.tb_post WHERE pk_post = ANY($1)`,
+          [this.createdPosts]
+        );
+      }
+      if (this.createdUsers.length > 0) {
+        await client.query(
+          `DELETE FROM benchmark.tb_user WHERE pk_user = ANY($1)`,
+          [this.createdUsers]
+        );
+      }
+    } finally {
+      client.release();
+      // Reset tracking arrays
+      this.createdComments = [];
+      this.createdPosts = [];
+      this.createdUsers = [];
     }
-  }
-
-  /**
-   * Get the appropriate client for queries
-   */
-  private async getClient(): Promise<{ client: PoolClient; shouldRelease: boolean }> {
-    if (this.testClient) {
-      return { client: this.testClient, shouldRelease: false };
-    }
-    return { client: await this.pool.connect(), shouldRelease: true };
   }
 
   /**
@@ -44,31 +56,32 @@ export class TestFactory {
    * Trinity Pattern: tb_user with pk_user (integer PK) + id (UUID)
    */
   async createUser(overrides?: Partial<{
-    name: string;        // Maps to first_name for simplicity
+    name: string;        // Maps to full_name
     email: string;
     username: string;
     bio: string | null;
   }>) {
+    const randomSuffix = Math.random().toString(36).substring(7);
     const {
-      name = 'Test',
-      email = `user-${Math.random().toString(36).substring(7)}@example.com`,
-      username = `user_${Math.random().toString(36).substring(7)}`,
+      name = 'Test User',
+      email = `user-${randomSuffix}@example.com`,
+      username = `user_${randomSuffix}`,
       bio = 'Test bio',
     } = overrides || {};
 
-    const { client, shouldRelease } = await this.getClient();
+    const client = await this.pool.connect();
     try {
       const result = await client.query(
-        `INSERT INTO benchmark.tb_user (username, email, first_name, last_name, bio)
+        `INSERT INTO benchmark.tb_user (username, identifier, email, full_name, bio)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
-        [username, email, name, 'User', bio]
+        [username, `user-${randomSuffix}`, email, name, bio]
       );
-      return result.rows[0];
+      const user = result.rows[0];
+      this.createdUsers.push(user.pk_user);
+      return user;
     } finally {
-      if (shouldRelease) {
-        client.release();
-      }
+      client.release();
     }
   }
 
@@ -80,7 +93,7 @@ export class TestFactory {
     title: string;
     content: string | null;
     fk_author?: number;
-    status?: string;
+    published?: boolean;
   }>) {
     let fkAuthor: number;
     if (overrides?.fk_author) {
@@ -90,25 +103,26 @@ export class TestFactory {
       fkAuthor = user.pk_user;
     }
 
+    const randomSuffix = Math.random().toString(36).substring(7);
     const {
-      title = `Test Post ${Math.random().toString(36).substring(7)}`,
+      title = `Test Post ${randomSuffix}`,
       content = 'Test content',
-      status = 'published',
+      published = true,
     } = overrides || {};
 
-    const { client, shouldRelease } = await this.getClient();
+    const client = await this.pool.connect();
     try {
       const result = await client.query(
-        `INSERT INTO benchmark.tb_post (fk_author, title, content, status)
-         VALUES ($1, $2, $3, $4)
+        `INSERT INTO benchmark.tb_post (fk_author, identifier, title, content, published)
+         VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
-        [fkAuthor, title, content, status]
+        [fkAuthor, `post-${randomSuffix}`, title, content, published]
       );
-      return result.rows[0];
+      const post = result.rows[0];
+      this.createdPosts.push(post.pk_post);
+      return post;
     } finally {
-      if (shouldRelease) {
-        client.release();
-      }
+      client.release();
     }
   }
 
@@ -140,7 +154,7 @@ export class TestFactory {
 
     const content = overrides?.content || 'Test comment';
 
-    const { client, shouldRelease } = await this.getClient();
+    const client = await this.pool.connect();
     try {
       const result = await client.query(
         `INSERT INTO benchmark.tb_comment (fk_post, fk_author, content)
@@ -148,18 +162,11 @@ export class TestFactory {
          RETURNING *`,
         [fkPost, fkAuthor, content]
       );
-      return result.rows[0];
+      const comment = result.rows[0];
+      this.createdComments.push(comment.pk_comment);
+      return comment;
     } finally {
-      if (shouldRelease) {
-        client.release();
-      }
+      client.release();
     }
-  }
-
-  /**
-   * Clean up test data via transaction rollback
-   */
-  async cleanup() {
-    await this.rollbackTransaction();
   }
 }

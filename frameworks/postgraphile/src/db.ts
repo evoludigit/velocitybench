@@ -1,11 +1,11 @@
 import { Pool } from 'pg';
 
 const pool = new Pool({
-  user: process.env.DB_USER || 'velocitybench',
-  password: process.env.DB_PASSWORD || 'password',
+  user: process.env.DB_USER || 'benchmark',
+  password: process.env.DB_PASSWORD || 'benchmark123',
   host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME || 'velocitybench_test',
+  port: parseInt(process.env.DB_PORT || '5434'),
+  database: process.env.DB_NAME || 'velocitybench_benchmark',
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,

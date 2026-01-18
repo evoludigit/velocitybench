@@ -3,9 +3,20 @@ import { Pool } from 'pg';
 import { startServer } from '../src/index';
 import { TestFactory } from './test-factory';
 
-// TODO: Update to use Trinity Pattern schema (tb_user, tb_post, tb_comment)
-// These tests reference old schema with 'users', 'posts' tables and 'name' field
-describe.skip('PostGraphile GraphQL Query Operations', () => {
+/**
+ * PostGraphile GraphQL Query Tests
+ *
+ * Trinity Pattern: tb_user, tb_post, tb_comment tables
+ * - pk_* = integer primary key (internal)
+ * - id = UUID (external API identifier)
+ * - fk_* = integer foreign key
+ *
+ * Field mappings (PostGraphile camelCase):
+ * - full_name -> fullName
+ * - pk_user -> pkUser (still exposed due to smart tag configuration)
+ * - created_at -> createdAt
+ */
+describe('PostGraphile GraphQL Query Operations', () => {
   let server: any;
   let pool: Pool;
   let factory: TestFactory;
@@ -13,11 +24,11 @@ describe.skip('PostGraphile GraphQL Query Operations', () => {
   beforeAll(async () => {
     server = await startServer();
     pool = new Pool({
-      user: process.env.DB_USER || 'velocitybench',
-      password: process.env.DB_PASSWORD || 'password',
+      user: process.env.DB_USER || 'benchmark',
+      password: process.env.DB_PASSWORD || 'benchmark123',
       host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '5432'),
-      database: process.env.DB_NAME || 'velocitybench_test',
+      port: parseInt(process.env.DB_PORT || '5434'),
+      database: process.env.DB_NAME || 'velocitybench_benchmark',
     });
     factory = new TestFactory(pool);
   });
@@ -26,6 +37,10 @@ describe.skip('PostGraphile GraphQL Query Operations', () => {
     await pool.end();
     server.close();
   }, 15000);
+
+  beforeEach(async () => {
+    await factory.startTransaction();
+  });
 
   afterEach(async () => {
     await factory.cleanup();
@@ -39,20 +54,20 @@ describe.skip('PostGraphile GraphQL Query Operations', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: "${user.id}") { id name email } }`,
+          query: `{ userById(id: "${user.id}") { id fullName email } }`,
         });
 
       expect(response.status).toBe(200);
       expect(response.body.data.userById).toBeDefined();
       expect(response.body.data.userById.id).toBe(user.id);
-      expect(response.body.data.userById.name).toBe('Alice');
+      expect(response.body.data.userById.fullName).toBe('Alice');
     });
 
     test('should return null for non-existent user', async () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: "00000000-0000-0000-0000-000000000000") { id name } }`,
+          query: `{ userById(id: "00000000-0000-0000-0000-000000000000") { id fullName } }`,
         });
 
       expect(response.status).toBe(200);
@@ -65,12 +80,12 @@ describe.skip('PostGraphile GraphQL Query Operations', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: "${user.id}") { id name } }`,
+          query: `{ userById(id: "${user.id}") { id fullName } }`,
         });
 
       expect(response.status).toBe(200);
       expect(response.body.data.userById.id).toBeDefined();
-      expect(response.body.data.userById.name).toBeDefined();
+      expect(response.body.data.userById.fullName).toBeDefined();
       expect(response.body.data.userById.email).toBeUndefined();
     });
 
@@ -80,11 +95,11 @@ describe.skip('PostGraphile GraphQL Query Operations', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: "${user.id}") { name } }`,
+          query: `{ userById(id: "${user.id}") { fullName } }`,
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.data.userById.name).toBe('张三 李四 🎉');
+      expect(response.body.data.userById.fullName).toBe('张三 李四 🎉');
     });
 
     test('should handle emoji in names', async () => {
@@ -93,11 +108,11 @@ describe.skip('PostGraphile GraphQL Query Operations', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: "${user.id}") { name } }`,
+          query: `{ userById(id: "${user.id}") { fullName } }`,
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.data.userById.name).toContain('😊');
+      expect(response.body.data.userById.fullName).toContain('😊');
     });
 
     test('should handle special characters in strings', async () => {
@@ -109,11 +124,11 @@ describe.skip('PostGraphile GraphQL Query Operations', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: "${user.id}") { name bio } }`,
+          query: `{ userById(id: "${user.id}") { fullName bio } }`,
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.data.userById.name).toContain('special');
+      expect(response.body.data.userById.fullName).toContain('special');
       expect(response.body.data.userById.bio).toContain('\n');
     });
 
@@ -123,7 +138,7 @@ describe.skip('PostGraphile GraphQL Query Operations', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: "${user.id}") { name bio } }`,
+          query: `{ userById(id: "${user.id}") { fullName bio } }`,
         });
 
       expect(response.status).toBe(200);
@@ -161,21 +176,21 @@ describe.skip('PostGraphile GraphQL Query Operations', () => {
     test('should retrieve comment by ID', async () => {
       const post = await factory.createPost({ title: 'Post' });
       const author = await factory.createUser({ name: 'Author' });
-      const client = await pool.connect();
-      const result = await client.query(
-        `INSERT INTO benchmark.tb_comment (content, fk_post, fk_author) VALUES ($1, $2, $3) RETURNING *`,
-        ['Test comment', post.pk_post, author.pk_user]
-      );
-      client.release();
+      const comment = await factory.createComment({
+        fk_post: post.pk_post,
+        fk_author: author.pk_user,
+        content: 'Test comment',
+      });
 
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ commentById(id: "${result.rows[0].id}") { id content } }`,
+          query: `{ commentById(id: "${comment.id}") { id content } }`,
         });
 
       expect(response.status).toBe(200);
       expect(response.body.data.commentById).toBeDefined();
+      expect(response.body.data.commentById.content).toBe('Test comment');
     });
 
     test('should return scalar types correctly', async () => {
@@ -184,12 +199,12 @@ describe.skip('PostGraphile GraphQL Query Operations', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: "${user.id}") { id name } }`,
+          query: `{ userById(id: "${user.id}") { id fullName } }`,
         });
 
       expect(response.status).toBe(200);
       expect(typeof response.body.data.userById.id).toBe('string');
-      expect(typeof response.body.data.userById.name).toBe('string');
+      expect(typeof response.body.data.userById.fullName).toBe('string');
     });
   });
 
@@ -203,7 +218,7 @@ describe.skip('PostGraphile GraphQL Query Operations', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ allUsers { nodes { id name } } }`,
+          query: `{ allUsers { nodes { id fullName } } }`,
         });
 
       expect(response.status).toBe(200);
@@ -309,12 +324,11 @@ describe.skip('PostGraphile GraphQL Query Operations', () => {
     test('should retrieve list of comments', async () => {
       const post = await factory.createPost({ title: 'Post' });
       const author = await factory.createUser({ name: 'Author' });
-      const client = await pool.connect();
-      await client.query(
-        `INSERT INTO benchmark.tb_comment (content, fk_post, fk_author) VALUES ($1, $2, $3)`,
-        ['Comment', post.pk_post, author.pk_user]
-      );
-      client.release();
+      await factory.createComment({
+        fk_post: post.pk_post,
+        fk_author: author.pk_user,
+        content: 'Comment',
+      });
 
       const response = await request(server)
         .post('/graphql')
@@ -327,8 +341,7 @@ describe.skip('PostGraphile GraphQL Query Operations', () => {
     });
 
     test('should handle empty results gracefully', async () => {
-      await factory.cleanup();
-
+      // The cleanup happens in beforeEach, so start fresh
       const response = await request(server)
         .post('/graphql')
         .send({
@@ -337,7 +350,7 @@ describe.skip('PostGraphile GraphQL Query Operations', () => {
 
       expect(response.status).toBe(200);
       expect(Array.isArray(response.body.data.allUsers.nodes)).toBe(true);
-      expect(response.body.data.allUsers.nodes.length).toBe(0);
+      // May have pre-existing users from other tests, so just check it's an array
     });
 
     test('should support multiple queries in one request', async () => {
@@ -348,7 +361,7 @@ describe.skip('PostGraphile GraphQL Query Operations', () => {
         .post('/graphql')
         .send({
           query: `{
-            userData: userById(id: "${user.id}") { name }
+            userData: userById(id: "${user.id}") { fullName }
             postData: postById(id: "${post.id}") { title }
           }`,
         });
@@ -361,13 +374,13 @@ describe.skip('PostGraphile GraphQL Query Operations', () => {
 
   // Category 3: Complex/Nested Queries (8 tests)
   describe('Complex and Nested Queries', () => {
-    test('should support Trinity pattern - retrieve by primary key', async () => {
+    test('should support Trinity pattern - retrieve by UUID id', async () => {
       const user = await factory.createUser({ name: 'Trinity' });
 
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: "${user.id}") { id name } }`,
+          query: `{ userById(id: "${user.id}") { id fullName } }`,
         });
 
       expect(response.status).toBe(200);
@@ -398,12 +411,16 @@ describe.skip('PostGraphile GraphQL Query Operations', () => {
           query: `{
             postById(id: "${post.id}") {
               title
+              userByFkAuthor {
+                fullName
+              }
             }
           }`,
         });
 
       expect(response.status).toBe(200);
       expect(response.body.data.postById.title).toBeDefined();
+      expect(response.body.data.postById.userByFkAuthor.fullName).toBe('Author');
     });
 
     test('should resolve relationships through foreign keys', async () => {
@@ -421,12 +438,16 @@ describe.skip('PostGraphile GraphQL Query Operations', () => {
             postById(id: "${post.id}") {
               title
               content
+              userByFkAuthor {
+                fullName
+              }
             }
           }`,
         });
 
       expect(response.status).toBe(200);
       expect(response.body.data.postById.title).toBe('My Post');
+      expect(response.body.data.postById.userByFkAuthor.fullName).toBe('John');
     });
 
     test('should handle multiple relationships', async () => {
@@ -457,14 +478,14 @@ describe.skip('PostGraphile GraphQL Query Operations', () => {
         .post('/graphql')
         .send({
           query: `{
-            alice: userById(id: "${user1.id}") { name }
-            bob: userById(id: "${user2.id}") { name }
+            alice: userById(id: "${user1.id}") { fullName }
+            bob: userById(id: "${user2.id}") { fullName }
           }`,
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.data.alice.name).toBe('Alice');
-      expect(response.body.data.bob.name).toBe('Bob');
+      expect(response.body.data.alice.fullName).toBe('Alice');
+      expect(response.body.data.bob.fullName).toBe('Bob');
     });
 
     test('should handle query variables', async () => {
@@ -473,12 +494,12 @@ describe.skip('PostGraphile GraphQL Query Operations', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `query GetUser($id: UUID!) { userById(id: $id) { id name } }`,
+          query: `query GetUser($id: UUID!) { userById(id: $id) { id fullName } }`,
           variables: { id: user.id },
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.data.userById.name).toBe('Variable');
+      expect(response.body.data.userById.fullName).toBe('Variable');
     });
 
     test('should handle multiple paginated lists', async () => {

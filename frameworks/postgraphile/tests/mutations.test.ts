@@ -3,9 +3,20 @@ import { Pool } from 'pg';
 import { startServer } from '../src/index';
 import { TestFactory } from './test-factory';
 
-// TODO: Update to use Trinity Pattern schema (tb_user, tb_post, tb_comment)
-// These tests require a running database with the full schema including triggers
-describe.skip('PostGraphile GraphQL Mutations', () => {
+/**
+ * PostGraphile GraphQL Mutation Tests
+ *
+ * Trinity Pattern: tb_user, tb_post, tb_comment tables
+ * - pk_* = integer primary key (internal)
+ * - id = UUID (external API identifier)
+ * - fk_* = integer foreign key
+ *
+ * Field mappings (PostGraphile camelCase):
+ * - full_name -> fullName
+ * - created_at -> createdAt
+ * - fk_author -> fkAuthor (exposed) + userByFkAuthor (relation)
+ */
+describe('PostGraphile GraphQL Mutations', () => {
   let server: any;
   let pool: Pool;
   let factory: TestFactory;
@@ -13,11 +24,11 @@ describe.skip('PostGraphile GraphQL Mutations', () => {
   beforeAll(async () => {
     server = await startServer();
     pool = new Pool({
-      user: process.env.DB_USER || 'velocitybench',
-      password: process.env.DB_PASSWORD || 'password',
+      user: process.env.DB_USER || 'benchmark',
+      password: process.env.DB_PASSWORD || 'benchmark123',
       host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '5432'),
-      database: process.env.DB_NAME || 'velocitybench_test',
+      port: parseInt(process.env.DB_PORT || '5434'),
+      database: process.env.DB_NAME || 'velocitybench_benchmark',
     });
     factory = new TestFactory(pool);
   });
@@ -88,86 +99,86 @@ describe.skip('PostGraphile GraphQL Mutations', () => {
   // Category 2: Data Visibility and Isolation
   describe('Data Visibility and Isolation', () => {
     test('should isolate data from different users', async () => {
-      const user1 = await factory.createUser({ username: 'user1', email: 'user1@example.com' });
-      const user2 = await factory.createUser({ username: 'user2', email: 'user2@example.com' });
+      const user1 = await factory.createUser({ name: 'User One' });
+      const user2 = await factory.createUser({ name: 'User Two' });
 
       // Query user1
       const response1 = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: "${user1.id}") { id username email } }`,
+          query: `{ userById(id: "${user1.id}") { id username email fullName } }`,
         });
 
       expect(response1.status).toBe(200);
-      expect(response1.body.data.userById.username).toBe('user1');
-      expect(response1.body.data.userById.email).toBe('user1@example.com');
+      expect(response1.body.data.userById.fullName).toBe('User One');
 
       // Query user2 separately
       const response2 = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: "${user2.id}") { id username email } }`,
+          query: `{ userById(id: "${user2.id}") { id username email fullName } }`,
         });
 
       expect(response2.status).toBe(200);
-      expect(response2.body.data.userById.username).toBe('user2');
-      expect(response2.body.data.userById.email).toBe('user2@example.com');
+      expect(response2.body.data.userById.fullName).toBe('User Two');
     });
 
     test('should handle multiple object queries in single request', async () => {
-      const user1 = await factory.createUser({ username: 'alice', email: 'alice@example.com' });
-      const user2 = await factory.createUser({ username: 'bob', email: 'bob@example.com' });
+      const user1 = await factory.createUser({ name: 'Alice' });
+      const user2 = await factory.createUser({ name: 'Bob' });
 
       const response = await request(server)
         .post('/graphql')
         .send({
           query: `{
-            user1: userById(id: "${user1.id}") { id username }
-            user2: userById(id: "${user2.id}") { id username }
+            user1: userById(id: "${user1.id}") { id fullName }
+            user2: userById(id: "${user2.id}") { id fullName }
           }`,
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.data.user1.username).toBe('alice');
-      expect(response.body.data.user2.username).toBe('bob');
+      expect(response.body.data.user1.fullName).toBe('Alice');
+      expect(response.body.data.user2.fullName).toBe('Bob');
     });
 
     test('should support query variables', async () => {
-      const user = await factory.createUser({ username: 'testuser', email: 'test@example.com' });
+      const user = await factory.createUser({ name: 'Variable User' });
 
       const response = await request(server)
         .post('/graphql')
         .send({
           query: `query GetUser($userId: UUID!) {
-            userById(id: $userId) { id username email }
+            userById(id: $userId) { id fullName email }
           }`,
           variables: { userId: user.id },
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.data.userById.username).toBe('testuser');
+      expect(response.body.data.userById.fullName).toBe('Variable User');
     });
   });
 
   // Category 3: Relationship Handling
   describe('Relationship Handling', () => {
     test('should properly handle post-author relationships', async () => {
-      const author = await factory.createUser({ username: 'author1', email: 'author@example.com' });
+      const author = await factory.createUser({ name: 'Post Author' });
       const post = await factory.createPost({ title: 'Test Post', fk_author: author.pk_user });
 
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ postById(id: "${post.id}") { id title } }`,
+          query: `{ postById(id: "${post.id}") { id title userByFkAuthor { fullName } } }`,
         });
 
       expect(response.status).toBe(200);
       expect(response.body.data.postById.title).toBe('Test Post');
+      expect(response.body.data.postById.userByFkAuthor.fullName).toBe('Post Author');
     });
 
     test('should handle cascade deletions', async () => {
-      const author = await factory.createUser({ username: 'author2', email: 'author2@example.com' });
+      const author = await factory.createUser({ name: 'Cascade Author' });
       const post = await factory.createPost({ title: 'ToDelete', fk_author: author.pk_user });
+      const postId = post.id;
 
       // Delete author (should cascade delete post due to FK constraint)
       const client = await pool.connect();
@@ -177,7 +188,7 @@ describe.skip('PostGraphile GraphQL Mutations', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ postById(id: "${post.id}") { id } }`,
+          query: `{ postById(id: "${postId}") { id } }`,
         });
 
       expect(response.status).toBe(200);
@@ -185,21 +196,22 @@ describe.skip('PostGraphile GraphQL Mutations', () => {
       expect(response.body.data.postById).toBeNull();
     });
 
-    test('should handle null relationships', async () => {
-      // Test with comment that has no parent
-      const user = await factory.createUser({ username: 'commenter', email: 'comment@example.com' });
+    test('should handle comment relationships', async () => {
+      const user = await factory.createUser({ name: 'Comment Author' });
       const post = await factory.createPost({ title: 'CommentTest', fk_author: user.pk_user });
-      const comment = await factory.createComment({ fk_post: post.pk_post, fk_author: user.pk_user });
+      const comment = await factory.createComment({ fk_post: post.pk_post, fk_author: user.pk_user, content: 'Nice post!' });
 
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ commentById(id: "${comment.id}") { id content isApproved } }`,
+          query: `{ commentById(id: "${comment.id}") { id content userByFkAuthor { fullName } postByFkPost { title } } }`,
         });
 
       expect(response.status).toBe(200);
       expect(response.body.data.commentById).toBeDefined();
-      expect(response.body.data.commentById.content).toBe('Test comment');
+      expect(response.body.data.commentById.content).toBe('Nice post!');
+      expect(response.body.data.commentById.userByFkAuthor.fullName).toBe('Comment Author');
+      expect(response.body.data.commentById.postByFkPost.title).toBe('CommentTest');
     });
   });
 
@@ -211,7 +223,7 @@ describe.skip('PostGraphile GraphQL Mutations', () => {
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: "${fakeId}") { id username } }`,
+          query: `{ userById(id: "${fakeId}") { id fullName } }`,
         });
 
       expect(response.status).toBe(200);
@@ -219,14 +231,16 @@ describe.skip('PostGraphile GraphQL Mutations', () => {
     });
 
     test('should enforce unique constraints on email', async () => {
-      const user1 = await factory.createUser({ username: 'user1', email: 'unique@example.com' });
+      // Create user with known email
+      const uniqueEmail = `unique-${Date.now()}@example.com`;
+      const user1 = await factory.createUser({ email: uniqueEmail, name: 'User1' });
 
       // Try to insert duplicate email via database
       const client = await pool.connect();
       try {
         await client.query(
-          'INSERT INTO benchmark.tb_user (username, email) VALUES ($1, $2)',
-          ['user2', 'unique@example.com']
+          'INSERT INTO benchmark.tb_user (username, identifier, email, full_name) VALUES ($1, $2, $3, $4)',
+          [`dup-user-${Date.now()}`, `dup-id-${Date.now()}`, uniqueEmail, 'User2']
         );
         // If we get here, the constraint wasn't enforced (bad!)
         expect(true).toBe(false);
@@ -245,18 +259,20 @@ describe.skip('PostGraphile GraphQL Mutations', () => {
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.data.userById.email).toBe('unique@example.com');
+      expect(response.body.data.userById.email).toBe(uniqueEmail);
     });
 
     test('should enforce unique constraints on username', async () => {
-      const user1 = await factory.createUser({ username: 'uniquename', email: 'email1@example.com' });
+      // Create user with known username
+      const uniqueUsername = `uniquename-${Date.now()}`;
+      await factory.createUser({ username: uniqueUsername, name: 'User1' });
 
       // Try to insert duplicate username via database
       const client = await pool.connect();
       try {
         await client.query(
-          'INSERT INTO benchmark.tb_user (username, email) VALUES ($1, $2)',
-          ['uniquename', 'email2@example.com']
+          'INSERT INTO benchmark.tb_user (username, identifier, email, full_name) VALUES ($1, $2, $3, $4)',
+          [uniqueUsername, `dup-id-${Date.now()}`, `dup-email-${Date.now()}@example.com`, 'User2']
         );
         // If we get here, the constraint wasn't enforced (bad!)
         expect(true).toBe(false);
@@ -273,30 +289,26 @@ describe.skip('PostGraphile GraphQL Mutations', () => {
   describe('Null Handling', () => {
     test('should handle optional fields correctly', async () => {
       const user = await factory.createUser({
-        username: 'sparse',
-        email: 'sparse@example.com',
-        name: undefined as any,
+        name: 'Sparse User',
         bio: null,
       });
 
       const response = await request(server)
         .post('/graphql')
         .send({
-          query: `{ userById(id: "${user.id}") { id username firstName lastName bio } }`,
+          query: `{ userById(id: "${user.id}") { id fullName bio } }`,
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.data.userById.username).toBe('sparse');
-      expect(response.body.data.userById.firstName).toBeNull();
-      expect(response.body.data.userById.lastName).toBeNull();
+      expect(response.body.data.userById.fullName).toBe('Sparse User');
       expect(response.body.data.userById.bio).toBeNull();
     });
 
-    test('should handle null post content', async () => {
-      const user = await factory.createUser({ username: 'postauthor', email: 'post@example.com' });
+    test('should handle post with content', async () => {
+      const user = await factory.createUser({ name: 'Content Author' });
       const post = await factory.createPost({
-        title: 'NoContent',
-        content: null,
+        title: 'WithContent',
+        content: 'This is the content',
         fk_author: user.pk_user,
       });
 
@@ -307,8 +319,8 @@ describe.skip('PostGraphile GraphQL Mutations', () => {
         });
 
       expect(response.status).toBe(200);
-      expect(response.body.data.postById.title).toBe('NoContent');
-      expect(response.body.data.postById.content).toBeNull();
+      expect(response.body.data.postById.title).toBe('WithContent');
+      expect(response.body.data.postById.content).toBe('This is the content');
     });
   });
 });

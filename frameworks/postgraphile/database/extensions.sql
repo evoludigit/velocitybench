@@ -55,7 +55,8 @@ COMMENT ON COLUMN benchmark.tb_comment.pk_comment IS E'@omit all\nInternal prima
 -- Hide internal foreign keys (expose through relations instead)
 COMMENT ON COLUMN benchmark.tb_comment.fk_post IS E'@omit all\nUse post relation instead';
 COMMENT ON COLUMN benchmark.tb_comment.fk_author IS E'@omit all\nUse author relation instead';
-COMMENT ON COLUMN benchmark.tb_comment.fk_parent IS E'@omit all\nUse parentComment relation instead';
+-- Note: fk_parent may not exist in all schema versions
+-- COMMENT ON COLUMN benchmark.tb_comment.fk_parent IS E'@omit all\nUse parentComment relation instead';
 
 -- Expose id as the public identifier
 COMMENT ON COLUMN benchmark.tb_comment.id IS 'Public identifier (UUID)';
