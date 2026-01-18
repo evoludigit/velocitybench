@@ -62,6 +62,8 @@ Optimized implementations for fair performance comparison. All frameworks in thi
 | **HotChocolate** | C# | `csharp-dotnet/` | 4000 | Ready | .NET 9, Entity Framework |
 | **PostGraphile** | Node.js | `postgraphile/` | 4000 | Ready | Auto-generated from DB schema (profile: postgraphile) |
 | **Hasura** | Docker | `hasura/` | 4000 | Ready | Auto-generated GraphQL engine (profile: hasura) |
+| **Ariadne** | Python | `ariadne/` | 4000 | Ready | Schema-first GraphQL (profile: ariadne) |
+| **ASGI-GraphQL** | Python | `asgi-graphql/` | 4000 | Ready | Direct graphql-core usage (profile: asgi-graphql) |
 
 ### REST Frameworks
 
@@ -93,12 +95,6 @@ Naive ORM implementations intentionally showing query explosion impact. Used to 
 ## Tier 3: Pending Implementation
 
 Frameworks with stub directories that need full implementation. All will use standardized ports.
-
-### Python GraphQL (Port 4000)
-| Framework | Directory | Notes |
-|-----------|-----------|-------|
-| **Ariadne** | `ariadne/` | Schema-first GraphQL |
-| **ASGI GraphQL** | `asgi-graphql/` | Generic ASGI with graphql-core |
 
 ### Node.js GraphQL (Port 4000)
 | Framework | Directory | Notes |

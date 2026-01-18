@@ -48,6 +48,8 @@ FRAMEWORKS=(
 PROFILE_FRAMEWORKS=(
     "hasura:4000:/healthz"
     "postgraphile:4000:/health"
+    "ariadne:4000:/health"
+    "asgi-graphql:4000:/health"
 )
 
 # Test each framework

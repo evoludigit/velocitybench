@@ -1,0 +1,17 @@
+# Ariadne GraphQL Framework Dependencies
+# Schema-first GraphQL for Python
+
+# Web Framework
+starlette==0.32.0
+uvicorn[standard]==0.24.0
+
+# GraphQL Framework
+ariadne==0.23.0
+
+# Database
+asyncpg==0.29.0
+
+# Testing
+pytest==9.0.2
+pytest-asyncio==1.3.0
+pytest-cov==4.1.0
