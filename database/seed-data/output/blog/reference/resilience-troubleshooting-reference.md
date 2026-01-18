@@ -1,251 +1,205 @@
-**[Pattern] Resilience Troubleshooting – Reference Guide**
+---
+# **[Resilience Troubleshooting] Reference Guide**
 
 ---
 
-### **Overview**
-The **Resilience Troubleshooting** pattern helps identify, diagnose, and mitigate failures in distributed systems by analyzing resilience mechanisms (e.g., retries, circuit breakers, fallbacks, and rate limiting). This guide provides structured approaches to detecting resilience-related issues and applying corrective actions efficiently.
-
-Resilience patterns are critical in modern architectures to handle transient failures, dependencies, and overloads. When these mechanisms fail (e.g., retries loop indefinitely, circuit breakers open prematurely, or fallbacks degrade service), they can amplify outages. This pattern ensures you can:
-- **Detect** resilience-related failures via observability tools (logs, metrics, traces).
-- **Diagnose** why resilience mechanisms are malfunctioning (e.g., misconfigured thresholds, unhandled exceptions).
-- **Resolve** issues with targeted fixes (e.g., adjusting retry logic, improving fallback logic).
-
-This guide focuses on **key components**, **troubleshooting steps**, and **implementation details** for common resilience strategies.
+## **Overview**
+This guide provides a structured approach to diagnosing and resolving resilience failures in distributed systems, particularly those using **retries, circuit breakers, bulkheads, fallbacks, and timeouts**. Resilience patterns often introduce complexity, and failures may manifest indirectly (e.g., degraded performance, cascading failures, or silent errors). This guide categorizes troubleshooting techniques by pattern, outlines key failure modes, and provides tools (logging, metrics, and tracing) to isolate root causes. Best practices for simulating resilience errors and validating fixes are also included.
 
 ---
 
-### **Schema Reference**
-Below are **tables outlining key resilience mechanisms**, their common failure modes, and troubleshooting checklists.
+## **Schema Reference**
+Use the following schema to document resilience-related metrics, logs, and traces for troubleshooting.
 
-| **Component**       | **Purpose**                          | **Failure Modes**                                                                 | **Troubleshooting Checks**                                                                                     |
-|---------------------|--------------------------------------|-------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------|
-| **Retry Policy**    | Automatically retry failed requests   | - Infinite retries <br> - Too aggressive retries (increase load) <br> - Ignored exceptions | - Verify `maxRetries` and `backoff` settings <br> - Confirm retryable exceptions are handled <br> - Check for cascading retries |
-| **Circuit Breaker** | Prevents cascading failures           | - Breaker trips too often (false positives) <br> - Never resets (false negatives)  | - Review `failureThreshold` and `resetTimeout` <br> - Check error classification logic <br> - Test with load simulations |
-| **Fallback/Degradation** | Provides graceful degradation   | - Fallback fails <br> - Overuse of fallback degrades performance <br> - Not triggered when expected | - Validate fallback logic and dependencies <br> - Monitor fallback invocation rates <br> - Ensure graceful degradation doesn’t break SLOs |
-| **Rate Limiting**   | Protects against overload            | - Too restrictive (blocking valid traffic) <br> - Too lenient (DDoS vulnerability) | - Verify rate limits per client/endpoint <br> - Check burst tolerance settings <br> - Test with traffic spikes |
-| **Bulkhead**        | Isolates resource contention         | - Thread pool exhaustion <br> - Ineffective isolation (shared resources)         | - Monitor thread pool metrics (e.g., `activeThreads`, `rejectedTasks`) <br> - Audit shared dependency usage |
-| **Timeouts**        | Prevents hanging operations          | - Too short (misses legitimate delays) <br> - Too long (wastes resources)         | - Validate timeout values for latency characteristics <br> - Check for unhandled `TimeoutException` |
-
----
-
-### **Key Troubleshooting Steps**
-Use the **five-step framework** below to diagnose resilience issues systematically.
-
-#### **1. Identify the Symptom**
-- **Symptoms of Resilience Failures:**
-  - Sudden spikes in **error rates** or **latency**.
-  - **Cascading failures** after a single component fails.
-  - **Unintended retries** or **overloaded fallback services**.
-  - **Circuit breakers stuck open** or **never resetting**.
-
-- **Observability Tools to Use:**
-  - **Metrics:** Error rates, retry counts, circuit breaker state.
-  - **Logs:** Filter for `Retry`, `Fallback`, or `CircuitBreaker` logs.
-  - **Traces:** Identify slow or failed dependencies (e.g., database timeouts).
-
-#### **2. Reproduce the Issue**
-- **Test Scenarios:**
-  - Simulate **high load** to trigger retries/rate limiting.
-  - Inject **artificial failures** (e.g., mock service errors).
-  - Verify **edge cases** (e.g., network partitions, dependency downtime).
-
-- **Tools for Reproduction:**
-  - **Chaos Engineering:** Tools like **Gremlin** or **Chaos Monkey**.
-  - **Load Testing:** **JMeter**, **k6**, or **Locust**.
-  - **Mock Services:** **WireMock**, **Postman**.
-
-#### **3. Diagnose the Root Cause**
-| **Failure Scenario**       | **Root Cause Hypotheses**                                                                 | **Diagnostic Queries/Commands**                                                                 |
-|----------------------------|-----------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
-| **Infinite Retries**       | - Retryable exceptions are not caught <br> - `maxRetries` misconfigured                 | ```grep "Retry.*Exception" /var/log/app.log | tail -n 50``` <br> Check `maxRetries` in config (e.g., `application.yml`). |
-| **Circuit Breaker Stuck Open** | - Failure threshold too low <br> - Errors not classified correctly                 | ```promql query: rate(circuit_breaker_failures_total[5m]) or error_classification_logs```        |
-| **Fallback Degrades Performance** | - Fallback is slow or inefficient <br> - Overused due to misconfigured breakers       | ```profile fallback_service_latency (pprof or distrac```) <br> Check fallback invocation metrics. |
-| **Rate Limiting Too Aggressive** | - Throttling valid traffic <br> - Incorrect rate limit per endpoint               | ```curl -H "X-RateLimit-Limit: 100" http://api.example.com``` <br> Check rate limit headers. |
-
-#### **4. Apply Fixes**
-| **Failure**               | **Recommended Fixes**                                                                                     | **Validation Steps**                                                                                  |
-|---------------------------|---------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------|
-| **Retry Issues**          | - Adjust `maxRetries` and `backoff` <br> - Log retryable vs. non-retryable exceptions                 | Deploy fix; monitor `retry_failure_rate` metrics.                                                  |
-| **Circuit Breaker Misbehavior** | - Tune `failureThreshold` and `resetTimeout` <br> - Improve error classification logic          | Run load test; verify breaker state transitions in observability dashboard.                       |
-| **Fallback Problems**     | - Optimize fallback logic <br> - Cache fallback responses <br> - Add circuit breaker for fallbacks  | A/B test fallback; ensure no regression in error rates.                                            |
-| **Rate Limiting Too Strict** | - Increase rate limits <br> - Use adaptive throttling (e.g., token bucket algorithm)          | Check user feedback on blocked requests; adjust dynamically.                                         |
-
-#### **5. Validate the Resolution**
-- **Post-Fix Metrics to Monitor:**
-  - **Error rates** (should decrease).
-  - **Retry counts** (should stabilize).
-  - **Circuit breaker state** (should reset normally).
-  - **Fallback invocation rates** (should reduce if fixed).
-  - **Latency percentiles** (should improve or stay stable).
-
-- **Automated Validation:**
-  - **Unit Tests:** Verify resilience logic in isolation (e.g., mock failovers).
-  - **Integration Tests:** Test end-to-end with simulated failures.
-  - **Chaos Tests:** Re-run chaos experiments post-fix.
+| **Category**       | **Metric/Field**               | **Description**                                                                                     | **Severe Threshold**                                                                                     | **Tools**                                                                                     |
+|--------------------|--------------------------------|-----------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------|
+| **Retries**        | `retryAttempts`                | Total retries for a given operation (counter)                                                      | `> 5 * defaultRetries` (adjust based on SLA)                                                          | APM tools (e.g., New Relic, Datadog), custom logging                                         |
+|                    | `retryFailures`                | Retries that resulted in failures (counter)                                                         | `retryFailures / retryAttempts > 50%`                                                              |                                                                                               |
+|                    | `retryBackoff`                 | Time between retry attempts (histogram)                                                              | Backoff > `2 * timeout` (risk of starvation)                                                          | OpenTelemetry, custom instrumentation                                                        |
+| **Circuit Breaker**| `stateChanges`                 | Transitions between `Closed`, `Open`, and `Half-Open` states (counter)                               | Rapid state changes (e.g., 5 `Open` → `Closed` cycles/min)                                           | Hystrix Metrics, Resilience4j monitoring                                                        |
+|                    | `errorThreshold`               | Invocation failures required to trip the circuit (metric)                                           | Exceeded threshold (e.g., `5 failures / 10s`)                                                       | Circuit breaker library dashboards                                                            |
+|                    | `resetTimeout`                 | Time until circuit resets to `Half-Open` (histogram)                                               | Reset too aggressively (e.g., `5s` when SLO requires `1m`)                                           |                                                                                               |
+| **Bulkheads**      | `concurrencyUsage`             | Concurrent requests blocked due to thread pool exhaustion (counter)                                  | `concurrencyUsage > 80% * maxThreads`                                                              | Resilience4j dashboards, custom metrics                                                       |
+|                    | `queueWaitTime`                | Time spent waiting in bulkhead queue (histogram)                                                    | Median `> 500ms` (latency degradation)                                                               | APM tools                                                                                       |
+| **Fallbacks**      | `fallbackExecutions`           | Fallback invoked (counter)                                                                          | `> 10%` of total invocations (indicates pattern misconfiguration)                                      | Custom logs, distributed tracing                                                               |
+|                    | `fallbackLatency`              | Time taken by fallback (histogram)                                                                   | Median `> 2 * timeout` (fallback too slow)                                                          | OpenTelemetry, APM tools                                                                       |
+| **Timeouts**       | `timeoutOccurrences`           | Operations failing due to timeout (counter)                                                         | `> 5%` of total invocations                                                                          | APM tools, CloudWatch                                                                      |
+|                    | `timeoutValue`                 | Configured timeout duration (metric)                                                              | Too short (e.g., `1s` for external API with `100ms` variance)                                      | Configuration management logs, Resilience4j metrics                                           |
+| **General**        | `resilienceErrorCode`          | Custom error code for resilience failures (e.g., `RESILIENCY_RETRY_EXHAUSTED`)                      | Monitored via structured logging                                                                   | ELK Stack, Datadog                                                                              |
+|                    | `resilienceTraceId`            | Correlates resilience events across services (string)                                                | Required for distributed tracing                                                                   | OpenTelemetry, Jaeger                                                                         |
 
 ---
 
-### **Query Examples**
-#### **1. Detecting Retry Loop in Logs (Gelf/Grafana)**
-```bash
-# Filter logs for retry loops (e.g., Spring Retry)
-grep -i "retry\|attempt" /var/log/app.log | awk '{print $1, $2, $NF}' | sort | uniq -c | sort -nr
-```
-**Expected Output:**
-```
-1500 2024-05-20T12:00:00 retry_successful
-50   2024-05-20T12:00:05 retry_failed_after_5_attempts
-```
+## **Query Examples**
+Use these queries to diagnose resilience issues in your monitoring stack.
 
-#### **2. PromQL Query for Circuit Breaker State**
-```promql
-# Check if circuit breaker is open for a specific service
-rate(circuit_breaker_open_total{service="payment_api"}[1m]) > 0
-```
-**Alert Rule:**
-```
-IF rate(circuit_breaker_open_total[1m]) > 0 THEN alert("CircuitBreakerOpen") ELSE ignore
-```
+---
 
-#### **3. SQL Query for Fallback Degradation (PostgreSQL)**
+### **1. Retry Troubleshooting**
+#### **Query: Retry Failures by Endpoint**
+**Tool:** PromQL (Prometheus) / KQL (Azure Monitor)
 ```sql
--- Identify endpoints where fallbacks are overused
-SELECT
-    endpoint,
-    COUNT(*) as fallback_invocations,
-    AVG(response_time) as avg_fallback_time
-FROM fallback_logs
-WHERE timestamp > NOW() - INTERVAL '1 hour'
-GROUP BY endpoint
-HAVING COUNT(*) > 1000  -- Threshold for "overuse"
-ORDER BY avg_fallback_time DESC;
+# Metric: retry_failures total
+sum(rate(retry_failures_total[5m])) by (endpoint)
+  > sum(rate(successful_requests_total[5m])) by (endpoint) * 0.5
 ```
+**Interpretation:** Endpoints where retry failures exceed 50% of successful requests.
 
-#### **4. Kubernetes Event Dump for Resource Exhaustion (Bulkhead)**
-```bash
-# Check pod events for OOM or CPU throttling
-kubectl describe pod <pod-name> | grep -i "limited\|oom\|throttled"
+#### **Query: Longest Retry Backoff**
+**Tool:** Grafana (Histograms)
+```sql
+# Metric: retry_backoff_seconds_bucket{le="10"}
+sum(rate(retry_backoff_seconds_bucket{le="10"}[5m])) / sum(rate(retry_attempts_total[5m]))
 ```
-**Example Output:**
-```
-Warning  CPUThrottled  3m (x10 over 1h)  kubelet            pod had high CPU throttling
-Warning  OOMKilled      1m               kubelet            container killed due to OOM
-```
+**Threshold:** Backoff > `2 * timeout` (e.g., `backoff=30s` when `timeout=10s`).
 
 ---
 
-### **Implementation Details**
-#### **1. Retry Policy Best Practices**
-- **Exponential Backoff:** Start with `initialInterval=100ms`, `maxInterval=10s`.
-- **Retryable Exceptions:** Only retry transient errors (e.g., `Timeout`, `ConnectionRefused`).
-  ```yaml
-  # Example: Spring Retry Configuration
-  spring:
-    retry:
-      max-attempts: 3
-      backoff:
-        initial-interval: 1s
-        max-interval: 10s
-        multiplier: 2.0
-  ```
-- **Circuit Breaker Integration:** Combine with Hystrix/Resilience4j.
-  ```java
-  @Retryable(value = {TimeoutException.class}, maxAttempts = 3)
-  public User getUser(String id) {
-      return userService.fetchUser(id);
-  }
-  ```
+### **2. Circuit Breaker Analysis**
+#### **Query: Circuit Breaker State Transitions**
+**Tool:** Resilience4j Dashboard / Grafana
+```sql
+# Metric: circuit_breaker_state.count
+increase(circuit_breaker_state_count{state="OPEN"}[1m])
+  > 3  # 3 state changes in 1 minute (adjust threshold)
+```
+**Interpretation:** Rapid toggling indicates flapping; investigate root cause (e.g., upstream API instability).
 
-#### **2. Circuit Breaker Tuning**
-| **Parameter**       | **Recommendation**                                                                 |
-|---------------------|------------------------------------------------------------------------------------|
-| `failureThreshold`  | Start with **5 failed calls in 10s**; adjust based on SLA.                          |
-| `resetTimeout`      | Set to **30s–2m** (longer if recovery is slow).                                     |
-| `automaticTransitionFromOpenToHalfOpen` | Enable if you want to test recovery.            |
-
-#### **3. Fallback Design**
-- **Cache Fallbacks:** Use **Redis** or **CDN** for fast responses.
-- **Graceful Degradation:** Return **cached data** or **stale reads** instead of failing.
-  ```python
-  # Example: Fallback with caching (FastAPI)
-  from fastapi import HTTPException
-  from caches import cached
-
-  @cached(ttl=300)
-  async def fallback_get_user(user_id: str):
-      try:
-          return await user_service.get_user(user_id)
-      except Exception:
-          return {"status": "degraded", "data": "cached_response"}
-  ```
-
-#### **4. Rate Limiting Strategies**
-| **Algorithm**       | **Use Case**                          | **Implementation**                                                                 |
-|---------------------|---------------------------------------|-----------------------------------------------------------------------------------|
-| **Fixed Window**    | Simple rate limiting                  | Use `Redis` or `Token Bucket` with fixed slots.                                  |
-| **Sliding Window**  | Accurate per-second limiting          | Track requests in a time window; use `Leaky Bucket`.                              |
-| **Adaptive**        | Dynamic limits (e.g., burst tolerance)| Combine with **machine learning** to adjust limits based on traffic patterns.    |
-
-#### **5. Bulkhead Isolation**
-- **Thread Pools:** Limit concurrent executions per component.
-  ```java
-  // Thread Pool Bulkhead (Java)
-  ExecutorService bulkhead = Executors.newFixedThreadPool(10);
-  bulkhead.submit(() -> { /* task */ });
-  ```
-- **Custom Isolators:** Use **Resilience4j Bulkhead**:
-  ```java
-  Bulkhead bulkhead = Bulkhead.of("userService", 10);
-  bulkhead.executeRunnable(() -> {
-      userService.processRequest();
-  });
-  ```
-
-#### **6. Timeout Strategies**
-- **Context Propagation:** Ensure timeouts propagate across async calls (e.g., **Spring Cloud Sleuth**).
-  ```yaml
-  # Spring Cloud Sleuth Timeout Configuration
-  spring:
-    sleuth:
-      sampler:
-        probability: 1.0
-    cloud:
-      circuitbreaker:
-        enabled: true
-  ```
-- **Graceful Degradation on Timeout:** Log and return a `429 Too Many Requests` instead of failing.
+#### **Query: Failed Requests Before Reset**
+**Tool:** PromQL
+```sql
+# Metric: circuit_breaker_failures_before_trip
+histogram_quantile(0.99, rate(circuit_breaker_failures_before_trip[5m]))
+```
+**Threshold:** 99th percentile > configured `failureThreshold` (e.g., `5` failures).
 
 ---
 
-### **Related Patterns**
-| **Pattern**               | **Purpose**                                                                 | **Connection to Resilience Troubleshooting**                                                                 |
-|---------------------------|-----------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------|
-| **Circuit Breaker**       | Prevents cascading failures                                                 | Troubleshooting requires verifying breaker thresholds and reset logic.                                       |
-| **Bulkhead**              | Isolates resource contention                                                | Diagnose thread pool exhaustion or shared dependency issues.                                               |
-| **Rate Limiting**         | Protects against overload                                                   | Tuning requires analyzing throttling policies and false positives.                                          |
-| **Retry as a Service**    | Manages retries centrally                                                  | Centralized retries simplify logging and debugging of retry loops.                                         |
-| **Chaos Engineering**     | Proactively tests resilience                                               | Use chaos experiments to reproduce and validate fixes for resilience issues.                                |
-| **Observability**         | Monitors system health                                                    | Essential for detecting resilience-related failures (logs, metrics, traces).                               |
-| **Fallback/Degradation**  | Provides graceful degradation                                             | Troubleshoot when fallbacks fail or are overused.                                                         |
+### **3. Bulkhead Congestion**
+#### **Query: Queue Wait Time Percentiles**
+**Tool:** Datadog / Elasticsearch
+```sql
+# Metric: bulkhead_queue_wait_ms
+histogram_quantile(0.95, bulkhead_queue_wait_ms{service="user-service"}) > 500
+```
+**Interpretation:** P95 > `500ms` indicates latency spikes due to bulkhead contention.
+
+#### **Query: Rejected Requests**
+**Tool:** KQL
+```sql
+requests
+| where operationName == "processOrder"
+| where isempty(correlationId)  // Fallback/bulkhead rejection
+| summarize count() by bin(timestamp, 1m)
+```
+**Threshold:** > `10%` of total requests rejected.
 
 ---
 
-### **Common Pitfalls & Mitigations**
-| **Pitfall**                          | **Mitigation**                                                                                     |
-|--------------------------------------|---------------------------------------------------------------------------------------------------|
-| **Over-Reliance on Retries**         | Leads to cascading failures. Use **circuit breakers** to complement retries.                     |
-| **Ignoring Non-Transient Errors**     | Retrying permanent failures (e.g., `404 Not Found`). Use **retry filters** to exclude them.       |
-| **Static Rate Limits**               | Can block legitimate traffic spikes. Use **adaptive limits** or **burst tolerance**.             |
-| **Fallbacks Without Monitoring**      | Hidden performance bottlenecks. Monitor fallback invocation rates and latency.                   |
-| **No Integration Testing**           | Resilience logic may fail in production. Test with **chaos engineering**.                          |
+### **4. Fallback Issues**
+#### **Query: Fallback Execution Rate**
+**Tool:** ELK Stack
+```sql
+# Log query: "fallback: invoked"
+logs
+| filter message: "fallback: invoked"
+| count by @timestamp, endpoint
+| where count > (total_requests * 0.1)
+```
+**Interpretation:** Fallback invoked >10% of time → consider revisiting fallback logic.
+
+#### **Query: Fallback Latency Spikes**
+**Tool:** OpenTelemetry
+```sql
+# Span query: fallback_latency > 2s
+tracespan
+| where resource.service.name == "user-service"
+| where operation.name == "fallbackHandler"
+| where duration > 2000ms
+| summarize count() by bin(timestamp, 1h)
+```
+**Threshold:** > `5` spans/hour (indicates fallback degradation).
 
 ---
-**Final Notes:**
-- **Resilience is iterative:** Adjust thresholds based on real-world failure patterns.
-- **Automate alerts:** Set up dashboards (e.g., **Grafana**) for resilience metrics.
-- **Document fixes:** Update runbooks for recurring resilience issues.
 
-For further reading, see:
-- [Resilience4j Documentation](https://resilience4j.readme.io/)
-- [Chaos Engineering Handbook](https://chaosengineering.io/handbook/)
-- [Spring Retry Reference](https://docs.spring.io/spring-retry/docs/current/reference/html/)
+### **5. Timeout Failures**
+#### **Query: Timeout by Endpoint**
+**Tool:** CloudWatch
+```sql
+# Metric: timeout_occurrences
+metrics
+| where metricName == "timeout_occurrences"
+| summarize count() by endpoint, bin(timestamp, 5m)
+| where count > 0
+```
+**Interpretation:** Investigate endpoints with `>5%` timeouts (adjust threshold based on SLA).
+
+#### **Query: Timeout Value Distribution**
+**Tool:** Prometheus
+```sql
+# Metric: timeout_config
+histogram_quantile(0.5, timeout_config_seconds_bucket)
+```
+**Threshold:** P50 < `2 * expected_operation_time` (e.g., `timeout=100ms` for `50ms` API).
+
+---
+
+## **Step-by-Step Troubleshooting Workflow**
+Follow this flow to diagnose resilience failures:
+
+1. **Identify the Pattern Affected**
+   - Check logs/metrics for `retryFailures`, `circuit_breaker_state`, or `fallback_executions`.
+
+2. **Reproduce the Failure**
+   - **Retries:** Use a load tester (e.g., k6) to simulate upstream failures.
+   - **Circuit Breaker:** Force failures (e.g., `POST /api/unsafe`).
+   - **Bulkhead:** Spam the system with concurrent requests.
+
+3. **Validate Fixes**
+   - **Retry:** Verify `retryAttempts` decreases after fixing upstream issues.
+   - **Circuit Breaker:** Ensure `resetTimeout` aligns with SLO recovery time.
+   - **Fallback:** Test fallback paths in staging with `timeout=0`.
+
+4. **Monitor Post-Fix**
+   - Set alerts for:
+     - `retryFailures > 3 * historical_avg`.
+     - `circuit_breaker_state` toggling > `1/min`.
+     - `fallbackLatency` > `2 * timeout`.
+
+---
+
+## **Related Patterns**
+| **Pattern**            | **Description**                                                                 | **Troubleshooting Overlap**                                                                 |
+|------------------------|-------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|
+| **Retry**              | Exponentially back off on transient failures.                                | Shared metrics: `retryAttempts`, `retryBackoff`.                                            |
+| **Circuit Breaker**    | Prevents cascading failures by stopping calls to failing services.             | Shared: `errorThreshold`, `stateChanges`.                                                   |
+| **Bulkhead**           | Isolates resource exhaustion (e.g., thread pools).                           | Shared: `concurrencyUsage`, `queueWaitTime`.                                              |
+| **Fallback**           | Provides degraded functionality when primary fails.                          | Shared: `fallbackExecutions`, `fallbackLatency`.                                            |
+| **Timeout**            | Aborts long-running operations.                                               | Shared: `timeoutOccurrences`, `timeoutValue`.                                               |
+| **Bulkhead with Timeout** | Combines bulkhead and timeout for strict SLA enforcement.                  | Use `concurrencyUsage` + `timeoutOccurrences` queries.                                     |
+| **Resilience Testing** | Proactively simulates failures to validate resilience patterns.              | Use in Step 2 above to reproduce issues.                                                    |
+
+---
+
+## **Tools & Libraries**
+| **Tool/Library**       | **Purpose**                                                                 | **Key Metrics/Logs**                                                                 |
+|------------------------|-----------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
+| **Resilience4j**       | Java library for circuit breakers, retries, etc.                           | `CircuitBreakerMetrics`, `RetryMetrics`.                                              |
+| **Hystrix**            | Legacy Netflix library (circuit breakers, bulkheads).                     | Hystrix streaming metrics.                                                            |
+| **OpenTelemetry**      | Distributed tracing for resilience events.                                  | Spans tagged with `resilience.error` or `resilience.retry`.                            |
+| **Prometheus + Grafana** | Monitoring for resilience metrics.                                         | Custom counters (e.g., `retry_failures_total`).                                       |
+| **k6**                 | Load testing to simulate resilience failures.                               | Simulate `retryExhausted` or `circuitOpen` scenarios.                                  |
+
+---
+
+## **Common Pitfalls & Fixes**
+| **Pitfall**                          | **Root Cause**                                      | **Solution**                                                                       |
+|--------------------------------------|----------------------------------------------------|------------------------------------------------------------------------------------|
+| Retry loop starvation                | Backoff too long relative to timeout.               | Set `backoffFactor <= 2 * timeout`.                                                 |
+| Circuit breaker thrashing            | `resetTimeout` too short.                          | Align with SLO recovery time (e.g., `1m` if SLO is `1h`).                           |
+| Bulkhead queue flooding              | `maxThreads` too low.                              | Scale `maxThreads` based on P99 load.                                               |
+| Fallback too slow                    | Fallback implementation > `timeout`.                | Optimize fallback or increase `timeout`.                                            |
+| Silent retries                       | No logging for retry exhaustions.                  | Add `INFO` log for `retryAttempts >= maxRetries`.                                   |
+
+---
+**Note:** Replace placeholder values (e.g., `5m`, `10%`) with your SLO-based thresholds.

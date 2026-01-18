@@ -1,192 +1,252 @@
-**[Pattern] Containers Troubleshooting Reference Guide**
+# **[Pattern] Containers Troubleshooting – Reference Guide**
 
 ---
 
-### **Overview**
-Containerized applications (e.g., Docker, Kubernetes) abstract infrastructure complexities but introduce unique challenges when debugging runtime failures. This guide outlines systematic troubleshooting for:
-- **Unresponsive containers** (crashes, hangs, timeouts).
-- **Resource constraints** (CPU/memory starvation).
-- **Networking issues** (failed connections, DNS misconfigurations).
-- **Configuration errors** (missing files, permission conflicts).
+## **Overview**
 
-Troubleshooting follows a structured approach:
-1. **Verify fundamentals** (logs, container state).
-2. **Inspect resources** (CPU, memory, storage).
-3. **Test network connectivity** (ports, endpoints).
-4. **Review configuration and dependencies**.
+Containers offer portability, efficiency, and isolation, but issues like crashes, resource constraints, network misconfigurations, or dependency failures can disrupt operations. This reference guide provides structured diagnostics for common container problems, covering **log analysis, resource monitoring, network checks, runtime issues, and rollback strategies**. It follows a **systematic troubleshooting workflow**—identify symptoms, isolate the root cause, and apply targeted fixes—while leveraging tools like `kubectl`, `docker stats`, `crictl`, and host-level utilities.
 
----
+Key scenarios addressed:
+- **Container crashes or restarts** (OOM, segmentation faults, exit codes)
+- **Performance degradation** (CPU/memory throttling, slow I/O)
+- **Network connectivity failures** (DNS, port conflicts, egress restrictions)
+- **Image/pull failures** (registry issues, authentication errors)
+- **Volume/persistent storage errors** (mount failures, permissions)
+- **Init/entrypoint execution failures** (missing dependencies, misconfigurations)
 
-### **Schema Reference**
-| **Category**               | **Attribute**               | **Description**                                                                 | **Tools/Commands**                          |
-|----------------------------|-----------------------------|---------------------------------------------------------------------------------|---------------------------------------------|
-| **Container State**        | Status                      | Running/Paused/Crashed/Dead/Exited.                                          | `docker inspect <container> \| grep Status` |
-|                            | Exit Code                   | Non-zero indicates failure.                                                   | `docker logs <container>`                   |
-|                            | Logs                        | Application/error output.                                                     | `kubectl logs <pod>` (K8s)                 |
-| **Resources**              | CPU Usage                   | Percentage of allocated CPU.                                                  | `docker stats`                              |
-|                            | Memory Usage                | RSS/Heap usage vs. limits.                                                    | `docker stats --no-stream`                  |
-|                            | Disk I/O                    | Latency, read/write errors.                                                   | `docker events` (filter for `disk I/O`)    |
-| **Networking**             | Port Mappings               | Host:Container ports.                                                        | `docker port <container>`                   |
-|                            | Connectivity Tests          | Ping, `telnet`, or `curl` to endpoints.                                       | `kubectl exec -it <pod> -- ping <host>`    |
-|                            | DNS Resolution              | Failed `nslookup` or `dig` queries.                                           | `docker exec <container> nslookup <host>`   |
-| **Configuration**          | Environment Variables       | Missing/incorrect values.                                                     | `docker inspect <container> \| grep Env`   |
-|                            | Volume Mounts               | Missing files or permission errors.                                           | `docker inspect <container> \| grep Mounts`|
-| **Dependencies**           | Linked Containers           | Health or readiness probes.                                                   | `kubectl describe pod <pod>` (K8s)         |
+The guide assumes familiarity with basic container orchestration (e.g., Docker, Kubernetes) and terminal commands.
 
 ---
 
-### **Troubleshooting Workflow**
+## **1. Schema Reference**
+Troubleshooting follows a **structured schema** to categorize symptoms, probable causes, and remediation steps. Below is a reference table for common issues.
 
-#### **1. Verify Container Fundamentals**
-**Symptom:** Container fails to start or exits immediately.
-**Steps:**
-- Check status:
-  ```bash
-  docker ps -a  # List containers (including stopped)
-  ```
-- Inspect logs:
-  ```bash
-  docker logs <container>  # Docker
-  kubectl logs <pod>       # Kubernetes
-  ```
-- Examine exit code:
-  ```bash
-  docker inspect --format='{{.State.ExitCode}}' <container>
-  ```
-  - **Exit Code 0:** Successful (unlikely for failures).
-  - **Exit > 128:** Signal-based (e.g., `137 = SIGKILL`).
-  - **Exit between 129-255:** Signal number + 128.
-
-**Common Causes:**
-  - Missing environment variables.
-  - Invalid `CMD`/`ENTRYPOINT` arguments.
-  - Permission denied on mounted volumes.
+| **Category**               | **Symptom**                       | **Probable Cause**                          | **Verification Commands**                          | **Remediation Steps**                                          |
+|----------------------------|-----------------------------------|---------------------------------------------|----------------------------------------------------|---------------------------------------------------------------|
+| **Runtime Environment**    | Container exits with code `137`    | OOM Killer terminated process               | `docker stats --no-stream`, `kubectl describe pod`  | Increase memory limits, debug memory leaks (`valgrind`).       |
+|                            | Container crashes with `SIGSEGV`   | Segmentation fault (code `11`)              | `docker logs <container>`, `gdb` (core dumps)      | Check for buffer overflows, update libraries.                  |
+| **Resource Constraints**   | High CPU/memory usage              | No resource limits (or insufficient limits) | `docker stats`, `kubectl top pod`                   | Set CPU/memory requests/limits; use resource quotas.          |
+|                            | Disk I/O saturation                | Slow storage backend                        | `iostat -x 1`, `kubectl describe pod -n <ns> <pod>` | Upgrade storage class, check for spinning disks.              |
+| **Networking**             | Container cannot resolve DNS       | Misconfigured `dnsPolicy` or DNS pod        | `cat /etc/resolv.conf`, `kubectl get events`        | Verify `kube-dns` health; check `dnsConfig` in YAML.           |
+|                            | Port conflicts (e.g., `443`)       | Port already in use                         | `netstat -tulnp`, `kubectl get endpoints`          | Change port mapping in `ports` section of deployment.         |
+|                            | Egress traffic blocked             | NetworkPolicy or firewall rules              | `kubectl describe networkpolicy`                  | Adjust `NetworkPolicy` rules or host firewall (`iptables`).     |
+| **Image/Dependency**       | Pull failure (`500 Internal Error`)| Invalid image or auth failure               | `docker pull --verbose`                            | Check credentials (`docker login`), verify image tag.           |
+|                            | Missing dependencies               | Missing `.so` files or missing CLI tools     | `ldd <executable>`, `apt-cache policy <package>`    | Rebuild image with dependencies or use multi-stage builds.     |
+| **Volume Storage**         | Volume mount fails (`Permission`) | SELinux/AppArmor or incorrect permissions   | `mount | grep <volume>`, `ls -la /host/mount`               | Adjust `fsGroup` in SecurityContext; chmod/chown volumes.     |
+|                            | Persistent volume not found        | Dynamic provisioning failure                | `kubectl get pvc`                                  | Check PVC `status.phase`; verify storage class.               |
+| **Init/Entrypoint**        | Init container fails                | Missing or misconfigured entrypoint          | `kubectl logs <pod> -c <init-container>`           | Verify `command` in container spec; test manually.             |
+|                            | Entrypoint hangs                   | Infinite loop or blocked I/O                | `ps aux`, `strace -p <PID>`                        | Debug with `strace` or add health checks.                     |
+| **Orchestration**          | Pod stuck in `Pending`             | Node resource unavailable                   | `kubectl describe node`, `kubectl get events`      | Scale up nodes; check taints/tolerations.                     |
+|                            | CrashLoopBackOff                    | Unhandled exceptions in app                 | `kubectl logs <pod> --tail=50`                    | Fix application logic; adjust restart policy (`livenessProbe`). |
 
 ---
 
-#### **2. Diagnose Resource Constraints**
-**Symptom:** Container throttled or killed (OOM, CPU throttling).
-**Steps:**
-- **CPU:**
-  ```bash
-  docker stats --no-stream <container>  # Check %CPU usage
-  ```
-  - **Action:** Increase limits in `docker run` or Kubernetes `resources.limits.cpu`.
-- **Memory:**
-  ```bash
-  docker top <container>  # Check memory per process
-  ```
-  - **Action:** Adjust `MEMORY_LIMIT` or check for memory leaks.
-- **Disk:**
-  ```bash
-  docker exec <container> df -h  # Check disk usage
-  ```
-  - **Action:** Clean logs or resize storage if needed.
-
-**Tools:**
-- **cAdvisor** (K8s): Monitor resource usage.
-- **Prometheus + Grafana**: Long-term metrics.
+## **2. Query Examples**
+Below are **command-line snippets** to diagnose container issues across environments.
 
 ---
 
-#### **3. Networking Issues**
-**Symptom:** Container fails to communicate with dependencies.
-**Steps:**
-- **Test connectivity:**
-  ```bash
-  kubectl exec -it <pod> -- ping <service>  # K8s
-  docker exec <container> ping <host>       # Docker
-  ```
-- **Check ports:**
-  ```bash
-  docker port <container>  # Verify exposed ports
-  netstat -tulnp          # Host-side port checks
-  ```
-- **DNS Resolution:**
-  ```bash
-  docker exec <container> cat /etc/resolv.conf
-  ```
-  - **Fix:** Mount custom `/etc/resolv.conf` or configure DNS in `docker-compose`.
+### **A. Basic Container Inspection**
+#### **List running containers and their status**
+```bash
+# Docker
+docker ps -a --format "table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}"
 
-**Common Causes:**
-  - Firewall blocking traffic.
-  - Misconfigured `network_mode` (e.g., `host` vs. `bridge`).
-  - Service mesh misrouting (Istio/Linkerd).
+# Kubernetes
+kubectl get pods --all-namespaces -o wide
+```
 
----
+#### **Check container logs**
+```bash
+# Docker (last 100 lines)
+docker logs --tail=100 <container_name>
 
-#### **4. Configuration Errors**
-**Symptom:** Application fails due to missing files or permissions.
-**Steps:**
-- **Inspect mounts:**
-  ```bash
-  docker inspect <container> \| grep Mounts
-  ```
-  - **Action:** Verify file paths and permissions in host volume mounts.
-- **Environment vars:**
-  ```bash
-  docker inspect <container> \| grep Env
-  ```
-  - **Action:** Set missing vars via `--env` or `environment:` in `docker-compose`.
+# Kubernetes (select pod/container)
+kubectl logs <pod_name> -c <container_name> --previous  # If crashed
+```
 
-**Example Fix:**
-If a config file `/app/config.yaml` is missing:
-```yaml
-# docker-compose.yml
-volumes:
-  - ./config:/app/config:ro  # Ensure host path exists
+#### **Inspect container metadata**
+```bash
+# Docker
+docker inspect --format='{{json .}}' <container_id> | grep -i "exit"
+
+# Kubernetes
+kubectl describe pod <pod_name> | grep -E "Events|State|Containers"
 ```
 
 ---
 
-### **Query Examples**
-#### **Docker**
-1. **List all containers (including stopped):**
-   ```bash
-   docker ps -a --format "table {{.ID}}\t{{.Names}}\t{{.Status}}"
-   ```
-2. **Check logs for a crashed container:**
-   ```bash
-   docker logs --tail 50 <container> \| grep -i error
-   ```
-3. **Inspect network connectivity:**
-   ```bash
-   docker exec <container> curl -v http://localhost:8080
-   ```
+### **B. Resource Analysis**
+#### **Check CPU/memory usage**
+```bash
+# Docker
+docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}"
 
-#### **Kubernetes**
-1. **Describe a failing pod:**
-   ```bash
-   kubectl describe pod <pod> \| grep -i "error\|warning"
-   ```
-2. **Exec into a pod to debug:**
-   ```bash
-   kubectl exec -it <pod> -- /bin/bash
-   ```
-3. **Check pod events:**
-   ```bash
-   kubectl get events --sort-by=.lastTimestamp
-   ```
+# Kubernetes
+kubectl top pod --sort-by=cpu
+```
+
+#### **Identify OOM Killer victims**
+```bash
+# Check kernel logs for OOM events
+dmesg | grep -i "killed process"
+```
+
+#### **Profile memory usage**
+```bash
+# Heap dump (Java)
+docker exec <container> jmap -dump:format=b,file=heap.hprof <PID>
+
+# Top processes inside container
+docker exec <container> top -c
+```
 
 ---
 
-### **Advanced Debugging**
-| **Scenario**               | **Tool/Command**                          | **Diagnosis**                          |
-|----------------------------|-------------------------------------------|----------------------------------------|
-| **Init Container Failure** | `kubectl logs <pod> -c <init-container>`  | Init step crashed (e.g., config load). |
-| **Sidecar Proxy Issues**   | `kubectl port-forward <pod> 8080:8080`    | Test if sidecar (e.g., Envoy) is reachable. |
-| **Volume Corruption**      | `docker run --rm -v <host-path>:/target alpine ls /target` | Verify host files exist. |
+### **C. Network Diagnostics**
+#### **Test connectivity from within a container**
+```bash
+# Ping an external host
+docker exec <container> ping -c 4 google.com
+
+# Check routes
+docker exec <container> ip route
+```
+
+#### **Verify port exposure**
+```bash
+# Check if a port is listening
+nc -zv <container_ip> <port>
+
+# Kubernetes port forwarding
+kubectl port-forward <pod_name> <local_port>:<pod_port>
+```
+
+#### **Inspect network policies**
+```bash
+kubectl get networkpolicy --all-namespaces
+kubectl describe networkpolicy <policy_name>
+```
 
 ---
 
-### **Related Patterns**
-1. **[Container Orchestration]** – Scale debugging to clusters (Kubernetes, Swarm).
-2. **[Logging Aggregation]** – Centralize logs with ELK Stack or Loki.
-3. **[Observability]** – Instrument containers with OpenTelemetry.
-4. **[Network Policies]** – Isolate troubleshooting to specific pods.
-5. **[Health Checks]** – Implement liveness/readiness probes for auto-recovery.
+### **D. Image/Dependency Checks**
+#### **Verify image integrity**
+```bash
+# Check image layers
+docker inspect --format='{{json .RootFS.Layers}}' <image>
+
+# Test image locally
+docker run --rm -it <image> sh -c "ls -la /app"
+```
+
+#### **Debug missing dependencies**
+```bash
+# List shared libraries
+docker exec <container> ldd /path/to/binary | grep "not found"
+
+# Reproduce in a shell
+docker run -it <image> sh
+```
 
 ---
-**References:**
-- [Docker Inspect Docs](https://docs.docker.com/engine/reference/commandline/inspect/)
-- [Kubernetes Troubleshooting Guide](https://kubernetes.io/docs/tasks/debug-application-cluster/)
+
+### **E. Volume/Persistent Storage**
+#### **Check volume mounts**
+```bash
+# Docker
+docker volume ls
+docker run -it --rm -v <volume_name>:/mnt alpine ls -la /mnt
+
+# Kubernetes
+kubectl get pvc
+kubectl exec <pod> -- ls /path/to/mount
+```
+
+#### **Verify storage class**
+```bash
+kubectl describe storageclass <class_name>
+kubectl get sc
+```
+
+---
+
+### **F. Init/Entrypoint Debugging**
+#### **Test init containers manually**
+```bash
+# Kubernetes
+kubectl run debug-init --image=busybox --rm -it --restart=Never -- \
+  sh -c "exec /path/to/init-script"
+```
+
+#### **Check entrypoint execution**
+```bash
+# Mock the entrypoint
+docker run -it <image> sh -c "/entrypoint.sh --debug"
+```
+
+---
+
+### **G. Orchestration Issues**
+#### **Check pod events**
+```bash
+kubectl get events --sort-by='.lastTimestamp' | head -20
+```
+
+#### **Describe pod for detailed logs**
+```bash
+kubectl describe pod <pod_name> | grep -A 10 "Events:"
+```
+
+#### **Scale nodes for resource exhaustion**
+```bash
+kubectl get nodes -o wide
+kubectl scale node <node_name> --replicas=1
+```
+
+---
+
+## **3. Related Patterns**
+Troubleshooting containers often intersects with other patterns. Refer to:
+
+1. **[Resource Management](https://docs.example.com/patterns/resource-management)**
+   - Configure **CPU/memory limits**, **priority classes**, and **resource quotas**.
+   - *Tools*: `kubectl top`, `ResourceQuota`.
+
+2. **[Health Checks](https://docs.example.com/patterns/health-checks)**
+   - Implement **liveness/readiness probes** to auto-recover failed containers.
+   - *Tools*: `livenessProbe`, `readinessProbe`, `kubectl probe`.
+
+3. **[Logging & Monitoring](https://docs.example.com/patterns/logging-monitoring)**
+   - Centralize logs with **EFK (Elasticsearch/Fluentd/Kibana)** or **Loki**.
+   - *Tools*: `Fluentd`, `Prometheus`, `Grafana`.
+
+4. **[Security Hardening](https://docs.example.com/patterns/security-hardening)**
+   - Apply **non-root users**, **read-only filesystems**, and **SELinux/AppArmor**.
+   - *Tools*: `SecurityContext`, `podSecurityPolicy`.
+
+5. **[Image Optimization](https://docs.example.com/patterns/image-optimization)**
+   - Reduce image size with **multi-stage builds** and **distroless images**.
+   - *Tools*: `docker build --squash`, `distroless`.
+
+6. **[Network Isolation](https://docs.example.com/patterns/network-isolation)**
+   - Use **NetworkPolicies** to restrict pod-to-pod communication.
+   - *Tools*: `NetworkPolicy`, `Calico`.
+
+---
+
+## **4. Best Practices**
+1. **Isolate issues**: Use `--debug` flags (`docker run --debug`) to enable verbose logging.
+2. **Reproduce locally**: Test fixes in a minimal container before applying to production.
+3. **Automate alerts**: Set up **Prometheus alerts** for crashes or resource spikes.
+4. **Update regularly**: Keep base images and runtime tools (e.g., Docker/Kubernetes) patched.
+5. **Document fixes**: Maintain a **runbook** for recurring issues (e.g., OOM kills).
+6. **Leverage eBPF**: Use tools like **Cilium** or **bpftrace** for deep packet inspection without containers.
+
+---
+
+## **5. Further Reading**
+- [Docker Troubleshooting Guide](https://docs.docker.com/troubleshoot/)
+- [Kubernetes Debugging](https://kubernetes.io/docs/tasks/debug/)
+- [CNCF Container Runtime Benchmark](https://github.com/cncf/crbench)
+- [Istio Troubleshooting](https://istio.io/latest/docs/tasks/observability/) (for service mesh issues)
