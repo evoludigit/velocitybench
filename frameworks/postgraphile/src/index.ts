@@ -3,7 +3,7 @@ import cors from 'cors';
 import { connectDatabase, closeDatabase, getPool } from './db';
 import { setupGraphQL } from './middleware';
 
-const PORT = parseInt(process.env.PORT || '4003', 10);
+const PORT = parseInt(process.env.PORT || '4000', 10);
 
 async function startServer() {
   const app = express();

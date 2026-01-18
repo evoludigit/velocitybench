@@ -217,21 +217,49 @@ services:
   hasura:
     image: hasura/graphql-engine:v2.36.0
     ports:
-      - "8081:8080"
+      - "4000:8080"  # Standardized GraphQL port
     depends_on:
       postgres:
         condition: service_started
     environment:
       - HASURA_GRAPHQL_DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
-      - HASURA_GRAPHQL_ENABLE_CONSOLE=true
-      - HASURA_GRAPHQL_DEV_MODE=true
-      - HASURA_GRAPHQL_ADMIN_SECRET=admin_secret_key
-      - HASURA_GRAPHQL_JWT_SECRET={"type":"HS256","key":"this_is_a_longer_secret_key_for_hasura_jwt"}
+      - HASURA_GRAPHQL_ENABLE_CONSOLE=false  # Disabled for benchmarks
+      - HASURA_GRAPHQL_DEV_MODE=false
+      - HASURA_GRAPHQL_ADMIN_SECRET=benchmark-admin
+      - HASURA_GRAPHQL_UNAUTHORIZED_ROLE=public
+    volumes:
+      - ./frameworks/hasura/metadata:/hasura-metadata
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
-      interval: 30s
-      timeout: 15s
-      retries: 3
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - hasura
+    networks:
+      - velocitybench-benchmark
+
+  postgraphile:
+    build: ./frameworks/postgraphile
+    ports:
+      - "4000:4000"  # Standardized GraphQL port
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - postgraphile
     networks:
       - velocitybench-benchmark
 
@@ -568,28 +596,6 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 15s
-      retries: 3
-    networks:
-      - velocitybench-benchmark
-
-  go-gqlgen-alt:
-    build: ./frameworks/go-gqlgen.broken
-    ports:
-      - "4003:4009"
-    depends_on:
-      postgres:
-        condition: service_started
-    environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_NAME=velocitybench_benchmark
-      - DB_USER=benchmark
-      - DB_PASSWORD=benchmark123
-      - PORT=4009
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4009/health"]
-      interval: 30s
-      timeout: 10s
       retries: 3
     networks:
       - velocitybench-benchmark

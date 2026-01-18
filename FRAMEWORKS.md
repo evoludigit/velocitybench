@@ -60,8 +60,8 @@ Optimized implementations for fair performance comparison. All frameworks in thi
 | **async-graphql** | Rust | `async-graphql/` | 4000 | Ready | High performance |
 | **Spring GraphQL** | Java | `spring-graphql/` | 4000 | Ready | Enterprise-grade |
 | **HotChocolate** | C# | `csharp-dotnet/` | 4000 | Ready | .NET 9, Entity Framework |
-| **PostGraphile** | Node.js | `postgraphile/` | 4000 | Ready | Auto-generated from DB schema |
-| **Hasura** | - | `hasura/` | 4000 | Config | Auto-generated GraphQL engine |
+| **PostGraphile** | Node.js | `postgraphile/` | 4000 | Ready | Auto-generated from DB schema (profile: postgraphile) |
+| **Hasura** | Docker | `hasura/` | 4000 | Ready | Auto-generated GraphQL engine (profile: hasura) |
 
 ### REST Frameworks
 

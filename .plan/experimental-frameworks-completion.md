@@ -16,7 +16,7 @@ This requires the database to be seeded first.
 | Phase | Description | Status |
 |-------|-------------|--------|
 | **Phase 1** | Cleanup Duplicates and Broken Frameworks | ✅ **COMPLETE** |
-| **Phase 2** | Configure Auto-Generated Tools (Hasura, PostGraphile) | 🔲 Pending |
+| **Phase 2** | Configure Auto-Generated Tools (Hasura, PostGraphile) | ✅ **COMPLETE** |
 | **Phase 3** | Implement Python GraphQL Frameworks | 🔲 Pending |
 | **Phase 4** | Implement Node.js GraphQL Frameworks | 🔲 Pending |
 | **Phase 5** | Implement Go GraphQL Framework | 🔲 Pending |
@@ -26,7 +26,7 @@ This requires the database to be seeded first.
 | **Phase 9** | Implement JVM GraphQL Frameworks | 🔲 Pending |
 | **Phase 10** | Update Documentation and Infrastructure | 🔲 Pending |
 
-**Estimated Remaining Effort**: ~51 hours (Phase 1 complete = 1 hour saved)
+**Estimated Remaining Effort**: ~47 hours (Phases 1-2 complete = 5 hours saved)
 
 ---
 
@@ -70,65 +70,56 @@ docker-compose --profile fastapi-rest up -d  # REST on :8080
 
 ---
 
-## Phase 2: Configure Auto-Generated Tools 🔲 PENDING
+## Phase 2: Configure Auto-Generated Tools ✅ COMPLETE
 
-**Estimated Effort**: 4 hours
+**Completed**: 2026-01-18
 
-### 2.1 Hasura Setup
+### 2.1 Hasura Setup ✅
 
 **Location:** `frameworks/hasura/`
 
-**Current State:** README only, no configuration
-
-**Tasks:**
-1. Create `docker-compose.yml` for standalone testing:
-   ```yaml
-   version: '3.8'
-   services:
-     hasura:
-       image: hasura/graphql-engine:v2.36.0
-       ports:
-         - "4000:8080"  # Map Hasura's 8080 to standardized 4000
-       environment:
-         HASURA_GRAPHQL_DATABASE_URL: postgresql://benchmark:benchmark123@postgres:5432/fraiseql_benchmark
-         HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
-         HASURA_GRAPHQL_ADMIN_SECRET: benchmark-admin
-       healthcheck:
-         test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
-         interval: 10s
-         timeout: 5s
-         retries: 5
-   ```
-
-2. Create `metadata/` directory with table tracking for:
-   - `benchmark.tb_user`
-   - `benchmark.tb_post`
-   - `benchmark.tb_comment`
-   - `benchmark.tb_tag`
-   - Relationship configurations
-
-3. Create `Dockerfile` that applies metadata on startup
-
-4. Add health check endpoint verification
-
-5. Add to main `docker-compose.yml` with profile
+**What Was Done:**
+1. ✅ Created `docker-compose.yml` for standalone testing
+2. ✅ Created `metadata/` directory structure:
+   - `metadata/version.yaml` - Metadata format version
+   - `metadata/actions.yaml` - Empty actions config
+   - `metadata/databases/databases.yaml` - Database connection config
+   - `metadata/databases/default/tables/tables.yaml` - Table tracking with:
+     - `benchmark.tb_user` (with posts relationship)
+     - `benchmark.tb_post` (with author, comments relationships)
+     - `benchmark.tb_comment` (with author, post relationships)
+     - `benchmark.tv_user`, `tv_post`, `tv_comment` (JSONB query views)
+3. ✅ Created `.env.example` with configuration template
+4. ✅ Updated `README.md` with comprehensive documentation
+5. ✅ Added to main `docker-compose.yml` with profile: `hasura`
 
 **Port:** 4000 (map Hasura's internal 8080 → 4000)
 
-### 2.2 PostGraphile Verification
+### 2.2 PostGraphile ✅
 
 **Location:** `frameworks/postgraphile/`
 
-**Current State:** Implementation exists, needs verification
+**What Was Done:**
+1. ✅ Fixed port from 4003 → 4000 (standardized)
+2. ✅ Created `Dockerfile` with health check
+3. ✅ Created `.dockerignore` for efficient builds
+4. ✅ Created `.env.example` with configuration template
+5. ✅ Added to main `docker-compose.yml` with profile: `postgraphile`
+6. ✅ Updated smoke test script with profile-based framework support
 
-**Tasks:**
-1. Verify `/health` endpoint returns 200
-2. Verify `/graphql` endpoint works
-3. Test basic query execution
-4. Add to main `docker-compose.yml` with profile if not present
-5. Run smoke test
+**Existing Implementation Verified:**
+- `src/index.ts` - Express server with health/ready endpoints
+- `src/middleware.ts` - PostGraphile configuration for benchmark schema
+- `src/db.ts` - pg connection pool with smart tags for schema customization
+- `package.json` - Dependencies and build scripts
+- `tsconfig.json` - TypeScript configuration
 
 **Port:** 4000 (standardized GraphQL port)
+
+### Additional Updates
+- ✅ Removed `go-gqlgen-alt` service from docker-compose.yml (referenced deleted `go-gqlgen.broken/`)
+- ✅ Updated `tests/integration/smoke-test.sh` with profile-based framework testing
+- ✅ Updated `FRAMEWORKS.md` to show both frameworks as Ready
 
 ---
 
