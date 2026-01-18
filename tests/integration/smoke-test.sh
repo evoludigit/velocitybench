@@ -56,6 +56,7 @@ PROFILE_FRAMEWORKS=(
     "graphql-go:4000:/health"
     "juniper:4000:/health"
     "hanami:4000:/health"
+    "webonyx-graphql-php:4000:/health"
 )
 
 # Test each framework

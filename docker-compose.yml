@@ -451,6 +451,29 @@ services:
     networks:
       - velocitybench-benchmark
 
+  webonyx-graphql-php:
+    build: ./frameworks/webonyx-graphql-php
+    ports:
+      - "4000:4000"  # Standardized GraphQL port
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - webonyx-graphql-php
+    networks:
+      - velocitybench-benchmark
+
   fastapi-rest:
     build: ./frameworks/fastapi-rest
     ports:
