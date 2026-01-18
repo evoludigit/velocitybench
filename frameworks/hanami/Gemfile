@@ -1,0 +1,35 @@
+# frozen_string_literal: true
+
+source "https://rubygems.org"
+
+ruby ">= 3.2"
+
+# Web framework
+gem "hanami", "~> 2.1"
+gem "hanami-router", "~> 2.1"
+gem "hanami-controller", "~> 2.1"
+
+# Web server
+gem "puma", "~> 6.4"
+
+# GraphQL
+gem "graphql", "~> 2.2"
+gem "graphql-batch", "~> 0.6"
+
+# Database
+gem "sequel", "~> 5.77"
+gem "pg", "~> 1.5"
+
+# JSON
+gem "oj", "~> 3.16"
+gem "multi_json", "~> 1.15"
+
+# Utilities
+gem "dry-types", "~> 1.7"
+gem "dry-struct", "~> 1.6"
+gem "zeitwerk", "~> 2.6"
+
+group :development, :test do
+  gem "rake", "~> 13.1"
+  gem "rspec", "~> 3.13"
+end

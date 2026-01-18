@@ -425,6 +425,32 @@ services:
     networks:
       - velocitybench-benchmark
 
+  hanami:
+    build: ./frameworks/hanami
+    ports:
+      - "4000:4000"  # Standardized GraphQL port
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+      - DB_POOL_MIN=10
+      - DB_POOL_MAX=50
+      - RACK_ENV=production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - hanami
+    networks:
+      - velocitybench-benchmark
+
   fastapi-rest:
     build: ./frameworks/fastapi-rest
     ports:

@@ -6,7 +6,7 @@ Comprehensive list of all frameworks tested in VelocityBench, organized by tier,
 
 | Category | Count | Languages |
 |----------|-------|-----------|
-| **Tier 1: Production-Ready** | 20 | Python, Node.js, Go, Rust, Java, C#, PHP |
+| **Tier 1: Production-Ready** | 21 | Python, Node.js, Go, Rust, Java, C#, PHP, Ruby |
 | **Tier 2: N+1 Demonstration** | 4 | Node.js, Java |
 | **Tier 3: Pending Implementation** | 13 | Various |
 
@@ -69,6 +69,7 @@ Optimized implementations for fair performance comparison. All frameworks in thi
 | **Express-GraphQL** | Node.js | `express-graphql/` | 4000 | Ready | Express + graphql-http (profile: express-graphql) |
 | **graphql-go** | Go | `graphql-go/` | 4000 | Ready | Reflection-based GraphQL (profile: graphql-go) |
 | **Juniper** | Rust | `juniper/` | 4000 | Ready | Rust GraphQL with Actix-web (profile: juniper) |
+| **Hanami** | Ruby | `hanami/` | 4000 | Ready | Ruby GraphQL with Sequel ORM (profile: hanami) |
 
 ### REST Frameworks
 
@@ -111,7 +112,6 @@ Frameworks with stub directories that need full implementation. All will use sta
 |-----------|-----------|-------|
 | **Ruby on Rails** | `ruby-rails/` | Fixed, needs verification |
 | **Rails** | `rails/` | Possible duplicate |
-| **Hanami** | `hanami/` | Lightweight Ruby framework |
 
 ### PHP GraphQL (Port 4000)
 | Framework | Directory | Notes |
@@ -206,6 +206,7 @@ How each framework handles the "blog page load" scenario (post + author + 10 com
 | **gqlgen** | DataLoader batching | 3 | Yes | Batched |
 | **graphql-go** | DataLoader batching | 3 | Yes | Batched |
 | **Juniper** | DataLoader batching | 3 | Yes | Batched |
+| **Hanami** | GraphQL::Batch | 3 | Yes | Batched |
 | **PostGraphile** | Auto-generated | 1-2 | Yes | Smart joins |
 | **Hasura** | Auto-generated | 1-2 | Yes | Smart joins |
 | **FastAPI REST** | Include params + JOINs | 3-4 | Partial | Requires tuning |

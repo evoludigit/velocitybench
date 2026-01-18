@@ -55,6 +55,7 @@ PROFILE_FRAMEWORKS=(
     "express-graphql:4000:/health"
     "graphql-go:4000:/health"
     "juniper:4000:/health"
+    "hanami:4000:/health"
 )
 
 # Test each framework
