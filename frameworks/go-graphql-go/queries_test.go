@@ -2,8 +2,6 @@ package main
 
 import (
 	"testing"
-
-	"github.com/benchmark/go-graphql-go/internal/graphql"
 )
 
 // ============================================================================

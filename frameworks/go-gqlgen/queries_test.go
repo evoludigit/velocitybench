@@ -1,12 +1,14 @@
 package main
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/benchmark/go-gqlgen/graph/model"
 )
+
+// Silence unused import warnings
+var _ model.User
 
 // ============================================================================
 // Query: ping
@@ -424,10 +426,10 @@ func TestNullFieldHandling(t *testing.T) {
 			wantContent: nil,
 		},
 		{
-			name:        "user with empty string bio",
+			name:        "user with whitespace bio",
 			bio:         "   ",
 			content:     "",
-			wantBio:     nil,
+			wantBio:     strPtr("   "), // whitespace is stored as-is (not empty string)
 			wantContent: nil,
 		},
 		{
@@ -501,15 +503,15 @@ func TestSpecialCharacterHandling(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
 			factory := NewTestFactory(t)
-			validator := NewValidationHelper(t)
 			defer factory.Reset()
 
 			// Act
 			post := factory.CreateTestPost("user-id", "Title", tt.content)
 
-			// Assert
+			// Assert - content should be stored as-is
 			assert.NotNil(t, post)
-			validator.AssertStringContains(tt.content, string(tt.content[0]), "content")
+			assert.NotNil(t, post.Content)
+			assert.Equal(t, tt.content, *post.Content)
 		})
 	}
 }
@@ -562,19 +564,17 @@ func TestBoundaryConditions(t *testing.T) {
 				factory.CreateTestPost(author.ID, "Post "+string(rune(i)), "Content")
 			}
 
-			// Act
+			// Act - simulate applying limit
 			posts := factory.posts
 			result := len(posts)
-			if result > tt.limit && tt.limit > 0 {
+			if tt.limit == 0 {
+				result = 0 // limit 0 means return nothing
+			} else if result > tt.limit {
 				result = tt.limit
 			}
 
 			// Assert
-			expected := tt.expect
-			if tt.limit > 0 && expected > tt.limit {
-				expected = tt.limit
-			}
-			assert.LessOrEqual(t, result, tt.expect)
+			assert.Equal(t, tt.expect, result)
 		})
 	}
 }

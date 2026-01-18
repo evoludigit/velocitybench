@@ -163,7 +163,7 @@ describe.skip('PostGraphile GraphQL Query Operations', () => {
       const author = await factory.createUser({ name: 'Author' });
       const client = await pool.connect();
       const result = await client.query(
-        `INSERT INTO comments (content, fk_post, fk_user) VALUES ($1, $2, $3) RETURNING *`,
+        `INSERT INTO benchmark.tb_comment (content, fk_post, fk_author) VALUES ($1, $2, $3) RETURNING *`,
         ['Test comment', post.pk_post, author.pk_user]
       );
       client.release();
@@ -311,8 +311,8 @@ describe.skip('PostGraphile GraphQL Query Operations', () => {
       const author = await factory.createUser({ name: 'Author' });
       const client = await pool.connect();
       await client.query(
-        `INSERT INTO comments (content, post_id, author_id) VALUES ($1, $2, $3)`,
-        ['Comment', post.id, author.id]
+        `INSERT INTO benchmark.tb_comment (content, fk_post, fk_author) VALUES ($1, $2, $3)`,
+        ['Comment', post.pk_post, author.pk_user]
       );
       client.release();
 
@@ -376,7 +376,7 @@ describe.skip('PostGraphile GraphQL Query Operations', () => {
 
     test('should support Trinity pattern - foreign key relationships', async () => {
       const author = await factory.createUser({ name: 'Author' });
-      const post = await factory.createPost({ title: 'Test', fk_user: author.pk_user });
+      const post = await factory.createPost({ title: 'Test', fk_author: author.pk_user });
 
       const response = await request(server)
         .post('/graphql')
@@ -390,7 +390,7 @@ describe.skip('PostGraphile GraphQL Query Operations', () => {
 
     test('should handle deeply nested relationships', async () => {
       const user = await factory.createUser({ name: 'Author' });
-      const post = await factory.createPost({ title: 'Post', fk_user: user.pk_user });
+      const post = await factory.createPost({ title: 'Post', fk_author: user.pk_user });
 
       const response = await request(server)
         .post('/graphql')
@@ -410,7 +410,7 @@ describe.skip('PostGraphile GraphQL Query Operations', () => {
       const author = await factory.createUser({ name: 'John' });
       const post = await factory.createPost({
         title: 'My Post',
-        fk_user: author.pk_user,
+        fk_author: author.pk_user,
         content: 'Content',
       });
 
@@ -432,8 +432,8 @@ describe.skip('PostGraphile GraphQL Query Operations', () => {
     test('should handle multiple relationships', async () => {
       const user1 = await factory.createUser({ name: 'User1' });
       const user2 = await factory.createUser({ name: 'User2' });
-      const post1 = await factory.createPost({ title: 'Post1', fk_user: user1.pk_user });
-      const post2 = await factory.createPost({ title: 'Post2', fk_user: user2.pk_user });
+      const post1 = await factory.createPost({ title: 'Post1', fk_author: user1.pk_user });
+      const post2 = await factory.createPost({ title: 'Post2', fk_author: user2.pk_user });
 
       const response = await request(server)
         .post('/graphql')

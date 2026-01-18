@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/benchmark/go-gqlgen/graph/model"
 )
 
 // ============================================================================

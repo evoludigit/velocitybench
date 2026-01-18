@@ -272,7 +272,6 @@ func TestSpecialCharacterErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
 			factory := NewTestFactory(t)
-			validator := NewValidationHelper(t)
 			defer factory.Reset()
 
 			// Act

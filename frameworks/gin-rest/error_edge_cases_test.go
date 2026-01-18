@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"yourmodule/internal/models"
+	"github.com/benchmark/gin-rest/internal/models"
 )
 
 // ============================================================================

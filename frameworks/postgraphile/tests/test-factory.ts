@@ -8,7 +8,6 @@ export class TestFactory {
   /**
    * Start a test transaction for isolation
    * Each test gets its own transaction that can be rolled back
-   * This is better than truncating tables - PostGraphile's schema stays intact
    */
   async startTransaction() {
     this.testClient = await this.pool.connect();
@@ -17,7 +16,7 @@ export class TestFactory {
 
   /**
    * Rollback the test transaction
-   * All test data is automatically cleaned up, no manual truncation needed
+   * All test data is automatically cleaned up
    */
   async rollbackTransaction() {
     if (this.testClient) {
@@ -32,8 +31,6 @@ export class TestFactory {
 
   /**
    * Get the appropriate client for queries
-   * Uses test transaction if one is active, otherwise gets a new connection
-   * This ensures test data stays within the transaction scope
    */
   private async getClient(): Promise<{ client: PoolClient; shouldRelease: boolean }> {
     if (this.testClient) {
@@ -43,26 +40,19 @@ export class TestFactory {
   }
 
   /**
-   * Create a test user using the benchmark schema
-   * Trinity Pattern:
-   * - id: UUID (public API identifier, also primary key)
-   * - username: unique identifier
-   * - email: contact info
-   * - first_name, last_name: personal info
-   * - bio: user bio
+   * Create a test user
+   * Trinity Pattern: tb_user with pk_user (integer PK) + id (UUID)
    */
   async createUser(overrides?: Partial<{
-    username: string;
+    name: string;        // Maps to first_name for simplicity
     email: string;
-    first_name: string;
-    last_name: string;
+    username: string;
     bio: string | null;
   }>) {
     const {
+      name = 'Test',
+      email = `user-${Math.random().toString(36).substring(7)}@example.com`,
       username = `user_${Math.random().toString(36).substring(7)}`,
-      email = `user-${Math.random()}@example.com`,
-      first_name = 'Test',
-      last_name = 'User',
       bio = 'Test bio',
     } = overrides || {};
 
@@ -72,7 +62,7 @@ export class TestFactory {
         `INSERT INTO benchmark.tb_user (username, email, first_name, last_name, bio)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
-        [username, email, first_name, last_name, bio]
+        [username, email, name, 'User', bio]
       );
       return result.rows[0];
     } finally {
@@ -83,16 +73,15 @@ export class TestFactory {
   }
 
   /**
-   * Create a test post with author relationship
-   * Trinity Pattern: fk_author references tb_user(pk_user)
+   * Create a test post
+   * Trinity Pattern: tb_post with pk_post (integer PK) + id (UUID) + fk_author (FK to tb_user.pk_user)
    */
   async createPost(overrides?: Partial<{
     title: string;
     content: string | null;
-    fk_author?: number; // pk_user of the author
+    fk_author?: number;
     status?: string;
   }>) {
-    // Create author if not provided
     let fkAuthor: number;
     if (overrides?.fk_author) {
       fkAuthor = overrides.fk_author;
@@ -102,7 +91,7 @@ export class TestFactory {
     }
 
     const {
-      title = `Test Post ${Math.random()}`,
+      title = `Test Post ${Math.random().toString(36).substring(7)}`,
       content = 'Test content',
       status = 'published',
     } = overrides || {};
@@ -125,7 +114,7 @@ export class TestFactory {
 
   /**
    * Create a test comment
-   * Trinity Pattern: References tb_post(pk_post) and tb_user(pk_user)
+   * Trinity Pattern: tb_comment with pk_comment (integer PK) + id (UUID) + fk_post/fk_author (FKs)
    */
   async createComment(overrides?: Partial<{
     fk_post?: number;
@@ -169,8 +158,6 @@ export class TestFactory {
 
   /**
    * Clean up test data via transaction rollback
-   * This is called after each test to automatically clean up all test data
-   * Much better than truncating tables - respects PostGraphile schema configuration
    */
   async cleanup() {
     await this.rollbackTransaction();

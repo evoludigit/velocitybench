@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/benchmark/gin-rest/internal/models"
 	"github.com/google/uuid"
-	"yourmodule/internal/models"
 )
 
 // TestFactory provides helper methods for creating test data

@@ -17,6 +17,27 @@ DB_PASSWORD = os.getenv('DB_PASSWORD', 'benchmark123')
 DB_NAME = os.getenv('DB_NAME', 'velocitybench_benchmark')
 
 
+def _check_db_available():
+    """Check if database is available."""
+    try:
+        conn = psycopg.connect(
+            host=DB_HOST,
+            port=DB_PORT,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            dbname=DB_NAME,
+            connect_timeout=3,
+        )
+        conn.close()
+        return True
+    except Exception:
+        return False
+
+
+# Skip all tests if database is not available
+db_available = _check_db_available()
+
+
 @pytest.fixture
 def db():
     """Connect to shared test database with transaction isolation.
@@ -26,6 +47,9 @@ def db():
 
     Uses psycopg3 for modern PostgreSQL connectivity.
     """
+    if not db_available:
+        pytest.skip("Database not available")
+
     conn = psycopg.connect(
         host=DB_HOST,
         port=DB_PORT,

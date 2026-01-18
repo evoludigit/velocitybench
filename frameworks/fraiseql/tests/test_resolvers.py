@@ -1,4 +1,10 @@
-"""Tests for FraiseQL GraphQL resolvers."""
+"""Tests for FraiseQL GraphQL resolvers.
+
+Uses Trinity Identifier Pattern:
+- pk_* = Integer primary key (internal, for FK relationships)
+- id = UUID (external API identifier)
+- fk_* = Integer foreign key (references pk_*)
+"""
 
 import pytest
 from uuid import UUID
@@ -31,7 +37,7 @@ class TestUserQueries:
 
     def test_query_user_not_found(self, factory):
         """Should return None for non-existent user."""
-        result = factory.get_user("non-existent-id")
+        result = factory.get_user("00000000-0000-0000-0000-000000000000")
 
         assert result is None
 
@@ -42,7 +48,8 @@ class TestPostQueries:
     def test_query_post_by_id(self, factory):
         """Should return post by ID."""
         user = factory.create_user("author", "author@example.com", "Author")
-        post = factory.create_post(user["id"], "Test Post", "Test content")
+        # Use pk_user for FK relationship (Trinity Pattern)
+        post = factory.create_post(user["pk_user"], "Test Post", "Test content")
 
         result = factory.get_post(post["id"])
 
@@ -53,8 +60,9 @@ class TestPostQueries:
     def test_query_posts_by_author(self, factory):
         """Should return posts by author."""
         author = factory.create_user("author", "author@example.com", "Author")
-        factory.create_post(author["id"], "Post 1", "Content 1")
-        factory.create_post(author["id"], "Post 2", "Content 2")
+        # Use pk_user for FK relationship
+        factory.create_post(author["pk_user"], "Post 1", "Content 1")
+        factory.create_post(author["pk_user"], "Post 2", "Content 2")
 
         posts = factory.get_posts_by_author(author["pk_user"])
 
@@ -67,9 +75,10 @@ class TestCommentQueries:
     def test_query_comment_by_id(self, factory):
         """Should return comment by ID."""
         author = factory.create_user("author", "author@example.com", "Author")
-        post = factory.create_post(author["id"], "Test Post", "Content")
+        post = factory.create_post(author["pk_user"], "Test Post", "Content")
         commenter = factory.create_user("commenter", "commenter@example.com", "Commenter")
-        comment = factory.create_comment(commenter["id"], post["id"], "Great post!")
+        # Use pk_user and pk_post for FK relationships
+        comment = factory.create_comment(commenter["pk_user"], post["pk_post"], "Great post!")
 
         result = factory.get_comment(comment["id"])
 
@@ -79,10 +88,10 @@ class TestCommentQueries:
     def test_query_comments_by_post(self, factory):
         """Should return comments by post."""
         author = factory.create_user("author", "author@example.com", "Author")
-        post = factory.create_post(author["id"], "Test Post", "Content")
+        post = factory.create_post(author["pk_user"], "Test Post", "Content")
         commenter = factory.create_user("commenter", "commenter@example.com", "Commenter")
-        factory.create_comment(commenter["id"], post["id"], "Comment 1")
-        factory.create_comment(commenter["id"], post["id"], "Comment 2")
+        factory.create_comment(commenter["pk_user"], post["pk_post"], "Comment 1")
+        factory.create_comment(commenter["pk_user"], post["pk_post"], "Comment 2")
 
         comments = factory.get_comments_by_post(post["pk_post"])
 
@@ -95,8 +104,8 @@ class TestRelationships:
     def test_user_posts_relationship(self, factory):
         """Should resolve user posts."""
         user = factory.create_user("author", "author@example.com", "Author")
-        post1 = factory.create_post(user["id"], "Post 1", "Content 1")
-        post2 = factory.create_post(user["id"], "Post 2", "Content 2")
+        post1 = factory.create_post(user["pk_user"], "Post 1", "Content 1")
+        post2 = factory.create_post(user["pk_user"], "Post 2", "Content 2")
 
         posts = factory.get_posts_by_author(user["pk_user"])
 
@@ -108,7 +117,7 @@ class TestRelationships:
     def test_post_author_relationship(self, factory):
         """Should resolve post author."""
         author = factory.create_user("author", "author@example.com", "Author")
-        post = factory.create_post(author["id"], "Test Post", "Content")
+        post = factory.create_post(author["pk_user"], "Test Post", "Content")
 
         assert post["author"] is not None
         assert post["author"]["pk_user"] == author["pk_user"]
@@ -116,9 +125,9 @@ class TestRelationships:
     def test_comment_author_relationship(self, factory):
         """Should resolve comment author."""
         author = factory.create_user("author", "author@example.com", "Author")
-        post = factory.create_post(author["id"], "Test Post", "Content")
+        post = factory.create_post(author["pk_user"], "Test Post", "Content")
         commenter = factory.create_user("commenter", "commenter@example.com", "Commenter")
-        comment = factory.create_comment(commenter["id"], post["id"], "Great!")
+        comment = factory.create_comment(commenter["pk_user"], post["pk_post"], "Great!")
 
         assert comment["author"] is not None
         assert comment["author"]["pk_user"] == commenter["pk_user"]
@@ -145,15 +154,15 @@ class TestEdgeCases:
         """Should handle special characters."""
         user = factory.create_user("author", "author@example.com", "Author")
         special_content = "Test with 'quotes' and \"double quotes\" and <html>"
-        post = factory.create_post(user["id"], "Special", special_content)
+        post = factory.create_post(user["pk_user"], "Special", special_content)
 
         assert post["content"] == special_content
 
     def test_unicode_content(self, factory):
         """Should handle unicode content."""
         user = factory.create_user("author", "author@example.com", "Author")
-        unicode_content = "Test with émojis 🎉 and ñ and 中文"
-        post = factory.create_post(user["id"], "Unicode", unicode_content)
+        unicode_content = "Test with emojis and n and Chinese"
+        post = factory.create_post(user["pk_user"], "Unicode", unicode_content)
 
         assert post["content"] == unicode_content
 
@@ -165,20 +174,20 @@ class TestValidation:
         """Should generate valid UUIDs."""
         user = factory.create_user("user", "user@example.com", "User")
 
-        # Should not raise
+        # Should not raise - id is already a string UUID
         UUID(user["id"])
 
     def test_create_post_with_invalid_author(self, factory):
         """Should raise for invalid author."""
         with pytest.raises(Exception):
-            factory.create_post("invalid-author", "Test", "Content")
+            factory.create_post(99999999, "Test", "Content")  # Non-existent pk_user
 
     def test_create_comment_with_invalid_post(self, factory):
         """Should raise for invalid post."""
         user = factory.create_user("user", "user@example.com", "User")
 
         with pytest.raises(Exception):
-            factory.create_comment(user["id"], "invalid-post", "Content")
+            factory.create_comment(user["pk_user"], 99999999, "Content")  # Non-existent pk_post
 
 
 class TestPerformance:
@@ -189,7 +198,7 @@ class TestPerformance:
         user = factory.create_user("author", "author@example.com", "Author")
 
         for i in range(50):
-            factory.create_post(user["id"], f"Post {i}", "Content")
+            factory.create_post(user["pk_user"], f"Post {i}", "Content")
 
         posts = factory.get_posts_by_author(user["pk_user"])
         assert len(posts) == 50
@@ -207,6 +216,6 @@ class TestPerformance:
         """Should handle long content."""
         user = factory.create_user("author", "author@example.com", "Author")
         long_content = "x" * 100000
-        post = factory.create_post(user["id"], "Long", long_content)
+        post = factory.create_post(user["pk_user"], "Long", long_content)
 
         assert len(post["content"]) == 100000

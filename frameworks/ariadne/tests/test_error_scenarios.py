@@ -163,12 +163,12 @@ def test_very_long_content(db, factory):
 
 @pytest.mark.error
 def test_negative_limit_parameter(db, factory):
-    """Test: negative limit values are handled."""
+    """Test: negative limit values are rejected by PostgreSQL."""
     cursor = db.cursor()
 
-    # PostgreSQL treats negative LIMIT as no limit
-    cursor.execute("SELECT id FROM benchmark.tb_user LIMIT -1")
-    # Should not raise, may return all or none
+    # PostgreSQL rejects negative LIMIT values
+    with pytest.raises(Exception):
+        cursor.execute("SELECT id FROM benchmark.tb_user LIMIT -1")
 
 
 @pytest.mark.error

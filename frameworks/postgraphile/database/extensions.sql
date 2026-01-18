@@ -17,6 +17,9 @@ SET search_path TO benchmark, public;
 -- tb_user Smart Tags
 -- ============================================================================
 
+-- Rename table from TbUser to User in GraphQL
+COMMENT ON TABLE benchmark.tb_user IS E'@name User\nUser account';
+
 -- Hide internal primary key from GraphQL API
 COMMENT ON COLUMN benchmark.tb_user.pk_user IS E'@omit all\nInternal primary key, use id instead';
 
@@ -26,6 +29,9 @@ COMMENT ON COLUMN benchmark.tb_user.id IS 'Public identifier (UUID)';
 -- ============================================================================
 -- tb_post Smart Tags
 -- ============================================================================
+
+-- Rename table from TbPost to Post in GraphQL
+COMMENT ON TABLE benchmark.tb_post IS E'@name Post\nBlog post';
 
 -- Hide internal primary key
 COMMENT ON COLUMN benchmark.tb_post.pk_post IS E'@omit all\nInternal primary key, use id instead';
@@ -39,6 +45,9 @@ COMMENT ON COLUMN benchmark.tb_post.id IS 'Public identifier (UUID)';
 -- ============================================================================
 -- tb_comment Smart Tags
 -- ============================================================================
+
+-- Rename table from TbComment to Comment in GraphQL
+COMMENT ON TABLE benchmark.tb_comment IS E'@name Comment\nPost comment';
 
 -- Hide internal primary key
 COMMENT ON COLUMN benchmark.tb_comment.pk_comment IS E'@omit all\nInternal primary key, use id instead';

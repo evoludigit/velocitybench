@@ -21,6 +21,27 @@ DB_PASSWORD = os.getenv('DB_PASSWORD', 'benchmark123')
 DB_NAME = os.getenv('DB_NAME', 'velocitybench_benchmark')
 
 
+def _check_db_available():
+    """Check if database is available."""
+    try:
+        conn = psycopg.connect(
+            host=DB_HOST,
+            port=DB_PORT,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            dbname=DB_NAME,
+            connect_timeout=3,
+        )
+        conn.close()
+        return True
+    except Exception:
+        return False
+
+
+# Skip all tests if database is not available
+db_available = _check_db_available()
+
+
 @pytest.fixture
 def db():
     """Synchronous database connection for non-async tests.
@@ -28,6 +49,9 @@ def db():
     Uses transaction isolation with automatic rollback.
     For async tests, use db_async fixture instead.
     """
+    if not db_available:
+        pytest.skip("Database not available")
+
     conn = psycopg.connect(
         host=DB_HOST,
         port=DB_PORT,

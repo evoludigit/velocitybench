@@ -6,6 +6,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "test": "vitest run",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
     "format": "prettier --write src",
@@ -15,20 +16,23 @@
     "express": "^4.18.0",
     "express-async-errors": "^3.1.1",
     "joi": "^17.11.0",
-    "sequelize": "^6.35.0",
     "pg": "^8.11.0",
-    "prom-client": "^15.1.0"
+    "prom-client": "^15.1.0",
+    "sequelize": "^6.35.0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
     "@types/express": "^4.17.0",
+    "@types/node": "^20.0.0",
     "@types/pg": "^8.10.0",
+    "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^6.14.0",
     "@typescript-eslint/parser": "^6.14.0",
     "eslint": "^8.54.0",
     "eslint-config-prettier": "^9.0.0",
     "prettier": "^3.1.0",
+    "tsx": "^4.7.0",
     "typescript": "^5.3.0",
-    "tsx": "^4.7.0"
+    "uuid": "^13.0.0",
+    "vitest": "^4.0.17"
   }
 }
