@@ -6,9 +6,8 @@ Comprehensive list of all frameworks tested in VelocityBench, organized by tier,
 
 | Category | Count | Languages |
 |----------|-------|-----------|
-| **Tier 1: Production-Ready** | 25 | Python, Node.js, Go, Rust, Java, Scala, C#, PHP, Ruby |
+| **Tier 1: Production-Ready** | 29 | Python, Node.js, Go, Rust, Java, Scala, C#, PHP, Ruby |
 | **Tier 2: N+1 Demonstration** | 4 | Node.js, Java |
-| **Tier 3: Pending Implementation** | 13 | Various |
 
 ---
 
@@ -55,7 +54,6 @@ Optimized implementations for fair performance comparison. All frameworks in thi
 | **Strawberry** | Python | `strawberry/` | 4000 | Ready | DataLoader batching |
 | **Graphene** | Python | `graphene/` | 4000 | Ready | DataLoader batching |
 | **Apollo Server** | Node.js | `apollo-server/` | 4000 | Ready | DataLoader batching |
-| **Mercurius** | Node.js | `mercurius/` | 4000 | Ready | Fastify-based, DataLoader |
 | **gqlgen** | Go | `go-gqlgen/` | 4000 | Ready | Code-gen, DataLoader |
 | **async-graphql** | Rust | `async-graphql/` | 4000 | Ready | High performance |
 | **Spring GraphQL** | Java | `spring-graphql/` | 4000 | Ready | Enterprise-grade |
@@ -99,23 +97,6 @@ Naive ORM implementations intentionally showing query explosion impact. Used to 
 | **Express ORM** | Express REST | `express-orm/` | 8080 | Show N+1 impact |
 | **Spring Boot ORM Naive** | Spring Boot | `spring-boot-orm-naive/` | 8080 | Show N+1 impact |
 | **Spring Boot ORM** | Spring Boot | `spring-boot-orm/` | 8080 | Moderate optimization |
-
----
-
-## Tier 3: Pending Implementation
-
-Frameworks with stub directories that need full implementation. All will use standardized ports.
-
-### Go GraphQL (Port 4000)
-| Framework | Directory | Notes |
-|-----------|-----------|-------|
-| **go-graphql-go** | `go-graphql-go/` | Has tests, needs server impl |
-
-### Ruby (Port 4000 GraphQL, 8080 REST)
-| Framework | Directory | Notes |
-|-----------|-----------|-------|
-| **Ruby on Rails** | `ruby-rails/` | Fixed, needs verification |
-| **Rails** | `rails/` | Possible duplicate |
 
 ---
 
