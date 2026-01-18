@@ -378,6 +378,29 @@ services:
     networks:
       - velocitybench-benchmark
 
+  graphql-go:
+    build: ./frameworks/graphql-go
+    ports:
+      - "4000:4000"  # Standardized GraphQL port
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - graphql-go
+    networks:
+      - velocitybench-benchmark
+
   fastapi-rest:
     build: ./frameworks/fastapi-rest
     ports:

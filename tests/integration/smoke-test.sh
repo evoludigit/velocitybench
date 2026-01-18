@@ -53,6 +53,7 @@ PROFILE_FRAMEWORKS=(
     "graphql-yoga:4000:/health"
     "mercurius:4000:/health"
     "express-graphql:4000:/health"
+    "graphql-go:4000:/health"
 )
 
 # Test each framework

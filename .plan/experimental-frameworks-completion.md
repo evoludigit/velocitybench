@@ -19,14 +19,14 @@ This requires the database to be seeded first.
 | **Phase 2** | Configure Auto-Generated Tools (Hasura, PostGraphile) | ✅ **COMPLETE** |
 | **Phase 3** | Implement Python GraphQL Frameworks | ✅ **COMPLETE** |
 | **Phase 4** | Implement Node.js GraphQL Frameworks | ✅ **COMPLETE** |
-| **Phase 5** | Implement Go GraphQL Framework | 🔲 Pending |
+| **Phase 5** | Implement Go GraphQL Framework | ✅ **COMPLETE** |
 | **Phase 6** | Implement Rust GraphQL Framework | 🔲 Pending |
 | **Phase 7** | Implement Ruby Framework | 🔲 Pending |
 | **Phase 8** | Implement PHP GraphQL Framework | 🔲 Pending |
 | **Phase 9** | Implement JVM GraphQL Frameworks | 🔲 Pending |
 | **Phase 10** | Update Documentation and Infrastructure | 🔲 Pending |
 
-**Estimated Remaining Effort**: ~35 hours (Phases 1-4 complete = 17 hours saved)
+**Estimated Remaining Effort**: ~31 hours (Phases 1-5 complete = 21 hours saved)
 
 ---
 
@@ -233,44 +233,42 @@ docker-compose --profile fastapi-rest up -d  # REST on :8080
 
 ---
 
-## Phase 5: Implement Go GraphQL Framework 🔲 PENDING
+## Phase 5: Implement Go GraphQL Framework ✅ COMPLETE
 
-**Estimated Effort**: 4 hours
+**Completed**: 2026-01-18
 
-### 5.1 graphql-go (Reflection-Based)
+### 5.1 graphql-go (Reflection-Based) ✅
 
 **Location:** `frameworks/graphql-go/`
 
-**Current State:** Empty stub
+**What Was Done:**
+1. ✅ Created `main.go` - HTTP server with graphql-go/handler
+2. ✅ Created `internal/db/db.go` - pgx connection pool (min: 10, max: 100)
+3. ✅ Created `internal/model/model.go` - User, Post, Comment structs
+4. ✅ Created `internal/dataloader/dataloader.go` - DataLoader for N+1 prevention:
+   - UserLoader, PostLoader for single entity fetches
+   - PostsByAuthorLoader, CommentsByPostLoader for relationships
+5. ✅ Created `internal/schema/schema.go` - GraphQL schema using graphql-go:
+   - Reflection-based type definitions (vs gqlgen code-gen)
+   - Query resolvers: ping, user, users, post, posts
+   - Mutation resolvers: updateUser, updatePost
+   - Object type resolvers for nested relationships
+6. ✅ Created `go.mod` and `go.sum` with dependencies
+7. ✅ Created `Dockerfile` with multi-stage build (builder + alpine runtime)
+8. ✅ Created `.dockerignore` and `.env.example`
+9. ✅ Added to docker-compose.yml with profile: `graphql-go`
+10. ✅ Updated smoke-test.sh with graphql-go entry
 
-**Files to Create:**
-```
-graphql-go/
-├── cmd/server/
-│   └── main.go         # Server entry point
-├── internal/
-│   ├── schema/
-│   │   └── schema.go   # GraphQL schema definition
-│   ├── resolvers/
-│   │   └── resolvers.go
-│   ├── loaders/
-│   │   └── loaders.go  # DataLoader equivalent
-│   └── db/
-│       └── db.go       # pgx connection pool
-├── go.mod
-├── go.sum
-├── Dockerfile
-└── .env.example
-```
-
-**Dependencies:**
-- github.com/graphql-go/graphql
-- github.com/graphql-go/handler
-- github.com/jackc/pgx/v5
-- github.com/graph-gophers/dataloader/v7
-- github.com/prometheus/client_golang
+**Dependencies Used:**
+- github.com/graphql-go/graphql - Reflection-based GraphQL implementation
+- github.com/graphql-go/handler - HTTP handler for GraphQL
+- github.com/jackc/pgx/v5 - PostgreSQL driver with pooling
+- github.com/graph-gophers/dataloader/v7 - DataLoader for batching
 
 **Port:** 4000
+
+**Key Difference from gqlgen:** graphql-go uses runtime reflection to map types,
+while gqlgen generates Go code from schema. Both use DataLoader for N+1 prevention.
 
 ---
 

@@ -6,9 +6,9 @@ Comprehensive list of all frameworks tested in VelocityBench, organized by tier,
 
 | Category | Count | Languages |
 |----------|-------|-----------|
-| **Tier 1: Production-Ready** | 18 | Python, Node.js, Go, Rust, Java, C#, PHP |
+| **Tier 1: Production-Ready** | 19 | Python, Node.js, Go, Rust, Java, C#, PHP |
 | **Tier 2: N+1 Demonstration** | 4 | Node.js, Java |
-| **Tier 3: Pending Implementation** | 15 | Various |
+| **Tier 3: Pending Implementation** | 14 | Various |
 
 ---
 
@@ -67,6 +67,7 @@ Optimized implementations for fair performance comparison. All frameworks in thi
 | **GraphQL Yoga** | Node.js | `graphql-yoga/` | 4000 | Ready | Modern Node.js GraphQL server (profile: graphql-yoga) |
 | **Mercurius** | Node.js | `mercurius/` | 4000 | Ready | Fastify-based GraphQL (profile: mercurius) |
 | **Express-GraphQL** | Node.js | `express-graphql/` | 4000 | Ready | Express + graphql-http (profile: express-graphql) |
+| **graphql-go** | Go | `graphql-go/` | 4000 | Ready | Reflection-based GraphQL (profile: graphql-go) |
 
 ### REST Frameworks
 
@@ -102,7 +103,6 @@ Frameworks with stub directories that need full implementation. All will use sta
 ### Go GraphQL (Port 4000)
 | Framework | Directory | Notes |
 |-----------|-----------|-------|
-| **graphql-go** | `graphql-go/` | Reflection-based (vs gqlgen code-gen) |
 | **go-graphql-go** | `go-graphql-go/` | Has tests, needs server impl |
 
 ### Rust GraphQL (Port 4000)
@@ -208,6 +208,7 @@ How each framework handles the "blog page load" scenario (post + author + 10 com
 | **Graphene** | DataLoader batching | 3 | Yes | Batched |
 | **Apollo** | DataLoader batching | 3 | Yes | Batched |
 | **gqlgen** | DataLoader batching | 3 | Yes | Batched |
+| **graphql-go** | DataLoader batching | 3 | Yes | Batched |
 | **PostGraphile** | Auto-generated | 1-2 | Yes | Smart joins |
 | **Hasura** | Auto-generated | 1-2 | Yes | Smart joins |
 | **FastAPI REST** | Include params + JOINs | 3-4 | Partial | Requires tuning |
