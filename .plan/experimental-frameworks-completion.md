@@ -18,7 +18,7 @@ This requires the database to be seeded first.
 | **Phase 1** | Cleanup Duplicates and Broken Frameworks | ✅ **COMPLETE** |
 | **Phase 2** | Configure Auto-Generated Tools (Hasura, PostGraphile) | ✅ **COMPLETE** |
 | **Phase 3** | Implement Python GraphQL Frameworks | ✅ **COMPLETE** |
-| **Phase 4** | Implement Node.js GraphQL Frameworks | 🔲 Pending |
+| **Phase 4** | Implement Node.js GraphQL Frameworks | ✅ **COMPLETE** |
 | **Phase 5** | Implement Go GraphQL Framework | 🔲 Pending |
 | **Phase 6** | Implement Rust GraphQL Framework | 🔲 Pending |
 | **Phase 7** | Implement Ruby Framework | 🔲 Pending |
@@ -26,7 +26,7 @@ This requires the database to be seeded first.
 | **Phase 9** | Implement JVM GraphQL Frameworks | 🔲 Pending |
 | **Phase 10** | Update Documentation and Infrastructure | 🔲 Pending |
 
-**Estimated Remaining Effort**: ~41 hours (Phases 1-3 complete = 11 hours saved)
+**Estimated Remaining Effort**: ~35 hours (Phases 1-4 complete = 17 hours saved)
 
 ---
 
@@ -170,68 +170,66 @@ docker-compose --profile fastapi-rest up -d  # REST on :8080
 
 ---
 
-## Phase 4: Implement Node.js GraphQL Frameworks 🔲 PENDING
+## Phase 4: Implement Node.js GraphQL Frameworks ✅ COMPLETE
 
-**Estimated Effort**: 6 hours
+**Completed**: 2026-01-18
 
-### 4.1 GraphQL-Yoga (Modern Node.js)
+### 4.1 GraphQL Yoga ✅
 
 **Location:** `frameworks/graphql-yoga/`
 
-**Files to Create:**
-```
-graphql-yoga/
-├── src/
-│   ├── index.ts        # Server entry point
-│   ├── schema.ts       # GraphQL schema
-│   ├── resolvers.ts    # Resolvers
-│   ├── dataloaders.ts  # DataLoader instances
-│   └── db.ts           # pg pool connection
-├── package.json
-├── tsconfig.json
-├── Dockerfile
-└── .env.example
-```
+**What Was Done:**
+1. ✅ Created `src/index.ts` - Server with Yoga and schema
+2. ✅ Created `src/db.ts` - pg connection pool
+3. ✅ Created `src/dataloaders.ts` - DataLoader for N+1 prevention
+4. ✅ Created `package.json` with graphql-yoga, dataloader, pg
+5. ✅ Created `tsconfig.json` for TypeScript compilation
+6. ✅ Created `Dockerfile` with health check
+7. ✅ Created `.dockerignore` and `.env.example`
+8. ✅ Added to docker-compose.yml with profile: `graphql-yoga`
 
-**Dependencies:**
-- graphql-yoga
-- graphql
-- pg
-- dataloader
-- prom-client
+**Port:** 4000 (standardized GraphQL port)
 
-**Port:** 4000
+### 4.2 Mercurius (Fastify GraphQL) ✅
 
-### 4.2 Fastify-GraphQL
+**Location:** `frameworks/mercurius/`
 
-**Location:** `frameworks/fastify-graphql/`
+**What Was Done:**
+1. ✅ Created `src/index.ts` - Fastify server with Mercurius
+2. ✅ Created `src/db.ts` - pg connection pool
+3. ✅ Created `src/dataloaders.ts` - DataLoader for N+1 prevention
+4. ✅ Created `package.json` with fastify, mercurius, dataloader, pg
+5. ✅ Created `tsconfig.json` for TypeScript compilation
+6. ✅ Created `Dockerfile` with health check
+7. ✅ Created `.dockerignore` and `.env.example`
+8. ✅ Added to docker-compose.yml with profile: `mercurius`
 
-**Implementation:** Fastify + mercurius
+**Note:** `frameworks/fastify-graphql/` remains as stub - Mercurius IS the Fastify GraphQL adapter.
 
-**Dependencies:**
-- fastify
-- mercurius
-- pg
-- dataloader
-- fastify-metrics
+**Port:** 4000 (standardized GraphQL port)
 
-**Port:** 4000
-
-### 4.3 Express-GraphQL (Legacy)
+### 4.3 Express-GraphQL ✅
 
 **Location:** `frameworks/express-graphql/`
 
-**Implementation:** Express + express-graphql middleware
+**What Was Done:**
+1. ✅ Created `src/index.ts` - Express server with graphql-http
+2. ✅ Created `src/db.ts` - pg connection pool
+3. ✅ Created `src/dataloaders.ts` - DataLoader for N+1 prevention
+4. ✅ Created `package.json` with express, graphql-http, dataloader, pg
+5. ✅ Created `tsconfig.json` for TypeScript compilation
+6. ✅ Created `Dockerfile` with health check
+7. ✅ Created `.dockerignore` and `.env.example`
+8. ✅ Added to docker-compose.yml with profile: `express-graphql`
 
-**Dependencies:**
-- express
-- express-graphql
-- graphql
-- pg
-- dataloader
-- prom-client
+**Note:** Uses `graphql-http` instead of deprecated `express-graphql` package.
 
-**Port:** 4000
+**Port:** 4000 (standardized GraphQL port)
+
+### Additional Updates
+- ✅ Updated smoke-test.sh with all 3 new frameworks
+- ✅ Updated FRAMEWORKS.md to move frameworks to Tier 1 (Ready)
+- ✅ Removed Node.js section from Tier 3 (Pending) in FRAMEWORKS.md
 
 ---
 

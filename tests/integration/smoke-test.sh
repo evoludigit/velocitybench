@@ -50,6 +50,9 @@ PROFILE_FRAMEWORKS=(
     "postgraphile:4000:/health"
     "ariadne:4000:/health"
     "asgi-graphql:4000:/health"
+    "graphql-yoga:4000:/health"
+    "mercurius:4000:/health"
+    "express-graphql:4000:/health"
 )
 
 # Test each framework

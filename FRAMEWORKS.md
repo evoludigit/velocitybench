@@ -64,6 +64,9 @@ Optimized implementations for fair performance comparison. All frameworks in thi
 | **Hasura** | Docker | `hasura/` | 4000 | Ready | Auto-generated GraphQL engine (profile: hasura) |
 | **Ariadne** | Python | `ariadne/` | 4000 | Ready | Schema-first GraphQL (profile: ariadne) |
 | **ASGI-GraphQL** | Python | `asgi-graphql/` | 4000 | Ready | Direct graphql-core usage (profile: asgi-graphql) |
+| **GraphQL Yoga** | Node.js | `graphql-yoga/` | 4000 | Ready | Modern Node.js GraphQL server (profile: graphql-yoga) |
+| **Mercurius** | Node.js | `mercurius/` | 4000 | Ready | Fastify-based GraphQL (profile: mercurius) |
+| **Express-GraphQL** | Node.js | `express-graphql/` | 4000 | Ready | Express + graphql-http (profile: express-graphql) |
 
 ### REST Frameworks
 
@@ -95,13 +98,6 @@ Naive ORM implementations intentionally showing query explosion impact. Used to 
 ## Tier 3: Pending Implementation
 
 Frameworks with stub directories that need full implementation. All will use standardized ports.
-
-### Node.js GraphQL (Port 4000)
-| Framework | Directory | Notes |
-|-----------|-----------|-------|
-| **GraphQL Yoga** | `graphql-yoga/` | Modern Node.js server |
-| **Fastify GraphQL** | `fastify-graphql/` | Fastify + Mercurius |
-| **Express GraphQL** | `express-graphql/` | Legacy middleware |
 
 ### Go GraphQL (Port 4000)
 | Framework | Directory | Notes |
