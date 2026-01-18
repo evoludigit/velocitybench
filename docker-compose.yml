@@ -474,6 +474,79 @@ services:
     networks:
       - velocitybench-benchmark
 
+  micronaut-graphql:
+    build: ./frameworks/micronaut-graphql
+    ports:
+      - "4000:4000"  # Standardized GraphQL port
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - micronaut-graphql
+    networks:
+      - velocitybench-benchmark
+
+  quarkus-graphql:
+    build: ./frameworks/quarkus-graphql
+    ports:
+      - "4000:4000"  # Standardized GraphQL port
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - quarkus-graphql
+    networks:
+      - velocitybench-benchmark
+
+  play-graphql:
+    build: ./frameworks/play-graphql
+    ports:
+      - "4000:4000"  # Standardized GraphQL port
+    depends_on:
+      postgres:
+        condition: service_started
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+      - APPLICATION_SECRET=benchmark-secret-key
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - play-graphql
+    networks:
+      - velocitybench-benchmark
+
   fastapi-rest:
     build: ./frameworks/fastapi-rest
     ports:

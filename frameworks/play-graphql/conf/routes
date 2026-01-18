@@ -1,0 +1,5 @@
+# Routes
+
+POST    /graphql            controllers.GraphQLController.graphql
+GET     /health             controllers.HealthController.health
+GET     /metrics            controllers.HealthController.metrics

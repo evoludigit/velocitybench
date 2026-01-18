@@ -57,6 +57,9 @@ PROFILE_FRAMEWORKS=(
     "juniper:4000:/health"
     "hanami:4000:/health"
     "webonyx-graphql-php:4000:/health"
+    "micronaut-graphql:4000:/health"
+    "quarkus-graphql:4000:/health"
+    "play-graphql:4000:/health"
 )
 
 # Test each framework

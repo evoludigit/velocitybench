@@ -6,7 +6,7 @@ Comprehensive list of all frameworks tested in VelocityBench, organized by tier,
 
 | Category | Count | Languages |
 |----------|-------|-----------|
-| **Tier 1: Production-Ready** | 22 | Python, Node.js, Go, Rust, Java, C#, PHP, Ruby |
+| **Tier 1: Production-Ready** | 25 | Python, Node.js, Go, Rust, Java, Scala, C#, PHP, Ruby |
 | **Tier 2: N+1 Demonstration** | 4 | Node.js, Java |
 | **Tier 3: Pending Implementation** | 13 | Various |
 
@@ -71,6 +71,9 @@ Optimized implementations for fair performance comparison. All frameworks in thi
 | **Juniper** | Rust | `juniper/` | 4000 | Ready | Rust GraphQL with Actix-web (profile: juniper) |
 | **Hanami** | Ruby | `hanami/` | 4000 | Ready | Ruby GraphQL with Sequel ORM (profile: hanami) |
 | **webonyx-graphql-php** | PHP | `webonyx-graphql-php/` | 4000 | Ready | Pure PHP GraphQL (profile: webonyx-graphql-php) |
+| **Micronaut GraphQL** | Java | `micronaut-graphql/` | 4000 | Ready | Lightweight JVM (profile: micronaut-graphql) |
+| **Quarkus GraphQL** | Java | `quarkus-graphql/` | 4000 | Ready | Native compilation support (profile: quarkus-graphql) |
+| **Play/Sangria** | Scala | `play-graphql/` | 4000 | Ready | Scala + Sangria Fetchers (profile: play-graphql) |
 
 ### REST Frameworks
 
@@ -113,13 +116,6 @@ Frameworks with stub directories that need full implementation. All will use sta
 |-----------|-----------|-------|
 | **Ruby on Rails** | `ruby-rails/` | Fixed, needs verification |
 | **Rails** | `rails/` | Possible duplicate |
-
-### JVM GraphQL (Port 4000)
-| Framework | Directory | Notes |
-|-----------|-----------|-------|
-| **Micronaut GraphQL** | `micronaut-graphql/` | Lightweight JVM |
-| **Quarkus GraphQL** | `quarkus-graphql/` | Native compilation |
-| **Play GraphQL** | `play-graphql/` | Scala + Sangria |
 
 ---
 
@@ -204,6 +200,9 @@ How each framework handles the "blog page load" scenario (post + author + 10 com
 | **Juniper** | DataLoader batching | 3 | Yes | Batched |
 | **Hanami** | GraphQL::Batch | 3 | Yes | Batched |
 | **webonyx-graphql-php** | DataLoader | 3 | Yes | Batched |
+| **Micronaut GraphQL** | DataLoader | 3 | Yes | Batched |
+| **Quarkus GraphQL** | Batch queries | 3 | Yes | Batched |
+| **Play/Sangria** | Fetchers | 3 | Yes | Batched |
 | **PostGraphile** | Auto-generated | 1-2 | Yes | Smart joins |
 | **Hasura** | Auto-generated | 1-2 | Yes | Smart joins |
 | **FastAPI REST** | Include params + JOINs | 3-4 | Partial | Requires tuning |
