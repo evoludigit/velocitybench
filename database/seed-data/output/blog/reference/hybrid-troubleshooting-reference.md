@@ -1,253 +1,207 @@
 # **[Pattern] Hybrid Troubleshooting Reference Guide**
 
 ---
-
 ## **Overview**
-Hybrid Troubleshooting is a structured approach to diagnosing and resolving issues in **distributed, multi-layered systems** (e.g., cloud-native, edge-compute, or mixed on-premises/cloud environments). This pattern blends **automated diagnostics**, **human-driven analysis**, and **collaborative debugging** to reduce Mean Time to Resolution (MTTR) while accommodating the complexity of hybrid architectures.
+Hybrid Troubleshooting combines *on-premises* and *cloud-based* diagnostics to resolve issues spanning heterogeneous environments (e.g., legacy systems + SaaS integrations). This pattern leverages **centralized logging, distributed tracing, AI-driven anomaly detection, and cross-platform agents** to triangulate root causes efficiently.
 
-Key principles:
-- **Layered Analysis**: Correlate logs, metrics, and traces across infrastructure, platform, and application layers.
-- **Proactive vs. Reactive**: Combine observability tools (e.g., Prometheus, Datadog) with manual triage for critical incidents.
-- **Collaboration**: Leverage tools like Jira, Slack, or GitHub Issues to align teams (DevOps, SREs, developers) during fixes.
-- **Documentation**: Maintain a **troubleshooting knowledge base (KB)** with patterns, root cause analyses (RCAs), and mitigation steps.
-
-This guide covers **schema design**, **query patterns**, and **integration points** for hybrid environments.
+The key benefit is **reduced diagnostic time** in multi-cloud or mixed-environment deployments, where traditional siloed tools (e.g., Wireshark for LAN, Prometheus for microservices) fail to correlate events across boundaries. This guide covers architecture, schema, query patterns, and complementary techniques.
 
 ---
+## **Key Concepts**
+| **Term**               | **Definition**                                                                                     | **Example**                                                                                     |
+|------------------------|---------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------|
+| **Hybrid Agent**       | Lightweight proxy (e.g., Fluent Bit, OpenTelemetry Collector) that bridges on-prem → cloud.      | Agent logs Kubernetes events to Loki while forwarding Windows Event Logs to Datadog.          |
+| **Telemetry Hub**      | Cloud-native platform (e.g., Grafana Cloud, Splunk) where hybrid data converges.                | Centralized timeline correlating AWS CloudTrail + local Nginx logs.                                |
+| **Cross-Platform Tracing** | Distributed tracing (e.g., OpenTelemetry) linking requests across hybrid layers (API → DB → edge). | Trace: `Browser → API Gateway (AWS) → Local Monolith → Database (SQL Server)`.              |
+| **Anomaly Correlation** | AI/ML models (e.g., Prometheus Alertmanager, Elastic SIEM) comparing on-prem baselines vs. cloud metrics. | Detects "unusually high" local CPU usage (baseline: 10%) + missing cloud audit logs (cloud: 0%). |
 
+---
 ## **Schema Reference**
-Use this schema to model hybrid troubleshooting workflows in databases (e.g., PostgreSQL, MongoDB) or knowledge bases (e.g., Confluence, Notion).
-
-| Field               | Type       | Description                                                                                                                                 | Example Values                                                                                     |
-|---------------------|------------|-------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|
-| **`troubleshooting_id`** | UUID       | Unique identifier for the incident.                                                                                                       | `550e8400-e29b-41d4-a716-446655440000`                                                             |
-| **`case_name`**     | String     | Human-readable name (e.g., "API Latency Spike during E commerce Peak").                                               | `High-Latency-AuthService`                                                                         |
-| **`status`**        | Enum       | `Open` / `In Progress` / `Resolved` / `Closed`.                                                                                           | `"In Progress"`                                                                                   |
-| **`priority`**      | Enum       | `Low` / `Medium` / `High` / `Critical` (based on SLA impact).                                                                           | `"High"`                                                                                           |
-| **`environment`**   | Array      | Hybrid environments affected (e.g., `["onprem", "aws", "azure"]`).                                                          | `["aws", "azure"]`                                                                                |
-| **`layers_affected`** | Array     | System layers involved (e.g., `["Infrastructure", "Network", "Application"]`).                                           | `["Network", "Application"]`                                                                       |
-| **`root_cause`**    | String     | Root cause analysis (RCM) summary.                                                                                                     | `"Kubernetes Node CPU Throttling due to Misconfigured Horizontal Pod Autoscaler"`                |
-| **`mitigation`**    | String     | Temporary/permanent fixes.                                                                                                        | `"Reallocated Node CPU Quota; Updated HPA limits in GitOps pipeline"`                             |
-| **`created_at`**    | Timestamp  | When the case was logged.                                                                                                           | `2024-05-20T14:30:00Z`                                                                             |
-| **`resolved_at`**   | Timestamp  | When the case was closed (null if `status=Open`).                                                                                      | `2024-05-21T10:15:00Z`                                                                             |
-| **`owner_team`**    | String     | Team responsible (e.g., `SRE`, `DevTeam-Billing`).                                                                                      | `"DevTeam-Billing"`                                                                                 |
-| **`related_tickets`** | Array      | Linked Jira/GitHub issues or previous troubleshooting IDs.                                                                             | `[{"id":"PROJ-123", "type":"Jira"}, {"id":"tso-456", "type":"Troubleshooting"}]`                |
-| **`observability_data`** | JSON       | Embedded metrics/logs for quick reference (e.g., Prometheus alerts, ELK queries).                                       | `{"prometheus_query": "rate(http_requests_total[5m])", "logs": ["ERROR: DB TIMEOUT"]}`         |
-| **`steps_taken`**   | Array      | Chronological list of diagnostic/fix actions (with timestamps).                                                               | `[{"action": "Restarted Kubernetes Pod", "time": "2024-05-20T15:00:00Z", "result": "Temporary Relief"}]` |
+### **1. Event Schema (Structured Logging)**
+| **Field**          | **Type**       | **Description**                                                                                     | **Example**                                  |
+|--------------------|----------------|----------------------------------------------------------------------------------------------------|----------------------------------------------|
+| `timestamp`        | ISO 8601       | Event recorded time (UTC).                                                                      | `"2024-05-20T14:30:00Z"`                    |
+| `source`           | String         | Hybrid source (e.g., `"k8s-pod"`, `"aws-kms"`, `"on-prem-sql"`).                               | `"on-prem-sql"`                              |
+| `severity`         | Enum (DEBUG/WARN/ERROR/CRITICAL) | Log level for prioritization.                                                              | `"ERROR"`                                    |
+| `trace_id`         | UUID           | Distributed trace identifier (correlates across systems).                                        | `"550e8400-e29b-41d4-a716-446655440000"`      |
+| `correlation_id`   | String         | Business transaction ID (e.g., order ID).                                                       | `"order_abc123"`                             |
+| `metadata`         | JSON           | Key-value pairs for context (e.g., `{"user_id": "123", "pod_name": "web-server01"}`).         | `{"host": "db-prod-01", "status": "TIMEOUT"}` |
 
 ---
+### **2. Hybrid Trace Schema (OpenTelemetry)**
+| **Attribute**       | **Type**       | **Description**                                                                                     | **Example**                                  |
+|--------------------|----------------|----------------------------------------------------------------------------------------------------|----------------------------------------------|
+| `span.name`        | String         | Operation name (e.g., `"authenticate_user"`).                                                       | `"call_aws_lambda"`                          |
+| `service.name`     | String         | System/container name (e.g., `"on-prem-webapp"`, `"aws-dynamodb"`).                              | `"on-prem-webapp"`                           |
+| `attributes`       | JSON           | Custom context (e.g., `"{http.method: 'POST', db.query: 'SELECT * FROM users'}"`).
+| `links`            | Array[Link]    | References to parent/child spans across boundaries.                                                 | `[{trace_id: "other-uuid", span_id: "child"}]` |
 
+---
+### **3. Correlation Rules (SIEM/Alertmanager)**
+| **Rule Type**       | **Condition**                                                                                     | **Action**                                                                                     |
+|---------------------|---------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------|
+| **Cross-Source Alert** | `source="on-prem-sql" AND severity=ERROR AND "timeout" IN metadata.query` **OR** `source="aws-cloudtrail" AND action="Deny"` | Trigger incident: `{"type": "security", "priority": "P1", "details": {}}`       |
+| **Hybrid Baseline Drift** | `(cloud_metric="aws_cpu_util") > (on-prem_baseline_cpu + 3%)` **OR** `(latency_p95 > 1.5 * baseline)` | Escalate to SRE team via PagerDuty.                                                           |
+
+---
 ## **Query Examples**
-### **1. Find Open High-Priority Cases in AWS**
+### **1. Correlate Logs Across Sources (Loki/Grafana)**
 ```sql
-SELECT
-  troubleshooting_id,
-  case_name,
-  environment,
-  priority,
-  created_at
-FROM hybrid_troubleshooting
-WHERE status = 'Open'
-  AND priority = 'High'
-  AND ANY(environment = ARRAY['aws']);
+# Find on-prem SQL errors linked to AWS cloudtrail API calls
+log
+  | json
+  | filter(
+      (source="on-prem-sql" AND severity="ERROR") OR
+      (source="aws-cloudtrail" AND eventName="CreateTable")
+    )
+  | line_format `{{.timestamp}} {{.source}}: {{.metadata}}`
 ```
 **Output:**
-| `troubleshooting_id` | `case_name`            | `environment` | `priority` | `created_at`          |
-|-----------------------|------------------------|----------------|------------|-----------------------|
-| `550e8400-e29b...`    | `AWS Lambda Timeout`   | `["aws"]`      | `High`     | `2024-05-20T09:15:00Z` |
-
----
-
-### **2. Correlate Troubleshooting Cases with GitHub Issues**
-```sql
-SELECT
-  t.troubleshooting_id,
-  t.case_name,
-  r.related_tickets->>'id' AS github_issue_id,
-  r.related_tickets->>'type' AS ticket_type
-FROM hybrid_troubleshooting t
-JOIN LATERAL (
-  SELECT
-    jsonb_agg(
-      CASE
-        WHEN related_tickets->>'type' = 'GitHub' THEN jsonb_build_object('id', related_tickets->>'id', 'type', 'GitHub')
-      END
-    ) AS related_tickets
-  FROM jsonb_array_elements(t.related_tickets) AS rt
-  WHERE rt->>'type' = 'GitHub'
-) r ON true
-WHERE r.related_tickets IS NOT NULL;
 ```
-**Output:**
-| `troubleshooting_id` | `case_name`       | `github_issue_id` | `ticket_type` |
-|-----------------------|-------------------|--------------------|---------------|
-| `550e8400-e29b...`    | `API Latency Fix` | `GH-42`            | `GitHub`      |
-
----
-
-### **3. Analyze Patterns in Resolved Cases (RCAs)**
-```sql
-SELECT
-  root_cause,
-  COUNT(*) AS frequency,
-  AVG(EXTRACT(EPOCH FROM (resolved_at - created_at))) AS avg_mttd_seconds
-FROM hybrid_troubleshooting
-WHERE status = 'Closed'
-  AND environment = ARRAY['onprem']
-GROUP BY root_cause
-ORDER BY frequency DESC;
+2024-05-20T14:30:00Z on-prem-sql: {"query": "SELECT * FROM users", "error": "timeout"}
+2024-05-20T14:31:00Z aws-cloudtrail: {"eventName": "CreateTable", "userIdentity": "admin"}
 ```
-**Output:**
-| `root_cause`                                      | `frequency` | `avg_mttd_seconds` |
-|---------------------------------------------------|--------------|--------------------|
-| `Misconfigured Load Balancer`                    | 8            | 3600               |
-| `Database Connection Pool Exhaustion`            | 5            | 2160               |
 
 ---
-
-### **4. Filter Cases with Embedded Observability Data**
-```sql
-SELECT
-  troubleshooting_id,
-  case_name,
-  observability_data->>'prometheus_query' AS query_used
-FROM hybrid_troubleshooting
-WHERE observability_data ? 'prometheus_query';
+### **2. Distributed Trace Analysis (Jaeger/Zipkin)**
+```bash
+# Query traces where on-prem server -> AWS Lambda
+curl -G \
+  --url "http://jaeger-query:16686/search" \
+  -d "query=%22service.name%3D%22on-prem-webapp%22%20AND%20service.name%3D%22aws-lambda%22%22"
 ```
-**Output:**
-| `troubleshooting_id` | `case_name`       | `query_used`                     |
-|-----------------------|-------------------|----------------------------------|
-| `550e8400-e29b...`    | `CPU Throttling`  | `rate(kubernetes_node_cpu_usage{})` |
+**Key Fields to Inspect:**
+- `duration` (latency spikes).
+- `attributes.http.method` (unexpected `POST` calls).
+- `links` (child spans in Lambda).
 
 ---
-
-## **Implementation Details**
-### **1. Layered Diagnostics**
-Hybrid systems require **multi-layer correlation**:
-- **Infrastructure Layer**: Check cloud provider metrics (e.g., AWS CloudWatch, Azure Monitor) for resource limits or outages.
-- **Network Layer**: Use tools like **Wireshark** (on-prem) or **VPC Flow Logs** (cloud) to identify packet drops.
-- **Application Layer**: Aggregate logs from **ELK Stack**, **Loki**, or **Datadog** with filters for error codes or latency spikes.
-
-**Example Workflow**:
-1. **Automated Trigger**: Prometheus alert fires for `http_request_duration > 2s`.
-2. **Human Triage**: SRE queries the `hybrid_troubleshooting` table to find related cases:
-   ```sql
-   SELECT * FROM hybrid_troubleshooting
-   WHERE observability_data->>'error_logs' ILIKE '%Timeout%';
-   ```
-3. **Collaboration**: Link to a GitHub Issue via `related_tickets` and assign to the backend team.
+### **3. Anomaly Detection (Prometheus + Rule Groups)**
+```yaml
+# alerts.yaml
+groups:
+- name: hybrid-baseline-alerts
+  rules:
+  - alert: HighCloudTrailErrors
+    expr: >-
+      cloudwatch_metric.aws_cloudtrail_errors
+      > (on_prem_average_errors * 1.5)
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "CloudTrail errors spike ({{$value}} > {{(on_prem_average_errors * 1.5)}})"
+```
 
 ---
-
-### **2. Proactive Monitoring Integration**
-Embed **observability queries** directly into the schema to avoid external lookups:
-```json
-{
-  "observability_data": {
-    "prometheus_queries": [
-      {"name": "High-Latency-Endpoint", "query": "http_request_duration_seconds_bucket{route=\"/api/payments\"}"}
-    ],
-    "elasticsearch_queries": [
-      {
-        "query": "error: \"DBConnectionTimeout\"",
-        "index": "app-logs-*",
-        "time_range": "now-1h"
-      }
-    ]
+## **Implementation Steps**
+### **1. Deploy Hybrid Agents**
+- **On-Premise:** Install Fluent Bit (log shipper) + OpenTelemetry Collector (trace agent).
+  ```bash
+  # Example: Ship Windows Event Logs to Loki
+  fluent-bit.service {
+    [OUTPUT]
+      Name          loki
+      Match         *
+      Host          loki.example.com
+      Label_Job     windows_events
+      Label_Stream  security
   }
-}
-```
+  ```
+- **Cloud:** Use native agents (e.g., AWS CloudWatch Agent) + forward to on-prem SIEM (Splunk).
+
+### **2. Correlate Data in Central Hub**
+- **Option A (Loki + Grafana):**
+  ```bash
+  # Create a Dashboard with:
+  # 1. On-prem logs (Loki).
+  # 2. Cloud metrics (Prometheus).
+  # 3. Distributed traces (Jaeger).
+  ```
+- **Option B (Elasticsearch + Beats):**
+  ```json
+  # Elasticsearch mapping for hybrid events
+  {
+    "mappings": {
+      "properties": {
+        "source": { "type": "keyword" },
+        "trace_id": { "type": "keyword" },
+        "correlation_id": { "type": "keyword" }
+      }
+    }
+  }
+  ```
+
+### **3. Set Up Correlation Rules**
+- **SIEM (Splunk):**
+  ```spl
+  # Correlate on-prem failures + cloud API errors
+  index=hybrid
+  | rex field=_raw "source=(?<source>.+?), severity=(?<severity>.+)"
+  | stats valuesSeverity=severity by source, correlation_id
+  | where severity="ERROR" AND count > 1
+  ```
+- **Alertmanager (Prometheus):**
+  ```yaml
+  # Group alerts by correlation_id
+  group_by: [correlation_id]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 12h
+  ```
 
 ---
-
-### **3. Collaboration Tool Integrations**
-| Tool          | Integration Method                                                                 | Example Payload                                                                                     |
-|---------------|-----------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|
-| **Jira**      | Webhook on `status=Open` to create a Jira ticket.                                 | `POST /rest/api/2/issue { "fields": { "summary": "Hybrid Troubleshooting: [case_name]" } }`    |
-| **Slack**     | Bot message with RCM and mitigation steps.                                          | `{"text": ":warning: High Priority Case - Root Cause: <RCM>, Fix: <mitigation>"}`                 |
-| **GitHub**    | Comment on linked PRs/issues with troubleshooting notes.                             | `{ "body": "See Troubleshooting ID `550e8400...` for details." }`                                |
-| **Confluence**| Auto-update a page with case details in a table format.                             | `{{macro:embed}} {"content": "[[hybrid_troubleshooting/550e8400...]]"}`                         |
-
----
-
-### **4. Knowledge Base (KB) Synchronization**
-Use a **graph database** (e.g., Neo4j) to link troubleshooting cases to:
-- **Patterns**: Common root causes (e.g., "K8s Node Overload").
-- **Mitigations**: Permanent fixes (e.g., "Update HPA to respect CPU limits").
-- **Related Cases**: "See also: `tso-123` for similar DB timeouts."
-
-**Query Example**:
-```cypher
-MATCH (t:Troubleshooting {id: '550e8400...'})
-RETURN t.root_cause AS pattern,
-       [p:Pattern | t <-[:AFFECTS] p] AS related_patterns,
-       [m:Mitigation | t <-[:LINKED_TO] m] AS mitigations
-```
-
----
-
 ## **Query Patterns for Common Scenarios**
-| Scenario                          | Query                                                                                     | Purpose                                                                                     |
-|-----------------------------------|------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------|
-| **Find unresolved cases older than 24h** | `SELECT * FROM hybrid_troubleshooting WHERE status = 'Open' AND created_at < NOW() - INTERVAL '24 hours'` | Identify stale incidents for follow-up.                                                   |
-| **Group cases by root cause**      | `SELECT root_cause, COUNT(*) FROM hybrid_troubleshooting GROUP BY root_cause ORDER BY COUNT(*) DESC` | Surface frequent issues for documentation.                                                 |
-| **Filter by environment + layer**  | `SELECT * FROM hybrid_troubleshooting WHERE environment = ARRAY['aws'] AND layers_affected = ARRAY['Network']` | Drill into specific layers in cloud environments.                                          |
-| **Trend analysis (MTTR over time)** | `SELECT DATE_TRUNC('month', created_at) AS month, AVG(EXTRACT(EPOCH FROM (resolved_at - created_at))) AS avg_mttd FROM hybrid_troubleshooting WHERE status = 'Closed' GROUP BY month;` | Track improvement in response times.                                                       |
+| **Scenario**                          | **Query/Rule**                                                                                     | **Tools**                              |
+|----------------------------------------|---------------------------------------------------------------------------------------------------|----------------------------------------|
+| **On-prem DB timeout → Cloud API error** | `log | filter(source="on-prem-sql" AND "timeout") OR (source="aws-api-gateway" AND status=500)`   | Loki/Grafana                         |
+| **Increased latency in hybrid flow**   | `trace | filter(service.name="on-prem" OR service.name="aws") | hist(latency)`                        | Jaeger/Zipkin                        |
+| **Security anomaly (e.g., unsanctioned access)** | `cloudtrail | filter(action="AssumeRole") AND not userIdentity="known-admin"` | CloudWatch/SIEM (Splunk)          |
+| **Resource exhaustion (on-prem + cloud)** | `metric | alert if (on_prem_cpu > 90% AND cloud_cpu > on_prem_baseline * 1.2)` | Prometheus/Grafana Cloud         |
 
 ---
-
 ## **Related Patterns**
-1. **[Event-Driven Observability]**
-   - Complements hybrid troubleshooting by automating alert correlation across layers.
-   - *Use Case*: Trigger hybrid troubleshooting cases when SLOs breach.
-
-2. **[Chaos Engineering for Hybrid Systems]**
-   - Proactively tests resilience in hybrid environments (e.g., simulate AWS outages).
-   - *Integration*: Log findings in the `hybrid_troubleshooting` schema for future reference.
-
-3. **[GitOps for Configuration Validation]**
-   - Ensures configurations (e.g., K8s limits) align with mitigations from past cases.
-   - *Example*: Link a `mitigation` to a GitHub PR with `related_tickets`.
-
-4. **[Postmortem Automation]**
-   - Generates standardized postmortem reports from resolved cases (e.g., using [Rekon](https://github.com/uber/rekon)).
-   - *Query*: Pull data from `hybrid_troubleshooting` to populate templates.
-
-5. **[Canary Analysis]**
-   - Gradually roll out fixes to hybrid environments and monitor for regressions.
-   - *Schema Extension*: Add a `canary_rollout` field to track phased deployments.
+1. **[Distributed Tracing]** – Foundational for cross-system correlation (see OpenTelemetry docs).
+2. **[Centralized Logging]** – Prerequisite for hybrid analysis (e.g., Fluent Bit → Loki).
+3. **[Chaos Engineering]** – Validate resilience of hybrid workflows (e.g., kill on-prem pods to test cloud failover).
+4. **[Service Mesh (Istio/Linkerd)** – Simplifies hybrid service-to-service observability.
+5. **[GitOps Observability]** – Sync dashboards/configs via Git (e.g., Prometheus + ArgoCD).
 
 ---
-
-## **Tools & Technologies**
-| Category               | Tools                                                                                     | Notes                                                                                     |
-|------------------------|------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------|
-| **Databases**          | PostgreSQL, MongoDB, Neo4j                                                         | Neo4j for relational analysis; PostgreSQL for structured queries.                     |
-| **Observability**      | Prometheus, Grafana, ELK, Datadog                                                   | Embed queries in `observability_data` for quick access.                                   |
-| **Collaboration**      | Jira, Slack, GitHub, Confluence                                                      | Use webhooks/integrations to link cases.                                                |
-| **Automation**         | Terraform, ArgoCD, GitHub Actions                                                    | Validate mitigations via IaC or CI/CD pipelines.                                         |
-| **Postmortem**         | Rekon, LinearB, Datadog Postmortem                                                     | Auto-generate reports from resolved cases.                                               |
-
----
-## **Best Practices**
-1. **Standardize Formats**:
-   - Use consistent naming for `troubleshooting_id` (ISO UUID).
-   - Enforce schema for `observability_data` (e.g., only allow Prometheus/ELK queries).
-
-2. **Automate Where Possible**:
-   - Use **alert managers** (e.g., Alertmanager) to auto-create `hybrid_troubleshooting` entries for critical incidents.
-
-3. **Document Patterns**:
-   - Maintain a **common root causes** KB (e.g., "K8s Node CPU Throttling") with links to resolved cases.
-
-4. **Review Periodically**:
-   - Run queries like the **MTTR trend analysis** quarterly to identify recurrent issues.
-
-5. **Security**:
-   - Mask sensitive data (e.g., PII) in `observability_data` before storing in KB.
+## **Troubleshooting Tips**
+| **Issue**                          | **Checklist**                                                                                     | **Tools**                          |
+|-------------------------------------|---------------------------------------------------------------------------------------------------|------------------------------------|
+| **Missing logs in cloud hub**       | - Verify agent config (`fluent-bit -D`).                                                           | `journalctl -u fluent-bit`         |
+|                                   | - Check network (firewall, VPN).                                                                  | `tcpdump`                          |
+| **Correlation ID mismatches**       | - Validate `trace_id`/`correlation_id` in logs vs. traces.                                        | Jaeger UI                          |
+| **High latency in hybrid flow**     | - Compare on-prem vs. cloud P99 latencies.                                                           | Grafana Explore                     |
+|                                   | - Look for `db.query` attributes in traces.                                                       | OpenTelemetry Collector Metrics   |
+| **False positives in alerts**       | - Adjust baseline thresholds (e.g., `on_prem_baseline_cpu`).                                       | Prometheus Rule Groups             |
 
 ---
-**Example Workflow Visualization**:
+## **Example Architecture**
 ```
-[Prometheus Alert] → [Auto-Create Case] → [SRE Queries Hybrid Schema] → [Link to Jira] → [Fix in GitHub PR] → [Update KB]
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│  On-Prem     │    │  Hybrid     │    │  Cloud     │
+│  (Windows/)  │    │  Agent      │    │  (AWS/GCP)  │
+│  - SQL       │───▶│ (Fluent Bit)|───▶│  - Lambda  │
+│  - K8s Pods  │    │ (OpenTelos.)│    │  - DynamoDB │
+└─────────────┘    └─────────────┘    └─────────────┘
+                             ▲
+                             │ (HTTP/OTLP)
+                             ▼
+┌─────────────────────────────────────────────────────┐
+│                 Central Hub (Grafana/Splunk)         │
+│  - Loki (Logs) │ Prometheus (Metrics) │ Jaeger (Traces) │
+└─────────────────────────────────────────────────────┘
 ```
+
+---
+## **Further Reading**
+- [OpenTelemetry Hybrid Collector Docs](https://opentelemetry.io/docs/collector/)
+- [Loki + Jaeger Integration Guide](https://grafana.com/docs/loki/latest/clients/jaeger/)
+- [Prometheus Hybrid Alerting](https://prometheus.io/docs/alerting/latest/)
+
+---
+**Last Updated:** `2024-05-20`
+**Version:** `1.2` (Added Jaeger integration examples).

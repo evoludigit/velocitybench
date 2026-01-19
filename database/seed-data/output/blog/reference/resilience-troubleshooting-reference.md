@@ -1,205 +1,315 @@
 ---
-# **[Resilience Troubleshooting] Reference Guide**
+
+# **[Pattern Name] Resilience Troubleshooting: Reference Guide**
 
 ---
 
 ## **Overview**
-This guide provides a structured approach to diagnosing and resolving resilience failures in distributed systems, particularly those using **retries, circuit breakers, bulkheads, fallbacks, and timeouts**. Resilience patterns often introduce complexity, and failures may manifest indirectly (e.g., degraded performance, cascading failures, or silent errors). This guide categorizes troubleshooting techniques by pattern, outlines key failure modes, and provides tools (logging, metrics, and tracing) to isolate root causes. Best practices for simulating resilience errors and validating fixes are also included.
+The **Resilience Troubleshooting** pattern helps teams diagnose, analyze, and mitigate failures in resilient systems by providing a structured approach to identifying root causes, evaluating recovery mechanisms, and validating system behavior under stress. This pattern is critical for distributed systems, microservices, and cloud-native architectures where failures are inevitable but resilience is essential.
+
+Resilience troubleshooting combines observability tools (metrics, logs, traces), reliability techniques (retries, circuit breakers, fallbacks), and adaptive strategies (caching, throttling) to ensure systems recover gracefully. This guide covers key components, schema references, query patterns, and related patterns to streamline troubleshooting workflows.
+
+---
+
+## **Key Concepts**
+
+| **Concept**               | **Description**                                                                                     |
+|---------------------------|-----------------------------------------------------------------------------------------------------|
+| **Observability**         | Collecting logs, metrics, and traces to monitor system health and detect anomalies.                  |
+| **Failure Modes**         | Common failure scenarios (timeouts, throttling, cascading failures) and their symptoms.           |
+| **Recovery Mechanisms**   | Built-in resiliency features (retries, circuit breakers, bulkheads) and manual interventions.     |
+| **Resilience Metrics**    | Key performance indicators (e.g., latency percentiles, error rates, retry counts) to gauge health. |
+| **Root Cause Analysis**   | Systematic identification of why failures occurred (e.g., upstream dependencies, resource exhaustion). |
+| **Validation**            | Testing fixes and recovery processes in a controlled environment before deployment.               |
 
 ---
 
 ## **Schema Reference**
-Use the following schema to document resilience-related metrics, logs, and traces for troubleshooting.
 
-| **Category**       | **Metric/Field**               | **Description**                                                                                     | **Severe Threshold**                                                                                     | **Tools**                                                                                     |
-|--------------------|--------------------------------|-----------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------|
-| **Retries**        | `retryAttempts`                | Total retries for a given operation (counter)                                                      | `> 5 * defaultRetries` (adjust based on SLA)                                                          | APM tools (e.g., New Relic, Datadog), custom logging                                         |
-|                    | `retryFailures`                | Retries that resulted in failures (counter)                                                         | `retryFailures / retryAttempts > 50%`                                                              |                                                                                               |
-|                    | `retryBackoff`                 | Time between retry attempts (histogram)                                                              | Backoff > `2 * timeout` (risk of starvation)                                                          | OpenTelemetry, custom instrumentation                                                        |
-| **Circuit Breaker**| `stateChanges`                 | Transitions between `Closed`, `Open`, and `Half-Open` states (counter)                               | Rapid state changes (e.g., 5 `Open` → `Closed` cycles/min)                                           | Hystrix Metrics, Resilience4j monitoring                                                        |
-|                    | `errorThreshold`               | Invocation failures required to trip the circuit (metric)                                           | Exceeded threshold (e.g., `5 failures / 10s`)                                                       | Circuit breaker library dashboards                                                            |
-|                    | `resetTimeout`                 | Time until circuit resets to `Half-Open` (histogram)                                               | Reset too aggressively (e.g., `5s` when SLO requires `1m`)                                           |                                                                                               |
-| **Bulkheads**      | `concurrencyUsage`             | Concurrent requests blocked due to thread pool exhaustion (counter)                                  | `concurrencyUsage > 80% * maxThreads`                                                              | Resilience4j dashboards, custom metrics                                                       |
-|                    | `queueWaitTime`                | Time spent waiting in bulkhead queue (histogram)                                                    | Median `> 500ms` (latency degradation)                                                               | APM tools                                                                                       |
-| **Fallbacks**      | `fallbackExecutions`           | Fallback invoked (counter)                                                                          | `> 10%` of total invocations (indicates pattern misconfiguration)                                      | Custom logs, distributed tracing                                                               |
-|                    | `fallbackLatency`              | Time taken by fallback (histogram)                                                                   | Median `> 2 * timeout` (fallback too slow)                                                          | OpenTelemetry, APM tools                                                                       |
-| **Timeouts**       | `timeoutOccurrences`           | Operations failing due to timeout (counter)                                                         | `> 5%` of total invocations                                                                          | APM tools, CloudWatch                                                                      |
-|                    | `timeoutValue`                 | Configured timeout duration (metric)                                                              | Too short (e.g., `1s` for external API with `100ms` variance)                                      | Configuration management logs, Resilience4j metrics                                           |
-| **General**        | `resilienceErrorCode`          | Custom error code for resilience failures (e.g., `RESILIENCY_RETRY_EXHAUSTED`)                      | Monitored via structured logging                                                                   | ELK Stack, Datadog                                                                              |
-|                    | `resilienceTraceId`            | Correlates resilience events across services (string)                                                | Required for distributed tracing                                                                   | OpenTelemetry, Jaeger                                                                         |
+Below are standard data schemas used in resilience troubleshooting.
+
+### **1. Failure Event Schema**
+| Field               | Type      | Description                                                                                     | Example Value                  |
+|---------------------|-----------|-------------------------------------------------------------------------------------------------|---------------------------------|
+| `event_id`          | String    | Unique identifier for the failure event.                                                        | `evt-1234567890`                |
+| `timestamp`         | DateTime  | When the failure was detected.                                                                 | `2024-05-01T12:34:56.789Z`      |
+| `component`         | String    | Name of the affected service/module.                                                            | `payment-service`               |
+| `severity`          | Enum      | Severity level (CRITICAL, HIGH, MEDIUM, LOW).                                                   | `HIGH`                          |
+| `failure_type`      | String    | Type of failure (timeout, thrashing, dependency failure, etc.).                                 | `dependency_failure`            |
+| `affected_endpoint` | String    | API/endpoint where the failure occurred.                                                        | `/payments/process`             |
+| `duration`          | Duration  | How long the failure persisted.                                                                | `PT2M30S`                       |
+| `recovery_action`   | String    | How the system recovered (automatically, manual intervention, etc.).                           | `circuit_breaker_tripped`       |
+| `metadata`          | Object    | Additional context (e.g., error codes, retry counts, dependencies involved).                    | `{ "retry_count": 4, "upstream": "auth-service" }` |
+
+---
+
+### **2. Resilience Metrics Schema**
+| Field               | Type      | Description                                                                                     | Example Value                  |
+|---------------------|-----------|-------------------------------------------------------------------------------------------------|---------------------------------|
+| `metric_id`         | String    | Unique identifier for the metric.                                                              | `latency_p99`                   |
+| `service`           | String    | Service emitting the metric.                                                                  | `order-service`                 |
+| `value`             | Number    | Numeric value of the metric.                                                                  | `1200`                          |
+| `unit`              | String    | Unit of measurement (e.g., ms, s, %, req/s).                                                   | `milliseconds`                  |
+| `timestamp`         | DateTime  | When the metric was recorded.                                                                  | `2024-05-01T13:45:00.123Z`      |
+| `threshold`         | Number    | Alert threshold (e.g., 95th percentile latency).                                                | `800`                           |
+| `is_alerted`        | Boolean   | Whether the metric triggered an alert.                                                        | `true`                          |
+
+---
+
+### **3. Recovery Process Schema**
+| Field               | Type      | Description                                                                                     | Example Value                  |
+|---------------------|-----------|-------------------------------------------------------------------------------------------------|---------------------------------|
+| `process_id`        | String    | Unique identifier for the recovery process.                                                   | `recover-20240501-1`           |
+| `failure_event_id`  | String    | Reference to the failure event this process addresses.                                         | `evt-1234567890`                |
+| `steps`             | Array     | List of recovery steps (manual or automated).                                                | `[ { "step": "restart_service", "status": "completed" }, ... ]` |
+| `outcome`           | Enum      | Result of the recovery (SUCCESS, PARTIAL, FAILED).                                           | `SUCCESS`                       |
+| `duration`          | Duration  | Time taken to complete recovery.                                                              | `PT1M15S`                       |
+| `notes`             | String    | Any additional context or notes from the recovery process.                                    | `Restarted with extended timeout.` |
 
 ---
 
 ## **Query Examples**
-Use these queries to diagnose resilience issues in your monitoring stack.
+
+### **1. Querying Failure Events**
+**Use Case:** List all critical failures in the last 24 hours for the `payment-service`.
+
+```sql
+SELECT *
+FROM failure_events
+WHERE
+  component = 'payment-service'
+  AND severity = 'CRITICAL'
+  AND timestamp >= NOW() - INTERVAL '24 hours';
+```
+
+**Expected Output:**
+```json
+[
+  {
+    "event_id": "evt-1234567890",
+    "timestamp": "2024-05-01T12:34:56.789Z",
+    "component": "payment-service",
+    "severity": "CRITICAL",
+    "failure_type": "dependency_failure",
+    "affected_endpoint": "/payments/process",
+    "duration": "PT2M30S",
+    "recovery_action": "circuit_breaker_tripped",
+    "metadata": { "retry_count": 4, "upstream": "auth-service" }
+  }
+]
+```
 
 ---
 
-### **1. Retry Troubleshooting**
-#### **Query: Retry Failures by Endpoint**
-**Tool:** PromQL (Prometheus) / KQL (Azure Monitor)
-```sql
-# Metric: retry_failures total
-sum(rate(retry_failures_total[5m])) by (endpoint)
-  > sum(rate(successful_requests_total[5m])) by (endpoint) * 0.5
-```
-**Interpretation:** Endpoints where retry failures exceed 50% of successful requests.
+### **2. Identifying Latency Spikes**
+**Use Case:** Find services with latency exceeding the 99th percentile threshold (>800ms) in the last hour.
 
-#### **Query: Longest Retry Backoff**
-**Tool:** Grafana (Histograms)
 ```sql
-# Metric: retry_backoff_seconds_bucket{le="10"}
-sum(rate(retry_backoff_seconds_bucket{le="10"}[5m])) / sum(rate(retry_attempts_total[5m]))
+SELECT
+  service,
+  metric_id,
+  value,
+  timestamp,
+  threshold,
+  is_alerted
+FROM resilience_metrics
+WHERE
+  metric_id = 'latency_p99'
+  AND value > threshold
+  AND timestamp >= NOW() - INTERVAL '1 hour';
 ```
-**Threshold:** Backoff > `2 * timeout` (e.g., `backoff=30s` when `timeout=10s`).
+
+**Expected Output:**
+```json
+[
+  {
+    "service": "order-service",
+    "metric_id": "latency_p99",
+    "value": 1200,
+    "timestamp": "2024-05-01T13:45:00.123Z",
+    "threshold": 800,
+    "is_alerted": true
+  }
+]
+```
 
 ---
 
-### **2. Circuit Breaker Analysis**
-#### **Query: Circuit Breaker State Transitions**
-**Tool:** Resilience4j Dashboard / Grafana
-```sql
-# Metric: circuit_breaker_state.count
-increase(circuit_breaker_state_count{state="OPEN"}[1m])
-  > 3  # 3 state changes in 1 minute (adjust threshold)
-```
-**Interpretation:** Rapid toggling indicates flapping; investigate root cause (e.g., upstream API instability).
+### **3. Tracking Recovery Processes**
+**Use Case:** Retrieve the status of recovery processes for a specific failure event.
 
-#### **Query: Failed Requests Before Reset**
-**Tool:** PromQL
 ```sql
-# Metric: circuit_breaker_failures_before_trip
-histogram_quantile(0.99, rate(circuit_breaker_failures_before_trip[5m]))
+SELECT *
+FROM recovery_processes
+WHERE failure_event_id = 'evt-1234567890';
 ```
-**Threshold:** 99th percentile > configured `failureThreshold` (e.g., `5` failures).
+
+**Expected Output:**
+```json
+[
+  {
+    "process_id": "recover-20240501-1",
+    "failure_event_id": "evt-1234567890",
+    "steps": [
+      { "step": "restart_service", "status": "completed" },
+      { "step": "increase_timeout", "status": "pending" }
+    ],
+    "outcome": "PARTIAL",
+    "duration": "PT1M15S",
+    "notes": "Service restarted; timeout adjustment pending."
+  }
+]
+```
 
 ---
 
-### **3. Bulkhead Congestion**
-#### **Query: Queue Wait Time Percentiles**
-**Tool:** Datadog / Elasticsearch
-```sql
-# Metric: bulkhead_queue_wait_ms
-histogram_quantile(0.95, bulkhead_queue_wait_ms{service="user-service"}) > 500
-```
-**Interpretation:** P95 > `500ms` indicates latency spikes due to bulkhead contention.
+### **4. Correlating Failures with Metrics**
+**Use Case:** Join failure events with metric data to identify patterns (e.g., high error rates preceding failures).
 
-#### **Query: Rejected Requests**
-**Tool:** KQL
 ```sql
-requests
-| where operationName == "processOrder"
-| where isempty(correlationId)  // Fallback/bulkhead rejection
-| summarize count() by bin(timestamp, 1m)
+SELECT
+  f.event_id,
+  f.timestamp AS failure_time,
+  m.timestamp AS metric_time,
+  m.value AS error_rate,
+  f.failure_type
+FROM failure_events f
+JOIN resilience_metrics m
+  ON f.component = m.service
+  AND m.metric_id = 'error_rate'
+  AND m.timestamp <= f.timestamp
+  AND m.timestamp > f.timestamp - INTERVAL '5 minutes'
+WHERE f.severity = 'CRITICAL'
+ORDER BY f.timestamp DESC;
 ```
-**Threshold:** > `10%` of total requests rejected.
+
+**Expected Output:**
+```json
+[
+  {
+    "event_id": "evt-9876543210",
+    "failure_time": "2024-05-01T14:00:00.000Z",
+    "metric_time": "2024-05-01T13:55:00.000Z",
+    "error_rate": 0.95,
+    "failure_type": "thrashing"
+  }
+]
+```
 
 ---
 
-### **4. Fallback Issues**
-#### **Query: Fallback Execution Rate**
-**Tool:** ELK Stack
-```sql
-# Log query: "fallback: invoked"
-logs
-| filter message: "fallback: invoked"
-| count by @timestamp, endpoint
-| where count > (total_requests * 0.1)
-```
-**Interpretation:** Fallback invoked >10% of time → consider revisiting fallback logic.
+## **Resilience Troubleshooting Workflow**
 
-#### **Query: Fallback Latency Spikes**
-**Tool:** OpenTelemetry
-```sql
-# Span query: fallback_latency > 2s
-tracespan
-| where resource.service.name == "user-service"
-| where operation.name == "fallbackHandler"
-| where duration > 2000ms
-| summarize count() by bin(timestamp, 1h)
-```
-**Threshold:** > `5` spans/hour (indicates fallback degradation).
+1. **Detect:**
+   Use observability tools (e.g., Prometheus, ELK) to identify failures via alerts or anomaly detection.
+2. **Classify:**
+   Categorize the failure (e.g., timeout, dependency failure) using the `failure_type` field.
+3. **Analyze:**
+   Correlate failure events with metrics (e.g., high latency, error rates) to isolate root causes.
+4. **Recover:**
+   Trigger recovery mechanisms (e.g., restart services, adjust circuit breakers) or manually intervene.
+5. **Validate:**
+   Verify recovery by monitoring metrics and re-testing under stress.
+6. **Document:**
+   Record findings in the `recovery_processes` schema for future reference.
 
 ---
 
-### **5. Timeout Failures**
-#### **Query: Timeout by Endpoint**
-**Tool:** CloudWatch
-```sql
-# Metric: timeout_occurrences
-metrics
-| where metricName == "timeout_occurrences"
-| summarize count() by endpoint, bin(timestamp, 5m)
-| where count > 0
-```
-**Interpretation:** Investigate endpoints with `>5%` timeouts (adjust threshold based on SLA).
+## **Tools and Integrations**
 
-#### **Query: Timeout Value Distribution**
-**Tool:** Prometheus
-```sql
-# Metric: timeout_config
-histogram_quantile(0.5, timeout_config_seconds_bucket)
-```
-**Threshold:** P50 < `2 * expected_operation_time` (e.g., `timeout=100ms` for `50ms` API).
-
----
-
-## **Step-by-Step Troubleshooting Workflow**
-Follow this flow to diagnose resilience failures:
-
-1. **Identify the Pattern Affected**
-   - Check logs/metrics for `retryFailures`, `circuit_breaker_state`, or `fallback_executions`.
-
-2. **Reproduce the Failure**
-   - **Retries:** Use a load tester (e.g., k6) to simulate upstream failures.
-   - **Circuit Breaker:** Force failures (e.g., `POST /api/unsafe`).
-   - **Bulkhead:** Spam the system with concurrent requests.
-
-3. **Validate Fixes**
-   - **Retry:** Verify `retryAttempts` decreases after fixing upstream issues.
-   - **Circuit Breaker:** Ensure `resetTimeout` aligns with SLO recovery time.
-   - **Fallback:** Test fallback paths in staging with `timeout=0`.
-
-4. **Monitor Post-Fix**
-   - Set alerts for:
-     - `retryFailures > 3 * historical_avg`.
-     - `circuit_breaker_state` toggling > `1/min`.
-     - `fallbackLatency` > `2 * timeout`.
+| **Tool**            | **Purpose**                                                                                     | **Schema Integration**                     |
+|---------------------|-------------------------------------------------------------------------------------------------|---------------------------------------------|
+| **Prometheus**      | Collect and query metrics (e.g., latency, error rates).                                         | `resilience_metrics`                        |
+| **ELK Stack**       | Aggregate and analyze logs for root cause analysis.                                              | `failure_events.metadata` (log correlation) |
+| **OpenTelemetry**   | Trace requests across microservices to identify bottlenecks.                                   | Not directly, but supports correlation IDs. |
+| **Grafana**         | Visualize metrics and dashboards for resilience monitoring.                                     | `resilience_metrics`                        |
+| **PagerDuty/Incident** | Alert on critical failures and track recovery processes.                                      | `failure_events`, `recovery_processes`      |
 
 ---
 
 ## **Related Patterns**
-| **Pattern**            | **Description**                                                                 | **Troubleshooting Overlap**                                                                 |
-|------------------------|-------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------|
-| **Retry**              | Exponentially back off on transient failures.                                | Shared metrics: `retryAttempts`, `retryBackoff`.                                            |
-| **Circuit Breaker**    | Prevents cascading failures by stopping calls to failing services.             | Shared: `errorThreshold`, `stateChanges`.                                                   |
-| **Bulkhead**           | Isolates resource exhaustion (e.g., thread pools).                           | Shared: `concurrencyUsage`, `queueWaitTime`.                                              |
-| **Fallback**           | Provides degraded functionality when primary fails.                          | Shared: `fallbackExecutions`, `fallbackLatency`.                                            |
-| **Timeout**            | Aborts long-running operations.                                               | Shared: `timeoutOccurrences`, `timeoutValue`.                                               |
-| **Bulkhead with Timeout** | Combines bulkhead and timeout for strict SLA enforcement.                  | Use `concurrencyUsage` + `timeoutOccurrences` queries.                                     |
-| **Resilience Testing** | Proactively simulates failures to validate resilience patterns.              | Use in Step 2 above to reproduce issues.                                                    |
+
+| **Pattern**                  | **Description**                                                                                     | **Connection to Resilience Troubleshooting**                                                                 |
+|------------------------------|-------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------|
+| **[Circuit Breaker]**        | Prevents cascading failures by stopping requests to failing services.                              | Resilience troubleshooting validates if circuit breakers are tripping correctly and recovers them properly.   |
+| **[Bulkhead Pattern]**       | Isolates failures by limiting concurrent requests to a service.                                   | Useful for diagnosing resource exhaustion (e.g., thread pool starvation) during failures.                   |
+| **[Retries with Backoff]**   | Automatically retries failed requests with exponential backoff.                                   | Troubleshooting may involve adjusting retry configurations based on failure patterns.                     |
+| **[Chaos Engineering]**      | Proactively tests system resilience by injecting failures.                                        | Post-mortems from chaos experiments inform resilience troubleshooting strategies.                           |
+| **[Rate Limiting]**          | Protects systems from overload by throttling requests.                                            | Helps identify if failures are caused by sudden traffic spikes.                                            |
+| **[Idempotency]**            | Ensures retries don’t cause duplicate side effects.                                               | Critical for debugging retry loops during troubleshooting.                                                 |
 
 ---
 
-## **Tools & Libraries**
-| **Tool/Library**       | **Purpose**                                                                 | **Key Metrics/Logs**                                                                 |
-|------------------------|-----------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
-| **Resilience4j**       | Java library for circuit breakers, retries, etc.                           | `CircuitBreakerMetrics`, `RetryMetrics`.                                              |
-| **Hystrix**            | Legacy Netflix library (circuit breakers, bulkheads).                     | Hystrix streaming metrics.                                                            |
-| **OpenTelemetry**      | Distributed tracing for resilience events.                                  | Spans tagged with `resilience.error` or `resilience.retry`.                            |
-| **Prometheus + Grafana** | Monitoring for resilience metrics.                                         | Custom counters (e.g., `retry_failures_total`).                                       |
-| **k6**                 | Load testing to simulate resilience failures.                               | Simulate `retryExhausted` or `circuitOpen` scenarios.                                  |
+## **Best Practices**
+
+1. **Instrument Early:**
+   Deploy observability tools (metrics, logs, traces) from the start of system development.
+
+2. **Define SLIs and SLOs:**
+   Set clear Service Level Indicators (e.g., "99th percentile latency < 500ms") and Objectives to measure resilience.
+
+3. **Automate Alerts:**
+   Configure alerts for critical failures (e.g., `severity = 'CRITICAL'` in `failure_events`).
+
+4. **Post-Mortem Reviews:**
+   After failures, document root causes and recovery steps in the `recovery_processes` schema for future reference.
+
+5. **Test Resilience:**
+   Use chaos engineering to validate recovery processes before they’re needed in production.
+
+6. **Monitor Recovery:**
+   Track metrics like `recovery_time` and `failure_reoccurrence_rate` to improve resilience over time.
+
+7. **Document Fallbacks:**
+   Clearly document fallback mechanisms (e.g., "If `auth-service` fails, use anonymous access") in the system design.
 
 ---
 
-## **Common Pitfalls & Fixes**
-| **Pitfall**                          | **Root Cause**                                      | **Solution**                                                                       |
-|--------------------------------------|----------------------------------------------------|------------------------------------------------------------------------------------|
-| Retry loop starvation                | Backoff too long relative to timeout.               | Set `backoffFactor <= 2 * timeout`.                                                 |
-| Circuit breaker thrashing            | `resetTimeout` too short.                          | Align with SLO recovery time (e.g., `1m` if SLO is `1h`).                           |
-| Bulkhead queue flooding              | `maxThreads` too low.                              | Scale `maxThreads` based on P99 load.                                               |
-| Fallback too slow                    | Fallback implementation > `timeout`.                | Optimize fallback or increase `timeout`.                                            |
-| Silent retries                       | No logging for retry exhaustions.                  | Add `INFO` log for `retryAttempts >= maxRetries`.                                   |
+## **Example: Troubleshooting a Dependency Failure**
 
----
-**Note:** Replace placeholder values (e.g., `5m`, `10%`) with your SLO-based thresholds.
+### **Scenario:**
+The `payment-service` fails intermittently due to timeouts when calling the `auth-service`.
+
+### **Steps:**
+1. **Detect:**
+   Query failure events:
+   ```sql
+   SELECT * FROM failure_events WHERE component = 'payment-service' AND failure_type = 'timeout';
+   ```
+   Result: Multiple events with `upstream: auth-service`.
+
+2. **Classify:**
+   Confirm the failure is due to `auth-service` timeouts (check logs/traces).
+
+3. **Analyze:**
+   Correlate with `resilience_metrics` for `auth-service` latency:
+   ```sql
+   SELECT * FROM resilience_metrics WHERE service = 'auth-service' AND metric_id = 'latency_p99' ORDER BY timestamp DESC LIMIT 5;
+   ```
+   Result: Latency spikes to 1.2s (> threshold of 800ms).
+
+4. **Recover:**
+   - Adjust circuit breaker in `payment-service` (e.g., reduce timeout from 2s to 5s).
+   - Restart `auth-service` if thrashing is detected.
+
+5. **Validate:**
+   Monitor `payment-service` failures post-recovery:
+   ```sql
+   SELECT * FROM failure_events WHERE component = 'payment-service' AND timestamp >= NOW() - INTERVAL '1 hour';
+   ```
+   Result: No new failures.
+
+6. **Document:**
+   Update `recovery_processes`:
+   ```json
+   {
+     "process_id": "recover-20240501-2",
+     "failure_event_id": "evt-9876543210",
+     "steps": [
+       { "step": "adjust_circuit_breaker_timeout", "status": "completed" },
+       { "step": "restart_auth_service", "status": "completed" }
+     ],
+     "outcome": "SUCCESS",
+     "notes": "Timeout extended to 5s; service restarted."
+   }
+   ```

@@ -2,182 +2,199 @@
 
 ---
 
-## **1. Overview**
-The **[Security Troubleshooting]** pattern provides a structured, step-by-step methodology to identify, diagnose, and resolve security-related issues in systems, applications, or networks. It ensures a systematic approach to security incidents, minimizing risk exposure while maintaining operational continuity. This guide covers key concepts, implementation steps, tooling validation, and common security scenarios.
+## **Overview**
+The **Security Troubleshooting** pattern provides a structured approach to diagnosing, investigating, and resolving security-related issues in cloud-native, on-premises, or hybrid environments. This guide outlines key concepts, troubleshooting workflows, common security anomalies, diagnostic tools, and best practices for mitigating risks. It applies to security events such as unauthorized access attempts, misconfigured resources, compliance violations, or anomalies in user behavior. The pattern emphasizes correlation of logs, leveraging automation, and following a **defensive debugging** approach to minimize blast radius.
+
+Key use cases include:
+- Investigating failed authentication attempts or brute-force attacks.
+- Diagnosing improper IAM policies or over-permissive access controls.
+- Analyzing unexpected API calls or data exfiltration attempts.
+- Addressing compliance gaps detected by security tools.
 
 ---
 
-## **2. Key Concepts & Implementation Details**
+## **Implementation Details**
 
-### **2.1 Core Principles**
-- **Incident Classification** – Categorize security events (e.g., unauthorized access, malware, misconfigurations).
-- **Root Cause Analysis (RCA)** – Identify underlying vulnerabilities or misconfigurations.
-- **Mitigation & Remediation** – Apply fixes and verify resolution.
-- **Post-Mortem & Documentation** – Record lessons learned for future incidents.
-- **Automation & Scalability** – Leverage tools and automation to streamline troubleshooting.
-
-### **2.2 Common Security Troubleshooting Scenarios**
-| **Scenario**               | **Description**                                                                 | **Typical Causes**                          |
-|----------------------------|---------------------------------------------------------------------------------|--------------------------------------------|
-| **Unauthorized Access**    | Suspicious logins, brute-force attempts, or privilege escalation.                | Weak credentials, misconfigured IAM.       |
-| **Malware/Infection**      | Detecting malicious processes, cryptominers, or ransomware.                      | Phishing, unpatched vulnerabilities.       |
-| **Configuration Drift**    | Deviation from security baselines (e.g., open ports, disabled firewalls).     | Poor patch management, misapplied policies. |
-| **Data Leaks**             | Unauthorized data exposure (e.g., logs, databases, APIs).                       | Missing encryption, weak access controls.  |
-| **DDoS/DOS Attacks**       | Abnormal traffic spikes overwhelming resources.                                | Lack of WAF rules, insufficient scaling.   |
-
-### **2.3 Troubleshooting Workflow**
-1. **Detection** – Identify an anomaly via logs, alerts, or monitoring tools.
-2. **Containment** – Isolate affected systems to prevent lateral movement.
-3. **Analysis** – Gather forensic evidence (e.g., logs, network traffic).
-4. **Resolution** – Apply fixes (patches, policy updates, access revocation).
-5. **Verification** – Confirm incident closure via validation checks.
-6. **Post-Incident Review** – Update security procedures and tools.
+### **Key Concepts**
+| Concept                | Definition                                                                                     |
+|------------------------|---------------------------------------------------------------------------------------------|
+| **Security Event**     | An anomaly detected by a security tool (e.g., failed login, unauthorized API call).         |
+| **Root Cause**         | The underlying issue (e.g., weak password, misconfigured RBAC policy).                       |
+| **Threat Vector**      | How an attacker exploits a vulnerability (e.g., phishing, privilege escalation).             |
+| **Defensive Debugging**| Actively monitoring and validating security controls to detect breaches early.             |
+| **Blast Radius**       | Scope of impact if an issue is left unaddressed (e.g., one compromised credential).       |
+| **Security Control**   | A safeguard (e.g., MFA, network firewall) preventing or mitigating an attack.               |
 
 ---
 
-## **3. Schema Reference**
+### **Troubleshooting Workflow**
+1. **Detection**
+   Triggered by alerts from SIEM, CSPM, or custom monitoring (e.g., CloudTrail for AWS, Azure Sentinel).
+2. **Triage**
+   Classify events by severity and type (e.g., login failure, policy violation).
+3. **Investigation**
+   Correlate logs from multiple sources (e.g., authentication logs + API calls).
+4. **Remediation**
+   Apply fixes (e.g., rotate credentials, tighten policies) and validate resolution.
+5. **Post Morton**
+   Document findings, update playbooks, and refine detection rules.
 
-### **3.1 Security Incident Schema**
-Below is a structured schema for documenting security incidents. Use this as a template for automation (e.g., in SIEMs like Splunk or ELK).
+---
 
-| **Field**               | **Type**   | **Description**                                                                 | **Example Value**                     |
-|-------------------------|------------|-------------------------------------------------------------------------------|----------------------------------------|
-| `incident_id`           | String     | Unique identifier for the incident.                                           | `SEC-2024-001`                        |
-| `severity`              | Enum       | Critical, High, Medium, Low (based on CVSS, NIST, or custom scale).            | `High`                                |
-| `timestamp`             | Datetime   | When the incident was first detected or reported.                             | `2024-05-15T14:30:00Z`                |
-| `source_system`         | String     | Affected system (host, app, network segment).                                | `web-server-01`                       |
-| `action_taken`          | Array      | List of mitigation steps performed.                                           | `[{"step": "revoked access", "time": "2024-05-15T15:00:00Z"}]` |
-| `root_cause`            | String     | Concise explanation of the vulnerability or misconfiguration.                 | `Unpatched CVE-2023-1234 exploit.`    |
-| `resolution_status`     | Boolean    | `true` if fully resolved, `false` if pending.                               | `true`                                |
-| `related_alerts`        | Array      | References to linked security alerts (e.g., from SIEM).                      | `[{"alert_id": "ALRT-005", "tool": "Splunk"}]` |
-| `forensic_data`         | Object     | Raw evidence (logs, hashes, network captures).                               | `{"logs": "/var/log/auth.log", "pcap": "capture-20240515.pcap"}` |
+### **Common Security Anomalies & Patterns**
+| Anomaly Type               | Description                                                                 | Possible Root Cause                          |
+|----------------------------|-----------------------------------------------------------------------------|----------------------------------------------|
+| **Brute Force Attacks**    | Repeated failed login attempts from a single IP.                           | Weak credentials, exposed RDP/SMB.          |
+| **Over-Permissive IAM**    | User/role granted excessive permissions (e.g., `*` in `Allow` policies).   | Misconfigured RBAC, automated policy generation. |
+| **Data Exfiltration**      | Unusual outbound API calls or large file downloads.                        | Compromised credentials, missing DLP rules. |
+| **Lateral Movement**       | Unauthorized access from one system to another (e.g., jump hosts).        | Shared credentials, weak network segmentation. |
+| **Compliance Violation**   | Non-compliance with CIS benchmarks or frameworks (e.g., PCI DSS).         | Missing patches, outdated security groups. |
 
-### **3.2 Tooling Schema (SIEM Integration)**
-For SIEM tools (e.g., **Splunk, ELK, Microsoft Sentinel**), standardize incident data with this schema:
+---
 
+## **Schema Reference**
+Below are key schema elements for security troubleshooting data models. Adapt these to your tooling (e.g., Terraform, OpenPolicyAgent, or custom scripts).
+
+### **1. Security Event Schema**
 ```json
 {
-  "incident": {
-    "id": "SEC-2024-001",
-    "severity": "high",
-    "source": {
-      "system": "web-server-01",
-      "component": "nginx"
-    },
-    "timestamp": "2024-05-15T14:30:00Z",
-    "description": "Brute-force attack detected on admin portal.",
-    "actions": [
-      {
-        "type": "access_revoked",
-        "user": "admin_user",
-        "time": "2024-05-15T15:00:00Z"
-      }
-    ],
-    "forensic_evidence": {
-      "logs": ["auth.log", "fail2ban.log"],
-      "ip_addresses": ["192.0.2.1", "203.0.113.45"]
+  "event_id": "unique_identifier",
+  "timestamp": "ISO_8601_format",
+  "severity": "low|medium|high|critical",
+  "type": "login_failure|api_call|policy_violation|network_scan",
+  "source": {
+    "tool": "SIEM|CSPM|CloudTrail",
+    "resource": "user|role|service_account",
+    "region": "us-east-1"
+  },
+  "details": {
+    "user_agent": "string",
+    "ip_address": "public_ip",
+    "failed_attempts": "integer",
+    "affected_resource": "arn|uri"
+  },
+  "related_events": ["event_id_1", "event_id_2"] // For correlation
+}
+```
+
+### **2. Remediation Playbook Schema**
+```json
+{
+  "playbook_id": "unique_identifier",
+  "anomaly_type": "brute_force|over_permissive_iam",
+  "steps": [
+    {
+      "action": "rotate_credentials|restrict_policy",
+      "tool": "AWS IAM|GCP IAM|Custom Script",
+      "prerequisites": ["rule_1", "rule_2"],
+      "validation_query": "sql_or_graphql_query"
     }
-  }
+  ],
+  "blast_radius": "low|medium|high",
+  "owner": "security_team|devops"
 }
 ```
 
 ---
 
-## **4. Query Examples**
+## **Query Examples**
+Use these queries to analyze security events in databases (e.g., PostgreSQL) or SIEM tools (e.g., Splunk, ELK).
 
-### **4.1 SIEM Query (Splunk SPL)**
-**Scenario:** Find all high-severity incidents involving brute-force attempts.
-```splunk
-index=security sourcetype=security_alerts
-| search severity="High" AND (event="bruteforce" OR event="failed_login")
-| table incident_id, source_system, timestamp, action_taken
-| sort -timestamp
+### **1. Find Brute Force Attempts (Last 24 Hours)**
+```sql
+SELECT
+  user_agent,
+  ip_address,
+  COUNT(*) AS failed_attempts
+FROM security_events
+WHERE
+  type = 'login_failure'
+  AND timestamp > NOW() - INTERVAL '24 hours'
+  AND severity = 'high'
+GROUP BY user_agent, ip_address
+HAVING COUNT(*) > 5
+ORDER BY failed_attempts DESC;
 ```
 
-### **4.2 ELK (Kibana) Search**
-**Scenario:** Query for misconfigured S3 buckets in AWS.
-```json
-{
-  "query": {
-    "bool": {
-      "must": [
-        { "match": { "event.category": "aws.s3" } },
-        { "bool": {
-            "should": [
-              { "term": { "response.status": "403" } },  // Access denied
-              { "term": { "policy.violation": "true" } }   // Policy mismatch
-            ]
-          }
-        }
-      ]
-    }
-  }
-}
+### **2. Detect Over-Permissive IAM Policies (AWS CloudTrail)**
+```sql
+SELECT
+  resource,
+  action,
+  principal
+FROM cloudtrail_logs
+WHERE
+  event_name IN ('PassRole', 'AttachPolicy', 'PutUserPolicy')
+  AND resource LIKE '%*%'  -- Wildcard in resource/condition
+ORDER BY timestamp DESC;
 ```
 
-### **4.3 AWS CLI Query (Check for Open Ports)**
-**Scenario:** Scan EC2 instances for open ports (troubleshoot unauthorized access).
-```bash
-aws ec2 describe-instances \
-  --filters "Name=instance-state-name,Values=running" \
-  --query "Reservations[].Instances[].[InstanceId, NetworkInterfaces[].Groups[].GroupId]"
+### **3. Correlate API Calls with Unusual Data Transfer (GCP Logs)**
+```sql
+SELECT
+  user_email,
+  method,
+  payload_size_mb,
+  timestamp
+FROM api_calls
+WHERE
+  method = 'POST'
+  AND payload_size_mb > 100  -- Large payload threshold
+  AND LAG(user_email) OVER (
+    PARTITION BY user_email
+    ORDER BY timestamp
+    ROWS BETWEEN 1 PRECEDING AND CURRENT ROW) != user_email
+ORDER BY timestamp;
 ```
-**Follow-up:** Use `nmap` or AWS Security Hub to verify open ports:
-```bash
-nmap -p 22,80,443 <instance-ip>
-```
 
-### **4.4 Python Script (Log Analysis)**
-**Scenario:** Parse Apache logs for suspicious 404 errors (potential scanning).
-```python
-import re
-from collections import defaultdict
-
-log_file = "access.log"
-suspicious_pattern = re.compile(r'404\s+\S+\s+\S+\s+\[\S+\]\s+"GET\s+(.+) HTTP/1.1"\s+404')
-
-error_endpoints = defaultdict(int)
-with open(log_file, 'r') as f:
-    for line in f:
-        match = suspicious_pattern.search(line)
-        if match:
-            endpoint = match.group(1)
-            error_endpoints[endpoint] += 1
-
-for endpoint, count in sorted(error_endpoints.items(), key=lambda x: -x[1]):
-    print(f"Endpoint: {endpoint}, Requests: {count}")
+### **4. Validate Remediation for Policy Changes**
+```sql
+SELECT
+  policy_arn,
+  last_modified_date,
+  denied_actions
+FROM iam_policies
+WHERE
+  last_modified_date > CURRENT_DATE - INTERVAL '7 days'
+  AND denied_actions LIKE '%deny %';
 ```
 
 ---
 
-## **5. Related Patterns**
-| **Pattern**                     | **Description**                                                                 | **When to Use**                          |
-|----------------------------------|---------------------------------------------------------------------------------|------------------------------------------|
-| **[Defense in Depth]**           | Layered security controls (e.g., firewalls + encryption + IAM).                | Designing secure architectures.           |
-| **[Zero Trust Architecture]**   | Verify every access request, even inside the network.                          | High-security environments.              |
-| **[Security Monitoring]**        | Real-time detection of anomalies via SIEMs, IDS/IPS.                           | Continuous threat monitoring.            |
-| **[Incident Response Playbook]** | Step-by-step guidance for handling breaches.                                   | During active security incidents.        |
-| **[Compliance Automation]**      | Automate audit checks (e.g., CIS benchmarks, GDPR).                            | Regulatory compliance verification.      |
-| **[Threat Modeling]**            | Proactively identify vulnerabilities in system design.                         | Pre-deployment security reviews.         |
+## **Diagnostic Tools**
+| Tool                  | Purpose                                                                 | Example Use Case                          |
+|-----------------------|-------------------------------------------------------------------------|-------------------------------------------|
+| **SIEM (Splunk/Elastic)** | Centralized log correlation and alerting.                               | Detecting lateral movement across systems. |
+| **CSPM (Prisma Cloud/Checkov)** | Scans cloud resources for misconfigurations.                           | Finding open S3 buckets.                 |
+| **CloudTrail/Azure Monitor** | Audits API calls and admin actions.                                       | Tracing a compromised service account.     |
+| **Wazuh/Valido**      | Open-source security monitoring for on-prem/containerized workloads.   | Detecting CVE exploiting unpatched hosts. |
+| **Terraform Policy Checks** | Enforce security rules during IaC deployment.                          | Blocking storage classes with `s3:PutObject`. |
+| **Custom Scripts (Python/Golang)** | Ad-hoc analysis (e.g., parsing logs for anomalies).                    | Analyzing DNS exfiltration patterns.     |
 
 ---
 
-## **6. Best Practices**
-1. **Standardize Terminology** – Use consistent labels (e.g., `severity: High`, `status: Resolved`).
-2. **Automate Where Possible** – Integrate SIEMs with ticketing systems (e.g., Jira, ServiceNow).
-3. **Document Everything** – Maintain runbooks for recurring issues (e.g., "How to patch CVE-2023-XXXX").
-4. **Test Remediation Plans** – Use sandbox environments to validate fixes.
-5. **Stay Updated** – Regularly review CVEs (e.g., [NVD](https://nvd.nist.gov/)) and tooling.
+## **Best Practices**
+1. **Automate Triage**
+   Use ML-based anomaly detection (e.g., AWS GuardDuty) to reduce alert fatigue.
+2. **Isolate Incidents**
+   Quarantine affected systems (e.g., detach IAM roles, revoke SSH keys).
+3. **Validate Fixes**
+   Re-run queries after remediation to confirm resolution.
+4. **Document Lessons Learned**
+   Update playbooks with new attack vectors or tooling gaps.
+5. **Monitor for Reoccurrence**
+   Set up long-term alerts for similar patterns.
 
 ---
-**Example Runbook Template:**
-```
-### Incident: Brute-Force on SSH (High)
-**Trigger:** 10+ failed login attempts in 5 minutes.
-**Steps:**
-1. Revoke SSH keys for affected user (`aws iam remove-user-ssh-key-key-pair`).
-2. Temporarily block IP in WAF (`aws waf add-statement --priority 0 --action Block`).
-3. Rotate credentials via Secrets Manager.
-**Validation:** Confirm no further attempts in 24h.
-**Tools:** Splunk, AWS GuardDuty, Fail2Ban.
-```
+
+## **Related Patterns**
+| Pattern                     | Description                                                                 | When to Use                                                  |
+|-----------------------------|-----------------------------------------------------------------------------|---------------------------------------------------------------|
+| **[Defensive Deployment]**  | Harden infrastructure before deployment (e.g., immutable AMIs, least privilege). | Proactive security during IaC pipelines.                     |
+| **[Chaos Engineering]**     | Test system resilience to failures (e.g., kill pods randomly).              | Validate security controls under stress.                     |
+| **[Compliance as Code]**    | Enforce policies via IaC (e.g., Terraform modules).                        | Automate compliance checks in CI/CD.                         |
+| **[Audit Logging]**         | Centralize logs for forensic analysis.                                       | Investigating post-breach incidents.                        |
+| **[Zero Trust]**            | Assume breach, enforce least privilege.                                     | High-security environments (e.g., finance, healthcare).      |
+
+---
+**Note:** For advanced scenarios, integrate with **SOAR (Security Orchestration, Automation, and Response)** tools (e.g., Palo Alto Cortex XSOAR) to automate response workflows.

@@ -1,193 +1,168 @@
----
-# **[Authentication Troubleshooting] Reference Guide**
+# **[Pattern] Authentication Troubleshooting - Reference Guide**
 
 ---
 
-## **1. Overview**
-Authentication failures can disrupt application workflows, security policies, and user experiences. This guide provides a **structured troubleshooting approach** for diagnosing and resolving common authentication issues. It covers **error patterns, validation steps, and remediation techniques** for OAuth 2.0, API Keys, JWT, password-based auth, and multi-factor authentication (MFA) systems. The guide is organized by **symptom**, **root cause**, and **correction**, ensuring rapid issue resolution.
-
-Key focus areas:
-- **Client-side vs. server-side** authentication failures
-- **Token-related issues** (expiry, revocation, invalid signatures)
-- **Configuration mismatches** (CORS, redirect URIs, scopes)
-- **Dependency failures** (IDP, OAuth providers, databases)
+## **Overview**
+Authentication failures can disrupt user access, API integrations, and system reliability. This guide provides a structured approach to diagnosing and resolving authentication issues across single-sign-on (SSO), OAuth2, JWT, and traditional username/password systems. Debugging follows a **layered methodology**—from client-side validation to server-side configuration—ensuring systematic resolution. Common pitfalls include expired tokens, misconfigured endpoints, or incorrect credentials, which this pattern addresses with **step-by-step diagnostics**, tools, and validation techniques.
 
 ---
 
-## **2. Schema Reference**
+## **Key Concepts & Implementation Details**
+### **1. Authentication Troubleshooting Layers**
+Troubleshooting follows a **bottom-up approach**:
+- **Client Layer**: Check UI/forms, network requests, and SDKs.
+- **Transport Layer**: Validate redirects, headers, and payload integrity.
+- **Backend Layer**: Inspect middleware, database queries, and session handling.
+- **Identity Provider Layer**: Verify IDP logs, token issuance, and revocation policies.
 
-| **Category**               | **Field**                  | **Description**                                                                                     | **Example Values**                                                                 |
-|----------------------------|----------------------------|-----------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------|
-| **General Auth Errors**    | `error_code`               | Standardized error code (e.g., `401`, `403`, `429`)                                                 | `"error": "invalid_grant"`                                                        |
-|                            | `error_description`        | Human-readable explanation of the failure                                                           | `"message": "Token expired at 15:30 UTC"`                                           |
-|                            | `timestamp`                | ISO-8601 formatted timestamp of the failure                                                         | `"timestamp": "2023-11-15T14:22:58Z"`                                              |
-| **OAuth 2.0**              | `grant_type`               | OAuth flow type (e.g., `authorization_code`, `client_credentials`)                                  | `"grant_type": "refresh_token"`                                                   |
-|                            | `auth_server`              | ID of the OAuth provider (e.g., `auth0`, `okta`)                                                    | `"auth_server": "okta"`                                                             |
-|                            | `scope`                    | Requested permissions (e.g., `openid profile email`)                                                | `"scope": "read write"`                                                             |
-| **JWT Validation**         | `alg`                      | Algorithm used for JWT signing (e.g., `RS256`, `HS256`)                                             | `"alg": "HS256"`                                                                   |
-|                            | `kid`                      | Key ID for asymmetric keys (if applicable)                                                          | `"kid": "abc123-4567-890"`                                                         |
-|                            | `exp`                      | Expiration time (UNIX timestamp)                                                                   | `"exp": 1700000000`                                                                |
-| **MFA**                    | `mfa_factor`               | Secondary auth method (e.g., `totp`, `sms`, `hardware_key`)                                        | `"mfa_factor": "totp"`                                                              |
-|                            | `retry_count`              | Number of failed attempts before MFA lockout                                                         | `"retry_count": 3`                                                                 |
-| **API Key Auth**           | `api_key_name`             | Name of the key used in headers (e.g., `X-API-Key`)                                                 | `"X-API-Key": "sk_123abc"`                                                          |
-|                            | `key_rotation_status`      | Whether the key has expired/been revoked                                                           | `"status": "revoked"`                                                               |
+### **2. Common Failure Scenarios**
+| Scenario               | Cause                          | Resolution Path                          |
+|------------------------|-------------------------------|------------------------------------------|
+| **401 Unauthorized**   | Expired token, invalid scope   | Refresh token/grant or check permissions |
+| **403 Forbidden**      | Role-based access denied       | Validate user roles/claims               |
+| **500 Server Error**   | Backend misconfiguration        | Check server logs, retry limits          |
+| **Redirect Loop**      | Malformed state/CSRF token     | Validate `state` parameter integrity     |
+| **Silent Failures**    | Missing `onError` handlers     | Log client-side exceptions               |
+
+### **3. Essential Tools**
+| Tool/Technique       | Purpose                                  | Example Command/Usage          |
+|----------------------|------------------------------------------|---------------------------------|
+| **Postman/cURL**     | Test API endpoints manually              | `curl -X POST -H "Authorization: Bearer <token>" ...` |
+| **Wireshark**        | Inspect HTTP/S traffic                   | Capture `POST /token` requests |
+| **JWT Decoder**      | Validate token signature/claims          | [jwt.io](https://jwt.io)        |
+| **OpenID Connect**   | Debug OIDC flows (e.g., `id_token_hint`) | Check `.well-known/openid-configuration` |
+| **Strace/Process Monitor** | System-level debugging      | `strace -f node /path/to/auth-server` |
+
+### **4. Token-Lifetime Management**
+| Token Type       | Lifetime Default | Recommended Reset On          |
+|------------------|------------------|--------------------------------|
+| **Access Token** | 1h–24h           | Login, role change, or session revocation |
+| **Refresh Token**| 7–30 days        | Compromise, explicit revocation |
+| **ID Token**     | Non-expiring*    | Re-authentication required     |
+
+*_OIDC ID tokens may include `exp` claims; check spec for compliance._*
+
+---
+## **Schema Reference**
+
+### **1. Authentication Request Payloads**
+| Field               | Type      | Required | Description                                                                 |
+|---------------------|-----------|----------|-----------------------------------------------------------------------------|
+| **username/email**  | string    | Yes      | User’s identity credential                                                 |
+| **password**        | string    | Yes      | Encrypted client-side (never logged)                                       |
+| **grant_type**      | string    | Yes      | OAuth2 flow type (`password`, `refresh_token`, `client_credentials`)       |
+| **client_id**       | string    | Yes      | Registered app ID (OAuth2)                                                  |
+| **client_secret**   | string    | Conditional | Confidential client apps only (OAuth2)                                    |
+| **scope**           | string    | Optional | Space-separated permissions (`openid profile email`)                        |
+| **redirect_uri**    | URL       | Conditional | Required for implicit/authorization flows                                  |
+| **state**           | string    | Optional | CSRF protection (must match reply)                                         |
 
 ---
 
-## **3. Query Examples**
+### **2. JWT Claim Requirements**
+| Claim          | Type    | Description                                                                 |
+|----------------|---------|-----------------------------------------------------------------------------|
+| `iss`          | string  | Issuer URI (e.g., `https://auth.example.com`)                              |
+| `sub`          | string  | Subject (user ID or email)                                                  |
+| `aud`          | string  | Audience (client ID or app URI)                                             |
+| `exp`          | number  | Unix timestamp (seconds) for expiration                                     |
+| `nbf`          | number  | Not before (prevents premature use)                                         |
+| `iat`          | number  | Issue at (timestamp validation)                                             |
+| `auth_time`    | number  | Last authentication timestamp (OIDC)                                        |
 
-### **3.1 Common Authentication Query Patterns**
-Use these `curl`/`HTTP` requests to diagnose issues. Replace placeholders (`{}`) with actual values.
+---
+## **Query Examples**
 
-#### **A. Token Validation Request**
-```http
-GET /auth/validate?token={JWT_TOKEN}
-Headers:
-  Authorization: Bearer {JWT_TOKEN}
+### **1. Diagnosing OAuth2 Token Exchange**
+**Request (cURL):**
+```bash
+curl -X POST \
+  https://auth.example.com/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=password&username=user123&password=PASSWORD&client_id=APP_ID&client_secret=SECRET&scope=read write"
 ```
-**Expected Response (Success):**
+
+**Expected Success Response (200 OK):**
 ```json
 {
-  "valid": true,
-  "expires_at": "2023-12-01T12:00:00Z",
-  "scopes": ["read", "write"]
-}
-```
-**Expected Response (Failure):**
-```json
-{
-  "error": "invalid_token",
-  "description": "Token not found in database"
+  "access_token": "eyJhbGciOiJSUzI1NiIs...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "REFRESH_TOKEN"
 }
 ```
 
-#### **B. OAuth 2.0 Token Refresh**
-```http
-POST /oauth/token
-Headers:
-  Content-Type: application/x-www-form-urlencoded
-Body:
-  grant_type=refresh_token
-  &refresh_token={REFRESH_TOKEN}
-  &client_id={CLIENT_ID}
-  &client_secret={CLIENT_SECRET}
-```
-**Failure Example (Invalid Refresh Token):**
+**Failure Response (401 Unauthorized):**
 ```json
 {
   "error": "invalid_grant",
-  "error_description": "Refresh token expired"
+  "error_description": "Incorrect username or password"
 }
 ```
 
-#### **C. MFA Challenge (SMS/TOTP)**
-```http
-POST /auth/mfa/challenge
-Headers:
-  Content-Type: application/json
-Body:
-  {
-    "factor": "sms",
-    "phone": "+1234567890"
-  }
+---
+### **2. Validating JWT Claims**
+```bash
+# Decode and verify JWT (without secret to inspect claims)
+echo "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..." | base64 -d | jq .
 ```
-**Failure Example (Invalid Phone Number):**
+**Output:**
 ```json
 {
-  "error": "invalid_request",
-  "message": "Phone not registered"
+  "iss": "https://auth.example.com",
+  "sub": "user@example.com",
+  "exp": 1712345678,
+  "nbf": 1712340000
 }
 ```
 
 ---
-
-### **3.2 Debugging Logs**
-**Server-Side Logs (Example):**
+### **3. Checking Session Revocation**
+**Request (cURL):**
+```bash
+curl -X POST \
+  https://auth.example.com/logout \
+  -H "Authorization: Bearer ACCESS_TOKEN"
 ```
-[ERROR] auth_service: Token validation failed for user_id=123.
-  - JWT 'kid' mismatch: expected 'abc123', got 'def456'.
-  - Possible cause: Key rotation not propagated to client.
-```
-**Client-Side Logs (Example):**
-```javascript
-console.error("Auth Error:", {
-  status: 403,
-  message: "Forbidden: Missing required scope 'admin'",
-  path: "/admin/dashboard"
-});
+**Expected Response (200 OK):**
+```json
+{
+  "revoked": ["eyJhbGciOiJSUzI1NiIs..."]
+}
 ```
 
 ---
+## **Validation Techniques**
 
-## **4. Troubleshooting Workflow**
+### **1. Cross-Origin Resource Sharing (CORS) Checks**
+- **Verify Headers**:
+  ```bash
+  curl -I https://auth.example.com/token \
+    -H "Origin: https://client.app"
+  ```
+  **Expected**:
+  `Access-Control-Allow-Origin: https://client.app`
 
-### **4.1 Symptom-Based Root Cause Analysis**
-| **Symptom**                          | **Likely Cause**                          | **Solution**                                                                 |
-|--------------------------------------|-------------------------------------------|------------------------------------------------------------------------------|
-| `401 Unauthorized`                   | Missing/invalid `Authorization` header    | Verify header format (`Bearer {token}`), check token validity.               |
-| `403 Forbidden`                      | Expired token or insufficient scopes      | Issue a new token; check `scope` permissions in response.                   |
-| `400 Bad Request`                    | Malformed payload (e.g., OAuth params)   | Validate `grant_type`, `client_id`, and `redirect_uri`.                    |
-| MFA lockout                          | Too many failed attempts                 | Reset MFA via admin panel; review `retry_count` limits.                      |
-| Redirect loops                       | Incorrect `redirect_uri` in OAuth config  | Match `redirect_uri` exactly in client registration.                        |
-| Slow responses (JWT validation)     | Asymmetric key decryption delay          | Optimize key caching; use `kid` hint for faster lookup.                     |
-
----
-
-### **4.2 Step-by-Step Corrections**
-
-#### **A. Token Expiry Issues**
-1. **Check `exp` claim** in JWT:
-   ```json
-   {
-     "exp": 1700000000  // Compare with current UNIX timestamp
-   }
-   ```
-2. **Refresh token** using `refresh_token` grant:
-   ```http
-   POST /oauth/token?grant_type=refresh_token&refresh_token={TOKEN}
-   ```
-3. **Configure token TTL** (e.g., 30 minutes) in auth server settings.
-
-#### **B. CORS/Redirect URI Mismatches**
-1. **Verify `allowed_redirect_uris`** in OAuth client config:
-   ```json
-   {
-     "redirect_uris": [
-       "https://app.example.com/callback",
-       "https://dev.example.com/callback"
-     ]
-   }
-   ```
-2. **Check browser console** for CORS errors (e.g., `Origin` mismatch).
-
-#### **C. MFA Bypass Attempts**
-1. **Audit failed MFA attempts**:
-   ```sql
-   SELECT * FROM mfa_attempts WHERE user_id = 123 AND status = 'failed';
-   ```
-2. **Adjust `retry_count`** in auth config (default: 5 attempts).
-3. **Log MFA events** for security monitoring.
+### **2. Rate Limiting Diagnostics**
+- **Test Throttling**:
+  ```bash
+  while true; do curl -X POST -d "username=test" https://auth.example.com/login; done
+  ```
+  **Expected Failure**:
+  `HTTP 429 Too Many Requests`
 
 ---
-
-## **5. Related Patterns**
-| **Pattern**                     | **Description**                                                                 | **Use Case**                                                                 |
-|----------------------------------|---------------------------------------------------------------------------------|------------------------------------------------------------------------------|
-| **[Idempotent OAuth Flows]**      | Ensure OAuth requests are repeatable without side effects.                     | Protect against duplicate token requests during network retries.             |
-| **[Token Blacklisting]**         | Revoke tokens proactively (e.g., on session end or breach).                     | Mitigate credential theft risks.                                              |
-| **[JWT Key Rotation]**            | Automate private key updates without client disruption.                         | Secure long-lived tokens against key compromise.                              |
-| **[Rate Limiting for Auth]**     | Throttle login attempts to prevent brute-force attacks.                         | Harden against credential stuffing.                                          |
-| **[Federated Identity]**         | Integrate with SAML/OpenID Connect for SSO.                                     | Unify auth across multiple applications.                                      |
-
----
-
-## **6. Best Practices**
-1. **Centralized Logging**: Correlate auth events with application logs (e.g., ELK stack).
-2. **Token Analytics**: Monitor token issuance/expires to detect anomalies (e.g., sudden spikes).
-3. **Client-Side Validation**: Validate tokens before sending to the server (e.g., `jwt-decode` library).
-4. **Key Management**: Use HSMs for asymmetric keys; rotate keys quarterly.
-5. **Deprecation Policy**: Gracefully handle deprecated auth methods (e.g., Basic Auth → API Keys).
+## **Related Patterns**
+| Pattern Name                     | Purpose                                                                 |
+|-----------------------------------|-------------------------------------------------------------------------|
+| **[Token Rotation]**              | Securely refresh tokens without user intervention.                      |
+| **[Multi-Factor Authentication]** | Enforce 2FA (TOTP, SMS, or hardware keys) for sensitive operations.    |
+| **[Session Hijacking Protection]** | Mitigate CSRF, XSS, and replay attacks via `SameSite` cookies.         |
+| **[Fine-Grained Permissions]**    | Map JWT claims to role-based access (e.g., `admin:read/write`).         |
+| **[Audit Logging]**               | Track authentication events for compliance (e.g., GDPR).                |
 
 ---
-**Last Updated:** `2023-11-15`
-**Version:** `1.2`
+## **Further Reading**
+- **[OAuth 2.0 Security Best Current Practices](https://datatracker.ietf.org/doc/html/rfc8252)**
+- **[JWT Best Practices](https://auth0.com/blog/critical-jwt-security-best-practices/)**
+- **[OpenID Connect Core 1.0](https://openid.net/specs/openid-connect-core-1_0.html)**

@@ -1,178 +1,224 @@
-**[Pattern] REST Troubleshooting Reference Guide**
+# **[Pattern] REST Troubleshooting – Reference Guide**
 
 ---
 
-### **Overview**
-The **REST Troubleshooting** pattern provides a structured approach to diagnosing and resolving issues in RESTful APIs. This guide covers systematic steps for identifying root causes—such as client-side errors, server misconfigurations, or network issues—along with tools, logging best practices, and diagnostic schemas. It ensures developers can efficiently validate API interactions, inspect payloads, and correlate errors with expected behaviors without relying solely on undocumented heuristics.
+## **Overview**
+Troubleshooting REST APIs requires a structured approach to identify issues in **requests, responses, authentication, performance, and infrastructure**. This guide outlines best practices, common error scenarios, and diagnostic steps to resolve REST API failures efficiently. Coverage includes **client-side issues, server-side errors, network problems, and API misconfigurations** (e.g., rate limits, CORS, authentication failures).
+
+Key focus areas:
+- **HTTP status codes** and response parsing
+- **Log analysis** and debugging tools
+- **Testing frameworks** (Postman, cURL, Swagger)
+- **Common pitfalls** (IDL mismatches, caching issues, payload validation errors)
+- **Monitoring and observability** techniques
+
+This guide assumes familiarity with core REST principles (statelessness, resource endpoints) and basic HTTP methods.
 
 ---
 
-### **Key Concepts & Implementation Details**
+## **Implementation Details**
 
-#### **1. Core Principles**
-REST troubleshooting follows a **layered debugging model**:
-- **Client Layer** – Verify input/output (e.g., request formatting, headers, authentication).
-- **Transport Layer** – Inspect HTTP status codes, latency, and protocol compliance.
-- **Server Layer** – Validate backend responses, rate limits, and resource availability.
-- **Infrastructure Layer** – Check load balancers, proxies, and firewall rules.
+### **1. Common Troubleshooting Scenarios**
+API issues typically fall into these categories:
 
-#### **2. Common REST Troubleshooting Scenarios**
-| **Scenario**               | **Symptoms**                          | **Tools/Checks**                          |
-|----------------------------|---------------------------------------|-------------------------------------------|
-| **Authentication Errors**  | `401/403`                              | Verify API keys, JWT expiration, OAuth2 scopes. |
-| **Payload Validation**     | `400 Bad Request`                      | Inspect schema mismatches (e.g., missing fields, type errors). |
-| **Throttling**             | `429 Too Many Requests`               | Check rate limits (e.g., `X-RateLimit-Remaining`). |
-| **Network Issues**         | Timeouts, intermittent failures       | Use `curl`/`Postman` with `-v`, `tcpdump`, and `ping`. |
-| **Server-Side Crashes**    | `500/503`                              | Review server logs, GC pauses, or DB queries. |
-| **CORS Errors**            | `403` with CORS headers               | Validate `Access-Control-Allow-Origin`.    |
-| **Idempotency Violations** | Duplicate side effects (e.g., `POST` duplicates). | Test with `Idempotency-Key` headers. |
+| **Category**            | **Example Problems**                                                                 |
+|-------------------------|------------------------------------------------------------------------------------|
+| **Client-Side Issues**  | Incorrect headers, malformed payloads, expired tokens, invalid URL encoding       |
+| **Server-Side Errors**  | Backend crashes, database timeouts, misconfigured endpoints                      |
+| **Network Problems**    | Latency, DNS resolution failures, proxy misconfigurations                         |
+| **Security Issues**     | Missing authentication, CSRF attacks, CORS misconfigurations                       |
+| **Performance**         | Slow responses, throttling (429 errors), unoptimized queries                       |
+| **Data Issues**         | Schema mismatches, null values in required fields, pagination errors              |
 
 ---
 
-### **Schema Reference**
-The following table outlines key REST troubleshooting schema elements for structured debugging.
+### **2. Diagnostic Workflow**
+Follow this structured approach to isolate issues:
 
-| **Category**               | **Field**               | **Type**       | **Description**                                                                                     | **Example Values**                     |
-|----------------------------|-------------------------|----------------|-----------------------------------------------------------------------------------------------------|----------------------------------------|
-| **HTTP Headers**           | `Content-Type`          | String         | Specifies media type (e.g., `application/json`).                                                     | `application/json; charset=utf-8`      |
-|                            | `Authorization`         | String         | Bearer tokens, API keys, or OAuth2 credentials.                                                     | `Bearer <token>`                       |
-|                            | `X-Request-ID`          | String         | Unique ID for tracing requests across services.                                                    | `req_12345abc`                         |
-| **Response Fields**        | `status`                | Integer        | HTTP status code (e.g., `200`, `404`).                                                              | `400`                                  |
-|                            | `error`                 | Object         | Standardized error payload (e.g., `{ "code": "INVALID_INPUT" }`).                                    | `{ "code": "429", "message": "Rate limit exceeded" }` |
-|                            | `traceId`               | String         | Correlation ID for distributed tracing.                                                             | `trace_67890def`                       |
-| **Validation**             | `requiredFields`        | Array          | List of mandatory fields in requests.                                                                | `[ "userId", "timestamp" ]`            |
-| **Rate Limiting**          | `X-RateLimit-Limit`     | Integer        | Max allowed requests per interval.                                                                  | `100`                                  |
-|                            | `X-RateLimit-Remaining` | Integer        | Remaining requests before throttling.                                                              | `42`                                   |
-| **Logging Context**        | `requestId`             | String         | Client-assigned ID for log correlation.                                                              | `client_req_7890`                      |
-|                            | `correlationId`         | String         | Server-assigned ID for internal tracing.                                                           | `server_trace_abc123`                  |
+1. **Replicate the Problem** – Confirm the error occurs consistently.
+2. **Inspect Requests/Responses** – Use tools like **Postman, cURL, or browser DevTools**.
+3. **Validate Headers** – Ensure `Content-Type`, `Authorization`, and `Accept` headers are correct.
+4. **Check Logs** – Review server-side logs (e.g., `nginx`, `Spring Boot`, or `AWS CloudTrail`).
+5. **Test with Minimal Payload** – Rule out payload-related issues.
+6. **Compare Working vs. Broken Requests** – Identify subtle differences.
+7. **Verify Rate Limits** – Check for `429 Too Many Requests`.
+8. **Test with Different Tools** – Confirm if the issue is tool-specific (e.g., Postman vs. `curl`).
 
 ---
 
-### **Query Examples**
-
-#### **1. Debugging Authentication Issues**
-**Problem:** `401 Unauthorized` when calling `/users/me`.
-**Steps:**
-1. Verify the `Authorization` header:
-   ```http
-   GET /users/me HTTP/1.1
-   Host: api.example.com
-   Authorization: Bearer <valid_token>
-   ```
-2. Check token validity:
-   ```bash
-   # Decode JWT (e.g., using https://jwt.io)
-   echo "<token>" | base64 --decode | jq .
-   ```
-3. Inspect server logs for token rejection reasons.
-
-#### **2. Validating Payload Structure**
-**Problem:** `400 Bad Request` with no clear error message.
-**Steps:**
-- Compare incoming payload against schema (e.g., OpenAPI/Swagger):
-  ```json
-  // Expected schema for `/orders` POST
-  {
-    "required": ["customerId", "items"],
-    "items": { "type": "array", "minItems": 1 }
-  }
-  ```
-- Use `curl` with `--header "Content-Type: application/json"` and pipe a malformed payload:
-  ```bash
-  curl -X POST -H "Content-Type: application/json" \
-       -d '{"missing": "customerId"}' \
-       https://api.example.com/orders
-  ```
-
-#### **3. Tracing Requests Across Services**
-**Problem:** Intermittent `500` errors from `/products`.
-**Steps:**
-1. Enable distributed tracing with `traceId`:
-   ```http
-   GET /products?traceId=client_123 HTTP/1.1
-   ```
-2. Correlate logs using:
-   ```bash
-   # Filter logs with traceId
-   grep "traceId=client_123" /var/log/api/*.log
-   ```
-3. Use tools like **Jaeger** or **Zipkin** for visual tracing.
-
-#### **4. Checking Rate Limiting**
-**Problem:** `429 Too Many Requests`.
-**Steps:**
-1. Review response headers:
-   ```http
-   HTTP/1.1 429 Too Many Requests
-   X-RateLimit-Limit: 100
-   X-RateLimit-Remaining: 0
-   Retry-After: 60
-   ```
-2. Implement exponential backoff:
-   ```javascript
-   if (res.headers["x-ratelimit-remaining"] === "0") {
-     const retryAfter = parseInt(res.headers["retry-after"]);
-     await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
-   }
-   ```
-
-#### **5. Validating Idempotency**
-**Problem:** Duplicate charges after `POST /payments`.
-**Steps:**
-1. Add `Idempotency-Key` header:
-   ```http
-   POST /payments HTTP/1.1
-   Idempotency-Key: abc123
-   ```
-2. Server should return `200` on retry with the same key and avoid duplicates.
+### **3. Key Troubleshooting Tools**
+| **Tool**               | **Purpose**                                                                                     | **Example Use Case**                              |
+|------------------------|------------------------------------------------------------------------------------------------|---------------------------------------------------|
+| **Postman**            | Send requests, inspect headers, save collections, and test APIs interactively.              | Debugging OAuth 2.0 token exchanges              |
+| **cURL**               | Command-line tool for HTTP requests (lightweight, scriptable).                                | Testing API with specific headers/body           |
+| **Swagger/OpenAPI**    | Validate API contracts, test endpoints with interactive UI.                                   | Verifying schema compatibility                  |
+| **Wireshark/tcpdump**  | Network-level packet inspection (for latency/connection issues).                            | Detecting packet loss or DNS resolution errors   |
+| **K6/Locust**          | Load testing to identify bottlenecks.                                                          | Simulating high traffic to find rate limits      |
+| **AWS X-Ray / Jaeger** | Distributed tracing for microservices.                                                       | Tracing requests across multiple services        |
+| **New Relic/Datadog**  | Monitoring API performance, error rates, and latency.                                        | Alerting on spike in 5xx errors                  |
 
 ---
 
-### **Tools & Utilities**
-| **Tool**               | **Purpose**                                                                 | **Example Command**                          |
-|------------------------|-----------------------------------------------------------------------------|---------------------------------------------|
-| **curl**               | Send raw HTTP requests + debug headers.                                     | `curl -v -X POST -d '{"key":"value"}' https://api.example.com` |
-| **Postman**            | GUI for REST debugging (inspectors, mock servers).                         | Open request → "Inspectors" tab → Headers   |
-| **Fiddler/Wireshark**  | Capture and analyze HTTP traffic.                                           | Filter for `api.example.com`                |
-| **PostgreSQL/Prometheus** | Query database or metrics for bottlenecks.                                | `SELECT * FROM transactions WHERE status = 'failed';` |
-| **OpenAPI Validator**  | Validate API contracts and payloads.                                        | `swagger-cli validate openapi.yaml`         |
-| **Jaeger**             | Distributed tracing for microservices.                                     | Deploy sidecar agents; query traces UI.     |
+## **Schema Reference**
+
+### **REST API Error Response Schema**
+Most REST APIs follow a standardized error format. Below are common schemas (adjust fields as needed):
+
+| **Field**          | **Type**   | **Description**                                                                 | **Example**                     |
+|--------------------|------------|-------------------------------------------------------------------------------|---------------------------------|
+| `error`            | String     | Human-readable error message (avoid exposing sensitive details).              | `"Invalid token expiration"`    |
+| `status`           | Integer    | HTTP status code (e.g., `400`, `500`).                                          | `401`                           |
+| `code`             | String     | Machine-readable error identifier (e.g., `auth.401`, `validation.422`).        | `"authentication_required"`     |
+| `timestamp`        | ISO 8601   | When the error occurred (useful for logs).                                     | `"2024-05-20T14:30:00Z"`        |
+| `path`             | String     | The API endpoint where the error occurred.                                      | `"/users/delete"`               |
+| `details`          | Object     | Additional context (e.g., missing fields, validation errors).                   | `{ "field": ["must be a number"] }`|
+| `requestId`        | String     | Unique identifier for tracing (correlate with server logs).                     | `"req_abc123xyz"`               |
+
+**Example Response:**
+```json
+{
+  "error": "Unauthorized",
+  "status": 401,
+  "code": "auth.401",
+  "timestamp": "2024-05-20T14:30:00Z",
+  "path": "/api/v1/users/me",
+  "details": { "message": "Token expired" },
+  "requestId": "req_xyz789"
+}
+```
 
 ---
 
-### **Logging Best Practices**
-1. **Structured Logging**:
-   Include `traceId`, `requestId`, and `correlationId` in every log entry.
-   ```json
-   {
-     "level": "ERROR",
-     "message": "Invalid payload",
-     "traceId": "trace_67890",
-     "requestId": "client_req_123",
-     "payload": { "missing": "field" }
-   }
-   ```
-
-2. **Error Tracking**:
-   Use tools like **Sentry** or **Datadog** to aggregate errors with context.
-
-3. **Rate Limiting Logs**:
-   Log `X-RateLimit-*` headers when throttling occurs.
-
-4. **Audit Trails**:
-   Log sensitive operations (e.g., `/users/delete`) with timestamps and user context.
+### **Common HTTP Status Code Troubleshooting**
+| **Status Code** | **Category**       | **Possible Causes**                                                                 | **Action Items**                                  |
+|------------------|--------------------|------------------------------------------------------------------------------------|--------------------------------------------------|
+| **200 OK**       | Success            | Request processed.                                                                 | None                                              |
+| **201 Created**  | Success            | Resource created (check `Location` header for ID).                                   | Verify resource exists via GET                   |
+| **400 Bad Request** | Client Error     | Malformed request (e.g., invalid JSON, missing headers).                              | Validate payload with Swagger/OpenAPI             |
+| **401 Unauthorized** | Client Error   | Missing/invalid authentication (e.g., token expired).                                | Check `Authorization` header                     |
+| **403 Forbidden** | Client Error      | Authenticated but lack permissions.                                                  | Review RBAC policies                              |
+| **404 Not Found** | Client Error      | Endpoint does not exist.                                                              | Verify URL and check API docs                    |
+| **405 Method Not Allowed** | Client Error | Incorrect HTTP method (e.g., `PUT` on a `GET`-only endpoint).                      | Use correct verb (check Swagger docs)           |
+| **408 Request Timeout** | Client Error | Server took too long to respond.                                                     | Increase timeout or optimize backend             |
+| **409 Conflict**  | Client Error       | Duplicate resource or pre-condition failed (e.g., `ETag` mismatch).                  | Check for idempotency keys                       |
+| **422 Unprocessable Entity** | Client Error | Valid request but payload fails validation (e.g., missing required field).         | Review `details` field in response               |
+| **429 Too Many Requests** | Client Error | Rate limit exceeded.                                                               | Implement exponential backoff                    |
+| **500 Internal Server Error** | Server Error | Backend crash (generic; check logs).                                               | Review server logs for stack traces              |
+| **502 Bad Gateway** | Server Error     | Upstream service failed (e.g., database).                                            | Check dependent service health                   |
+| **503 Service Unavailable** | Server Error | Server overloaded or down.                                                          | Monitor capacity; restart services if needed      |
+| **504 Gateway Timeout** | Server Error   | Proxy/gateway timed out waiting for response.                                        | Increase timeout settings                        |
 
 ---
 
-### **Related Patterns**
-| **Pattern**                     | **Description**                                                                 | **When to Use**                                  |
-|----------------------------------|---------------------------------------------------------------------------------|--------------------------------------------------|
-| **[REST Error Handling](https://docs.example.com/rest-error-handling)** | Standardized error codes and response formats.                                   | Define consistent error responses for clients.    |
-| **[API Gateway Patterns](https://docs.example.com/api-gateways)**        | Use gateways for routing, rate limiting, and request validation.              | Centralize API logic and security.              |
-| **[Idempotency in REST](https://docs.example.com/idempotency)**            | Design safe, retriable operations.                                               | Handle duplicate requests (e.g., payments).      |
-| **[OpenAPI/Swagger Validation](https://docs.example.com/openapi)**       | Document and validate API contracts.                                             | Ensure API consumers have accurate specs.         |
-| **[Circuit Breaker](https://docs.example.com/circuit-breaker)**            | Prevent cascading failures in distributed systems.                              | Mitigate backend outages.                       |
+## **Query Examples**
+
+### **1. Testing a Failed Request in cURL**
+```bash
+# Failed request (missing Authorization header)
+curl -X POST http://api.example.com/v1/users \
+     -H "Content-Type: application/json" \
+     -d '{"name": "Test User", "email": "test@example.com"}'
+
+# Expected response:
+# {"error": "Unauthorized", "status": 401, ...}
+
+# Fixed request (with token)
+curl -X POST http://api.example.com/v1/users \
+     -H "Authorization: Bearer valid_token_123" \
+     -H "Content-Type: application/json" \
+     -d '{"name": "Test User", "email": "test@example.com"}'
+```
 
 ---
-**Last Updated:** `YYYY-MM-DD`
-**Contributors:** `@author1`, `@author2`
+
+### **2. Debugging a 429 Error (Rate Limiting)**
+```bash
+# Check headers for rate limit details
+curl -I http://api.example.com/v1/items
+
+# Response Headers:
+# X-RateLimit-Limit: 100
+# X-RateLimit-Remaining: 0
+# X-RateLimit-Reset: 60
+
+# Implement backoff (Python example):
+import time
+import requests
+
+response = requests.get("http://api.example.com/v1/items")
+while response.status_code == 429:
+    reset_time = int(response.headers.get("X-RateLimit-Reset"))
+    wait_time = max(reset_time - time.time(), 0) + 5  # Add buffer
+    print(f"Rate limited. Retrying in {wait_time:.1f}s...")
+    time.sleep(wait_time)
+    response = requests.get("http://api.example.com/v1/items")
+```
+
+---
+
+### **3. Validating a JSON Payload with Swagger**
+1. Open the **Swagger UI** for the API (e.g., `http://api.example.com/swagger`).
+2. Select the endpoint (e.g., `POST /users`).
+3. Fill in the request body and click **Try it out**.
+4. Swagger will:
+   - Validate the schema.
+   - Generate `cURL` or code snippets.
+   - Show errors if the payload is invalid (e.g., wrong `email` format).
+
+---
+### **4. Checking Server Logs for 500 Errors**
+```bash
+# Example log entry for a 500 error (Spring Boot):
+2024-05-20 14:30:10.123 ERROR 1 --- [nio-8080-exec-1] com.example.controller.UserController : 500 Internal Server Error for HTTP POST "/users/delete"
+
+# Key details to extract:
+- **Timestamp**: When the error occurred.
+- **Thread**: Identify if it’s stuck in a long-running task.
+- **Stack Trace**: Points to the root cause (e.g., `NullPointerException` in `UserRepository.save()`).
+```
+
+---
+
+## **Related Patterns**
+
+| **Pattern**               | **Description**                                                                                                                                 | **When to Use**                                                                 |
+|---------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------|
+| **[Idempotency Key](pattern.md)** | Ensure safe retries by using unique IDs for requests (e.g., `Idempotency-Key` header).                                             | Handling duplicate requests or rate-limited retries.                          |
+| **[Retries & Backoff](pattern.md)** | Implement exponential backoff for transient failures (e.g., 5xx errors).                                                       | Improving resilience in distributed systems.                                  |
+| **[Circuit Breaker](pattern.md)** | Stop cascading failures by temporarily blocking requests to a failing service.                                                     | High-latency or unstable backend services.                                   |
+| **[API Gateway](pattern.md)** | Centralize routing, authentication, and request validation.                                                                        | Managing microservices or complex auth flows.                                 |
+| **[Versioning](pattern.md)** | Mitigate breaking changes with URL/path versioning (e.g., `/v1/users`).                                                       | Maintaining backward compatibility during API updates.                       |
+| **[Observability](pattern.md)** | Collect logs, metrics, and traces for real-time debugging.                                                                        | Proactively detecting and diagnosing issues.                                  |
+| **[Authentication](pattern.md)** | Secure APIs with OAuth 2.0, JWT, or API keys.                                                                                     | Protecting endpoints from unauthorized access.                               |
+| **[Pagination](pattern.md)** | Handle large datasets with `offset`, `limit`, or cursor-based pagination.                                                     | Avoiding timeouts and improving performance for large collections.          |
+
+---
+
+## **Best Practices**
+1. **Standardize Error Responses** – Use the schema above to ensure consistency across teams.
+2. **Log Request/Response Pairs** – Correlate client and server logs with `requestId`.
+3. **Monitor Key Metrics** – Track:
+   - Error rates (`5xx` responses).
+   - Latency percentiles (p50, p99).
+   - Rate limit hits (`429` errors).
+4. **Test Edge Cases** – Validate:
+   - Empty/malformed payloads.
+   - Race conditions (e.g., concurrent updates).
+   - Offline scenarios (network partition handling).
+5. **Use Feature Flags** – Disable problematic endpoints without deploying code.
+6. **Document Breaking Changes** – Clearly communicate API version updates.
+
+---
+
+## **Glossary**
+| **Term**               | **Definition**                                                                                     |
+|------------------------|-------------------------------------------------------------------------------------------------|
+| **Idempotency**        | Repeating the same request has the same effect as sending it once (e.g., `GET`, safe `POST`).  |
+| **Retry Token**        | A temporary token allowing a client to retry a failed request after a timeout.                  |
+| **Gateway Timeout**    | When a proxy/gateway waits too long for a response from a backend service.                     |
+| **CORS (Cross-Origin)**| Restriction on sending requests from one domain to another (configured via `Access-Control-Allow-Origin`). |
+| **Throttling**         | Limiting API requests per client/IP to prevent abuse (e.g., `429` errors).                     |
+| **Distributed Tracing**| Tracking a request as it traverses multiple services (e.g., using Jaeger or AWS X-Ray).       |
+
+---
+**End of Reference Guide.** For further reading, see the [REST API Design Patterns](pattern-collection.md) collection.

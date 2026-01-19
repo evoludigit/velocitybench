@@ -1,172 +1,215 @@
-# **[Pattern] Encryption Troubleshooting – Reference Guide**
+# **[Encryption Troubleshooting] Reference Guide**
 
 ---
 
 ## **Overview**
-Encryption Troubleshooting is a structured approach to diagnosing and resolving issues related to encrypted data, keys, and infrastructure components (e.g., TLS, VPNs, databases, or cloud storage). This guide covers common failure scenarios, validation techniques, and actionable steps to restore security and functionality. Whether troubleshooting key rotation failures, cipher mismatch errors, or connectivity issues with encrypted services, this pattern provides a systematic methodology for root-cause analysis and remediation.
+Encryption troubleshooting ensures secure data integrity and availability when encryption issues arise. This guide covers common encryption failures, diagnostic approaches, and remediation steps for symmetric, asymmetric, and key management problems. Use this pattern to validate encryption configurations, debug compromised keys, or resolve interoperability gaps in hybrid environments.
 
-Key objectives:
-- Validate encryption integrity (e.g., hashes, signatures).
-- Diagnose key management issues (e.g., revocation, rotation).
-- Resolve infrastructure misconfigurations (e.g., TLS handshake failures).
-- Ensure compliance with security policies post-fix.
+The guide is structured to help technical teams:
+- **Identify** root causes (e.g., misconfigured algorithms, expired keys, protocol mismatches).
+- **Validate** encrypted data integrity (hashing, digital signatures, or integrity checks).
+- **Recover** from failures (key rotation, fallback mechanisms, or cryptographic updates).
+- **Audit** encryption logs for anomalies (e.g., failed decryption attempts, unexpected rejections).
+
+For advanced users, this guide includes schema references for common encryption standards (AES, RSA, TLS), query examples for logging systems, and integrations with related patterns like *Key Rotation* and *Secure Key Management*.
 
 ---
 
 ## **Key Concepts & Implementation Details**
 
-| **Category**               | **Term**               | **Definition**                                                                                                                                                                                                 |
-|----------------------------|------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Encryption Layers**      | TLS Handshake          | Process where client/server authenticate via certificates and negotiate encryption (e.g., TLS 1.2/1.3).                                                                                                        |
-|                            | Key Rotation            | Process of replacing cryptographic keys (e.g., RSA, ECDH) to maintain security.                                                                                                                                    |
-|                            | Certificate Revocation | Invalidating keys/certificates via CRL (Certificate Revocation List) or OCSP (Online Certificate Status Protocol).                                                                                                |
-| **Validation Techniques**  | Hash Comparison         | Verifying file integrity using algorithms like SHA-256.                                                                                                                                                          |
-|                            | Decryption Test         | Attempting to decrypt data with suspect keys to confirm compromised access.                                                                                                                                   |
-| **Failure Scenarios**      | Cipher Mismatch        | Client/server use incompatible encryption algorithms (e.g., TLS_FALLBACK_SCSV).                                                                                                                                |
-|                            | Key Expiry              | Expired keys causing authentication failures (e.g., SSH, VPN).                                                                                                                                                 |
-|                            | Policy Violation        | Non-compliance with NIST/FIPS standards (e.g., weak encryption algorithms).                                                                                                                                      |
-| **Tools & Protocols**      | OpenSSL                 | Command-line tool for SSL/TLS testing (e.g., `openssl s_client`).                                                                                                                                              |
-|                            | Wireshark               | Network protocol analyzer for inspecting encrypted traffic (e.g., TLS packets).                                                                                                                                |
-|                            | Hashcat                 | Password/cracking tool for testing decryption vulnerabilities.                                                                                                                                                 |
+### **1. Common Encryption Failure Scenarios**
+| **Scenario**               | **Root Cause**                          | **Symptoms**                          | **Impact**                          |
+|----------------------------|----------------------------------------|---------------------------------------|-------------------------------------|
+| Failed decryption          | Expired key, wrong IV, corrupted data  | `DecryptError`, partial data         | Data unavailability                 |
+| Authenticaiton failure     | Invalid signature, HMAC mismatch      | `VerificationFailed` error           | Security breach risk                |
+| Protocol downgrade        | TLS_FALLBACK_SCSV rejection           | Connection reset, degraded security  | Vulnerability to known attacks      |
+| Key revocation             | Key in excluded list (e.g., CRL/OcSP)  | Access denied, `KeyRejected`         | Temporarily locked access           |
+| Performance degradation    | CPU-intensive cipher (e.g., RSA-ECB)   | High latency, resource exhaustion    | Poor user experience, DoS risk      |
+
+---
+
+### **2. Diagnostic Checklist**
+Before troubleshooting, verify:
+- **Correct algorithm selection**: Ensure the cipher (e.g., AES-256-GCM) matches requirements (e.g., FIPS 140-2 Level 3).
+- **Key material validity**: Check for expiration, corruption, or improper handling (e.g., zero-padding).
+- **Environment consistency**: Verify OS/crypto library versions (e.g., OpenSSL, Bouncy Castle) and platform support.
+- **Network transparency**: For TLS, rule out MITM attacks or proxy misconfigurations.
+
+---
+
+### **3. Troubleshooting Steps by Layer**
+
+#### **A. Key Management**
+| **Step**                     | **Action**                                      | **Tools/Commands**                     |
+|------------------------------|--------------------------------------------------|----------------------------------------|
+| **Verify key storage**       | Confirm keys are encrypted-at-rest (e.g., HSM, KMS). | `aws kms list-aliases`, `kubectl get secrets` |
+| **Check key rotation**       | Ensure keys are rotated per policy (e.g., every 90 days). | `openssl rsa -check -in private.pem`   |
+| **Audit key access logs**    | Review IAM policies or audit trails for unauthorized access. | `grep "kms:Decrypt" /var/log/auth.log` |
+| **Test key revocation**      | Simulate revocation and verify access denial.    | `curl --cacert revoked.crt https://target` |
+
+#### **B. Symmetric Encryption (AES, ChaCha20)**
+| **Issue**                    | **Debugging Command**                          | **Fix**                                |
+|------------------------------|------------------------------------------------|----------------------------------------|
+| Wrong IV length              | `echo "test" | openssl enc -aes-256-cbc -iv <IV> -nosalt` fails | Use `--iv-length 16` for AES-256-CBC. |
+| Corrupted payload            | `openssl dgst -sha256 -verify public.pem -signature signature.txt data.txt` fails | Re-encrypt data with correct padding. |
+| Performance bottleneck       | `perf stat -e cycles ./myapp` shows high CPU usage | Switch to ChaCha20-Poly1305 for lower overhead. |
+
+#### **C. Asymmetric Encryption (RSA, ECC)**
+| **Issue**                    | **Debugging Command**                          | **Fix**                                |
+|------------------------------|------------------------------------------------|----------------------------------------|
+| Weak modulus                 | `openssl rsa -pubin -in public.pem -text` shows <2048-bit key | Generate new key: `openssl genpkey -algorithm RSA -outform PEM -out key.pem -pkeyopt rsa_keygen_bits:4096`. |
+| Signature verification fail | `openssl dgst -sha256 -verify public.pem -signature sig.bin data.bin` fails | Ensure signature algorithm matches (e.g., RSASSA-PSS). |
+| Slow operations              | `openssl speed -evp rsa` shows poor performance | Use NIST P-256 (ECC) instead of RSA-2048. |
+
+#### **D. TLS/Transport Encryption**
+| **Issue**                    | **Debugging Command**                          | **Fix**                                |
+|------------------------------|------------------------------------------------|----------------------------------------|
+| TLS handshake failure        | `openssl s_client -connect example.com:443` shows `SSL handshake failed` | Check for cipher mismatch (`-cipher AES256-SHA`). |
+| Heartbleed vulnerability     | `openssl s_client -connect example.com:443 -bugs heartbleed` | Upgrade OpenSSL to 1.0.1g+.             |
+| Certificate chain invalid    | `openssl verify -CAfile root.ca.pem cert.pem` fails | Reissue certificate with full chain.   |
+| Session resumption failure   | `TLS session_id` not matching                  | Enable session tickets: `-session-tickets`. |
 
 ---
 
 ## **Schema Reference**
-Below are structured schemas for common encryption troubleshooting scenarios.
+### **1. Encryption Configuration Schema**
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EncryptionTroubleshootingConfig",
+  "type": "object",
+  "properties": {
+    "symmetric": {
+      "type": "object",
+      "properties": {
+        "algorithm": {"enum": ["AES-128-CBC", "AES-256-GCM", "ChaCha20-Poly1305"]},
+        "keySize": {"minimum": 16, "maximum": 32},
+        "ivLength": {"minimum": 12, "maximum": 16},
+        "padding": {"enum": ["PKCS7", "None"]}
+      }
+    },
+    "asymmetric": {
+      "type": "object",
+      "properties": {
+        "algorithm": {"enum": ["RSA", "ECDSA"]},
+        "keySize": {"minimum": 2048, "maximum": 8192},
+        "signatureScheme": {"enum": ["PS384", "RSAPSS"]}
+      }
+    },
+    "tls": {
+      "type": "object",
+      "properties": {
+        "version": {"enum": ["TLSv1.2", "TLSv1.3"]},
+        "ciphers": {"type": "array", "items": {"type": "string"}},
+        "certificateChain": {"type": "array", "items": {"type": "string"}},
+        "sessionTimeout": {"type": "integer", "minimum": 300}
+      }
+    },
+    "keyManagement": {
+      "type": "object",
+      "properties": {
+        "rotationPolicy": {"enum": ["Manual", "Automatic"]},
+        "expiryWarning": {"type": "integer", "minimum": 7},
+        "recoveryProcedures": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  },
+  "required": ["symmetric", "keyManagement"]
+}
+```
 
-| **Scenario**               | **Fields**                                                                 | **Description**                                                                                                                                                                                                 |
-|----------------------------|-----------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **TLS Handshake Failure**  | `ClientVersion`, `ServerVersion`, `CipherSuite`, `Protocol`, `ErrorCode`   | Logs from `openssl s_client -connect example.com:443 -showcerts`.                                                                                                                                       |
-| **Key Rotation Log**       | `KeyID`, `OldKey`, `NewKey`, `RotationTime`, `Status`                     | Audit trail for key replacements (e.g., AWS KMS, HashiCorp Vault).                                                                                                                                        |
-| **Certificate Revocation** | `Subject`, `Issuer`, `RevocationReason`, `RevokedAt`, `CRL/OCSP URL`      | Output from `openssl crl -text -in crl.pem` or OCSP response validation.                                                                                                                                   |
-| **Decryption Test Result** | `InputData`, `KeyUsed`, `Success/Failure`, `ErrorMessage`                 | Result from `openssl enc -d -aes-256-cbc -in data.enc -out decrypted.txt`.                                                                                                                               |
+---
+
+### **2. Common Logging Schema for Encryption Events**
+```json
+{
+  "encryptionEvent": {
+    "timestamp": "ISO8601",
+    "type": ["DecryptError", "KeyRotation", "TLSHandshake"],
+    "source": "string", // e.g., "KMS", "AppService"
+    "details": {
+      "statusCode": "string", // e.g., "403 Forbidden"
+      "error": "string",     // e.g., "InvalidSignature"
+      "metadata": {
+        "keyId": "string",
+        "algorithm": "string",
+        "durationMs": "integer"
+      }
+    },
+    "severity": ["INFO", "WARNING", "ERROR", "CRITICAL"]
+  }
+}
+```
 
 ---
 
 ## **Query Examples**
-Use these commands and queries to diagnose encryption issues.
-
-### **1. TLS Handshake Testing**
+### **1. Grep for Decryption Failures (Linux)**
 ```bash
-# Check supported ciphers and TLS versions
-openssl s_client -connect example.com:443 -showcerts -tls1_2 -no_ign_eof
-
-# Debug handshake failures (verbose output)
-openssl s_client -connect example.com:443 -debug -msg
+# Search logs for failed decryption in JSON format
+grep -E '"type":"DecryptError"' /var/log/app.log | jq '.details.error'
 ```
-**Expected Output:**
-```plaintext
-Protocol: TLSv1.2
-Cipher: ECDHE-RSA-AES256-GCM-SHA384
-Verification: OK (success)
----
+**Output:**
 ```
-**Common Errors:**
-- `SSL_handshake_failure` → Cipher mismatch (e.g., server only supports TLS 1.3, client defaulted to 1.2).
-- `unable_to_get_local_issuer_certificate` → Missing intermediate CA in certificate chain.
+"InvalidSignature"
+"KeyRejected"
+```
 
----
+### **2. Monitor TLS Handshake Failures (Prometheus)**
+```promql
+# Alert if TLS handshake errors exceed threshold
+sum(rate(tls_handshake_errors_total[5m])) by (service) > 10
+```
 
-### **2. Key Rotation Validation**
+### **3. Audit Key Access (AWS KMS)**
 ```bash
-# List active keys in AWS KMS (via CLI)
-aws kms list-aliases --query 'Aliases[?starts_with(KeyId, `alias/aws/`)].KeyId'
-
-# Check key status (e.g., enabled/disabled)
-aws kms describe-key --key-id alias/my-key --query 'Enabled'
+# List recent KMS decrypt operations
+aws kms list-keys | jq -r '.Keys[].KeyId'
+aws kms get-key-usage --key-id <ARN> | grep "RotationEnabled"
 ```
-**Expected Output:**
-```json
-{
-  "Enabled": true,
-  "KeyCreationDate": "2023-01-01T00:00:00Z"
-}
-```
-**Troubleshooting Steps:**
-1. Verify new key is imported to HSM/software module.
-2. Update applications/services to reference the new key (e.g., via IAM policies).
 
----
-
-### **3. Certificate Revocation Check**
+### **4. Verify Certificate Chain (OpenSSL)**
 ```bash
-# Validate OCSP response
-openssl ocsp -issuer ca.crt -cert client.crt -url http://ocsp.example.com
-
-# Check CRL for revoked certificates
-openssl crl -text -in crl.pem | grep -i "revoked"
+# Check if intermediate CA is missing
+openssl verify -CAfile root.ca.pem client.crt
 ```
-**Expected Output:**
-```plaintext
-Certificate Revocation List (CRL):
-    Last Update: Nov 15 12:00:00 2023 UTC
-    Next Update: Dec 15 12:00:00 2023 UTC
-    Revoked Certificates:
-        Serial Number: 0123456789 (Revoked)
-            Revocation Date: Oct 15 09:00:00 2023 UTC
+**Output if invalid:**
 ```
-**Resolution:**
-- Reissue certificates or update internal CRL caches.
-
----
-
-### **4. Decryption Test**
-```bash
-# Decrypt a file with a suspect key
-openssl enc -d -aes-256-cbc -in encrypted.bin -out decrypted.bin -pass pass:testkey
-
-# Verify hash integrity (e.g., SHA-256)
-sha256sum decrypted.bin
+error 20 at 0 depth lookup: unable to get local issuer certificate
 ```
-**Expected Output (`openssl`):**
-```plaintext
-Decrypted output written to decrypted.bin
-```
-**Common Errors:**
-- `decryption failed` → Incorrect key or corrupted data.
-- `bad decrypt` → Key may be revoked or expired.
-
----
-
-## **Step-by-Step Troubleshooting Flowchart**
-1. **Symptom Identification**
-   - *Symptom*: Connection refused over VPN.
-     → Check: Key expiry, firewall rules, or TLS misconfiguration.
-   - *Symptom*: "Permission denied" during decryption.
-     → Check: Key permissions (e.g., `chmod 400 private_key.pem`).
-
-2. **Validation**
-   - **TLS**: Use `openssl` to verify cipher negotiation.
-   - **Keys**: Run `aws kms describe-key` or `vault kv get secrets/key`.
-   - **Data Integrity**: Compare hashes (`sha256sum`).
-
-3. **Remediation**
-   | **Issue**               | **Action**                                                                 |
-   |-------------------------|----------------------------------------------------------------------------|
-   | Expired Key              | Rotate key via KMS/Vault; update consumers.                                |
-   | Cipher Mismatch          | Update client/server to support overlapping ciphers (e.g., TLS 1.2+).      |
-   | Revoked Certificate      | Reissue via CA; push updated certificates to services.                     |
-   | Policy Violation         | Audit with `nmap -sV --script ssl-enum-ciphers`; enforce FIPS-compliant algs.|
-
-4. **Testing**
-   - Reproduce fix in staging (e.g., `kubectl exec` for containerized apps).
-   - Monitor for rollback risks (e.g., `journalctl -u nginx` for TLS errors).
 
 ---
 
 ## **Related Patterns**
-| **Pattern**                     | **Description**                                                                                     | **When to Use**                                                                                     |
-|----------------------------------|-----------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
-| **Key Management Automation**    | Automates key rotation and revocation using tools like HashiCorp Vault or AWS KMS.                   | When manual key management is error-prone or scaling beyond 100 keys.                                |
-| **Zero-Trust Networking**        | Implements mutual TLS (mTLS) for service-to-service authentication.                                   | For microservices architectures requiring granular access control.                                   |
-| **Compliance Auditing**          | Uses tools like OpenSCAP to validate encryption policies against NIST/FIPS standards.                 | During regulatory audits or infrastructure migrations.                                               |
-| **Data Residency Controls**      | Encrypts data at rest using customer-managed keys (CMKs) in cloud providers.                          | For industries with strict data sovereignty requirements (e.g., GDPR).                               |
-| **Quantum-Resistant Encryption**| Evaluates post-quantum algorithms (e.g., Kyber, Dilithium) for long-term security.                  | Future-proofing cryptographic systems against quantum computing threats.                              |
+| **Pattern**                     | **Description**                                                                 | **Integration Points**                          |
+|---------------------------------|---------------------------------------------------------------------------------|--------------------------------------------------|
+| **[Secure Key Rotation]**       | Automates key replacement and revocation policies.                              | Uses `EncryptionTroubleshooting` to validate rotation impact. |
+| **[Zero-Trust Networking]**     | Enforces mutual TLS (mTLS) for service-to-service communication.               | Leverages TLS debugging from this pattern.     |
+| **[Data Masking]**              | Anonymizes data for testing while preserving encryption.                       | Integrates with symmetric encryption troubleshooting. |
+| **[Cryptographic Agility]**     | Supports algorithm upgrades (e.g., AES-384).                                  | Uses schema validation from this pattern.       |
+| **[Audit Logging]**             | Centralizes encryption-related events for compliance.                           | Ingests logs from `encryptionEvent` schema.      |
 
 ---
 
 ## **Best Practices**
-1. **Logging**: Enable TLS handshake logs in web servers (e.g., Apache `LogLevel debug`).
-2. **Testing**: Use `sniptest` (TLS vulnerability scanner) to validate configurations pre-deployment.
-3. **Documentation**: Maintain a runbook for key recovery procedures (e.g., AWS KMS backup keys).
-4. **Alerting**: Set up alerts for key expiry (e.g., AWS CloudTrail + SNS for KMS events).
+1. **Isolate Encryption Failures**:
+   - Test decryption locally before assuming environment issues.
+   - Use `stress-testing` tools like `wrk` for TLS performance.
+
+2. **Leverage Observability**:
+   - Correlate encryption logs with application metrics (e.g., latency spikes during key rotation).
+   - Set up alerts for `KeyRejected` or `DecryptError` events.
+
+3. **Plan for Downgrades**:
+   - Maintain backward compatibility (e.g., support TLS 1.2 even during migrations to 1.3).
+   - Document fallback mechanisms (e.g., manual key recovery).
+
+4. **Compliance Checklists**:
+   - Audit against regulations like **NIST SP 800-57** (cryptographic module validation) or **GDPR** (data integrity).
+
+5. **Documentation**:
+   - Include encryption-specific troubleshooting in runbooks (e.g., "Failed decryption: Check IV length").
+   - Use **chef cookbooks** or **Ansible roles** for consistent cryptographic configurations.
+
+---
+**Note**: For production environments, combine this pattern with *Chaos Engineering* to test encryption resilience under load.

@@ -1,277 +1,206 @@
-# **[Pattern] Performance Troubleshooting Reference Guide**
+# **[Pattern] Performance Troubleshooting – Reference Guide**
 
 ---
 
-## **Overview**
-Performance Troubleshooting is a structured **multi-step debugging pattern** designed to identify and resolve inefficiencies in applications, databases, infrastructure, or systems. This pattern provides a **methodical process** to measure, analyze, and optimize performance bottlenecks using tools, metrics, and best practices. It applies to **high-latency issues, resource starvation, or suboptimal configurations** in microservices, monoliths, cloud-native workloads, or legacy systems.
+## **1. Overview**
+Performance troubleshooting is a structured approach to identifying, diagnosing, and resolving bottlenecks in application, system, or infrastructure performance. This pattern provides a systematic methodology to:
+- **Measure** baseline and real-time performance metrics.
+- **Isolate** root causes (e.g., CPU overload, I/O saturation, latency spikes).
+- **Optimize** configurations, code, or dependencies.
+- **Validate** fixes using repeatable testing.
 
-Key objectives:
-- **Isolate** performance degradation to specific layers (e.g., CPU, memory, I/O, network).
-- **Quantify** bottlenecks using metrics (e.g., response time, throughput, error rates).
-- **Propose** remediation strategies (e.g., code tuning, hardware scaling, or architectural changes).
-- **Validate** fixes with controlled experiments.
-
-This guide covers **concepts, schematic workflows, common tools, and actionable steps** to apply the pattern effectively.
+Unlike reactive debugging, performance troubleshooting focuses on **proactive analysis**, leveraging logging, monitoring, and profiling tools. It applies across domains: web apps, databases, microservices, and cloud workloads.
 
 ---
 
-## **Key Concepts & Implementation Details**
+## **2. Key Concepts & Implementation Details**
 
-### **1. Performance Bottleneck Layers**
-Performance issues typically arise in one or more of these layers:
+### **2.1. Performance Metrics**
+| **Category**       | **Metrics**                          | **Tools** Example                     | **Target Threshold**                     |
+|--------------------|--------------------------------------|---------------------------------------|------------------------------------------|
+| **System**         | CPU %, Memory Usage, Disk I/O       | `top`, `vmstat`, `iostat`            | CPU < 80%, Mem < 90%, Disk I/O < 1000 ops/s |
+| **Network**        | Latency (P99), Throughput, Packets/sec | `ping`, `netdata`, `Wireshark`       | Latency < 200ms, Throughput > 90% baseline |
+| **Application**    | Response Time (P99), Error Rate     | APM (AppDynamics, New Relic), APM     | P99 RT < 500ms, Error Rate < 1%          |
+| **Database**       | Query Execution Time, Lock Contention | `EXPLAIN ANALYZE`, `pg_stat`, `Slow Query Log` | Avg QRT < 100ms, Lock Waits < 0.5%      |
 
-| **Layer**          | **Common Metrics**                          | **Tools/Techniques**                          | **Example Issues**                          |
-|--------------------|--------------------------------------------|-----------------------------------------------|--------------------------------------------|
-| **Application Code** | CPU%, Memory usage, GC pauses, Thread pool saturation | Profiler (YourKit, JProfiler), APM (New Relic, Datadog) | High GC overhead, inefficient loops, blocking I/O |
-| **Database**        | Query execution time, lock contention, slow joins | EXPLAIN plans, slow query logs, APM DB monitoring | Unindexed queries, N+1 problem, connection leaks |
-| **Network**         | Latency (RTT), Throughput, Packet loss      | `ping`, `traceroute`, Wireshark, Load testing (k6, JMeter) | High TCP retries, DNS resolution delays |
-| **Storage (Disk)**  | I/O ops/sec, Latency (SSD vs HDD), Cache hit ratio | `iostat`, `vmstat`, `dstat`, CloudWatch Metrics | Full table scans, fragmented disks, slow storage backend |
-| **Memory**          | Heap usage, Swapping, Leaks                | `top`, `free`, Heap dump analysis (Eclipse MAT) | OOM crashes, excessive string duplication |
-| **Hardware**        | CPU cores, RAM, GPU utilization           | `htop`, `nmon`, Cloud provider metrics       | CPU throttling, insufficient vCPUs |
-| **Load Balancer/Proxy** | Request rate, Error 5xx, Timeout rates     | ELB logs, Nginx/Apache metrics, APM            | LB starvation, misconfigured rate limiting |
-| **Container/Orchestration** | Pod restarts, CPU throttling, evictions | Kubernetes metrics (Prometheus), cAdvisor | Noisy neighbor problem, insufficient limits |
+**Note:** Thresholds depend on SLAs (e.g., 99th percentile latency for user-facing apps).
 
 ---
 
-### **2. Performance Troubleshooting Workflow**
-Use this **step-by-step schema** to diagnose bottlenecks systematically:
+### **2.2. Troubleshooting Workflow**
 
-#### **Schema Reference**
-| **Step**       | **Action**                                                                 | **Output**                                                                 | **Tools/Queries**                                                                 |
-|----------------|---------------------------------------------------------------------------|---------------------------------------------------------------------------|----------------------------------------------------------------------------------|
-| **1. Observe** | Collect baseline metrics (before/after changes).                          | Metrics dashboard (Prometheus, Grafana), APM traces.                     | `prometheus query`, `kubectl top pods`, `New Relic APM` dashboard.               |
-| **2. Isolate** | Narrow down to a **suspect layer** (e.g., high CPU in DB or slow API calls). | Suspect components (e.g., `/api/v1/search` taking 2s avg).               | APM traces, distributed tracing (Jaeger, OpenTelemetry).                          |
-| **3. Drill Down** | Dive deeper into the suspect layer (e.g., slow DB query).                  | Root cause (e.g., missing index on `products.category_id`).              | `EXPLAIN ANALYZE`, slow query logs, CPU profiling.                                |
-| **4. Hypothesize** | Formulate **testable hypotheses** (e.g., "Query X is slow due to lack of index"). | Hypothesis statement + expected impact.                                  | Reproduce issue with synthetic load (Locust, k6).                                |
-| **5. Validate** | Test changes in a **staging environment**.                                 | Before/after metrics comparison.                                           | A/B testing, canary deployments, feature flags.                                   |
-| **6. Deploy**   | Apply fix to production with **rollout monitoring**.                      | Zero downtime, automated rollback if metrics degrade.                     | Feature flags, blue-green deployment.                                           |
-| **7. Review**   | Document lessons learned + performance budget.                            | Runbook, SLOs, post-mortem template.                                        | Slack/Confluence notes, SRE playbooks.                                            |
+#### **Phase 1: Observation & Hypothesis**
+1. **Symptoms**: Describe observed issues (e.g., "API responses slow at 3 PM").
+2. **Data Collection**:
+   - **Logs**: Filter for errors/warnings (e.g., `grep "ERROR" /var/log/app.log | tail -n 50`).
+   - **Metrics**: Correlate with tooling (e.g., Prometheus + Grafana).
+   - **Profiling**: Use CPU/memory profilers (e.g., `pprof`, Java Flight Recorder).
+3. **Hypotheses**: Propose root causes (e.g., "High GC pauses due to memory leaks").
+
+#### **Phase 2: Isolation**
+- **Eliminate Noise**: Rule out external factors (e.g., spikes in CDN traffic).
+- **Reproduce**: Simulate conditions (e.g., load test with `locust` or `k6`).
+- **Isolate Components**: Check dependencies (e.g., database queries, external APIs).
+
+**Example Isolation Steps**:
+```bash
+# Check DB query performance
+EXPLAIN ANALYZE SELECT * FROM orders WHERE user_id = 123;
+
+# Monitor network latency to a backend
+tcpdump -i eth0 host backend-api -c 100 | wc -l
+```
+
+#### **Phase 3: Optimization**
+- **System-Level**:
+  - Tune OS settings (e.g., `vm.swappiness=10` in `/etc/sysctl.conf`).
+  - Optimize storage (e.g., SSDs for I/O-bound workloads).
+- **Application-Level**:
+  - Code refactoring (e.g., avoid N+1 queries).
+  - Caching (Redis, CDN).
+- **Infrastructure-Level**:
+  - Scale horizontally (add replicas) or vertically (upgrade nodes).
+
+#### **Phase 4: Validation**
+- **Baseline Comparison**: Compare metrics before/after fixes.
+- **A/B Testing**: Deploy changes to a subset of users.
+- **Automated Alerts**: Set up alerts for regression detection (e.g., Prometheus alerts).
 
 ---
 
-## **Query Examples**
-### **1. Database Bottleneck Analysis**
-**Problem:** Slow `SELECT * FROM orders WHERE customer_id = ?` (avg 1.2s).
+## **3. Schema Reference**
 
-#### **Step 1: Check Query Plan**
+### **3.1. Performance Incident Template**
+| **Field**               | **Type**      | **Description**                                                                 | **Example**                          |
+|-------------------------|---------------|---------------------------------------------------------------------------------|--------------------------------------|
+| `incident_id`           | String        | Unique identifier for the issue.                                                | `PERF-2023-045`                     |
+| `timestamp`             | Datetime      | When the issue was reported/observed.                                           | `2023-10-15T14:30:00Z`              |
+| `component`             | String        | Affected system (e.g., `backend-service`, `database`).                          | `payment-service`                    |
+| `severity`              | Enum          | Critical/High/Medium/Low.                                                      | `High`                               |
+| `metrics_affected`      | Array         | Affected metrics (from Schema 2.1).                                            | `["latency_p99", "cpu_usage"]`       |
+| `root_cause`            | String        | Hypothesis or confirmed cause.                                                  | `Blocking queries due to missing index`|
+| `resolution`            | String        | Steps taken to fix (e.g., "Added index on `user_id`").                          | `"Enabled Redis caching for orders API"`|
+| `validation_method`     | String        | How fix was verified (e.g., "Load test with 10K RPS").                           | `" Compared P99 latency pre/post-fix"`|
+| `status`                | String        | `Open`, `In Progress`, `Resolved`, `Closed`.                                  | `Resolved`                           |
+| `affected_users`        | Integer       | Number of end users impacted.                                                   | `5000`                               |
+
+---
+
+### **3.2. Query Performance Report Schema**
+| **Field**               | **Type**      | **Description**                                                                 |
+|-------------------------|---------------|---------------------------------------------------------------------------------|
+| `query_id`              | String        | Unique query identifier (e.g., transaction ID).                                |
+| `sql`                   | String        | Raw SQL query.                                                                  |
+| `execution_time_ms`     | Float         | Time taken (milliseconds).                                                       |
+| `rows_processed`        | Integer       | Number of rows fetched.                                                          |
+| `lock_contention`       | Float         | % of time spent waiting for locks.                                              |
+| `cache_hit_ratio`       | Float         | % of queries served from cache.                                                 |
+| `database_version`      | String        | DBMS version (e.g., `PostgreSQL 15.3`).                                         |
+| `environment`           | String        | `dev`, `staging`, `prod`.                                                       |
+
+---
+## **4. Query Examples**
+
+### **4.1. Database Query Analysis**
+**Problem**: Slow `SELECT * FROM users WHERE email = ?`.
+**Tools**: PostgreSQL `EXPLAIN ANALYZE`.
+
 ```sql
--- PostgreSQL
-EXPLAIN ANALYZE SELECT * FROM orders WHERE customer_id = 12345;
+-- Check query plan
+EXPLAIN ANALYZE SELECT * FROM users WHERE email = 'user@example.com';
+
+-- Sample output (identify bottlenecks like sequential scans)
+QUERY PLAN
+-------------------------------------------------------
+Seq Scan on users  (cost=0.00..1.04 rows=1 width=72) (actual time=0.015..0.015 rows=1 loops=1)
+  Filter: (email = 'user@example.com'::text)
+  Rows Removed by Filter: 10000
 ```
-**Expected Output:**
-```
-Seq Scan on orders  (cost=0.15..8.17 rows=1 width=80) (actual time=1234.56..1234.56 rows=1 loops=1)
-```
-**→** Full table scan → **Add index:**
+**Fix**: Add a composite index:
 ```sql
-CREATE INDEX idx_orders_customer_id ON orders(customer_id);
-```
-
-#### **Step 2: Verify Fix**
-```sql
-EXPLAIN ANALYZE SELECT * FROM orders WHERE customer_id = 12345;
-```
-**Expected Output:**
-```
-Index Scan using idx_orders_customer_id on orders  (cost=0.15..8.17 rows=1 width=80) (actual time=0.50..0.50 rows=1 loops=1)
+CREATE INDEX idx_users_email ON users(email);
 ```
 
 ---
 
-### **2. Application-Level CPU Profiling**
-**Problem:** High CPU usage in a Java application (90% utilization).
+### **4.2. Network Latency Diagnosis**
+**Problem**: High latency to `api.external.com`.
+**Tools**: `mtr` (matrix ping) or `ping + tcpdump`.
 
-#### **Step 1: Use JStack to Identify Threads**
 ```bash
-jstack <pid> | grep "native"  # Look for blocked threads
-```
-#### **Step 2: Profile with YourKit**
-1. Attach YourKit profiler to the process.
-2. Run a load test (`ab -n 1000 -c 50 http://localhost/api`).
-3. Analyze **CPU profiles** for slow methods.
+# Install mtr
+sudo apt install mtr
 
-**Example Output:**
+# Trace route + latency
+mtr api.external.com
+
+# Check packet loss/delay
+api.external.com     100.0%  |    --  1.2 ms    0.8 ms    1.1 ms
+                         0.0%  |    --  2.5 ms    2.3 ms    2.4 ms
 ```
-Method Name               | Time (%) | Calls
---------------------------|----------|-------
-com.example.service.OrderService.findById | 60%     | 500
-```
-**→** Optimize `OrderService.findById` (e.g., cache results).
+**Fix**: Escalate to network team if TTL hops > 15 or packet loss > 1%.
 
 ---
 
-### **3. Network Latency Investigation**
-**Problem:** High latency for `/api/users` (avg 800ms).
+### **4.3. CPU Profiling (Python Example)**
+**Problem**: Slow Python script (`app.py`).
+**Tools**: `cProfile`.
 
-#### **Step 1: Use `traceroute`**
-```bash
-traceroute api.example.com
+```python
+# Run with profiling
+python -m cProfile -s cumulative app.py
 ```
-**Expected Output:**
+**Output**:
 ```
-1  * * *
-2  api.example.com (10.0.0.1)  400ms
-```
-**→** Latency spike at step 2 → Investigate **CDN/LB** or **DNS propagation**.
+         1200 function calls in 4.234 seconds
 
-#### **Step 2: Use `curl -v` for HTTP Inspection**
-```bash
-curl -v -o /dev/null http://api.example.com/users
-```
-**Look for:**
-- `> GET /users HTTP/1.1` → `HTTP/1.1 200 OK` (total time)
-- Slowest hop (e.g., 500ms DNS, 300ms TLS).
+   Ordered by: cumulative time
 
-#### **Step 3: Load Test with k6**
-```javascript
-// script.js
-import http from 'k6/http';
-
-export default function () {
-  http.get('http://api.example.com/users');
-}
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    4.234    4.234 app.py:5(main)
+        1    0.000    0.000    4.234    4.234 app.py:10(_process_data)
+   1200    0.000    0.000    4.233    0.003 {built-in method builtins.range}
 ```
-Run with:
-```bash
-k6 run --vus 100 --duration 30s script.js
-```
-**Expected Output:**
-```
-Duration: 30s
-Requests: 3000
-Avg RTT: 850ms (should reduce to <500ms after fix)
-```
+**Fix**: Optimize `_process_data` (e.g., use `pandas` for vectorized operations).
 
 ---
 
-### **4. Memory Leak Detection**
-**Problem:** Java app crashes with `OutOfMemoryError` after 48h.
-
-#### **Step 1: Generate Heap Dump**
-```bash
-jmap -dump:format=b,file=heap.hprof <pid>
-```
-#### **Step 2: Analyze with Eclipse MAT**
-1. Open `heap.hprof` in **Eclipse MAT**.
-2. Navigate to **Dominator Tree** → Large objects (e.g., `"java.util.ArrayList"`).
-3. **Suspicious Patterns:**
-   - Unclosed streams (e.g., `java.io.FileInputStream`).
-   - Cached data not invalidated (e.g., `ConcurrentHashMap` growth).
-
-**Fix Example:**
-```java
-// Before (leak)
-public class Cache {
-  private static Map<String, User> cache = new HashMap<>();
-}
-
-// After (fixed)
-public class Cache {
-  private static Map<String, User> cache = new WeakHashMap<>();
-}
-```
+## **5. Related Patterns**
+| **Pattern**                     | **Description**                                                                 | **When to Use**                                  |
+|----------------------------------|---------------------------------------------------------------------------------|---------------------------------------------------|
+| **[Observability](Pattern)**     | Centralized logging, metrics, and tracing for visibility.                       | When you need real-time monitoring.                |
+| **[Load Testing](Pattern)**      | Simulate production traffic to find bottlenecks.                                | Before deployments or under heavy load.           |
+| **[Caching](Pattern)**           | Reduce database/API latency with in-memory stores.                              | For read-heavy or repetitive queries.              |
+| **[Auto-Scaling](Pattern)**      | Dynamically adjust resources based on demand.                                   | For unpredictable workloads.                     |
+| **[Database Indexing](Pattern)** | Optimize query performance with indexes.                                       | When SQL queries are slow due to full table scans. |
 
 ---
 
-## **Related Patterns**
-| **Pattern**                     | **Purpose**                                                                 | **When to Use**                                                                 |
-|----------------------------------|-----------------------------------------------------------------------------|---------------------------------------------------------------------------------|
-| **[Observability]**               | Design systems for **metrics, logs, traces**.                               | When building **new services** or migrating to cloud.                           |
-| **[Load Testing]**                | Simulate traffic to **validate performance under load**.                    | Before **production deployments** or major feature releases.                     |
-| **[Caching Strategies]**          | Reduce database/API calls with **in-memory caching**.                       | When **slow queries** or **high read loads** are identified.                     |
-| **[Asynchronous Processing]**     | Offload work to **message queues (Kafka, SQS)**.                          | When **long-running tasks** block HTTP responses.                                |
-| **[Auto-Scaling]**                | Dynamically adjust **compute resources** based on load.                    | For **spiky workloads** (e.g., e-commerce during Black Friday).                  |
-| **[Database Sharding]**           | Split **database load** across multiple instances.                          | When **single DB becomes a bottleneck** (e.g., >10k RPS).                       |
-| **[Retry & Circuit Breakers]**    | Handle **failure gracefully** with retries and fallback.                    | For **external API dependencies** with high failure rates.                      |
+## **6. Best Practices**
+1. **Instrument Early**: Add metrics/logging from development.
+2. **Define SLIs/SLOs**: Set clear performance targets (e.g., "99% of requests < 300ms").
+3. **Automate Alerts**: Use tools like Prometheus + Alertmanager for proactive detection.
+4. **Profile Regularly**: Run performance tests post-deployment (e.g., "Smoke Tests" with synthetic traffic).
+5. **Document Fixes**: Update runbooks with reproducibility steps (e.g., "Fix: Added index `idx_user_email`").
+6. **Isolate Environments**: Ensure staging mirrors production (e.g., same DB version, OS).
 
 ---
-
-## **Best Practices**
-1. **Start with Metrics:**
-   - Use **Prometheus/Grafana** for real-time dashboards.
-   - Set **SLOs (Service Level Objectives)** (e.g., "95% of API calls <500ms").
-
-2. **Reproduce Issues Locally:**
-   - Use **Docker Compose** to mimic production environments.
-   - Example:
-     ```yaml
-     # docker-compose.yml
-     services:
-       db:
-         image: postgres
-         environment:
-           POSTGRES_PASSWORD: example
-       app:
-         image: my-app
-         depends_on: [db]
-         environment:
-           DB_URL: jdbc:postgresql://db:5432/mydb
-     ```
-
-3. **Isolate Changes:**
-   - Test fixes in **staging first** (use **feature flags**).
-   - Example (Java):
-     ```java
-     if (System.getenv("FEATURE_TURBO_MODE") != null) {
-       // Optimized code path
-     } else {
-       // Original code path
-     }
-     ```
-
-4. **Document Everything:**
-   - Keep a **runbook** for recurring issues (e.g., "How to fix slow login API").
-   - Example template:
-     ```
-     [Issue] High latency in /login (2023-10-01)
-     - Root Cause: Missing index on `users.email`.
-     - Fix: Run `CREATE INDEX idx_users_email ON users(email)`.
-     - Impact: Reduced latency from 800ms → 50ms.
-     ```
-
-5. **Automate Alerting:**
-   - Set up **alerts** for:
-     - `http_request_duration > 1s` (Prometheus alert rule).
-     - `db.query_time > 2s` (CloudWatch alarm).
-   - Example Prometheus rule:
-     ```yaml
-     - alert: HighApiLatency
-       expr: histogram_quantile(0.95, sum(rate(http_request_duration_bucket[5m])) by (le, route)) > 1000
-       for: 5m
-       labels:
-         severity: warning
-       annotations:
-         summary: "High latency on {{ $labels.route }}" (95th percentile {{ $value }}ms)
-     ```
-
-6. **Plan for Scale Early:**
-   - **Database:** Use **read replicas** for read-heavy workloads.
-   - **App:** Implement **circuit breakers** (e.g., Resilience4j).
-   - **Storage:** Move to **SSDs** or **distributed storage** (e.g., S3, Ceph).
+## **7. Tools Cheat Sheet**
+| **Category**       | **Tool**               | **Use Case**                                  | **Example Command**                     |
+|--------------------|------------------------|-----------------------------------------------|------------------------------------------|
+| **Logging**        | ELK Stack (Elasticsearch, Logstash, Kibana) | Centralized log analysis.                    | `logstash input { stdin { codec => plain { charset => "UTF-8" } } }` |
+| **Metrics**        | Prometheus + Grafana   | Time-series monitoring.                       | `prometheus --web.listen-address=:9090`   |
+| **APM**            | New Relic / Datadog    | Application performance monitoring.          | `datadog-agent service`                  |
+| **Profiling**      | `pprof` (Go), JFR (Java)| CPU/memory profiling.                         | `pprof http://localhost:6060/debug/pprof` |
+| **Database**       | `pgBadger` (PostgreSQL)| Query analysis/reports.                        | `pgbadger logfile.sql.gz > report.html`  |
+| **Load Testing**   | Locust / k6            | Simulate traffic.                             | `locust -f locustfile.py`               |
 
 ---
-
-## **Common Pitfalls**
-| **Pitfall**                          | **Solution**                                                                 |
-|---------------------------------------|------------------------------------------------------------------------------|
-| **Blindly optimizing without data**   | Always **measure first** (use profiling tools).                             |
-| **Ignoring the "tail" (99th percentile)** | Focus on **P99 latency**, not just averages.                               |
-| **Over-tuning for edge cases**       | Balance **performance** with **code readability**.                          |
-| **Not testing in production-like env** | Use **staging with identical infra** (e.g., same DB version, OS).          |
-| **Rolling back too late**             | Implement **canary releases** and **automated rollback** on metric degradation. |
-| **Forgetting cold starts**            | Pre-warm caches or use **serverless optimizations** (e.g., Provisioned Concurrency). |
+## **8. Common Pitfalls**
+- **Ignoring the 99th Percentile**: Focusing only on averages can hide outliers.
+- **Over-Optimizing Prematurely**: Profile before refactoring (e.g., don’t optimize a rarely used function).
+- **Silos**: Isolate teams (e.g., frontend vs. backend) can delay fixes.
+- **False Positives**: Correlate metrics with business impact (e.g., "High CPU" but no user impact).
 
 ---
-## **Further Reading**
-- **Books:**
-  - *Site Reliability Engineering* (Google SRE Book) – [Link](https://sre.google/sre-book/)
-  - *Production-Ready Microservices* – Chris Richardson
-- **Tools:**
-  - [Prometheus Documentation](https://prometheus.io/docs/introduction/overview/)
-  - [OpenTelemetry Guide](https://opentelemetry.io/docs/)
-  - [Kubernetes Performance Tuning](https://kubernetes.io/docs/tasks/debug-application-cluster/debugging-performance/)
-- **Talks:**
-  - [How Google Scales to 10^8 QPS](https://www.youtube.com/watch?v=wFIka9XQnwU) (Google I/O 2016)
-
----
-**End of Guide.** For feedback or contributions, open an issue in the [documentation repo](LINK).
+**Appendix**: Glossary of terms like **P99 Latency**, **Throughput**, **GC Pause**, **Blocking Query**.

@@ -1,221 +1,155 @@
----
-# **[Pattern] Failover Troubleshooting – Reference Guide**
+# **[Pattern] Failover Troubleshooting Reference Guide**
 
 ---
 
 ## **Overview**
-The **Failover Troubleshooting** pattern ensures system reliability by diagnosing and resolving issues when a primary component (e.g., server, service, or network) fails and falls back to a secondary (backup) resource. This guide outlines methodologies for logging, diagnosing, and mitigating failover failures, covering manual and automated approaches.
-
-Effective failover troubleshooting requires structured logging (e.g., error codes, timestamps), dependency mapping (e.g., DB connections, API endpoints), and systematic rollback procedures. The pattern integrates with **Observability** (logging/metrics) and **Resilience** (retry/logic) patterns to reduce downtime and improve Mean Time to Recovery (MTTR).
+The **Failover Troubleshooting** pattern ensures system resilience by diagnosing and resolving failures when a primary component (e.g., a service, database, or node) transitions to a backup (secondary) component. This guide outlines key concepts, diagnostic approaches, and best practices for identifying root causes of failover failures, verifying secondary components, and restoring full functionality. Adaptable to cloud, on-premises, or hybrid architectures, this pattern applies to services like databases (PostgreSQL, Kubernetes), microservices, and distributed systems.
 
 ---
 
-## **Implementation Details**
+## **Key Concepts & Schema Reference**
 
-### **1. Key Concepts**
-| Concept               | Description                                                                                     |
-|-----------------------|-------------------------------------------------------------------------------------------------|
-| **Primary/Secondary** | Active (primary) and standby (secondary) components that take over in case of failure.         |
-| **Failover Trigger**  | Event (e.g., health check failure, latency spike) that initiates failover.                     |
-| **Failover Detection**| Mechanism (e.g., heartbeat monitoring, circuit breakers) to identify component degradation.    |
-| **Recovery Logic**    | Steps to revert to the primary once the issue is resolved (e.g., manual intervention, auto-heal).|
-| **Dependency Mapping**| Tracking interdependencies (e.g., microservices, databases) to ensure synchronized failover.     |
-
----
-
-### **2. Failure Scenarios & Root Causes**
-| Scenario                     | Root Cause Examples                                                                 |
-|------------------------------|-------------------------------------------------------------------------------------|
-| **Service Unavailability**   | Network partition, container crash, misconfigured service mesh.                      |
-| **Database Failover**        | Replication lag, connection timeout, or primary node corruption.                    |
-| **API Gateway Failure**      | Rate limiting, misrouted requests, or backend service unavailability.               |
-| **Load Balancer Misconfiguration** | Incorrect health checks, stale session data, or regional outages.               |
+### **1. Core Components**
+| **Component**       | **Description** | **Failure Indicators** |
+|---------------------|----------------|-----------------------|
+| **Primary Service** | The active instance (e.g., database, API). | Unresponsive, latency spikes, connection timeouts. |
+| **Secondary Service** | Standby/backup instance. | Not promoted, data drift, slower performance. |
+| **Failover Trigger** | Event causing transition (e.g., health checks, manual intervention). | Misconfigured thresholds, missing alerts. |
+| **Failover Agent** | Software/hardware managing switchover (e.g., Kubernetes `Service`/`Pod`, PostgreSQL `pg_promote`). | Agent frozen, misconfigured policies. |
+| **Monitoring & Alerts** | Tools tracking health and failover status (e.g., Prometheus, Datadog). | Missing logs, false negatives. |
+| **Recovery Process** | Steps to restore primary functionality post-failover. | Manual overrides required, incomplete rollback. |
 
 ---
 
-## **Schema Reference**
-Below is a **failover troubleshooting schema** for structured logging and root cause analysis.
-
-### **Table 1: Failover Event Log**
-| Field               | Type    | Description                                                                                     | Example Value                     |
-|---------------------|---------|-------------------------------------------------------------------------------------------------|-----------------------------------|
-| `event_id`          | String  | Unique identifier for the failover event.                                                      | `FAIL-20240515-10:45:32`          |
-| `timestamp`         | ISO8601 | When the failover was triggered or completed.                                                  | `2024-05-15T10:45:32.123Z`        |
-| `component`         | String  | Affected service/component (e.g., `order-service`, `postgres-cluster`).                       | `order-service-primary`            |
-| `status`            | Enum    | `FAILED`, `SUCCESS`, `PARTIAL`, `PENDING`.                                                    | `FAILED`                           |
-| `primary_node`      | String  | ID of the primary component before failover.                                                  | `node-1`                           |
-| `secondary_node`    | String  | ID of the backup component that took over.                                                    | `node-2`                           |
-| `cause`             | String  | High-level cause (e.g., `HEALTH_CHECK_FAILED`, `NETWORK_PARTITION`).                         | `HEALTH_CHECK_FAILED`              |
-| `root_cause`        | String  | Detailed technical reason (e.g., `DB_CONNECTION_TIMEOUT`, `LISTENER_PORT_CRASH`).              | `DB_CONNECTION_TIMEOUT (5s)`       |
-| `dependencies`      | Array   | List of affected dependencies (e.g., databases, APIs).                                       | `["redis-cache", "payment-gateway"]`|
-| `duration`          | Duration| Time taken for failover (e.g., `PT0M15S` for 15 seconds).                                     | `PT0M45S`                          |
-| `recovery_action`   | String  | Steps taken to recover (e.g., `MANUAL_RESTART`, `AUTO_ROLLBACK`).                            | `AUTO_ROLLBACK`                    |
-| `resolved_by`       | String  | User/team responsible for resolution.                                                         | `ops-team@company.com`             |
+### **2. Failover States & Validation Schema**
+| **State**          | **Definition** | **Validation Checks** |
+|--------------------|----------------|-----------------------|
+| **Healthy (Active)** | Primary is operational. | `Status: Active`, `Latency: < X ms`, `Replication Lag: 0`. |
+| **Degraded** | Partial failure (e.g., one node down). | `Component Status: Degraded`, `Alerts: High`. |
+| **Failover Initiated** | Transition in progress. | `Primary: Pending`, `Secondary: Promoting`, `Logs: Transition Log`. |
+| **Failed Failover** | Switchover aborted/partially completed. | `Primary: Still Active`, `Secondary: Unreachable`, `Agent Logs: Error`. |
+| **Post-Failover** | Secondary is now primary. | `New Primary: Active`, `Old Primary: Standby`, `Data Sync: Complete`. |
 
 ---
 
-### **Table 2: Failover Health Check Metrics**
-| Metric               | Description                                                                                     | Example Value                     |
-|----------------------|-------------------------------------------------------------------------------------------------|-----------------------------------|
-| `failover_latency`   | Time taken to detect and initiate failover.                                                   | `120ms`                            |
-| `secondary_health`   | Health status of the secondary node post-failover (`HEALTHY`, `DEGRADED`, `UNHEALTHY`).         | `HEALTHY`                          |
-| `traffic_shift`      | Percentage of traffic redirected to the secondary during failover.                            | `100%` (immediate) or `50%` (gradual)|
-| `rollback_time`      | Time taken to revert to primary (if applicable).                                               | `PT0M30S`                          |
-| `retries_attempted`  | Number of retry attempts before failing over.                                                  | `3`                                |
+### **3. Troubleshooting Workflow**
+1. **Identify Failure**:
+   - Check system logs (`journalctl -u <service>`, Kubernetes `kubectl logs`).
+   - Review monitoring dashboards (e.g., Grafana alerts).
+2. **Verify Failover Trigger**:
+   - Confirm the event (e.g., `kubectl get events` for Kubernetes).
+   - Audit failover policies (e.g., `configmaps` in Kubernetes, `replication_slots` in PostgreSQL).
+3. **Inspect Secondary Component**:
+   - **Connectivity**: Test network paths (e.g., `ping`, `telnet`, `nc -zv`).
+   - **Data Consistency**: Compare primary/secondary data (e.g., `pg_isready -U user -h secondary-host`).
+   - **Agent Status**: Check failover agent health (e.g., `etcdctl endpoint health` for Kubernetes).
+4. **Resolve Root Cause**:
+   - **Common Causes**:
+     - Network partitions (e.g., `iptables` misconfiguration).
+     - Corrupted secondary state (e.g., PostgreSQL `pg_ctl promote` failure).
+     - Resource exhaustion (e.g., `OOMKilled` in containers).
+   - **Mitigations**:
+     - Restart failed components (`kubectl rollout restart deployment`).
+     - Reinitialize secondary (`pg_basebackup` for PostgreSQL).
+5. **Restore Primary**:
+   - Promote secondary (e.g., `kubectl patch svc <service> -p '{"spec":{"selector":{"role":"primary"}}'}`).
+   - Validate replication (`SELECT * FROM pg_stat_replication;`).
+6. **Document & Retest**:
+   - Update runbooks with fixes.
+   - Simulate failover (`kubectl patch svc --dry-run`).
 
 ---
 
 ## **Query Examples**
 
-### **1. Filter Failover Events by Component**
-```sql
-SELECT *
-FROM failover_logs
-WHERE component = 'order-service-primary'
-  AND status = 'FAILED'
-  ORDER BY timestamp DESC
-LIMIT 20;
+### **1. Kubernetes Failover Debugging**
+```bash
+# Check failover events (Pod evictions)
+kubectl get events --sort-by='.metadata.creationTimestamp' -A
+
+# Verify Service selector (ensure 'role=primary' is active)
+kubectl describe svc <service-name> | grep -i selector
+
+# Inspect Pod readiness
+kubectl get pods -l app=<app-name> --show-labels
 ```
-**Output:**
-| `event_id`          | `timestamp`               | `cause`               | `root_cause`                     |
-|---------------------|---------------------------|-----------------------|----------------------------------|
-| FAIL-20240515-10:45 | 2024-05-15T10:45:32.123Z | HEALTH_CHECK_FAILED   | LISTENER_PORT_CRASH (port 8080)  |
+
+### **2. PostgreSQL Failover Checks**
+```sql
+-- Check replication status
+SELECT * FROM pg_stat_replication;
+
+-- Verify primary connection
+pg_isready -U replica_user -h primary-host;
+
+-- Restart replication (if lagged)
+SELECT pg_promote();
+```
+
+### **3. Monitoring Alerts (Prometheus)**
+```promql
+# Alert for failover timeout (e.g., >30s)
+up{job="postgres"} == 0 or on() (up{job="postgres"} - up{job="postgres-replica"}) == 1
+```
+
+### **4. Network Troubleshooting**
+```bash
+# Test connectivity between nodes
+ping <primary-ip>
+telnet <primary-ip> 5432  # For PostgreSQL port
+
+# Check firewall rules
+sudo iptables -L -n
+```
 
 ---
 
-### **2. Identify Long-Duration Failovers**
-```sql
-SELECT event_id,
-       timestamp,
-       duration,
-       component
-FROM failover_logs
-WHERE duration > 'PT5M'  -- Failovers lasting >5 minutes
-ORDER BY duration DESC;
-```
-**Output:**
-| `event_id`          | `timestamp`               | `duration` | `component`         |
-|---------------------|---------------------------|------------|---------------------|
-| FAIL-20240514-09:15 | 2024-05-14T09:15:00.000Z | PT15M       | payment-gateway      |
-
----
-
-### **3. Dependency Impact Analysis**
-```sql
-SELECT DISTINCT d.dependency
-FROM failover_logs fl
-JOIN failover_dependencies fd ON fl.event_id = fd.event_id
-WHERE fl.cause = 'SERVICE_UNVAILABLE'
-  AND fl.timestamp > '2024-05-01';
-```
-**Output:**
-| `dependency`        |
-|---------------------|
-| redis-cache         |
-| payment-gateway     |
-
----
-
-### **4. Failover Success Rate by Component**
-```sql
-SELECT component,
-       SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) AS success_count,
-       SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) AS failure_count,
-       SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) /
-         (SUM(CASE WHEN status = 'SUCCESS' THEN 1 ELSE 0 END) +
-          SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END)) AS success_rate
-FROM failover_logs
-GROUP BY component;
-```
-**Output:**
-| `component`         | `success_count` | `failure_count` | `success_rate` |
-|---------------------|-----------------|-----------------|----------------|
-| order-service       | 42              | 3               | 0.93           |
-| postgres-cluster    | 12              | 2               | 0.86           |
-
----
-
-## **Troubleshooting Workflow**
-
-### **Step 1: Validate Failover Trigger**
-- **Check logs**:
-  ```bash
-  grep "FAILURE" /var/log/healthchecks/* | tail -n 10
-  ```
-- **Verify metrics**:
-  ```bash
-  # Prometheus query for failed health checks
-  up{job="order-service-primary"} == 0
-  ```
-
-### **Step 2: Diagnose Root Cause**
-- **For service failures**:
-  ```bash
-  docker ps --filter "status=exited"  # Check crashed containers
-  journalctl -u order-service         # Container logs
-  ```
-- **For database issues**:
-  ```bash
-  pg_isready -h primary-db -p 5432   # Test connection
-  show replication lag;              # PostgreSQL lag check
-  ```
-
-### **Step 3: Review Dependencies**
-- **Check inter-service calls**:
-  ```bash
-  # Track API call failures via OpenTelemetry traces
-  curl http://api-tracer:4318/v1/traces?start_time=now-5m
-  ```
-- **Database replication status**:
-  ```sql
-  SELECT pg_is_in_recovery(), pg_last_xact_replay_timestamp();
-  ```
-
-### **Step 4: Resolve & Rollback (If Needed)**
-- **Manual rollback**:
-  ```bash
-  # Restart primary if secondary is stable
-  kubectl rollout restart deployment/order-service-primary
-  ```
-- **Automated recovery**:
-  ```yaml
-  # Kubernetes Liveness Probe adjustment
-  livenessProbe:
-    httpGet:
-      path: /healthz
-      port: 8080
-    initialDelaySeconds: 30
-    timeoutSeconds: 2
-  ```
+## **Implementation Best Practices**
+1. **Automate Validation**:
+   - Use **liveness/readiness probes** in Kubernetes (`initialDelaySeconds: 30`, `failureThreshold: 3`).
+   - Implement **health checks** in application code (e.g., `/health` endpoint).
+2. **Log Correlate Failovers**:
+   - Tag logs with `failover_id` for traceability.
+   - Example: `logging: { driver: "json-file", format: "{ 'failover_id': '${FAILOVER_ID}', 'message': '%{message}' }" }`.
+3. **Test Failovers Regularly**:
+   - Schedule **chaos engineering** (e.g., using **Chaos Mesh** in Kubernetes).
+   - Example: `chaos mesh apply -f kill-pod.yaml --namespace=production`.
+4. **Document Runbooks**:
+   - Include **step-by-step failover commands** and **known issues**.
+   - Example:
+     ```markdown
+     ### PostgreSQL Failover Runbook
+     1. `sudo su - postgres`
+     2. `pg_ctl promote`
+     3. `systemctl restart postgresql`
+     ```
+5. **Optimize Recovery Time**:
+   - **Minimize replication lag** (tune `wal_level`, `synchronous_commit` in PostgreSQL).
+   - **Use geo-redundancy** for cloud failovers (e.g., AWS Multi-AZ, GCP Regional Persistent Disk).
 
 ---
 
 ## **Related Patterns**
-1. **[Resilience: Circuit Breaker]**
-   - Use cases: Prevent cascading failures by limiting retries to secondary nodes.
-   - Tools: Hystrix, Resilience4j.
-
-2. **[Observability: Distributed Tracing]**
-   - Use cases: Trace failover events across microservices.
-   - Tools: Jaeger, OpenTelemetry.
-
-3. **[Configuration: Feature Flags]**
-   - Use cases: Temporarily disable failover for critical services during outages.
-
-4. **[Synchronization: Event Sourcing]**
-   - Use cases: Ensure secondary nodes have consistent state post-failover.
-
-5. **[Scalability: Auto-Scaling]**
-   - Use cases: Dynamically adjust secondary node capacity during failover spikes.
+| **Pattern**               | **Purpose**                                                                 | **Integration Points**                     |
+|---------------------------|-----------------------------------------------------------------------------|--------------------------------------------|
+| **[Circuit Breaker](https://example.com/circuit-breaker)** | Prevent cascading failures during recovery.                                | `failover_timeout` in `Hystrix`/`Resilience4j`. |
+| **[Blue-Green Deployment](https://example.com/blue-green)** | Zero-downtime failover for application updates.                            | Kubernetes `Service` with `externalName`. |
+| **[Multi-Region Replication](https://example.com/multi-region)** | Global failover resilience.                                                  | AWS Global Accelerator, Kafka MirrorMaker. |
+| **[Chaos Engineering](https://example.com/chaos)**            | Proactively test failover resilience.                                        | Chaos Mesh, Gremlin.                      |
+| **[Idempotent Operations](https://example.com/idempotent)**   | Ensure safe failover rollback.                                              | Database transactions, AWS Step Functions. |
 
 ---
 
-## **Best Practices**
-- **Log everything**: Include `event_id`, `component`, `cause`, and `dependencies`.
-- **Automate alerts**: Notify teams via Slack/PagerDuty for prolonged failovers.
-- **Test failovers**: Simulate failures (e.g., `kubectl delete pod <primary>`) to validate recovery.
-- **Document rollback procedures**: Keep a playbook for manual interventions.
-- **Monitor secondary health**: Use tools like Prometheus to track `failover_latency` and `secondary_health`.
+## **Common Pitfalls & Mitigations**
+| **Pitfall**                          | **Mitigation**                                                                 |
+|---------------------------------------|--------------------------------------------------------------------------------|
+| **Overlapping failover windows**      | Use **canary failovers** (gradual rollout).                                    |
+| **Data drift between primary/secondary** | Enable **continuous replication** (e.g., PostgreSQL `logical replication`).  |
+| **Failover agent race conditions**    | Implement **locking mechanisms** (e.g., `etcd` for Kubernetes).              |
+| **Undetected secondary failures**     | Add **heartbeat checks** (e.g., Heartbeat service in Linux HA).               |
+| **Manual intervention required**      | Automate with **Terraform/Ansible** playbooks.                                |
 
 ---
-**End of Reference Guide** (Word count: ~1,100)
+**See Also**:
+- [Kubernetes Failover Docs](https://kubernetes.io/docs/tasks/extend-kubernetes/configure-multiple-control-plane)
+- [PostgreSQL High Availability Guide](https://www.postgresql.org/docs/current/high-availability.html)
