@@ -159,6 +159,10 @@ def factory(db):
 def pytest_configure(config):
     """Register custom pytest markers."""
     config.addinivalue_line("markers", "slow: slow tests")
+    config.addinivalue_line("markers", "security: security tests")
+    config.addinivalue_line("markers", "security_injection: SQL injection prevention tests")
+    config.addinivalue_line("markers", "security_validation: input validation tests")
+    config.addinivalue_line("markers", "security_integrity: data integrity tests")
     config.addinivalue_line("markers", "integration: integration tests")
     config.addinivalue_line("markers", "mutation: mutation tests")
     config.addinivalue_line("markers", "query: query resolver tests")
