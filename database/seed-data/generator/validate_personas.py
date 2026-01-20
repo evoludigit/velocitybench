@@ -264,7 +264,8 @@ realism, and internal alignment. Be critical but fair. Focus on semantic coheren
         # Extract SCORE
         score = None
         import re
-        score_match = re.search(r'score[:\*]* *\*?(\d+)', text)
+        # Handle vLLM markdown format: **score:** **95/100** or score: 95/100 or SCORE: 95
+        score_match = re.search(r'score[:\*]+ *\*+(\d+)', text, re.IGNORECASE)
         if score_match:
             try:
                 score = int(score_match.group(1))
