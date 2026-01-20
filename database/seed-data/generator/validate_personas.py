@@ -205,33 +205,132 @@ Be concise and practical in your suggestions."""
         # Return None to indicate manual review needed
         return None
 
-    def validate_persona(self, persona: Dict, persona_id: int) -> Tuple[bool, str]:
+    def _validate_with_vllm(self, persona: Dict) -> Tuple[bool, str]:
+        """
+        Use vLLM to perform semantic coherence analysis of the entire persona.
+        Returns (is_coherent, analysis_summary)
+        """
+        analysis_prompt = f"""
+Analyze this persona profile for semantic coherence and realism. Check:
+1. Does the title match the experience level? (Junior with 2 years vs Principal with 25 years)
+2. Does the background story align with the business domain and company type?
+3. Do the communication style and reply style match?
+4. Are the expertise areas realistic for this title and domain?
+5. Is the geographic region consistent with the name and language background?
+6. Do the personality traits support the communication/reply style?
+
+Persona:
+- Name: {persona.get('name')}
+- Title: {persona.get('title')}
+- Years: {persona.get('years_experience')} ({persona.get('experience_level')})
+- Region: {persona.get('geographic_region')}
+- Language: {persona.get('language_background')}
+- Company: {persona.get('company_type')}
+- Domain: {persona.get('business_domain')}
+- Communication style: {persona.get('communication_style')}
+- Reply style: {persona.get('reply_style')}
+- Expertise: {', '.join(persona.get('expertise_areas', []))}
+- Traits: {', '.join(persona.get('personality_traits', []))}
+- Background: {persona.get('background')[:100]}...
+
+Respond with:
+COHERENT: yes/no
+SCORE: 0-100 (100 = perfect, 0 = completely incoherent)
+ISSUES: [list any issues found, or "none" if fully coherent]
+SUMMARY: [1-2 sentence explanation]
+"""
+
+        system_prompt = """You are a persona coherence expert. Analyze personas for logical consistency,
+realism, and internal alignment. Be critical but fair. Focus on semantic coherence, not just data validation."""
+
+        response = self._call_vllm(analysis_prompt, system_prompt)
+
+        if not response:
+            return None, "vLLM error"
+
+        # Parse response - handle markdown formatting from vLLM
+        text = response.strip().lower()
+
+        # Extract COHERENT status
+        is_coherent = None
+        # Check various formats that vLLM might use
+        if "coherent:" in text:
+            coherent_section = text[text.find("coherent:"):text.find("coherent:") + 50]
+            if "yes" in coherent_section:
+                is_coherent = True
+            elif "no" in coherent_section:
+                is_coherent = False
+
+        # Extract SCORE
+        score = None
+        import re
+        score_match = re.search(r'score[:\*]* *\*?(\d+)', text)
+        if score_match:
+            try:
+                score = int(score_match.group(1))
+            except:
+                score = None
+
+        # Extract summary (first sentence mentioning coherent, realistic, etc.)
+        summary = ""
+        if "semantically coherent" in text:
+            summary = "Semantically coherent and realistic"
+        elif "well-structured" in text:
+            summary = "Well-structured profile"
+        elif "logical inconsistencies" in text and "no" in text:
+            summary = "No logical inconsistencies"
+
+        # If no explicit coherent flag but high score, consider coherent
+        if is_coherent is None and score:
+            is_coherent = score >= 70
+
+        details = f"Score: {score}/100" if score is not None else "Analysis complete"
+        if summary:
+            details = f"{details} - {summary}"
+
+        return is_coherent, details
+
+    def validate_persona(self, persona: Dict, persona_id: int, use_vllm: bool = True) -> Tuple[bool, str]:
         """
         Validate a single persona.
         Returns (is_valid, notes)
         """
-        # Check coherence
-        is_coherent, issue = self._check_coherence(persona)
+        # First check local coherence rules
+        is_local_coherent, local_issue = self._check_coherence(persona)
 
-        if is_coherent:
-            self.validated_count += 1
-            return True, "✓ Coherent"
+        if not is_local_coherent and not use_vllm:
+            # Failed local checks, no vLLM
+            return False, f"✗ Local validation failed: {local_issue}"
 
-        # Try to refine if incoherent
-        self.refined_count += 1
-        refined = self._refine_persona(persona, issue)
+        # If enabled, use vLLM for semantic analysis
+        if use_vllm:
+            is_vllm_coherent, vllm_analysis = self._validate_with_vllm(persona)
 
-        if refined:
-            # Return refined persona marked for review
-            return False, f"⚠ Refined (issue: {issue})"
+            if is_vllm_coherent:
+                self.validated_count += 1
+                if is_local_coherent:
+                    return True, f"✓ Coherent - {vllm_analysis}"
+                else:
+                    # vLLM disagrees with local checks - show both
+                    return True, f"✓ vLLM coherent (local issue: {local_issue}) - {vllm_analysis}"
+            else:
+                # vLLM found issues
+                self.refined_count += 1
+                return False, f"⚠ vLLM found issues - {vllm_analysis}"
         else:
-            return False, f"✗ Incoherent (issue: {issue})"
+            # No vLLM, just local checks
+            if is_local_coherent:
+                self.validated_count += 1
+                return True, "✓ Coherent"
+            else:
+                return False, f"✗ {local_issue}"
 
     def validate_all(
         self,
         input_dir: Path,
         count: Optional[int] = None,
         dry_run: bool = False,
+        use_vllm: bool = True,
     ) -> Dict:
         """Validate all personas in input directory."""
         print(f"\n{'='*70}")
@@ -239,6 +338,7 @@ Be concise and practical in your suggestions."""
         print(f"{'='*70}")
         print(f"Input directory: {input_dir}")
         print(f"Dry run: {dry_run}")
+        print(f"vLLM analysis: {'enabled' if use_vllm and not dry_run else 'disabled'}")
         if count:
             print(f"Limit: {count}")
         print(f"{'='*70}\n")
@@ -248,6 +348,7 @@ Be concise and practical in your suggestions."""
             "incoherent": 0,
             "refined": 0,
             "failed": 0,
+            "vllm_analysis_skipped": 0,
             "issues_found": [],
         }
 
@@ -262,7 +363,10 @@ Be concise and practical in your suggestions."""
                     persona = json.load(f)
 
                 persona_id = persona.get("pk_user", i)
-                is_valid, notes = self.validate_persona(persona, persona_id)
+                # Use vLLM unless in dry-run mode
+                is_valid, notes = self.validate_persona(
+                    persona, persona_id, use_vllm=use_vllm and not dry_run
+                )
 
                 if is_valid:
                     status = "✓"
@@ -282,16 +386,20 @@ Be concise and practical in your suggestions."""
         print(f"\n{'='*70}")
         print("VALIDATION SUMMARY")
         print(f"{'='*70}")
-        print(f"Validated (coherent):  {results['validated']}")
-        print(f"Incoherent:            {results['incoherent']}")
-        print(f"Refined:               {results['refined']}")
-        print(f"Failed:                {results['failed']}")
+        print(f"Validated (coherent):      {results['validated']}")
+        print(f"Incoherent/Issues:         {results['incoherent']}")
+        print(f"Refined:                   {results['refined']}")
+        print(f"Failed:                    {results['failed']}")
+        if use_vllm and not dry_run:
+            print(f"vLLM analysis performed:   yes")
         print(f"{'='*70}\n")
 
-        if results["issues_found"] and results["incoherent"] <= 10:
+        if results["issues_found"] and results["incoherent"] <= 20:
             print("Issues found:")
-            for issue in results["issues_found"]:
+            for issue in results["issues_found"][:20]:
                 print(f"  - {issue}")
+            if len(results["issues_found"]) > 20:
+                print(f"  ... and {len(results['issues_found']) - 20} more")
             print()
 
         return results
@@ -323,6 +431,11 @@ def main():
         action="store_true",
         help="Don't call vLLM, just check local coherence",
     )
+    parser.add_argument(
+        "--no-vllm",
+        action="store_true",
+        help="Skip vLLM semantic analysis, only do local validation",
+    )
 
     args = parser.parse_args()
 
@@ -337,6 +450,7 @@ def main():
         args.input_dir,
         count=args.count,
         dry_run=args.dry_run,
+        use_vllm=not args.no_vllm,
     )
 
     # Exit with appropriate code
