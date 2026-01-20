@@ -16,16 +16,6 @@ help:
 	@echo "VelocityBench - Framework Benchmarking Suite"
 	@echo "======================================================================"
 	@echo ""
-	@echo "Framework Commands:"
-	@echo "  make framework-list             - List all available frameworks"
-	@echo "  make framework-start FRAMEWORK=<name>  - Start a framework"
-	@echo "  make framework-stop FRAMEWORK=<name>   - Stop a framework"
-	@echo "  make framework-smoke            - Run smoke tests on running frameworks"
-	@echo ""
-	@echo "Database Commands:"
-	@echo "  make db-up                      - Start PostgreSQL database"
-	@echo "  make db-down                    - Stop PostgreSQL database"
-	@echo ""
 	@echo "Blog Generation Commands:"
 	@echo "  make blog-all                   - Generate ALL blog posts for all patterns"
 	@echo "  make blog-fraisier              - Generate Fraisier deployment pattern blogs"
@@ -35,6 +25,22 @@ help:
 	@echo "  make blog-history               - Generate deployment history blogs"
 	@echo "  make blog-multi-provider        - Generate multi-Git-provider blogs"
 	@echo "  make blog-multi-env             - Generate multi-environment blogs"
+	@echo ""
+	@echo "Comment & Persona Commands:"
+	@echo "  make personas-generate          - Generate ~2000 diverse personas"
+	@echo "  make personas-test              - Test persona generation (10 personas)"
+	@echo "  make personas-validate          - Validate persona coherence (2nd pass quality check)"
+	@echo "  make personas-validate-sample   - Validate first 100 personas"
+	@echo "  make personas-analyze           - Analyze generated personas"
+	@echo "  make personas-clean             - Clean generated personas"
+	@echo ""
+	@echo "  make comments-test              - Test comment generation (5 posts)"
+	@echo "  make comments-generate          - Generate comments on ALL blog posts"
+	@echo "  make comments-replies           - Generate replies to debatable comments"
+	@echo "  make comments-validate          - Validate/filter generated comments"
+	@echo "  make comments-load              - Load comments to PostgreSQL database"
+	@echo "  make comments-analyze           - Analyze generated comments"
+	@echo "  make comments-clean             - Clean generated comment files"
 	@echo ""
 	@echo "Individual Pattern Commands:"
 	@echo "  make blog-pattern PATTERN=<id> TYPE=<type> DEPTH=<depth>"
@@ -47,13 +53,22 @@ help:
 	@echo "  make venv-check                 - Check if virtualenv is set up"
 	@echo "  make venv-setup                 - Create virtualenv if needed"
 	@echo ""
-	@echo "Cleanup Commands:"
-	@echo "  make blog-clean                 - Clean generated blog files"
+	@echo "Framework Commands:"
+	@echo "  make framework-list             - List all available frameworks"
+	@echo "  make framework-start FRAMEWORK=<name>  - Start a framework"
+	@echo "  make framework-stop FRAMEWORK=<name>   - Stop a framework"
+	@echo "  make framework-smoke            - Run smoke tests on running frameworks"
+	@echo ""
+	@echo "Database Commands:"
+	@echo "  make db-up                      - Start PostgreSQL database"
+	@echo "  make db-down                    - Stop PostgreSQL database"
 	@echo ""
 	@echo "Examples:"
+	@echo "  make personas-test              # Generate 10 test personas"
+	@echo "  make personas-generate          # Generate 2000 full personas"
+	@echo "  make comments-test              # Test comment generation on 5 posts"
+	@echo "  make comments-generate          # Generate comments on all 9000+ posts"
 	@echo "  make framework-start FRAMEWORK=fraiseql  # Start FraiseQL on port 4000"
-	@echo "  make framework-smoke                     # Test running frameworks"
-	@echo "  make blog-fraisier                       # Generate Fraisier blogs"
 	@echo ""
 	@echo "======================================================================"
 
@@ -258,8 +273,171 @@ venv-info:
 	@echo "  Python: $(VENV_PYTHON)"
 	@echo "  Activate: source $(VENV_ACTIVATE)"
 
-.PHONY: help blog-all blog-pattern blog-fraisier blog-webhooks blog-git-providers blog-cqrs blog-history blog-multi-provider blog-multi-env blog-list blog-clean venv-check venv-setup venv-info \
+.PHONY: help blog-all blog-pattern blog-fraisier blog-webhooks blog-git-providers blog-cqrs blog-history blog-multi-provider blog-multi-env blog-list blog-clean \
+	personas-generate personas-test personas-validate personas-validate-sample personas-analyze personas-clean \
+	comments-generate comments-test comments-analyze comments-replies comments-validate comments-load comments-clean \
+	venv-check venv-setup venv-info \
 	framework-start framework-stop framework-smoke framework-list db-up db-down
+
+# ======================================================================
+# Persona Generation Commands
+# ======================================================================
+
+# Test persona generation (10 personas, dry-run)
+personas-test: venv-check
+	@echo "======================================================================"
+	@echo "Testing Persona Generation (10 personas)..."
+	@echo "======================================================================"
+	@$(VENV_PYTHON) -m pip install -q requests pyyaml
+	@cd $(GENERATOR_DIR) && $(VENV_PYTHON) generate_personas.py --count 10 --dry-run
+	@echo "======================================================================"
+
+# Generate full persona set (~2000 personas)
+personas-generate: venv-check
+	@echo "======================================================================"
+	@echo "Generating ~2000 Diverse Personas (this will take 30-60 minutes)..."
+	@echo "======================================================================"
+	@$(VENV_PYTHON) -m pip install -q requests pyyaml jsonschema
+	@cd $(GENERATOR_DIR) && $(VENV_PYTHON) generate_personas.py --count 2000
+	@echo "======================================================================"
+	@echo "✓ Personas generated!"
+	@echo "Output directory: $(PROJECT_ROOT)database/seed-data/output/personas/"
+	@echo "  - personas/index.json (quick lookup)"
+	@echo "  - personas/persona_*.json (individual persona files)"
+	@echo "  - personas.json (legacy format, for backwards compatibility)"
+	@echo "======================================================================"
+
+# Analyze generated personas
+personas-analyze: venv-check
+	@echo "======================================================================"
+	@echo "Analyzing Generated Personas..."
+	@echo "======================================================================"
+	@$(VENV_PYTHON) -m pip install -q requests pyyaml
+	@cd $(GENERATOR_DIR) && $(VENV_PYTHON) generate_personas.py --analyze $(PROJECT_ROOT)database/seed-data/output/personas/personas.json
+	@echo "======================================================================"
+
+# Validate persona coherence (2nd pass quality check - checks all 6 coherence criteria)
+personas-validate: venv-check
+	@echo "======================================================================"
+	@echo "Validating All Generated Personas (Coherence Check)..."
+	@echo "======================================================================"
+	@$(VENV_PYTHON) -m pip install -q requests pyyaml jsonschema
+	@cd $(GENERATOR_DIR) && $(VENV_PYTHON) validate_personas.py --input-dir $(PROJECT_ROOT)database/seed-data/output/personas/personas
+	@echo "======================================================================"
+
+# Validate persona coherence - sample only (first 100 personas, faster)
+personas-validate-sample: venv-check
+	@echo "======================================================================"
+	@echo "Validating Sample of Generated Personas (first 100)..."
+	@echo "======================================================================"
+	@$(VENV_PYTHON) -m pip install -q requests pyyaml jsonschema
+	@cd $(GENERATOR_DIR) && $(VENV_PYTHON) validate_personas.py --input-dir $(PROJECT_ROOT)database/seed-data/output/personas/personas --count 100
+	@echo "======================================================================"
+
+# Clean persona files
+personas-clean:
+	@echo "Cleaning persona files..."
+	@rm -rf $(PROJECT_ROOT)database/seed-data/output/personas
+	@echo "✓ Personas cleaned"
+
+# ======================================================================
+# Comment & Reply Generation Commands
+# ======================================================================
+
+# Test comment generation (5 posts, dry-run)
+comments-test: venv-check
+	@echo "======================================================================"
+	@echo "Testing Comment Generation (5 posts, dry-run)..."
+	@echo "======================================================================"
+	@$(VENV_PYTHON) -m pip install -q requests pyyaml
+	@cd $(GENERATOR_DIR) && $(VENV_PYTHON) generate_blog_comments.py --test --posts 5 --dry-run
+	@echo "======================================================================"
+
+# Generate comments on all blog posts
+comments-generate: venv-check
+	@echo "======================================================================"
+	@echo "Generating Comments on ALL Blog Posts..."
+	@echo "This will generate ~120,000 comments across 9,281 posts (6-8 hours)"
+	@echo "======================================================================"
+	@$(VENV_PYTHON) -m pip install -q requests pyyaml
+	@cd $(GENERATOR_DIR) && $(VENV_PYTHON) generate_blog_comments.py --all
+	@echo "======================================================================"
+	@echo "✓ Comments generated!"
+	@echo "Output: $(PROJECT_ROOT)database/seed-data/output/comments/"
+	@echo "======================================================================"
+
+# Generate replies to comments
+comments-replies: venv-check
+	@echo "======================================================================"
+	@echo "Generating Replies to Comments (hallucination-driven)..."
+	@echo "======================================================================"
+	@$(VENV_PYTHON) -m pip install -q requests pyyaml
+	@cd $(GENERATOR_DIR) && $(VENV_PYTHON) generate_comment_replies.py --all \
+		--comments-dir $(PROJECT_ROOT)database/seed-data/output/comments \
+		--blog-dir $(PROJECT_ROOT)database/seed-data/output/blog
+	@echo "======================================================================"
+	@echo "✓ Comment replies generated!"
+	@echo "Output: $(PROJECT_ROOT)database/seed-data/output/comments-with-replies/"
+	@echo "======================================================================"
+
+# Validate/filter comments for quality
+comments-validate: venv-check
+	@echo "======================================================================"
+	@echo "Validating & Filtering Comments (hallucination detection)..."
+	@echo "======================================================================"
+	@$(VENV_PYTHON) -m pip install -q requests pyyaml
+	@cd $(GENERATOR_DIR) && $(VENV_PYTHON) validate_blog_comments.py \
+		--comments-dir $(PROJECT_ROOT)database/seed-data/output/comments-with-replies
+	@echo "======================================================================"
+	@echo "✓ Comments validated!"
+	@echo "Output: $(PROJECT_ROOT)database/seed-data/output/comments-validated/"
+	@echo "======================================================================"
+
+# Load comments to PostgreSQL
+comments-load: venv-check
+	@echo "======================================================================"
+	@echo "Loading Comments to PostgreSQL..."
+	@echo "======================================================================"
+	@if [ -z "$(DB_CONNECTION)" ]; then \
+		echo "Error: DB_CONNECTION is required"; \
+		echo "Usage: make comments-load DB_CONNECTION='postgresql://user:pass@localhost/db'"; \
+		echo ""; \
+		echo "Example:"; \
+		echo "  make comments-load DB_CONNECTION='postgresql://user:pass@localhost:5432/velocitybench'"; \
+		echo ""; \
+		echo "Notes:"; \
+		echo "  - Personas are mapped to consistent user PKs (1-5000)"; \
+		echo "  - Same persona always maps to same user"; \
+		echo "  - See PERSONA_USER_MAPPING.md for details"; \
+		exit 1; \
+	fi
+	@$(VENV_PYTHON) -m pip install -q requests pyyaml psycopg
+	@cd $(GENERATOR_DIR) && $(VENV_PYTHON) load_comments_to_db.py \
+		--comments-dir $(PROJECT_ROOT)database/seed-data/output/comments-validated \
+		--num-users 5000 \
+		--connection "$(DB_CONNECTION)"
+	@echo "======================================================================"
+	@echo "✓ Comments loaded to database!"
+	@echo "✓ Personas mapped to users (see PERSONA_USER_MAPPING.md)"
+	@echo "======================================================================"
+
+# Analyze generated comments
+comments-analyze: venv-check
+	@echo "======================================================================"
+	@echo "Analyzing Generated Comments..."
+	@echo "======================================================================"
+	@$(VENV_PYTHON) -m pip install -q requests pyyaml
+	@cd $(GENERATOR_DIR) && $(VENV_PYTHON) analyze_comments.py
+	@echo "======================================================================"
+
+# Clean comment files
+comments-clean:
+	@echo "Cleaning comment files..."
+	@rm -rf $(PROJECT_ROOT)database/seed-data/output/comments
+	@rm -rf $(PROJECT_ROOT)database/seed-data/output/comments-with-replies
+	@rm -rf $(PROJECT_ROOT)database/seed-data/output/comments-validated
+	@mkdir -p $(PROJECT_ROOT)database/seed-data/output/comments
+	@echo "✓ Comments cleaned"
 
 # ======================================================================
 # Framework Management Commands
