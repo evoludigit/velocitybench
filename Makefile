@@ -29,8 +29,11 @@ help:
 	@echo "Comment & Persona Commands:"
 	@echo "  make personas-generate          - Generate ~2000 diverse personas"
 	@echo "  make personas-test              - Test persona generation (10 personas)"
-	@echo "  make personas-validate          - Validate persona coherence (2nd pass quality check)"
+	@echo "  make personas-validate          - Validate persona coherence (Layer 2 - 2nd pass)"
 	@echo "  make personas-validate-sample   - Validate first 100 personas"
+	@echo "  make personas-correct           - Correct personas based on vLLM analysis (Layer 3)"
+	@echo "  make personas-correct-sample    - Correct first 50 personas (faster testing)"
+	@echo "  make personas-correct-dry       - Analyze without making corrections (dry-run)"
 	@echo "  make personas-analyze           - Analyze generated personas"
 	@echo "  make personas-clean             - Clean generated personas"
 	@echo ""
@@ -274,7 +277,7 @@ venv-info:
 	@echo "  Activate: source $(VENV_ACTIVATE)"
 
 .PHONY: help blog-all blog-pattern blog-fraisier blog-webhooks blog-git-providers blog-cqrs blog-history blog-multi-provider blog-multi-env blog-list blog-clean \
-	personas-generate personas-test personas-validate personas-validate-sample personas-analyze personas-clean \
+	personas-generate personas-test personas-validate personas-validate-sample personas-correct personas-correct-sample personas-correct-dry personas-analyze personas-clean \
 	comments-generate comments-test comments-analyze comments-replies comments-validate comments-load comments-clean \
 	venv-check venv-setup venv-info \
 	framework-start framework-stop framework-smoke framework-list db-up db-down
@@ -332,6 +335,37 @@ personas-validate-sample: venv-check
 	@echo "======================================================================"
 	@$(VENV_PYTHON) -m pip install -q requests pyyaml jsonschema
 	@cd $(GENERATOR_DIR) && $(VENV_PYTHON) validate_personas.py --input-dir $(PROJECT_ROOT)database/seed-data/output/personas/personas --count 100
+	@echo "======================================================================"
+
+# Correct personas based on vLLM analysis (Layer 3 - automatic corrections)
+personas-correct: venv-check
+	@echo "======================================================================"
+	@echo "Correcting Personas Based on vLLM Analysis (Layer 3)..."
+	@echo "This will identify and fix coherence issues in all personas..."
+	@echo "======================================================================"
+	@$(VENV_PYTHON) -m pip install -q requests pyyaml jsonschema
+	@cd $(GENERATOR_DIR) && $(VENV_PYTHON) correct_personas.py --input-dir $(PROJECT_ROOT)database/seed-data/output/personas/personas --output-dir $(PROJECT_ROOT)database/seed-data/output/personas/corrected
+	@echo "======================================================================"
+	@echo "✓ Persona corrections completed!"
+	@echo "Output: $(PROJECT_ROOT)database/seed-data/output/personas/corrected/"
+	@echo "======================================================================"
+
+# Correct personas - sample only (first 50 personas, faster testing)
+personas-correct-sample: venv-check
+	@echo "======================================================================"
+	@echo "Testing Persona Corrections (first 50)..."
+	@echo "======================================================================"
+	@$(VENV_PYTHON) -m pip install -q requests pyyaml jsonschema
+	@cd $(GENERATOR_DIR) && $(VENV_PYTHON) correct_personas.py --input-dir $(PROJECT_ROOT)database/seed-data/output/personas/personas --output-dir $(PROJECT_ROOT)database/seed-data/output/personas/corrected --count 50
+	@echo "======================================================================"
+
+# Correct personas - dry run (analyze only, no changes)
+personas-correct-dry: venv-check
+	@echo "======================================================================"
+	@echo "Analyzing Personas for Corrections (Dry Run - no changes)..."
+	@echo "======================================================================"
+	@$(VENV_PYTHON) -m pip install -q requests pyyaml jsonschema
+	@cd $(GENERATOR_DIR) && $(VENV_PYTHON) correct_personas.py --input-dir $(PROJECT_ROOT)database/seed-data/output/personas/personas --dry-run
 	@echo "======================================================================"
 
 # Clean persona files
