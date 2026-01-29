@@ -1,0 +1,271 @@
+id: fraiseql-testing-patterns
+name: "FraiseQL Testing Patterns"
+category: fraiseql
+type: standard
+tags:
+  - fraiseql
+  - testing
+  - pytest
+  - fixtures
+  - test-factories
+
+summary:
+  short: "Testing FraiseQL applications with fixtures, factories, and benchmarks"
+  long: |
+    FraiseQL applications require comprehensive testing: unit tests for resolvers, integration tests
+    for GraphQL queries, performance tests for query optimization, and security tests for input validation.
+    This pattern covers pytest fixtures, test factories with Trinity pattern, mocking strategies, and
+    benchmarking approaches for FraiseQL applications.
+
+problem:
+  description: |
+    Testing GraphQL APIs requires:
+    - Fresh database state for each test
+    - Realistic test data via factories
+    - Query performance benchmarks
+    - Security vulnerability testing
+    - Type validation testing
+
+    Developers need patterns for efficient, maintainable test suites.
+
+  symptoms:
+    - name: "Slow test execution"
+      description: "Test suite takes 5 minutes for 50 tests"
+      detection: "Excessive setup/teardown overhead"
+
+    - name: "Flaky tests"
+      description: "Tests fail randomly depending on previous test order"
+      detection: "Test order dependency"
+
+    - name: "Hard to write tests"
+      description: "Creating test data requires many manual steps"
+      detection: "Repetitive factory/fixture code"
+
+  impact: |
+    Slow feedback loop, unreliable tests, hard to maintain test suite
+
+solution:
+  principle: "Efficient, maintainable testing with factories, fixtures, and benchmarks"
+
+  components:
+    - name: "Test Database Setup"
+      type: "Fixture"
+      purpose: "Fresh database for each test"
+      pattern: |
+        ```python
+        @pytest.fixture(scope="function")
+        async def db(postgres_url):
+            """Fresh database for each test."""
+            async with asyncpg.create_pool(postgres_url) as pool:
+                async with pool.acquire() as conn:
+                    # Create schema
+                    await conn.execute("CREATE SCHEMA test_schema")
+                    yield pool
+                    # Cleanup
+                    await conn.execute("DROP SCHEMA test_schema CASCADE")
+        ```
+
+    - name: "Test Factory"
+      type: "Pattern"
+      purpose: "Create test data with Trinity pattern"
+      pattern: |
+        ```python
+        class TestFactory:
+            def __init__(self, db):
+                self.db = db
+
+            async def create_user(self, email="test@example.com", name="Test User"):
+                """Create test user with Trinity pattern."""
+                result = await self.db.fetchrow("""
+                    INSERT INTO tb_user (email, name)
+                    VALUES (%s, %s)
+                    RETURNING id, pk_user
+                """, email, name)
+                return {
+                    'id': result['id'],
+                    'pk_user': result['pk_user'],
+                    'email': email
+                }
+
+            async def create_post(self, fk_author, title="Test Post"):
+                """Create test post."""
+                result = await self.db.fetchrow("""
+                    INSERT INTO tb_post (fk_author, title)
+                    VALUES (%s, %s)
+                    RETURNING pk_post
+                """, fk_author, title)
+                return result['pk_post']
+        ```
+
+    - name: "GraphQL Query Testing"
+      type: "Pattern"
+      purpose: "Test GraphQL queries"
+      pattern: |
+        ```python
+        async def test_get_user_query(factory, graphql_client):
+            """Test GraphQL user query."""
+            user = await factory.create_user()
+
+            response = await graphql_client.execute("""
+                query GetUser($id: ID!) {
+                    user(id: $id) {
+                        id
+                        email
+                        name
+                    }
+                }
+            """, variables={"id": user['pk_user']})
+
+            assert response['data']['user']['email'] == user['email']
+        ```
+
+    - name: "Performance Benchmarking"
+      type: "Pattern"
+      purpose: "Benchmark query performance"
+      pattern: |
+        ```python
+        @pytest.mark.benchmark
+        def test_filter_performance(benchmark, factory, db):
+            """Benchmark filtering performance."""
+            # Create 100 users
+            for i in range(100):
+                await factory.create_user(f"user{i}@example.com")
+
+            def query():
+                return await db.fetch("""
+                    SELECT * FROM tv_user WHERE email LIKE %s
+                """, ('%user50%',))
+
+            result = benchmark(query)
+            assert len(result) >= 1  # Should find user50
+        ```
+
+    - name: "Security Testing"
+      type: "Pattern"
+      purpose: "Test for SQL injection, XSS, etc."
+      pattern: |
+        ```python
+        async def test_sql_injection_protection(graphql_client):
+            """Verify SQL injection is prevented."""
+            response = await graphql_client.execute("""
+                query GetUser($id: ID!) {
+                    user(id: $id) { id email }
+                }
+            """, variables={"id": "1'; DROP TABLE users; --"})
+
+            # Should not execute, return error
+            assert 'errors' in response or 'id' not in response
+        ```
+
+key_concepts:
+  concept_1: "Test fixtures provide fresh database state for each test"
+  concept_2: "Test factories create realistic test data efficiently"
+  concept_3: "Benchmarks verify query performance meets SLAs"
+  concept_4: "Security tests verify input validation works"
+  concept_5: "Integration tests verify GraphQL queries end-to-end"
+  concept_6: "Trinity pattern (id, pk_*, fk_*) must work in tests"
+  concept_7: "Test data volume should match production characteristics"
+  concept_8: "Flaky tests indicate environmental dependencies"
+
+implementation_considerations:
+  consideration_1: "Use function-scoped fixtures for database isolation"
+  consideration_2: "Create seed data efficiently with batch inserts"
+  consideration_3: "Test with realistic data volume (not toy data)"
+  consideration_4: "Benchmark before and after optimization"
+  consideration_5: "Use parametrized tests for multiple scenarios"
+  consideration_6: "Mock external services, not database"
+  consideration_7: "Verify test data is cleaned up after each test"
+  consideration_8: "Run tests in random order to detect flakiness"
+
+best_practices:
+  - name: "Use factories for test data"
+    description: "Cleaner than manual SQL, easier to maintain"
+
+  - name: "Test with realistic data volume"
+    description: "Edge cases appear at scale, not with 5 records"
+
+  - name: "Benchmark before and after"
+    description: "Verify optimization actually improves performance"
+
+  - name: "Test edge cases"
+    description: "Empty results, NULL values, boundary conditions"
+
+  - name: "Use parametrized tests"
+    description: "Test multiple scenarios with single test function"
+
+  - name: "Mock external services"
+    description: "Don't call real APIs in tests"
+
+  - name: "Test error paths"
+    description: "Verify error handling, not just happy path"
+
+anti_patterns:
+  - name: "Small test datasets"
+    description: "Test with 5 records when production has 1M"
+    consequence: "Index effectiveness unclear, N+1 hidden"
+    fix: "Test with realistic data volume"
+
+  - name: "Shared database state"
+    description: "Tests modify shared database, affecting other tests"
+    consequence: "Flaky tests, order-dependent failures"
+    fix: "Fresh database per test or explicit cleanup"
+
+  - name: "Testing database, not application"
+    description: "Test SQL instead of testing GraphQL resolvers"
+    consequence: "Don't catch application bugs"
+    fix: "Test GraphQL queries end-to-end"
+
+examples:
+  example_1:
+    title: "Basic Factory Test"
+    description: "Create test user and query via GraphQL"
+    code: |
+      async def test_user_creation(factory, graphql_client):
+          user = await factory.create_user("alice@example.com", "Alice")
+
+          result = await graphql_client.execute("""
+              query { user(id: "%s") { email name } }
+          """ % user['pk_user'])
+
+          assert result['data']['user']['email'] == "alice@example.com"
+
+  example_2:
+    title: "Performance Benchmark"
+    description: "Verify query performance with realistic data"
+    code: |
+      @pytest.mark.benchmark
+      def test_user_filtering_performance(benchmark, factory, db):
+          # Create 1000 users
+          for i in range(1000):
+              factory.create_user(f"user{i}@example.com")
+
+          result = benchmark(lambda: db.fetch("""
+              SELECT * FROM tv_user WHERE email LIKE %s
+          """, ('%user500%',)))
+
+          assert len(result) >= 1
+
+blog_hooks:
+  beginner:
+    focus: "Writing basic FraiseQL tests"
+    key_points:
+      - "Use fixtures for database setup"
+      - "Use factories for test data creation"
+      - "Test GraphQL queries end-to-end"
+      - "Verify results match expectations"
+
+  intermediate:
+    focus: "Comprehensive testing with performance"
+    key_points:
+      - "Test with realistic data volume"
+      - "Benchmark query performance"
+      - "Test error paths and edge cases"
+      - "Parametrized tests for variations"
+
+  advanced:
+    focus: "Testing edge cases and optimization"
+    key_points:
+      - "Test N+1 scenarios before and after optimization"
+      - "Load testing with realistic concurrent users"
+      - "Security testing for injection vulnerabilities"
+      - "Regression testing for performance regressions"

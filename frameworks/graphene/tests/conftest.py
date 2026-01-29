@@ -208,3 +208,5 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "security_injection: SQL injection prevention tests")
     config.addinivalue_line("markers", "security_validation: input validation tests")
     config.addinivalue_line("markers", "security_integrity: data integrity tests")
+    config.addinivalue_line("markers", "perf: performance benchmark tests")
+    config.addinivalue_line("markers", "perf_queries: query performance benchmark tests")

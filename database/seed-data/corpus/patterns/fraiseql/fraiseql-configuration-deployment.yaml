@@ -1,0 +1,502 @@
+id: fraiseql-configuration-deployment
+name: "FraiseQL Configuration and Deployment Patterns"
+category: fraiseql
+type: standard
+tags:
+  - fraiseql
+  - configuration
+  - deployment
+  - tuning
+  - production
+
+summary:
+  short: "FraiseQLConfig settings for database pools, introspection, field naming, and query limits"
+  long: |
+    FraiseQL applications are configured through FraiseQLConfig, which sets database connection
+    pooling, query complexity limits, schema introspection policies, field naming conventions,
+    and debugging features. Understanding these configuration options is critical for production
+    deployments, performance tuning, and security hardening.
+
+problem:
+  description: |
+    GraphQL servers need configuration for:
+    - Database connection pooling (how many concurrent connections?)
+    - Field naming convention (camelCase vs snake_case?)
+    - Schema introspection (allow clients to introspect schema?)
+    - Query limits (prevent expensive queries?)
+    - Debugging (enable playground in production?)
+    - Error handling (show detailed errors or generic?)
+
+    Wrong configuration can cause: connection pool exhaustion, information disclosure,
+    performance problems, security vulnerabilities.
+
+  symptoms:
+    - name: "Connection pool exhaustion"
+      description: "Error: 'Cannot acquire database connection' during load"
+      detection: "pool_size too small for concurrent users"
+
+    - name: "Name mismatch errors"
+      description: "Client sends camelCase but database expects snake_case"
+      detection: "Field not found errors; manual mapping required"
+
+    - name: "Schema introspection abuse"
+      description: "GraphQL schema exposed; allows enumeration of all fields/types"
+      detection: "Competitor uses introspection to copy API"
+
+    - name: "Expensive queries allowed"
+      description: "Client sends deeply nested query (100 levels) causing timeout"
+      detection: "Query complexity not limited"
+
+  impact: |
+    Connection failures, runtime errors, security vulnerabilities, information disclosure,
+    performance degradation under load
+
+solution:
+  principle: "Explicit configuration for production safety and performance"
+
+  components:
+    - name: "Database Connection Pooling"
+      type: "Configuration setting"
+      purpose: "Reuse database connections efficiently"
+      parameters:
+        database_url: "PostgreSQL connection string"
+        database_pool_size: "Number of persistent connections (default 10)"
+        database_max_overflow: "Additional connections for spikes (default 5)"
+        database_pool_timeout: "Wait time for available connection (default 5s)"
+      guidance: |
+        pool_size = expected concurrent requests (not total users)
+        For typical web app: 10-20
+        For high-traffic: 20-50
+        Don't over-allocate (wastes memory; each connection uses ~5-10MB)
+      example: |
+        FraiseQLConfig(
+            database_url="postgresql://user:password@host/dbname",
+            database_pool_size=20,      # 20 concurrent connections
+            database_max_overflow=10,    # 10 additional for spikes
+            ...
+        )
+
+    - name: "Field Naming Convention"
+      type: "Configuration setting"
+      purpose: "Automatic field name conversion between database and GraphQL"
+      option_auto_camel_case: |
+        True = snake_case (database) → camelCase (GraphQL)
+        False = preserve as-is
+      benefit: |
+        Developers use natural naming (Python snake_case)
+        API exposes standard GraphQL naming (camelCase)
+        Conversion automatic; no manual mapping
+      example: |
+        FraiseQLConfig(
+            auto_camel_case=True,  # first_name → firstName
+            ...
+        )
+
+        @fraiseql.type(sql_source="benchmark.tv_user")
+        class User:
+            first_name: str  # snake_case in Python
+            # GraphQL schema shows: firstName (camelCase)
+
+    - name: "Introspection Policy"
+      type: "Configuration setting"
+      purpose: "Control whether clients can introspect GraphQL schema"
+      options:
+        PUBLIC: "Allow introspection queries (default, development)"
+        AUTHENTICATED_ONLY: "Require authentication to introspect"
+        DISABLED: "Block all introspection queries (production)"
+      security:
+        - "PUBLIC: Schema exposed; competitors can copy API structure"
+        - "DISABLED: Clients must get schema documentation separately"
+      example: |
+        from fraiseql.fastapi.config import IntrospectionPolicy
+
+        FraiseQLConfig(
+            introspection_policy=IntrospectionPolicy.PUBLIC,
+            # or
+            introspection_policy=IntrospectionPolicy.DISABLED,
+            ...
+        )
+
+    - name: "Query Complexity Limits"
+      type: "Configuration setting"
+      purpose: "Prevent expensive queries from overwhelming database"
+      parameters:
+        max_query_depth: "Maximum nesting depth (default 10)"
+        complexity_enabled: "Enable complexity analysis (default False)"
+      guidance:
+        max_query_depth: "Limit to 5-10 (deeper queries become exponentially expensive)"
+        complexity_enabled: "Set to True for high-security deployments"
+      example: |
+        FraiseQLConfig(
+            max_query_depth=10,      # Prevent deep nesting
+            complexity_enabled=True,  # Analyze query complexity
+            ...
+        )
+
+    - name: "Playground and Debugging"
+      type: "Configuration setting"
+      purpose: "Control GraphQL playground availability"
+      parameters:
+        enable_playground: "Enable GraphQL playground UI (default True)"
+        environment: "Environment name (development/production)"
+      security:
+        - "Playground exposes schema, introspection, execution"
+        - "Disable in production unless authenticated"
+      example: |
+        FraiseQLConfig(
+            enable_playground=False,  # Disable in production
+            environment="production",
+            ...
+        )
+
+    - name: "CORS Configuration"
+      type: "Configuration setting"
+      purpose: "Control cross-origin requests from browsers"
+      parameters:
+        cors_enabled: "Enable CORS headers (default True)"
+        cors_origins: "Allowed origins (whitelist)"
+      example: |
+        FraiseQLConfig(
+            cors_enabled=True,
+            cors_origins=["https://example.com", "https://app.example.com"],
+            ...
+        )
+
+key_concepts:
+  concept_1: "Connection pool size ≈ expected concurrent requests (not total users)"
+  concept_2: "auto_camel_case converts snake_case (code) → camelCase (GraphQL)"
+  concept_3: "Introspection Policy PUBLIC in dev, DISABLED in production"
+  concept_4: "max_query_depth=10 reasonable default; limits exponential complexity"
+  concept_5: "Enable playground only in development (information disclosure risk)"
+  concept_6: "CORS whitelist prevents unauthorized cross-origin requests"
+  concept_7: "Configuration environment-specific (dev vs production)"
+  concept_8: "Monitor pool exhaustion errors; indicates sizing issue"
+
+implementation_considerations:
+  consideration_1: "Environment-specific config (dev uses different settings than prod)"
+  consideration_2: "Use environment variables for secrets (DB URL, API keys)"
+  consideration_3: "Set reasonable pool size based on expected concurrent users"
+  consideration_4: "Test connection pool behavior under load"
+  consideration_5: "Monitor pool statistics (active, waiting, size)"
+  consideration_6: "Disable playground in production"
+  consideration_7: "Use DISABLED introspection in production"
+  consideration_8: "Document all configuration options"
+  consideration_9: "Set max_query_depth limit (5-10 typical)"
+  consideration_10: "Regular config audit (quarterly security review)"
+
+best_practices:
+  - name: "Environment-specific config"
+    description: "Load from environment variables based on APP_ENV"
+
+  - name: "Right-size connection pool"
+    description: "pool_size = expected concurrent requests (typically 10-20)"
+
+  - name: "Enable auto_camel_case"
+    description: "Pythonic code names converted automatically to camelCase API"
+
+  - name: "Disable playground in production"
+    description: "enable_playground=False unless authenticated"
+
+  - name: "Disable introspection in production"
+    description: "IntrospectionPolicy.DISABLED prevents schema enumeration"
+
+  - name: "Whitelist CORS origins"
+    description: "Only allow known frontend domains"
+
+  - name: "Set max_query_depth"
+    description: "Typical value: 10 (prevents deep nesting attacks)"
+
+  - name: "Monitor pool metrics"
+    description: "Alert if pool frequently exhausted or connections wait"
+
+anti_patterns:
+  - name: "pool_size = 1 for multi-user app"
+    description: "Single connection for concurrent requests"
+    consequence: "Connection exhaustion; timeouts"
+    fix: "Set pool_size to expected concurrent users (10-20)"
+
+  - name: "Playground enabled in production"
+    description: "enable_playground=True with public URL"
+    consequence: "Schema exposed; playground UI available to all"
+    fix: "Set enable_playground=False in production"
+
+  - name: "Introspection PUBLIC in production"
+    description: "IntrospectionPolicy.PUBLIC with public endpoint"
+    consequence: "Schema introspection queries allowed; full schema discovery"
+    fix: "Set IntrospectionPolicy.DISABLED in production"
+
+  - name: "No max_query_depth"
+    description: "complexity_enabled=False; no depth limit"
+    consequence: "Malicious clients can send expensive nested queries"
+    fix: "Set max_query_depth=10"
+
+  - name: "CORS disabled"
+    description: "cors_enabled=False"
+    consequence: "Legitimate frontend cannot make requests"
+    fix: "Enable CORS with whitelist: cors_origins=[...]"
+
+  - name: "Hard-coded credentials"
+    description: "database_url = 'postgresql://user:pass@host/db' in code"
+    consequence: "Credentials exposed in repo; security risk"
+    fix: "Use environment variables: os.getenv('DATABASE_URL')"
+
+  - name: "No pool monitoring"
+    description: "Connection pool exhaustion surprises in production"
+    consequence: "Cascading failures under load"
+    fix: "Monitor pool metrics; alert on high utilization"
+
+implementation:
+  title: "Implementing FraiseQL Configuration"
+  steps:
+    - number: 1
+      title: "Create environment-specific config"
+      description: |
+        ```python
+        import os
+        from fraiseql.fastapi import FraiseQLConfig
+        from fraiseql.fastapi.config import IntrospectionPolicy
+
+        def create_config() -> FraiseQLConfig:
+            env = os.getenv('APP_ENV', 'development')
+            is_prod = env == 'production'
+
+            return FraiseQLConfig(
+                database_url=os.getenv('DATABASE_URL'),
+                environment=env,
+
+                # Connection pooling
+                database_pool_size=int(os.getenv('DB_POOL_SIZE', 20 if is_prod else 5)),
+                database_max_overflow=int(os.getenv('DB_MAX_OVERFLOW', 10 if is_prod else 5)),
+
+                # Field naming
+                auto_camel_case=True,
+
+                # Security
+                introspection_policy=(
+                    IntrospectionPolicy.DISABLED if is_prod
+                    else IntrospectionPolicy.PUBLIC
+                ),
+                enable_playground=not is_prod,
+
+                # Query limits
+                max_query_depth=10,
+                complexity_enabled=is_prod,
+
+                # CORS
+                cors_enabled=True,
+                cors_origins=os.getenv('CORS_ORIGINS', 'http://localhost:3000').split(','),
+            )
+        ```
+
+    - number: 2
+      title: "Load configuration in application"
+      description: |
+        ```python
+        from fastapi import FastAPI
+        from fraiseql.fastapi import create_fraiseql_app
+
+        app = FastAPI()
+
+        fraiseql_config = create_config()
+        fraiseql_app = create_fraiseql_app(fraiseql_config)
+
+        app.include_router(fraiseql_app, prefix="/graphql")
+        ```
+
+    - number: 3
+      title: "Set environment variables"
+      description: |
+        .env (development):
+        ```
+        APP_ENV=development
+        DATABASE_URL=postgresql://user:pass@localhost:5432/fraiseql_benchmark
+        DB_POOL_SIZE=5
+        DB_MAX_OVERFLOW=5
+        CORS_ORIGINS=http://localhost:3000,http://localhost:3001
+        ```
+
+        production (e.g., Docker environment):
+        ```
+        APP_ENV=production
+        DATABASE_URL=postgresql://prod_user:***@prod-db.amazonaws.com/fraiseql_prod
+        DB_POOL_SIZE=20
+        DB_MAX_OVERFLOW=10
+        CORS_ORIGINS=https://example.com,https://app.example.com
+        ```
+
+    - number: 4
+      title: "Monitor connection pool"
+      description: |
+        ```python
+        @app.get("/health/db-pool")
+        async def health_db_pool():
+            # Get pool stats (implementation depends on DB driver)
+            pool = fraiseql_config._pool  # Access internal pool
+            return {
+                "size": pool.size(),
+                "checked_out": pool.checkedout(),
+                "overflow": pool.overflow(),
+                "total": pool.size() + pool.overflow()
+            }
+
+        # Set up monitoring/alerting
+        # Alert if: checked_out / total > 0.8 (80% utilization)
+        ```
+
+    - number: 5
+      title: "Test configuration"
+      description: |
+        ```python
+        def test_config_development():
+            config = create_config()
+            # Assumes APP_ENV=development
+            assert config.enable_playground is True
+            assert config.database_pool_size == 5
+
+        def test_config_production():
+            os.environ['APP_ENV'] = 'production'
+            config = create_config()
+            assert config.enable_playground is False
+            assert config.introspection_policy == IntrospectionPolicy.DISABLED
+            assert config.database_pool_size == 20
+        ```
+
+examples:
+  example_1:
+    title: "Development Configuration"
+    description: "Permissive settings for local development"
+    code: |
+      FraiseQLConfig(
+          database_url="postgresql://localhost:5432/fraiseql_dev",
+          environment="development",
+          database_pool_size=5,
+          auto_camel_case=True,
+          introspection_policy=IntrospectionPolicy.PUBLIC,
+          enable_playground=True,
+          max_query_depth=10,
+          complexity_enabled=False,
+          cors_enabled=True,
+          cors_origins=["http://localhost:3000"]
+      )
+
+  example_2:
+    title: "Production Configuration"
+    description: "Secure, performance-optimized settings"
+    code: |
+      FraiseQLConfig(
+          database_url=os.getenv('DATABASE_URL'),
+          environment="production",
+          database_pool_size=20,
+          database_max_overflow=10,
+          auto_camel_case=True,
+          introspection_policy=IntrospectionPolicy.DISABLED,
+          enable_playground=False,
+          max_query_depth=10,
+          complexity_enabled=True,
+          cors_enabled=True,
+          cors_origins=["https://example.com", "https://app.example.com"]
+      )
+
+  example_3:
+    title: "Environment-Based Configuration"
+    description: "Single config function for all environments"
+    code: |
+      def create_fraiseql_config() -> FraiseQLConfig:
+          env = os.getenv('APP_ENV', 'development')
+          is_production = env == 'production'
+
+          return FraiseQLConfig(
+              database_url=os.getenv('DATABASE_URL'),
+              environment=env,
+              database_pool_size=int(os.getenv('DB_POOL_SIZE', 20 if is_production else 5)),
+              auto_camel_case=True,
+              introspection_policy=(
+                  IntrospectionPolicy.DISABLED if is_production
+                  else IntrospectionPolicy.PUBLIC
+              ),
+              enable_playground=not is_production,
+              max_query_depth=10,
+              complexity_enabled=is_production,
+          )
+
+comparison_matrix:
+  setting:
+    database_pool_size: "Number of concurrent connections"
+    database_max_overflow: "Additional connections for spikes"
+    auto_camel_case: "Field name conversion"
+    introspection_policy: "Schema query permission"
+    enable_playground: "GraphQL playground UI"
+    max_query_depth: "Maximum nesting depth"
+
+  development:
+    database_pool_size: "5"
+    database_max_overflow: "5"
+    auto_camel_case: "True"
+    introspection_policy: "PUBLIC"
+    enable_playground: "True"
+    max_query_depth: "10"
+
+  production:
+    database_pool_size: "20"
+    database_max_overflow: "10"
+    auto_camel_case: "True"
+    introspection_policy: "DISABLED"
+    enable_playground: "False"
+    max_query_depth: "10"
+
+recommendation_matrix:
+  - setting: "database_pool_size"
+    development: "5"
+    production: "20-50"
+    reasoning: "Development: low concurrency | Production: scale to concurrent users"
+
+  - setting: "introspection_policy"
+    development: "PUBLIC"
+    production: "DISABLED"
+    reasoning: "Protect schema in production"
+
+  - setting: "enable_playground"
+    development: "True"
+    production: "False"
+    reasoning: "Debug locally, lock down production"
+
+  - setting: "max_query_depth"
+    development: "10"
+    production: "10"
+    reasoning: "Consistent limit; prevent expensive queries"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Configuration is like restaurant settings:
+      - Kitchen size (pool_size) = number of chefs who can cook simultaneously
+      - Backup chefs (max_overflow) = additional chefs for rush hours
+      - Rules (max_query_depth) = prevent customer orders too complex to cook
+
+      Wrong settings = chaos; right settings = smooth operation!
+
+    focus: "Why configuration matters and what settings do"
+    key_points:
+      - "pool_size = concurrent requests (not total users)"
+      - "auto_camel_case converts field names automatically"
+      - "Disable playground/introspection in production"
+      - "max_query_depth prevents expensive queries"
+
+  intermediate:
+    focus: "Environment-specific configuration"
+    key_points:
+      - "Development: permissive (playground, introspection enabled)"
+      - "Production: restrictive (playground disabled, introspection disabled)"
+      - "Use environment variables for secrets (DATABASE_URL)"
+      - "Right-size pool for expected load"
+      - "Monitor pool utilization; alert if exhausted"
+
+  advanced:
+    focus: "Production tuning and security hardening"
+    key_points:
+      - "Dynamic pool sizing based on load"
+      - "Monitor connection pool metrics (active, waiting, size)"
+      - "Separate DB credentials per environment"
+      - "CORS whitelist prevents unauthorized origins"
+      - "Query complexity limits prevent DoS attacks"
+      - "Regular config audits (security, performance)"

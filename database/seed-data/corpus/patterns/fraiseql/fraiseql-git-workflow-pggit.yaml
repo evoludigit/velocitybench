@@ -1,0 +1,315 @@
+id: fraiseql-git-workflow-pggit
+name: "FraiseQL Git Workflow with pgGit"
+category: fraiseql
+type: standard
+tags:
+  - fraiseql
+  - pggit
+  - git-workflow
+  - version-control
+  - schema-branching
+
+summary:
+  short: "Git-like version control for FraiseQL database schemas using pgGit"
+  long: |
+    pgGit brings Git workflow concepts (branch, merge, diff, history) to PostgreSQL databases.
+    Combined with FraiseQL, it enables schema experimentation, parallel feature development,
+    and code-like review process for database changes. Developers can branch the database,
+    experiment with schema changes, merge changes, and generate migrations for production deployment.
+
+problem:
+  description: |
+    Database schema evolution lacks version control conveniences:
+    - Can't try different approaches without committing
+    - Can't branch schema for parallel features
+    - Can't revert schema to previous state easily
+    - No diff of "what changed between versions"
+    - No history of "who changed what when"
+
+  symptoms:
+    - name: "Schema experimentation risky"
+      description: "Try different approaches, but hard to revert"
+      detection: "Scared to experiment on database"
+
+    - name: "Parallel schema work difficult"
+      description: "Two developers need different schema approaches"
+      detection: "Can't work on separate branches"
+
+    - name: "No schema history"
+      description: "Can't see what changed, when, why"
+      detection: "Who changed this column? When? Why?"
+
+    - name: "Merge conflicts on schema"
+      description: "Two branches modified same table differently"
+      detection: "Manual merge required"
+
+  impact: |
+    Risk aversion, serial development, hard to debug schema issues
+
+solution:
+  principle: "Apply Git workflows to database schemas via pgGit"
+
+  components:
+    - name: "Schema Branching"
+      type: "Version control"
+      purpose: "Isolate schema changes without affecting main"
+      pattern: |
+        git branch feature/payments
+        SELECT pggit.create_branch('feature/payments');
+        SELECT pggit.checkout('feature/payments');
+
+        -- Make schema changes on this branch
+        ALTER TABLE tb_user ADD COLUMN stripe_id TEXT;
+        ALTER TABLE tb_user ADD COLUMN stripe_status TEXT;
+
+        -- Switch back to main
+        SELECT pggit.checkout('main');
+
+      benefit: |
+        - Isolated changes (don't affect main database)
+        - Easy to revert (just switch branch)
+        - Test before merging
+        - Parallel feature development
+
+    - name: "Schema Diff"
+      type: "Comparison tool"
+      purpose: "See what changed between branches"
+      pattern: |
+        SELECT pggit.diff('main', 'feature/payments');
+
+        Output:
+        - users: Added stripe_id, stripe_status columns
+        - users: Added index on stripe_id
+        - Added new stripe_metadata table
+
+      benefit: |
+        - Understand what changed
+        - Review before merging
+        - Documentation of changes
+
+    - name: "Schema Merge"
+      type: "Integration"
+      purpose: "Merge changes from branch to main"
+      pattern: |
+        SELECT pggit.checkout('main');
+        SELECT pggit.merge('feature/payments');
+
+        -- If conflicts:
+        SELECT pggit.status();  -- Show conflicts
+        -- Resolve conflicts manually
+        SELECT pggit.merge_resolve(...);
+        SELECT pggit.merge_commit('Merged payments feature');
+
+      benefit: |
+        - Combine branches safely
+        - Conflict detection
+        - Reversible merges
+
+    - name: "Schema History"
+      type: "Version tracking"
+      purpose: "See who changed what when"
+      pattern: |
+        SELECT * FROM pggit.log('feature/payments');
+
+        Output:
+        Commit | Author | Date | Message
+        - abc123 | claude | 2025-01-29 10:00 | Add stripe_id to users
+        - def456 | gpt | 2025-01-29 11:00 | Add stripe_status and index
+        - ghi789 | claude | 2025-01-29 12:00 | Add stripe_metadata table
+
+      benefit: |
+        - Audit trail of schema changes
+        - Understand reasoning
+        - Revert to previous version
+
+    - name: "Development Workflow"
+      type: "Workflow pattern"
+      purpose: "Multi-branch parallel development"
+      flow: |
+        Main Branch: Current production schema
+
+        Feature Branch 1 (Alice): Payments feature
+        - Branch: feature/payments
+        - Changes: Add stripe_id, stripe_status
+        - Test: Local test database with changes
+
+        Feature Branch 2 (Bob): Analytics feature
+        - Branch: feature/analytics
+        - Changes: Add analytics tables, views
+        - Test: Local test database with changes
+
+        Merge: When ready for production
+        - Merge feature/payments into main
+        - Merge feature/analytics into main
+        - Generate migrations
+        - Deploy to production
+
+    - name: "Integration with Confiture"
+      type: "Migration generation"
+      purpose: "Generate migrations from pgGit branches"
+      pattern: |
+        # On development database with pgGit
+        SELECT pggit.checkout('feature/payments');
+        -- Make changes...
+        SELECT pggit.checkout('main');
+        SELECT pggit.merge('feature/payments');
+
+        # Generate migration from merged state
+        confiture migrate generate \
+          --name 'stripe_payment_integration' \
+          --from main \
+          --to feature/payments
+
+        # Apply to production
+        confiture migrate apply --env production
+
+key_concepts:
+  concept_1: "pgGit brings Git concepts to database schemas"
+  concept_2: "Branches isolate schema changes without affecting main"
+  concept_3: "Diff shows exactly what changed between versions"
+  concept_4: "Merge combines branches with conflict detection"
+  concept_5: "History tracks who changed what when why"
+  concept_6: "Experimentation safe (easy to revert)"
+  concept_7: "Parallel development via branching"
+  concept_8: "Migrations generated from merged branches"
+
+best_practices:
+  - name: "Create branch per feature"
+    description: "feature/payments, feature/analytics, feature/search"
+
+  - name: "Use meaningful branch names"
+    description: "Describe what the feature does"
+
+  - name: "Review diffs before merging"
+    description: "Use pggit.diff to understand changes"
+
+  - name: "Merge frequently"
+    description: "Reduce conflicts with frequent merges"
+
+  - name: "Test before merging"
+    description: "Verify changes work in isolated branch"
+
+  - name: "Document changes"
+    description: "Commit messages describe why and what"
+
+  - name: "Generate migrations after merge"
+    description: "Confiture handles merge → migration"
+
+anti_patterns:
+  - name: "Long-lived branches"
+    description: "Branch exists for months without merging"
+    consequence: "Merge conflicts accumulate"
+    fix: "Merge frequently (daily or better)"
+
+  - name: "No review before merge"
+    description: "Merge without reviewing diff"
+    consequence: "Bad changes merged"
+    fix: "Review pggit.diff before merging"
+
+  - name: "Conflicting branches"
+    description: "Two branches modify same table differently"
+    consequence: "Hard to merge"
+    fix: "Coordinate via Confiture multi-agent system"
+
+  - name: "No documentation"
+    description: "Commit without explaining change"
+    consequence: "Future developers don't understand why"
+    fix: "Write clear commit messages"
+
+examples:
+  example_1:
+    title: "Basic Branch Workflow"
+    description: "Create branch, make changes, merge"
+    code: |
+      -- Create and checkout branch
+      SELECT pggit.create_branch('feature/payments');
+      SELECT pggit.checkout('feature/payments');
+
+      -- Make changes
+      ALTER TABLE tb_user ADD COLUMN stripe_id TEXT UNIQUE;
+      CREATE INDEX idx_user_stripe ON tb_user(stripe_id);
+
+      -- Review changes (before merging)
+      SELECT pggit.diff('main', 'feature/payments');
+      -- Output: Added stripe_id column, added index
+
+      -- Merge to main
+      SELECT pggit.checkout('main');
+      SELECT pggit.merge('feature/payments');
+
+  example_2:
+    title: "Parallel Feature Development"
+    description: "Two features developed independently"
+    code: |
+      -- Feature 1: Payments (Alice)
+      SELECT pggit.create_branch('feature/payments');
+      SELECT pggit.checkout('feature/payments');
+      -- Add stripe_id, stripe_status
+
+      -- Feature 2: Analytics (Bob)
+      SELECT pggit.create_branch('feature/analytics');
+      SELECT pggit.checkout('feature/analytics');
+      -- Add analytics tables, views
+
+      -- Both work independently, merge when ready
+      SELECT pggit.checkout('main');
+      SELECT pggit.merge('feature/payments');
+      SELECT pggit.merge('feature/analytics');
+
+  example_3:
+    title: "Schema History"
+    description: "View who changed what"
+    code: |
+      SELECT * FROM pggit.log('main') LIMIT 10;
+
+      Output:
+      Commit | Author | Date | Message
+      abc123 | claude | 2025-01-29 | Add user profiles
+      def456 | gpt | 2025-01-28 | Add post comments
+      ghi789 | bot | 2025-01-27 | Add auth system
+
+comparison_matrix:
+  aspect:
+    main_branch: "Production schema"
+    feature_branch: "Experimental schema"
+
+  isolation:
+    main_branch: "Shared, affects all"
+    feature_branch: "Isolated, affects only this branch"
+
+  use_case:
+    main_branch: "Current state, always deployable"
+    feature_branch: "Experimental, work in progress"
+
+  merge_process:
+    main_branch: "N/A (base)"
+    feature_branch: "Merge into main when ready"
+
+  diff_available:
+    main_branch: "Against any branch"
+    feature_branch: "Against main or other branches"
+
+blog_hooks:
+  beginner:
+    focus: "Understanding Git-like workflows for schema"
+    key_points:
+      - "Branch: isolate schema changes"
+      - "Merge: combine changes from branches"
+      - "Diff: see what changed"
+      - "History: track who changed what"
+
+  intermediate:
+    focus: "Parallel development and branching strategies"
+    key_points:
+      - "Create feature branch per feature"
+      - "Experiment safely without affecting main"
+      - "Review diffs before merging"
+      - "Merge frequently to avoid conflicts"
+
+  advanced:
+    focus: "Complex workflows and integration"
+    key_points:
+      - "Multi-branch merges"
+      - "Conflict resolution strategies"
+      - "Migration generation from branches"
+      - "Coordination with Confiture"

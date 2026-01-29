@@ -1,0 +1,531 @@
+id: fraiseql-batch-operations
+name: "FraiseQL Batch Operations Patterns"
+category: fraiseql
+type: standard
+tags:
+  - fraiseql
+  - batch-operations
+  - performance
+  - mutations
+  - bulk-updates
+
+summary:
+  short: "Efficient bulk INSERT, UPDATE, DELETE operations through batch mutations"
+  long: |
+    Batch operations allow processing multiple records with single database queries instead of
+    per-record round trips. FraiseQL supports multiple batching patterns: ARRAY operations,
+    ANY clauses, CTEs with multi-row inserts, and batch mutations. Choosing the right pattern
+    based on operation size and complexity is critical for bulk data processing performance.
+
+problem:
+  description: |
+    Processing multiple records without batching causes N round trips:
+    - Update 100 users: 100 separate UPDATE queries (1 second)
+    - With batching: 1 UPDATE query (10ms) - 100× speedup
+
+    Developers must understand which batch pattern works best for their use case.
+
+  symptoms:
+    - name: "Slow bulk updates"
+      description: "Updating 100 records takes 1 second (should be 10ms)"
+      detection: "100 separate UPDATE queries in slow_log"
+
+    - name: "Connection pool exhaustion"
+      description: "Bulk operation drains connection pool during processing"
+      detection: "Connection timeout during batch operation"
+
+    - name: "Memory issues"
+      description: "Large batch operations cause memory spikes"
+      detection: "Out of memory during bulk INSERT"
+
+  impact: |
+    Poor performance for bulk operations, connection pool exhaustion,
+    poor user experience for batch processing, cascading failures
+
+solution:
+  principle: "Use SQL-level batching to minimize round trips and maximize throughput"
+
+  components:
+    - name: "ARRAY-Based Batching"
+      type: "SQL pattern"
+      use_case: "Bulk operations with simple where clauses"
+      strategy: |
+        Use PostgreSQL ARRAY functions for efficient filtering:
+        ```sql
+        -- Old way (N queries)
+        UPDATE tb_user SET is_active = false WHERE id = 1;
+        UPDATE tb_user SET is_active = false WHERE id = 2;
+        ...
+        UPDATE tb_user SET is_active = false WHERE id = 100;
+
+        -- Batched way (1 query)
+        UPDATE tb_user SET is_active = false
+        WHERE id = ANY(ARRAY[1, 2, 3, ..., 100]::INTEGER[]);
+        ```
+      benefit: "Single query processes all records"
+      example: |
+        async def deactivate_users(user_ids: list[int]):
+            """Deactivate multiple users in single query."""
+            return await db.execute("""
+                UPDATE tb_user
+                SET is_active = false, updated_at = NOW()
+                WHERE id = ANY(%s)
+                RETURNING pk_user
+            """, (user_ids,))
+
+    - name: "ANY Clause Pattern"
+      type: "SQL pattern"
+      use_case: "Filtering on multiple columns"
+      strategy: |
+        ```sql
+        -- Batch delete with multiple conditions
+        DELETE FROM tb_post
+        WHERE (fk_author, status) = ANY(
+          ARRAY[(1, 'draft'), (2, 'archived'), (3, 'spam')]
+        );
+        ```
+      benefit: "Complex filtering in single query"
+      example: |
+        async def delete_posts_by_author_status(items: list[tuple[int, str]]):
+            """Delete posts matching (author_id, status) pairs."""
+            return await db.execute("""
+                DELETE FROM tb_post
+                WHERE (fk_author, status) = ANY(%s)
+                RETURNING pk_post
+            """, (items,))
+
+    - name: "Multi-Row INSERT"
+      type: "SQL pattern"
+      use_case: "Bulk inserts with multiple records"
+      strategy: |
+        ```sql
+        -- Old way (N queries)
+        INSERT INTO tb_user (email, name) VALUES ('alice@example.com', 'Alice');
+        INSERT INTO tb_user (email, name) VALUES ('bob@example.com', 'Bob');
+        ...
+
+        -- Batched way (1 query)
+        INSERT INTO tb_user (email, name) VALUES
+          ('alice@example.com', 'Alice'),
+          ('bob@example.com', 'Bob'),
+          ('charlie@example.com', 'Charlie')
+        RETURNING pk_user, email;
+        ```
+      benefit: "All inserts in single query with RETURNING"
+      example: |
+        async def create_users_batch(users: list[dict]):
+            """Create multiple users in single query."""
+            values = [(u['email'], u['name']) for u in users]
+            return await db.fetch("""
+                INSERT INTO tb_user (email, name) VALUES
+            """ + ",".join(["(%s, %s)"] * len(values)) + """
+                RETURNING pk_user, email, created_at
+            """, sum(values, ()))
+
+    - name: "CTE-Based Batching"
+      type: "SQL pattern"
+      use_case: "Complex batch operations with dependencies"
+      strategy: |
+        ```sql
+        WITH new_users AS (
+          INSERT INTO tb_user (email, name) VALUES
+            ('alice@example.com', 'Alice'),
+            ('bob@example.com', 'Bob')
+          RETURNING pk_user, email
+        ),
+        new_posts AS (
+          INSERT INTO tb_post (fk_user, title) VALUES
+            ((SELECT pk_user FROM new_users WHERE email = 'alice@example.com'), 'Alice Post 1'),
+            ((SELECT pk_user FROM new_users WHERE email = 'bob@example.com'), 'Bob Post 1')
+          RETURNING pk_post, fk_user
+        )
+        SELECT * FROM new_users, new_posts;
+        ```
+      benefit: "Chain multiple batch operations with RETURNING"
+      example: |
+        async def create_users_with_posts(batch_data: list[dict]):
+            """Create users and posts in single transaction."""
+            # Complex CTE for related inserts
+            # All in single round-trip
+
+    - name: "Batch Mutation Pattern"
+      type: "GraphQL pattern"
+      use_case: "Bulk operations via GraphQL mutations"
+      decorators: |
+        ```python
+        @fraiseql.mutation(function="benchmark.batch_create_posts")
+        class BatchCreatePosts:
+            input: BatchCreatePostsInput  # List of posts
+            success: BatchCreatePostsSuccess  # Results
+            error: BatchCreatePostsError
+        ```
+      benefit: "GraphQL API with batch semantics"
+      example: |
+        @dataclass
+        class BatchCreatePostsInput:
+            posts: list[CreatePostInput]  # Multiple posts
+
+        @fraiseql.success
+        class BatchCreatePostsSuccess:
+            created_posts: list[Post]
+            total_count: int
+
+        async def batch_create_posts(
+            info: GraphQLResolveInfo,
+            input: BatchCreatePostsInput
+        ) -> BatchCreatePostsSuccess:
+            # All inserts in single query via CTE
+            results = await create_posts_batch(input.posts)
+            return BatchCreatePostsSuccess(
+                created_posts=results,
+                total_count=len(results)
+            )
+
+    - name: "Batch Size Optimization"
+      type: "Operational pattern"
+      purpose: "Find optimal batch size for throughput"
+      guidance: |
+        Batch size affects performance:
+        - Too small (<10): Overhead dominates, slow
+        - Optimal (100-1000): Best throughput
+        - Too large (>10000): Memory issues, network bloat
+
+        Test with realistic data:
+        ```python
+        for batch_size in [10, 50, 100, 500, 1000, 5000]:
+            time_for_1000 = benchmark_batch_operation(1000, batch_size)
+            print(f"Batch {batch_size}: {time_for_1000}ms")
+        ```
+
+key_concepts:
+  concept_1: "Batch operations minimize round trips (1 instead of N)"
+  concept_2: "ARRAY clauses efficiently filter/process multiple records"
+  concept_3: "Multi-row INSERT returns all inserted records with RETURNING"
+  concept_4: "CTEs enable chaining dependent batch operations"
+  concept_5: "Batch mutations provide GraphQL API for bulk operations"
+  concept_6: "Optimal batch size is 100-1000 records per query"
+  concept_7: "Monitor batch operation performance; alert if >1000ms"
+  concept_8: "Test batch operations with realistic record counts"
+
+implementation_considerations:
+  consideration_1: "Test batch size optimization with realistic data volume"
+  consideration_2: "Implement batch size limits to prevent memory issues"
+  consideration_3: "Use RETURNING clause to get results back from batch"
+  consideration_4: "Handle partial failures in batch operations"
+  consideration_5: "Log batch operation performance metrics"
+  consideration_6: "Break large batches into smaller chunks if memory constrained"
+  consideration_7: "Use transactions for atomicity if needed"
+  consideration_8: "Monitor database load during batch operations"
+  consideration_9: "Implement retry logic for transient failures"
+  consideration_10: "Document batch size limits in API documentation"
+
+best_practices:
+  - name: "Use ARRAY for simple filtering"
+    description: "WHERE id = ANY(array) more efficient than multiple WHERE"
+
+  - name: "Batch inserts with VALUES list"
+    description: "INSERT (col1, col2) VALUES (...), (...) in single query"
+
+  - name: "Use RETURNING for results"
+    description: "Get all inserted/updated IDs in single round trip"
+
+  - name: "Limit batch size"
+    description: "Cap at 1000-5000 records to avoid memory issues"
+
+  - name: "Test with realistic data"
+    description: "Batch performance changes at scale"
+
+  - name: "Use CTEs for dependent batches"
+    description: "Chain inserts/updates in single query via WITH clause"
+
+  - name: "Monitor batch performance"
+    description: "Alert if batch operations exceed 1 second"
+
+  - name: "Implement error handling"
+    description: "Handle partial failures in batch operations"
+
+anti_patterns:
+  - name: "N separate queries instead of batch"
+    description: "Update 100 records with 100 separate queries"
+    consequence: "100 round trips, 1 second when should be 10ms"
+    fix: "Use ARRAY clause or multi-row UPDATE"
+
+  - name: "Unbounded batch size"
+    description: "Batch 100,000 records in single query"
+    consequence: "Memory exhaustion, network bloat"
+    fix: "Limit batch size to 1000-5000 records"
+
+  - name: "No error handling"
+    description: "Batch operation fails silently, data inconsistent"
+    consequence: "Partial data corruption, hard to debug"
+    fix: "Implement transaction rollback and error handling"
+
+  - name: "Batch without RETURNING"
+    description: "INSERT 100 records but can't get their IDs"
+    consequence: "Have to query back inserted records (extra query)"
+    fix: "Always use RETURNING for results"
+
+  - name: "Complex batching in application"
+    description: "Application logic tries to batch (DataLoader, etc.)"
+    consequence: "Complexity, inefficiency, potential bugs"
+    fix: "Use SQL-level batching (ARRAY, multi-row INSERT)"
+
+implementation:
+  title: "Implementing Batch Operations"
+  steps:
+    - number: 1
+      title: "Profile current performance"
+      description: |
+        Measure non-batched baseline:
+        ```python
+        async def update_user_status_slow(user_ids: list[int], status: str):
+            """Non-batched updates (N queries)."""
+            for user_id in user_ids:
+                await db.execute(
+                    "UPDATE tb_user SET status = %s WHERE id = %s",
+                    (status, user_id)
+                )
+            # For 100 users: ~100ms
+
+        async def update_user_status_batched(user_ids: list[int], status: str):
+            """Batched update (1 query)."""
+            await db.execute(
+                "UPDATE tb_user SET status = %s WHERE id = ANY(%s)",
+                (status, user_ids)
+            )
+            # For 100 users: ~1ms (100× faster)
+        ```
+
+    - number: 2
+      title: "Implement ARRAY-based batching"
+      description: |
+        ```python
+        async def batch_update_users(updates: list[tuple[int, str]]):
+            """Update multiple users with different values in single query."""
+            # Convert [(id, status), ...] to arrays
+            ids = [u[0] for u in updates]
+            statuses = [u[1] for u in updates]
+
+            return await db.fetch("""
+                UPDATE tb_user SET status = u.status
+                FROM (
+                  SELECT UNNEST(%s::INTEGER[]) as id,
+                         UNNEST(%s::TEXT[]) as status
+                ) u
+                WHERE tb_user.id = u.id
+                RETURNING pk_user, status
+            """, (ids, statuses))
+        ```
+
+    - number: 3
+      title: "Implement multi-row INSERT"
+      description: |
+        ```python
+        async def batch_create_posts(posts: list[dict]):
+            """Insert multiple posts in single query."""
+            values = [
+                (p['fk_author'], p['title'], p['content'])
+                for p in posts
+            ]
+
+            placeholders = ",".join(
+                [f"(%s, %s, %s)"] * len(values)
+            )
+
+            return await db.fetch(f"""
+                INSERT INTO tb_post (fk_author, title, content)
+                VALUES {placeholders}
+                RETURNING pk_post, created_at
+            """, sum(values, ()))
+        ```
+
+    - number: 4
+      title: "Implement batch mutation"
+      description: |
+        ```python
+        @fraiseql.input
+        class BatchCreateUsersInput:
+            users: list[CreateUserInput]
+
+        @fraiseql.success
+        class BatchCreateUsersSuccess:
+            created_users: list[User]
+            total_count: int
+
+        async def batch_create_users(
+            info: GraphQLResolveInfo,
+            input: BatchCreateUsersInput
+        ) -> BatchCreateUsersSuccess:
+            # Convert to batch insert
+            rows = await db.fetch("""
+                INSERT INTO tb_user (email, name) VALUES
+            """ + ",".join(["(%s, %s)"] * len(input.users)) + """
+                RETURNING pk_user, email, name, created_at
+            """, sum([(u.email, u.name) for u in input.users], ()))
+
+            return BatchCreateUsersSuccess(
+                created_users=[User(**row) for row in rows],
+                total_count=len(rows)
+            )
+        ```
+
+    - number: 5
+      title: "Optimize batch size"
+      description: |
+        ```python
+        async def benchmark_batch_size():
+            """Find optimal batch size for this workload."""
+            test_sizes = [10, 50, 100, 500, 1000, 5000]
+
+            for batch_size in test_sizes:
+                users = [{"email": f"user{i}@example.com"} for i in range(batch_size)]
+
+                start = time.time()
+                await batch_create_users(users)
+                elapsed = time.time() - start
+
+                throughput = batch_size / elapsed
+                print(f"Batch {batch_size}: {elapsed*1000:.1f}ms ({throughput:.0f} recs/sec)")
+
+            # Choose size with best throughput for your hardware
+        ```
+
+    - number: 6
+      title: "Test with realistic data"
+      description: |
+        ```python
+        def test_batch_operations():
+            # Test various batch sizes
+            for batch_size in [100, 500, 1000]:
+                users = factory.create_users(batch_size)
+
+                result = batch_update_users([
+                    (u.pk, 'inactive') for u in users
+                ])
+
+                assert len(result) == batch_size
+                assert all(r['status'] == 'inactive' for r in result)
+        ```
+
+examples:
+  example_1:
+    title: "Batch Update with ARRAY"
+    description: "Update multiple records in single query"
+    code: |
+      -- Update 100 users to inactive in single query
+      UPDATE tb_user
+      SET is_active = false, updated_at = NOW()
+      WHERE id = ANY(ARRAY[1, 2, 3, ..., 100]::INTEGER[])
+      RETURNING pk_user, is_active;
+
+      -- Performance: 1ms (vs 100ms with individual queries)
+
+  example_2:
+    title: "Batch Insert with RETURNING"
+    description: "Insert multiple records and get results"
+    code: |
+      -- Insert 50 posts and get their IDs
+      INSERT INTO tb_post (fk_author, title, content) VALUES
+        (1, 'Post 1', 'Content 1'),
+        (1, 'Post 2', 'Content 2'),
+        (2, 'Post 3', 'Content 3'),
+        ...
+      RETURNING pk_post, created_at;
+
+      -- Performance: 1 query + RETURNING (not N queries)
+
+  example_3:
+    title: "Batch with UNNEST"
+    description: "Update different values per record"
+    code: |
+      -- Update multiple users with different statuses
+      UPDATE tb_user SET status = u.status
+      FROM (
+        SELECT UNNEST(ARRAY[1, 2, 3]::INTEGER[]) as id,
+               UNNEST(ARRAY['active', 'inactive', 'pending']::TEXT[]) as status
+      ) u
+      WHERE tb_user.id = u.id
+      RETURNING pk_user, status;
+
+comparison_matrix:
+  pattern:
+    individual: "N separate queries"
+    array_clause: "WHERE id = ANY(array)"
+    multi_row: "INSERT VALUES (), (), ()"
+    cte_batch: "WITH clause for dependencies"
+
+  best_for:
+    individual: "Single record operations"
+    array_clause: "Simple filtering/updates"
+    multi_row: "Bulk inserts/deletes"
+    cte_batch: "Dependent operations"
+
+  queries_needed:
+    individual: "N (one per record)"
+    array_clause: "1"
+    multi_row: "1"
+    cte_batch: "1"
+
+  performance_100_records:
+    individual: "~100ms (N round trips)"
+    array_clause: "~1ms"
+    multi_row: "~1ms"
+    cte_batch: "~2ms"
+
+  complexity:
+    individual: "Low (simple loop)"
+    array_clause: "Low (simple SQL)"
+    multi_row: "Medium (SQL string building)"
+    cte_batch: "High (complex SQL)"
+
+recommendation_matrix:
+  - scenario: "Deactivate 100 users"
+    strategy: "ARRAY clause"
+    reasoning: "Simple update, single condition"
+
+  - scenario: "Create 1000 posts"
+    strategy: "Multi-row INSERT"
+    reasoning: "Bulk insert, standard pattern"
+
+  - scenario: "Update different values per record"
+    strategy: "UNNEST + ARRAY"
+    reasoning: "Complex update, needs per-record values"
+
+  - scenario: "Create users then posts (dependent)"
+    strategy: "CTE-based batching"
+    reasoning: "Need IDs from insert for foreign keys"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Batching is like grocery shopping:
+      - Individual: Go to store for bread. Come back. Go for milk. Come back. (100 trips)
+      - Batch: Make list, one trip, get everything. (1 trip)
+
+      SQL batching is one trip for everything instead of N trips.
+
+    focus: "Understanding batch operation benefits"
+    key_points:
+      - "Batch: 1 query for 100 records (1ms)"
+      - "Individual: 100 queries for 100 records (100ms)"
+      - "Use ARRAY for filtering in WHERE clause"
+      - "Use multi-row INSERT for bulk inserts"
+
+  intermediate:
+    focus: "Implementing different batch patterns"
+    key_points:
+      - "ARRAY clause for simple updates/deletes"
+      - "Multi-row INSERT for bulk inserts"
+      - "UNNEST for per-record value updates"
+      - "CTEs for dependent batch operations"
+      - "Always use RETURNING for results"
+
+  advanced:
+    focus: "Optimization and edge cases"
+    key_points:
+      - "Optimal batch size: 100-1000 records"
+      - "Test batch size optimization with real data"
+      - "Handle partial failures in batches"
+      - "Monitor batch operation performance"
+      - "Memory considerations for large batches"
+      - "Use streaming for massive batches (100K+)"

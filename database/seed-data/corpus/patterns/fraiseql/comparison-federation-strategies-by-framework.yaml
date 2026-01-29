@@ -1,0 +1,508 @@
+id: comparison-federation-strategies-by-framework
+name: "Framework Comparison: GraphQL Federation Strategies (Apollo v2 vs PostGraphile vs FraiseQL)"
+category: fraiseql
+type: comparison
+tags:
+  - framework-comparison
+  - graphql-architecture
+  - federation
+  - distributed-schema
+
+summary:
+  short: "Compare federation approaches across Apollo, PostGraphile, and FraiseQL"
+  long: |
+    As GraphQL APIs grow across multiple services, teams need federation—a way to compose
+    schemas from multiple sources into a unified graph. Different frameworks take different approaches:
+    Apollo Federation v2 (subgraph composition), PostGraphile (foreign key federation), FraiseQL (Python decorators).
+    This comparison helps teams choose the right federation strategy for their scale and architecture.
+
+problem:
+  description: |
+    At scale, a single monolithic GraphQL schema becomes a bottleneck:
+    - Teams can't coordinate schema changes
+    - Deployments require coordination
+    - Different services own different domains
+    - Need a way to compose schemas from multiple services
+
+    Federation solves this, but approaches vary:
+    - Apollo: Gateway composes subgraphs (most popular)
+    - PostGraphile: Database relationships across databases
+    - FraiseQL: Python decorators mirror Apollo's pattern
+
+comparison:
+  approach_1:
+    name: "Apollo Federation v2 (Subgraph Composition)"
+    philosophy: "Multiple GraphQL services (subgraphs) composed by gateway"
+
+    workflow: |
+      Apollo Federation architecture:
+      1. Each team owns a GraphQL subgraph (separate schema)
+      2. Define @key entities (primary keys for composition)
+      3. Use @extends to add fields from other services
+      4. Apollo Router composes subgraphs into unified schema
+      5. Clients query unified schema, router routes queries
+
+      Example subgraph (Users service):
+      ```graphql
+      type User @key(fields: "id") {
+        id: ID!
+        email: String!
+        name: String!
+      }
+      ```
+
+      Example subgraph (Posts service):
+      ```graphql
+      extend type User @key(fields: "id") {
+        id: ID! @external
+        posts: [Post!]!
+      }
+
+      type Post {
+        id: ID!
+        title: String!
+        user: User!
+      }
+      ```
+
+      Unified schema (composed by Apollo Router):
+      ```graphql
+      type User {
+        id: ID!
+        email: String!
+        name: String!
+        posts: [Post!]!  # From Posts service
+      }
+
+      type Post {
+        id: ID!
+        title: String!
+        user: User!
+      }
+      ```
+
+      Client queries unified schema:
+      ```graphql
+      query GetUserWithPosts($userId: ID!) {
+        user(id: $userId) {
+          id
+          name
+          email
+          posts { id, title }
+        }
+      }
+      # Router automatically:
+      # 1. Routes to Users service (id, name, email)
+      # 2. Routes to Posts service (posts)
+      # 3. Composes results
+      ```
+
+    architecture: "Distributed (multiple services, gateway composes)"
+    schema_ownership: "Per-service (each team owns their schema)"
+    composition_model: "Subgraph with @key/@extends directives"
+
+    pros:
+      - "Team autonomy (each service independent)"
+      - "Standard pattern (Apollo federation is industry standard)"
+      - "Language-agnostic (any language can implement subgraph)"
+      - "Incremental adoption (federate one service at a time)"
+      - "Great tooling (Apollo Studio, Rover CLI)"
+      - "Clear ownership (service owns entities)"
+
+    cons:
+      - "Network hops (gateway must call multiple services)"
+      - "Operational complexity (manage multiple services, gateway)"
+      - "Latency increase (8-10ms per service call)"
+      - "Router dependency (need Apollo Router or gateway)"
+      - "Distributed debugging (trace across services)"
+      - "Entity resolution complexity (@key, @requires)"
+
+    best_for: "Large teams (>50), multiple services, independent deployment"
+    deployment_model: "Each subgraph deployed independently"
+    scaling_model: "Horizontal (add more services)"
+
+  approach_2:
+    name: "PostGraphile Cross-Database Federation"
+    philosophy: "Database relationships across multiple PostgreSQL instances"
+
+    workflow: |
+      PostGraphile federation:
+      1. Multiple PostgreSQL databases (one per service)
+      2. Foreign key relationships across databases (via foreign data wrappers)
+      3. PostGraphile introspects all databases
+      4. Schema includes relationships from all databases
+      5. Single GraphQL schema includes all data
+
+      Example architecture:
+      Database 1 (Users):
+      ```sql
+      CREATE TABLE tb_user (
+        id UUID PRIMARY KEY,
+        email VARCHAR NOT NULL
+      );
+      ```
+
+      Database 2 (Posts):
+      ```sql
+      CREATE TABLE tb_post (
+        id UUID PRIMARY KEY,
+        user_id UUID NOT NULL,
+        -- Foreign key to users database via foreign data wrapper
+        FOREIGN KEY (user_id) REFERENCES users_db.tb_user(id)
+      );
+      ```
+
+      PostGraphile introspection creates:
+      ```graphql
+      type User {
+        id: UUID!
+        email: String!
+        posts: [Post!]!  # Via FK relationship
+      }
+
+      type Post {
+        id: UUID!
+        user: User!  # Via FK relationship
+      }
+      ```
+
+      Single GraphQL endpoint queries across databases:
+      ```graphql
+      query GetUserWithPosts($userId: ID!) {
+        user(id: $userId) {
+          email
+          posts { title }
+        }
+      }
+      # PostGraphile automatically joins across databases
+      ```
+
+    architecture: "Distributed (multiple DBs, single GraphQL)"
+    schema_ownership: "Database-driven (schema from DB relationships)"
+    composition_model: "Foreign key relationships across databases"
+
+    pros:
+      - "Single endpoint (no gateway, simpler operations)"
+      - "Auto-generated (introspect databases, no code)"
+      - "Consistent schema (from database constraints)"
+      - "No duplicated types (relationships inferred)"
+      - "Natural permissions (use database RLS)"
+
+    cons:
+      - "Database infrastructure complex (foreign data wrappers)"
+      - "Limited flexibility (schema locked to DB structure)"
+      - "Query optimization limited (can't hand-craft)"
+      - "Not language-neutral (PostGraphile specific)"
+      - "Scaling harder (joins across DB networks)"
+      - "Team coordination still needed (DB changes)"
+
+    best_for: "Teams already using PostgreSQL extensively, database-first orgs"
+    deployment_model: "Databases deployed independently, PostGraphile syncs"
+    scaling_model: "Can replicate, but complex across networks"
+
+  approach_3:
+    name: "FraiseQL Federation (Python Decorators + Apollo Pattern)"
+    philosophy: "Python decorators mirror Apollo Federation, composed at application level"
+
+    workflow: |
+      FraiseQL federation:
+      1. Each service is FraiseQL application (separate Python codebase)
+      2. Define @key on entities (match Apollo pattern)
+      3. Use @extends to add fields from other services
+      4. Services connect via HTTP (or common orchestration)
+      5. Schema composed at framework level (like Apollo Router)
+
+      Example subgraph (Users service):
+      ```python
+      @fraiseql.type
+      @key("id")  # Mark as federation key
+      class User:
+          id: str
+          email: str
+          name: str
+      ```
+
+      Example subgraph (Posts service):
+      ```python
+      @fraiseql.type
+      @key("id")
+      @extends  # Extend User from other service
+      class User:
+          id: str = external()  # External from Users service
+          posts: list[Post]
+
+      @fraiseql.type
+      class Post:
+          id: str
+          title: str
+          user: User
+
+      @fraiseql.query
+      async def posts_for_user(user_id: str) -> list[Post]:
+          return db.get_user_posts(user_id)
+      ```
+
+      FraiseQL federation gateway composes:
+      ```python
+      from fraiseql import create_federated_gateway
+
+      gateway = create_federated_gateway([
+          "http://users-service:4000",
+          "http://posts-service:4000",
+          "http://orders-service:4000"
+      ])
+
+      app = create_app(gateway)
+      ```
+
+      Unified schema (automatically composed):
+      ```graphql
+      type User {
+        id: ID!
+        email: String!
+        name: String!
+        posts: [Post!]!  # From Posts service
+      }
+
+      type Post {
+        id: ID!
+        title: String!
+        user: User!
+      }
+      ```
+
+    architecture: "Distributed (multiple services, Python decorators)"
+    schema_ownership: "Per-service (each FraiseQL app owns their types)"
+    composition_model: "@key/@extends decorators (matches Apollo)"
+
+    pros:
+      - "Apollo-compatible pattern (developers know the model)"
+      - "Python-native (decorators, type hints)"
+      - "Type-safe (Python compiler enforces)"
+      - "Code-first (not database-driven)"
+      - "Team autonomy (each service independent)"
+      - "Same language (Python teams, single skillset)"
+
+    cons:
+      - "Python-only (not language-agnostic like Apollo)"
+      - "Gateway still needed (similar to Apollo Router)"
+      - "Network hops (multiple service calls)"
+      - "Operational complexity (manage multiple services)"
+      - "Latency increase (network overhead)"
+      - "Distributed debugging needed"
+
+    best_for: "Python-first teams, want federation, Apollo-compatible pattern"
+    deployment_model: "Each service deployed independently (Docker, Kubernetes)"
+    scaling_model: "Horizontal (add more services)"
+
+  fraiseql_choice:
+    name: "Federation via @key/@extends Decorators"
+    rationale: |
+      FraiseQL chose **Apollo Federation pattern in Python** because:
+      1. **Industry standard pattern**: Developers know @key/@extends from Apollo
+      2. **Python-native**: Decorators match Python's idioms (not foreign concepts)
+      3. **Type-safe**: Python types ensure entities are consistent
+      4. **Flexible**: Code-first allows hand-optimized queries
+      5. **Team-friendly**: Python teams don't need GraphQL expertise
+
+    implementation_philosophy: |
+      FraiseQL's federation:
+      - @key decorator marks federation keys (matches Apollo)
+      - @extends for adding fields from other services
+      - External references to fields from other services
+      - Gateway composes services at request time
+      - Each service owns its data and resolvers
+
+      Key insight: Federation in Python is more approachable than:
+      - Apollo (JavaScript/TypeScript specific)
+      - PostGraphile (database-specific, less flexible)
+      - Manual composition (too much orchestration)
+
+    assessment_strengths: |
+      ✓ **Familiar pattern**: @key/@extends is industry standard
+      ✓ **Python-native**: Decorators, type hints feel natural
+      ✓ **Type-safe**: Python enforces consistency
+      ✓ **Code-first**: Full control over optimization
+      ✓ **Team autonomy**: Services independent, deploy freely
+      ✓ **Language consistency**: All Python, single skillset
+      ✓ **Incremental**: Federate one service at a time
+
+    assessment_weaknesses: |
+      ✗ **Python-only**: Not language-agnostic like Apollo
+      ✗ **Gateway needed**: Still need composition layer
+      ✗ **Network hops**: Multiple services = multiple calls
+      ✗ **Operational overhead**: Manage multiple services
+      ✗ **Latency increase**: Network round-trips add 10-20ms
+      ✗ **Distributed tracing**: Harder to debug
+      ✗ **Gateway orchestration**: Need to manage gateway service
+
+    when_to_choose_fraiseql_federation: |
+      Choose FraiseQL federation when:
+      - **Python team**: Already using Python
+      - **Familiar with Apollo**: Know @key/@extends pattern
+      - **Multiple domains**: Different teams own different services
+      - **Scale anticipated**: Need independent deployment
+      - **Team autonomy important**: Teams move at own pace
+      - **Incremental federation**: Start with core, add services
+
+    when_apollo_is_better: |
+      Choose Apollo Federation when:
+      - **Multi-language**: Mix of JavaScript, Python, Go, etc.
+      - **Larger ecosystem**: Need more third-party subgraphs
+      - **Apollo tooling**: Studio, Rover, composition checks
+      - **Not Python**: Team doesn't use Python
+
+    when_postgraphile_is_better: |
+      Choose PostGraphile federation when:
+      - **Database-first**: All data in PostgreSQL
+      - **No services**: Single database, multiple logical domains
+      - **Simple relationships**: FK relationships sufficient
+
+benchmarks:
+  scenario: "Get user, their posts, and comments (across 3 services)"
+
+  network_architecture:
+    apollo_federation:
+      services: "3 (Users, Posts, Comments)"
+      composition: "Apollo Router (gateway)"
+      discovery: "SDL registry or rover"
+
+    postgraphile:
+      services: "1 GraphQL, multiple DBs"
+      composition: "Single PostGraphile, foreign data wrappers"
+      discovery: "Database introspection"
+
+    fraiseql:
+      services: "3 (Users, Posts, Comments)"
+      composition: "FraiseQL gateway"
+      discovery: "Service registry or config"
+
+  query_execution:
+    apollo_federation:
+      route_1: "Router → Users service (get user)"
+      route_2: "Router → Posts service (get posts)"
+      route_3: "Router → Comments service (get comments)"
+      total_hops: "3 network calls + composition"
+
+    postgraphile:
+      route_1: "PostgreSQL (users DB join with posts DB join comments DB)"
+      total_hops: "1 logical query, multiple DB calls"
+
+    fraiseql:
+      route_1: "Gateway → Users service"
+      route_2: "Gateway → Posts service"
+      route_3: "Gateway → Comments service"
+      total_hops: "3 network calls, same as Apollo"
+
+  latency_comparison:
+    apollo_federation: "8ms (users) + 10ms (posts) + 9ms (comments) + 3ms (routing) = 30ms"
+    postgraphile: "15ms (single query, cross-DB joins)"
+    fraiseql: "8ms (users) + 10ms (posts) + 9ms (comments) + 3ms (routing) = 30ms"
+
+  developer_experience:
+    apollo_federation: "Standard (industry pattern)"
+    postgraphile: "Simple (introspection), limited flexibility"
+    fraiseql: "Familiar (Python + Apollo pattern)"
+
+  operational_complexity:
+    apollo_federation: "High (manage router, subgraphs, orchestration)"
+    postgraphile: "Medium (manage databases, foreign data wrappers)"
+    fraiseql: "High (manage gateway, services, orchestration)"
+
+decision_matrix:
+  team_programming_languages:
+    question: "Does your team use multiple languages?"
+    answer_yes_multiple: "Apollo Federation (language-agnostic)"
+    answer_no_single_language: "FraiseQL (if Python), Apollo (if JavaScript)"
+
+  database_architecture:
+    question: "Is all data in PostgreSQL?"
+    answer_yes_all_postgres: "PostGraphile (natural federation)"
+    answer_no_multiple_dbs: "Apollo or FraiseQL"
+
+  team_size_and_autonomy:
+    question: "How important is team autonomy?"
+    answer_critical_independent: "Apollo or FraiseQL (service ownership)"
+    answer_coordinated_teams: "PostGraphile (single schema)"
+
+  existing_federation:
+    question: "Do you already use Apollo Federation?"
+    answer_yes_apollo_users: "FraiseQL (compatible pattern)"
+    answer_no_new: "Consider all three"
+
+  scale_expectations:
+    question: "How many services anticipated?"
+    answer_few_services: "PostGraphile (simpler)"
+    answer_many_services: "Apollo or FraiseQL"
+
+trade_off_summary:
+  language_agnostic_vs_native: |
+    Apollo: Language-agnostic (any language)
+    FraiseQL: Python-native (better DX for Python teams)
+    PostGraphile: Database-native (schema from DB)
+
+    **FraiseQL is best for Python teams, Apollo for polyglot orgs.**
+
+  operational_simplicity_vs_flexibility: |
+    PostGraphile: Simple (single gateway, DB foreign keys)
+    Apollo/FraiseQL: Complex (service orchestration), flexible
+
+    **PostGraphile simpler operationally, but less flexible.**
+
+  query_optimization_vs_standard_pattern: |
+    PostGraphile: Auto-optimized (DB handles joins)
+    Apollo/FraiseQL: Manual composition, standard pattern
+
+    **PostGraphile better for query optimization, others better for pattern familiarity.**
+
+recommendations:
+  - "Use Apollo Federation for multi-language organizations (most mature)"
+  - "Use FraiseQL federation for Python-first teams (native patterns)"
+  - "Use PostGraphile federation if all data is PostgreSQL (simplest)"
+  - "Start monolithic, federate when teams/domains separate"
+  - "Accept 10-20ms latency cost of federation for team autonomy"
+  - "Use same pattern across organization (don't mix federation approaches)"
+
+cost_analysis:
+  apollo:
+    apollo_router: "Open source (free) or managed"
+    subgraph_services: "Your infrastructure"
+    operational_cost: "High (manage router + services)"
+    observability: "Apollo Studio (free tier available)"
+
+  postgraphile:
+    postgraphile_server: "Open source (free)"
+    database_infrastructure: "Complex (foreign data wrappers)"
+    operational_cost: "Medium (manage DBs and FDW)"
+    observability: "Limited (database-level)"
+
+  fraiseql:
+    fraiseql_gateway: "Open source (free)"
+    service_infrastructure: "Your servers/containers"
+    operational_cost: "High (manage gateway + services)"
+    observability: "Python logging, standard tools"
+
+blog_hooks:
+  beginner:
+    focus: "Understanding GraphQL federation concepts"
+    key_points:
+      - "Federation: Compose schemas from multiple services"
+      - "Apollo: Industry standard (subgraphs + router)"
+      - "PostGraphile: Database relationships across DBs"
+      - "FraiseQL: Python decorators, Apollo-compatible"
+
+  intermediate:
+    focus: "Federation trade-offs at scale"
+    key_points:
+      - "Apollo: Mature tooling, language-agnostic"
+      - "PostGraphile: Simple if all PostgreSQL"
+      - "FraiseQL: Python-native, same pattern as Apollo"
+      - "All add latency (network hops between services)"
+
+  advanced:
+    focus: "Operational and architectural considerations"
+    key_points:
+      - "Apollo: Complex gateway, standard pattern"
+      - "PostGraphile: Foreign data wrappers, query optimization"
+      - "FraiseQL: Service orchestration, Python type safety"
+      - "Choose based on language, scale, and flexibility needs"

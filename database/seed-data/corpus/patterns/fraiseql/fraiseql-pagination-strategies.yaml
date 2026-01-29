@@ -1,0 +1,490 @@
+id: fraiseql-pagination-strategies
+name: "FraiseQL Pagination Strategies"
+category: fraiseql
+type: standard
+tags:
+  - fraiseql
+  - pagination
+  - performance
+  - offset
+  - keyset
+  - cursors
+
+summary:
+  short: "LIMIT/OFFSET pagination vs keyset-based pagination for efficient large result sets"
+  long: |
+    FraiseQL supports two pagination approaches: traditional LIMIT/OFFSET (simple but slow for large offsets)
+    and keyset-based pagination (fast regardless of position). Understanding when to use each strategy
+    is critical for API performance. LIMIT/OFFSET is appropriate for small result sets and simple UIs.
+    Keyset pagination is essential for large datasets or infinite-scroll interfaces.
+
+problem:
+  description: |
+    Pagination is necessary to avoid overwhelming clients with huge result sets:
+    - User scrolls through 1000s of posts
+    - LIMIT/OFFSET at offset=10000 becomes slow (must scan and skip 10000 rows)
+    - Client needs to know total count (expensive for large tables)
+    - No way to share stable URLs for sorted results
+
+  symptoms:
+    - name: "Slow pagination"
+      description: "OFFSET 10000 LIMIT 10 takes 200ms (should be <50ms)"
+      detection: "EXPLAIN shows full scan up to offset, then LIMIT"
+
+    - name: "Inconsistent results"
+      description: "New record inserted between page requests; result appears twice"
+      detection: "Same record on page 2 and page 3"
+
+    - name: "Missing total count"
+      description: "No COUNT(*) available (expensive to calculate)"
+      detection: "UI cannot show 'Page 5 of 100'"
+
+  impact: |
+    Poor UX for large datasets, database load from expensive scans,
+    unstable result sets when data changes between requests
+
+solution:
+  principle: "Choose pagination strategy based on use case: OFFSET for simple, keyset for complex/large"
+
+  components:
+    - name: "LIMIT/OFFSET Pagination"
+      type: "Simple pagination"
+      use_case: "Small result sets (< 1000 total), page-based UI"
+      pros:
+        - "Simple implementation"
+        - "Works with any ORDER BY"
+        - "Can show total count"
+        - "Familiar to users (Page 1, 2, 3)"
+      cons:
+        - "Slow for large offsets (O(n) scan to skip)"
+        - "Inconsistent results if data changes"
+        - "No stable URLs (offset changes)"
+      performance: |
+        OFFSET 10: ~5ms
+        OFFSET 1000: ~50ms
+        OFFSET 100000: ~1000ms+ (degraded)
+      example: |
+        SELECT * FROM tb_post
+        ORDER BY created_at DESC
+        LIMIT 10 OFFSET 0;  -- Page 1
+        LIMIT 10 OFFSET 10;  -- Page 2
+        LIMIT 10 OFFSET 20;  -- Page 3
+
+    - name: "Keyset Pagination"
+      type: "Efficient pagination"
+      use_case: "Large result sets, infinite scroll, stable URLs"
+      pros:
+        - "Constant performance regardless of position (O(log n))"
+        - "Stable results even if data changes"
+        - "Can create bookmarkable URLs (cursor)"
+        - "Natural for infinite scroll"
+      cons:
+        - "Cannot jump to random page (must page sequentially)"
+        - "Cannot show total count (would require full scan)"
+        - "Requires sortable column (cursor value)"
+      performance: |
+        Fetch next 10: ~10ms (regardless of position)
+        Fetch next 1000: ~10ms (same query cost)
+      example: |
+        -- First page (no cursor)
+        SELECT * FROM tb_post
+        ORDER BY created_at DESC
+        LIMIT 10;
+
+        -- Next page (cursor = last item's created_at)
+        SELECT * FROM tb_post
+        WHERE created_at < %s  -- cursor value
+        ORDER BY created_at DESC
+        LIMIT 10;
+
+        -- Next page (cursor = new last item's created_at)
+        SELECT * FROM tb_post
+        WHERE created_at < %s  -- cursor value
+        ORDER BY created_at DESC
+        LIMIT 10;
+
+    - name: "Cursor-based Pagination"
+      type: "Keyset variant"
+      purpose: "Encode cursor to hide implementation from client"
+      strategy: |
+        Encode last item's sort key as cursor (base64):
+        - Cursor = base64(created_at=2024-01-15T10:30:00Z)
+        - Client passes cursor to next request
+        - Server decodes cursor, fetches WHERE created_at < cursor_value
+      benefit: "Client doesn't know implementation; can change internally"
+      example: |
+        -- Response with cursor
+        {
+          "posts": [...10 posts...],
+          "nextCursor": "eyJjcmVhdGVkX2F0IjogIjIwMjQtMDEtMTVUMTA6MzA6MDBaIn0="
+        }
+
+        -- Client requests next page with cursor
+        /posts?cursor=eyJjcmVhdGVkX2F0IjogIjIwMjQtMDEtMTVUMTA6MzA6MDBaIn0=
+
+key_concepts:
+  concept_1: "OFFSET scans to skip rows; expensive for large offsets"
+  concept_2: "Keyset pagination uses WHERE clause; O(log n) with index"
+  concept_3: "Keyset requires sortable cursor column (usually created_at or id)"
+  concept_4: "Cursor can encode sort key (base64 encoding hides implementation)"
+  concept_5: "Total count is expensive for keyset (requires full scan)"
+  concept_6: "Always include ORDER BY with LIMIT (deterministic results)"
+  concept_7: "Combine pagination with filters (WHERE status = 'active' LIMIT 10)"
+  concept_8: "Test pagination consistency (data shouldn't appear twice or disappear)"
+
+implementation_considerations:
+  consideration_1: "Always pair LIMIT with ORDER BY (deterministic results)"
+  consideration_2: "Use keyset for > 1000 total items or infinite scroll"
+  consideration_3: "Use OFFSET for <= 1000 items or page-based UI"
+  consideration_4: "Cursor column must be unique or combined with unique key"
+  consideration_5: "Include tie-breaking column if cursor not globally unique"
+  consideration_6: "Encode cursor (base64) to hide database details"
+  consideration_7: "Return hasNextPage flag in keyset pagination"
+  consideration_8: "Monitor pagination query performance with EXPLAIN ANALYZE"
+  consideration_9: "Test with realistic data size (pagination behavior changes at scale)"
+  consideration_10: "Consider caching first page (most accessed)"
+
+best_practices:
+  - name: "Choose strategy based on dataset size"
+    description: "<1000 items: OFFSET | >1000 items: keyset"
+
+  - name: "Always ORDER BY with LIMIT"
+    description: "Ensure deterministic results without ordering"
+
+  - name: "Use keyset for infinite scroll"
+    description: "Constant performance regardless of scroll position"
+
+  - name: "Include previous page support"
+    description: "Use > instead of < for reverse pagination"
+
+  - name: "Return hasNextPage flag"
+    description: "Client knows if more items exist without counting"
+
+  - name: "Encode cursor (base64)"
+    description: "Hide implementation details from client"
+
+  - name: "Test pagination consistency"
+    description: "Insert data between requests; verify no duplicates/gaps"
+
+  - name: "Index cursor column"
+    description: "CREATE INDEX idx_post_created ON tb_post(created_at) for keyset"
+
+anti_patterns:
+  - name: "OFFSET without ORDER BY"
+    description: "SELECT * FROM posts LIMIT 10 OFFSET 0 (results vary)"
+    consequence: "Non-deterministic results; records appear/disappear"
+    fix: "Add ORDER BY: ORDER BY created_at DESC LIMIT 10"
+
+  - name: "OFFSET for large result sets"
+    description: "OFFSET 50000 LIMIT 10 on million-row table"
+    consequence: "Slow pagination (must scan 50000 rows)"
+    fix: "Use keyset pagination for large datasets"
+
+  - name: "Large PAGE SIZE"
+    description: "LIMIT 1000 (trying to avoid pagination)"
+    consequence: "Large response, slow network, memory issues"
+    fix: "Use reasonable page size (10-50), keyset for efficiency"
+
+  - name: "Cursor without encoding"
+    description: "Return raw created_at timestamp to client"
+    consequence: "Client can guess/manipulate cursor values"
+    fix: "Encode cursor: base64(json.dumps({'created_at': ...}))"
+
+  - name: "No hasNextPage indicator"
+    description: "Client can't tell if more items exist"
+    consequence: "Must attempt next page to discover end"
+    fix: "Include hasNextPage boolean in response"
+
+  - name: "Non-unique cursor column"
+    description: "Use status (inactive/active) as keyset (ties)"
+    consequence: "Pagination skips items with same cursor value"
+    fix: "Use globally unique column or combine (status, created_at, id)"
+
+implementation:
+  title: "Implementing Pagination in FraiseQL"
+  steps:
+    - number: 1
+      title: "Determine strategy"
+      description: |
+        Choose based on dataset size:
+        ```python
+        if estimated_total_rows < 1000:
+            # Use OFFSET pagination
+            strategy = "OFFSET"
+        else:
+            # Use keyset pagination
+            strategy = "KEYSET"
+        ```
+
+    - number: 2
+      title: "Implement OFFSET pagination (simple case)"
+      description: |
+        ```python
+        async def get_posts(limit: int = 10, offset: int = 0):
+            db = info.context["db"]
+            return await db.find(
+                "benchmark.tv_post",
+                limit=limit,
+                offset=offset,
+                order_by=[{"created_at": "DESC"}]
+            )
+
+        # GraphQL Query
+        query GetPosts($limit: Int, $offset: Int) {
+          posts(limit: $limit, offset: $offset) {
+            id title createdAt
+          }
+        }
+        ```
+
+    - number: 3
+      title: "Implement keyset pagination"
+      description: |
+        ```python
+        import base64
+        import json
+
+        async def get_posts_keyset(limit: int = 10, cursor: str | None = None):
+            db = info.context["db"]
+
+            # Decode cursor if provided
+            last_created_at = None
+            if cursor:
+                decoded = base64.b64decode(cursor)
+                cursor_data = json.loads(decoded)
+                last_created_at = cursor_data['created_at']
+
+            # Query
+            filters = {}
+            if last_created_at:
+                filters['created_at'] = {'lt': last_created_at}
+
+            posts = await db.find(
+                "benchmark.tv_post",
+                where=filters,
+                limit=limit + 1,  # Fetch one extra to detect hasNextPage
+                order_by=[{"created_at": "DESC"}]
+            )
+
+            # Determine hasNextPage
+            has_next = len(posts) > limit
+            if has_next:
+                posts = posts[:-1]  # Remove extra
+
+            # Encode cursor
+            next_cursor = None
+            if has_next and posts:
+                last_item = posts[-1]
+                cursor_data = {'created_at': last_item['created_at']}
+                next_cursor = base64.b64encode(
+                    json.dumps(cursor_data).encode()
+                ).decode()
+
+            return {
+                'posts': posts,
+                'next_cursor': next_cursor,
+                'has_next_page': has_next
+            }
+
+        # GraphQL Query
+        query GetPostsKeyset($limit: Int, $cursor: String) {
+          posts(limit: $limit, cursor: $cursor) {
+            posts { id title createdAt }
+            nextCursor
+            hasNextPage
+          }
+        }
+        ```
+
+    - number: 4
+      title: "Add index for keyset performance"
+      description: |
+        ```sql
+        -- Index on cursor column for efficient keyset queries
+        CREATE INDEX idx_post_created ON benchmark.tb_post(created_at DESC);
+
+        -- For combined filters + pagination
+        CREATE INDEX idx_post_author_created
+        ON benchmark.tb_post(fk_author, created_at DESC);
+        ```
+
+    - number: 5
+      title: "Verify pagination correctness"
+      description: |
+        ```python
+        def test_offset_pagination():
+            # Create posts
+            for i in range(30):
+                factory.create_post(user['pk_user'], f'Post {i}')
+
+            # Get page 1
+            page1 = get_posts(limit=10, offset=0)
+            assert len(page1) == 10
+
+            # Get page 2
+            page2 = get_posts(limit=10, offset=10)
+            assert len(page2) == 10
+
+            # Ensure no duplicates
+            page1_ids = [p['id'] for p in page1]
+            page2_ids = [p['id'] for p in page2]
+            assert len(set(page1_ids + page2_ids)) == 20
+
+        def test_keyset_pagination():
+            # Create posts
+            for i in range(100):
+                factory.create_post(user['pk_user'], f'Post {i}')
+
+            # Get first page
+            result1 = get_posts_keyset(limit=10)
+            assert len(result1['posts']) == 10
+            assert result1['has_next_page'] is True
+
+            # Get second page
+            result2 = get_posts_keyset(limit=10, cursor=result1['next_cursor'])
+            assert len(result2['posts']) == 10
+
+            # Ensure no overlap
+            ids1 = {p['id'] for p in result1['posts']}
+            ids2 = {p['id'] for p in result2['posts']}
+            assert len(ids1 & ids2) == 0  # No intersection
+        ```
+
+examples:
+  example_1:
+    title: "OFFSET Pagination for Small Datasets"
+    description: "Simple page-based pagination"
+    code: |
+      -- Get first 10 posts
+      SELECT id, title, created_at FROM benchmark.tb_post
+      ORDER BY created_at DESC
+      LIMIT 10 OFFSET 0;
+
+      -- Get next 10
+      SELECT id, title, created_at FROM benchmark.tb_post
+      ORDER BY created_at DESC
+      LIMIT 10 OFFSET 10;
+
+      -- Performance: <50ms (with index)
+
+  example_2:
+    title: "Keyset Pagination for Large Datasets"
+    description: "Efficient infinite scroll"
+    code: |
+      -- First page (no cursor)
+      SELECT id, title, created_at FROM benchmark.tb_post
+      ORDER BY created_at DESC
+      LIMIT 11;  -- Fetch 11 to detect hasNextPage
+
+      -- Second page (cursor = last item's created_at from page 1)
+      SELECT id, title, created_at FROM benchmark.tb_post
+      WHERE created_at < '2024-01-15T10:30:00Z'  -- cursor value
+      ORDER BY created_at DESC
+      LIMIT 11;
+
+      -- Performance: ~10ms (constant, regardless of position)
+
+  example_3:
+    title: "Pagination with Filters"
+    description: "Combine pagination with WHERE clause"
+    code: |
+      -- OFFSET with filter
+      SELECT id, title FROM benchmark.tb_post
+      WHERE fk_author = %s
+      ORDER BY created_at DESC
+      LIMIT 10 OFFSET 0;
+
+      -- Keyset with filter (more efficient)
+      SELECT id, title FROM benchmark.tb_post
+      WHERE fk_author = %s AND created_at < %s
+      ORDER BY created_at DESC
+      LIMIT 10;
+
+comparison_matrix:
+  pagination_type:
+    offset: "LIMIT/OFFSET"
+    keyset: "WHERE cursor < value"
+
+  dataset_size:
+    offset: "< 1000 items"
+    keyset: "> 1000 items"
+
+  performance:
+    offset: "Degrades with offset (O(n))"
+    keyset: "Constant (O(log n))"
+
+  can_jump_to_page:
+    offset: "Yes (offset = (page-1) * size)"
+    keyset: "No (must page sequentially)"
+
+  can_show_total:
+    offset: "Yes (COUNT(*) available)"
+    keyset: "No (requires full scan)"
+
+  stability:
+    offset: "Results inconsistent if data changes"
+    keyset: "Stable (new rows don't break pagination)"
+
+  use_case:
+    offset: "Page-based UI, small datasets"
+    keyset: "Infinite scroll, large datasets"
+
+recommendation_matrix:
+  - dataset_size: "< 100 items"
+    strategy: "OFFSET (simplicity)"
+    reasoning: "Pagination speed not significant"
+
+  - dataset_size: "100 - 1000 items"
+    strategy: "OFFSET with reasonable page sizes"
+    reasoning: "Performance acceptable; simplicity valued"
+
+  - dataset_size: "> 1000 items"
+    strategy: "Keyset pagination"
+    reasoning: "OFFSET becomes unacceptable; constant performance needed"
+
+  - ui_pattern: "Page buttons (1, 2, 3, ...)"
+    strategy: "OFFSET"
+    reasoning: "Users jump between pages"
+
+  - ui_pattern: "Infinite scroll"
+    strategy: "Keyset"
+    reasoning: "Users scroll sequentially; constant perf important"
+
+  - api_type: "Mobile app (slow network)"
+    strategy: "Keyset with small page size"
+    reasoning: "Constant performance, minimal data per request"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Think of pagination like a library:
+      - OFFSET = "Skip to book #50, then read 10" (must walk past 50)
+      - Keyset = "Find book with title starting with 'Python', read next 10" (index jump)
+
+      For large libraries, keyset is faster!
+
+    focus: "Understanding pagination tradeoffs"
+    key_points:
+      - "OFFSET slow for large offsets (must skip rows)"
+      - "Keyset fast always (uses index)"
+      - "Always ORDER BY with LIMIT"
+      - "OFFSET for pages; keyset for scrolling"
+
+  intermediate:
+    focus: "Implementing both pagination strategies"
+    key_points:
+      - "OFFSET: simple, can show total, but slow"
+      - "Keyset: efficient, no total count, requires cursor encoding"
+      - "Cursor = base64(last_item_sort_key)"
+      - "Fetch limit+1 to detect hasNextPage"
+      - "Index cursor column for performance"
+
+  advanced:
+    focus: "Optimization and edge cases"
+    key_points:
+      - "Combine pagination with filters efficiently"
+      - "Multi-column cursors for non-unique sort keys"
+      - "Reverse pagination (previous page)"
+      - "Handle ties in keyset gracefully"
+      - "Test pagination consistency with concurrent writes"
+      - "Cache first page (most accessed)"

@@ -1,0 +1,496 @@
+id: benchmark-testing-strategies
+name: "Architectural Benchmark: Testing Strategies (Unit vs Integration vs E2E)"
+category: fraiseql
+type: benchmark
+tags:
+  - benchmark
+  - testing
+  - quality
+  - productivity
+  - confidence
+
+summary:
+  short: "Compare testing approaches: Unit, integration, end-to-end, property-based testing"
+  long: |
+    Testing strategy affects code quality, confidence in deployments, and development velocity.
+    Four main approaches exist: unit (fast, narrow), integration (comprehensive, slower),
+    end-to-end (real-world, very slow), and property-based (thorough, difficult).
+    FraiseQL ecosystem recommends a **pragmatic mix**: focus on integration tests (confidence
+    with acceptable speed). This benchmark compares all approaches with real-world trade-offs.
+
+problem:
+  description: |
+    Testing is essential but expensive:
+    - Unit tests: Fast (2ms) but miss real issues
+    - Integration tests: Comprehensive (50ms) but slower
+    - E2E tests: Real-world (500ms) but very slow
+    - Property-based: Thorough (1000ms) but complex
+
+    Teams must balance coverage with developer velocity and CI/CD speed.
+
+comparison:
+  approach_1:
+    name: "Unit Tests Only"
+    philosophy: "Test functions in isolation, mock dependencies"
+    implementation: |
+      # Unit test - test function, mock database
+      @pytest.fixture
+      def mock_db():
+          return MagicMock()
+
+      def test_get_user_not_found(mock_db):
+          mock_db.query_one.return_value = None
+          result = get_user("abc123", mock_db)
+          assert result is None
+
+      def test_get_user_success(mock_db):
+          mock_db.query_one.return_value = {"id": "abc123", "name": "Alice"}
+          result = get_user("abc123", mock_db)
+          assert result["name"] == "Alice"
+
+    execution_time: "2ms per test (very fast)"
+    total_test_time: "200ms for 100 tests"
+    coverage: "Can achieve 90%+ line coverage"
+
+    pros:
+      - "Very fast (CI/CD in seconds)"
+      - "Easy to write (mocks are straightforward)"
+      - "Good for business logic"
+      - "Fast feedback loop"
+      - "Can run on laptop"
+
+    cons:
+      - "Mocks hide bugs (DB behavior not tested)"
+      - "False confidence (passing tests, broken in prod)"
+      - "Doesn't test integration points"
+      - "Mocks need maintenance (keep in sync)"
+      - "Easy to test wrong thing"
+
+    real_world_confidence: "Low (30-40%)"
+    regression_detection: "Poor (only tests mocked behavior)"
+    integration_bugs_caught: "0% (integration not tested)"
+    best_for: "Business logic only (calculations, algorithms)"
+
+  approach_2:
+    name: "Integration Tests"
+    philosophy: "Test with real database, real services, isolated from external systems"
+    implementation: |
+      # Integration test - real database, test transaction
+      @pytest.fixture
+      def db_session():
+          db = create_test_database()
+          yield db
+          db.rollback()  # Clean up
+
+      def test_get_user_not_found(db_session):
+          # Real database query
+          result = get_user("nonexistent", db_session)
+          assert result is None
+
+      def test_get_user_success(db_session):
+          # Create real user
+          db_session.execute(
+              "INSERT INTO tb_user (id, name) VALUES (%s, %s)",
+              ("abc123", "Alice")
+          )
+          db_session.commit()
+
+          # Query and verify
+          result = get_user("abc123", db_session)
+          assert result["name"] == "Alice"
+
+      def test_user_with_posts(db_session):
+          # Create user and posts
+          user_id = db_session.execute(
+              "INSERT INTO tb_user (name) VALUES (%s) RETURNING id",
+              ("Alice",)
+          ).scalar()
+
+          for i in range(5):
+              db_session.execute(
+                  "INSERT INTO tb_post (fk_user, title) VALUES (%s, %s)",
+                  (user_id, f"Post {i}")
+              )
+          db_session.commit()
+
+          # Query with relationships
+          user = get_user_with_posts(user_id, db_session)
+          assert len(user.posts) == 5
+
+    execution_time: "50ms per test (moderate speed)"
+    total_test_time: "5 seconds for 100 tests"
+    coverage: "Achieve 70-80% coverage"
+
+    pros:
+      - "Real database behavior tested"
+      - "Catches integration bugs"
+      - "Tests actual queries (not mocks)"
+      - "Reasonable speed (5s for 100 tests)"
+      - "Finds bugs before production"
+      - "Reasonable confidence (60-70%)"
+
+    cons:
+      - "Slower than unit tests (10-50ms each)"
+      - "Requires test database (setup/teardown)"
+      - "Hard to reproduce specific database state"
+      - "Flaky if test order matters"
+      - "Not as fast as unit tests"
+
+    real_world_confidence: "High (70-80%)"
+    regression_detection: "Good (real DB behavior)"
+    integration_bugs_caught: "90% (real integration tested)"
+    ci_cd_speed: "Acceptable (5-10s for full suite)"
+    best_for: "Most applications (business logic + DB interactions)"
+
+  approach_3:
+    name: "End-to-End Tests"
+    philosophy: "Test full request/response cycle, with real services"
+    implementation: |
+      # E2E test - full GraphQL query
+      @pytest.fixture
+      def graphql_client():
+          client = GraphQLTestClient(app)
+          yield client
+          client.cleanup()
+
+      def test_get_user_via_graphql_success(graphql_client):
+          # Real GraphQL query through full stack
+          query = """
+              query GetUser($id: ID!) {
+                  getUser(id: $id) {
+                      ... on GetUserSuccess {
+                          user { id, name }
+                      }
+                  }
+              }
+          """
+          response = graphql_client.query(query, {"id": "abc123"})
+
+          assert response.data.getUser.user.name == "Alice"
+          assert response.status == 200
+
+      def test_user_pagination(graphql_client):
+          # Test pagination through full stack
+          query = """
+              query GetUsers($first: Int, $after: String) {
+                  users(first: $first, after: $after) {
+                      edges { cursor, node { id, name } }
+                      pageInfo { hasNextPage, endCursor }
+                  }
+              }
+          """
+          response = graphql_client.query(query, {"first": 10})
+
+          assert len(response.data.users.edges) == 10
+          assert response.data.users.pageInfo.hasNextPage
+
+    execution_time: "500ms per test (slow)"
+    total_test_time: "50 seconds for 100 tests"
+    coverage: "Achieve 50-60% code coverage"
+
+    pros:
+      - "Tests real behavior (full stack)"
+      - "Closest to production (actual code paths)"
+      - "Catches subtle integration issues"
+      - "High confidence (80-90%)"
+      - "Documents expected behavior"
+
+    cons:
+      - "Very slow (500ms per test)"
+      - "Hard to debug (multiple layers)"
+      - "Flaky (depends on test order, data state)"
+      - "Difficult to reproduce failures"
+      - "CI/CD becomes slow (50s for 100 tests)"
+      - "Can't run frequently (developers run less often)"
+
+    real_world_confidence: "Very high (85-90%)"
+    regression_detection: "Excellent (catches real issues)"
+    integration_bugs_caught: "95%+ (full integration)"
+    ci_cd_speed: "Slow (50+ seconds for full suite)"
+    developer_velocity_impact: "Negative (developers run less)"
+    best_for: "Critical paths only (checkout, payment)"
+
+  approach_4:
+    name: "Property-Based Testing"
+    philosophy: "Test invariants, generate random inputs"
+    implementation: |
+      from hypothesis import given, strategies as st
+
+      @given(
+          user_id=st.uuids(),
+          page_size=st.integers(min_value=1, max_value=100),
+          page_number=st.integers(min_value=0, max_value=1000)
+      )
+      def test_pagination_always_returns_page_size_or_less(user_id, page_size, page_number):
+          # Invariant: pagination returns <= page_size items
+          results = paginate_user_posts(user_id, page_size, page_number)
+          assert len(results) <= page_size
+
+      @given(
+          name=st.text(min_size=1, max_size=100),
+          email=st.emails()
+      )
+      def test_user_creation_always_returns_valid_id(name, email):
+          # Invariant: created user has valid UUID id
+          user = create_user(name, email)
+          assert user.id is not None
+          assert isinstance(user.id, UUID)
+          assert len(str(user.id)) == 36  # UUID string length
+
+      @given(
+          original=st.lists(st.integers()),
+          index=st.integers()
+      )
+      def test_pagination_cursor_always_valid(original, index):
+          # Invariant: cursor can always seek to next page
+          if not original or index < 0 or index >= len(original):
+              return  # Skip edge cases
+
+          cursor = encode_cursor(original[index])
+          next_page = paginate_from_cursor(cursor)
+          assert len(next_page) > 0
+
+    execution_time: "1000ms+ per property (very slow)"
+    total_test_time: "100+ seconds for 100 properties"
+    inputs_generated: "100-1000 per property"
+
+    pros:
+      - "Finds edge cases (random generation)"
+      - "Tests invariants (what MUST be true)"
+      - "Comprehensive (1000s of input combinations)"
+      - "Documents assumptions (invariants explicit)"
+
+    cons:
+      - "Very slow (100s per property)"
+      - "Hard to understand failures (random inputs)"
+      - "Complex to write (need to think about invariants)"
+      - "Not suitable for data-driven tests"
+      - "Overkill for most business logic"
+
+    real_world_confidence: "Theoretical very high, practical varies"
+    regression_detection: "Excellent (edge cases)"
+    ci_cd_speed: "Terrible (100+ seconds)"
+    developer_velocity_impact: "Very negative"
+    best_for: "Critical algorithms (pagination, sorting)"
+
+  fraiseql_choice:
+    name: "Pragmatic Mix: Focus on Integration Tests"
+    rationale: |
+      FraiseQL recommends **integration tests as the core** with:
+      1. **Unit tests for logic** (fast feedback, 2ms each)
+      2. **Integration tests for behavior** (confidence, 50ms each)
+      3. **E2E tests sparingly** (critical paths only)
+      4. **Property-based for algorithms** (optional, if complexity warrants)
+
+    implementation_philosophy: |
+      FraiseQL testing pyramid (recommended distribution):
+      - 40% Unit tests (fast, narrow)
+      - 50% Integration tests (comprehensive, moderate speed)
+      - 10% E2E tests (critical paths, real scenarios)
+      - 0-5% Property-based (if algorithm-heavy)
+
+      Goals:
+      - Developer runs full suite locally (< 30 seconds)
+      - CI/CD runs full suite (< 60 seconds)
+      - Confidence in deployments (85%+ real bugs caught)
+      - Reasonable maintenance (not too many flaky tests)
+
+    assessment_strengths: |
+      ✓ **Good confidence**: 85%+ real bugs caught (integration focus)
+      ✓ **Reasonable speed**: Full suite in 30-60 seconds
+      ✓ **Developer velocity**: Developers run tests frequently
+      ✓ **Good coverage**: Both logic and integration tested
+      ✓ **Maintainable**: Not too many tests to maintain
+      ✓ **Catches regressions**: Real DB behavior tested
+      ✓ **Practical**: Fits into CI/CD pipeline
+
+    assessment_weaknesses: |
+      ✗ **Not 100% confident**: Some edge cases miss E2E
+      ✗ **Not fastest feedback**: Unit tests would be faster
+      ✗ **Requires test database**: Setup/teardown complexity
+      ✗ **Potential flakiness**: Test order dependencies
+      ✗ **Not academically pure**: Pragmatic, not comprehensive
+
+    when_fraiseql_choice_is_right: |
+      FraiseQL's pragmatic mix is optimal when:
+      - **Team velocity important** (want fast feedback)
+      - **Deployment confidence critical** (catch real bugs)
+      - **CI/CD speed matters** (minutes not hours)
+      - **Developer experience valued** (want to run tests)
+      - **Most applications** (this is the general case)
+
+    when_to_adjust_strategy: |
+      Add more E2E tests when:
+      - **Critical business flows** (payment, checkout)
+      - **Security-sensitive** (authentication, authorization)
+      - **High-risk deployments** (regulatory, customer-facing)
+
+      Add more unit tests when:
+      - **Complex algorithms** (sorting, filtering)
+      - **Math-heavy** (calculations, conversions)
+
+      Add property-based tests when:
+      - **Algorithm intensive** (pagination, search)
+      - **Edge cases common** (boundary conditions)
+
+benchmarks:
+  scenario: "Test suite for typical FraiseQL API (100 endpoints, 3000 test cases)"
+
+  speed:
+    unit_only: "3 seconds (2000 tests × 2ms)"
+    integration_only: "150 seconds (3000 tests × 50ms)"
+    mixed_recommended: "90 seconds (2000 unit + 1000 integration)"
+    with_e2e: "200 seconds (+ 100 E2E × 500ms)"
+    with_property_based: "500+ seconds (+ property tests)"
+
+  coverage:
+    unit_only: "85% code coverage (logic covered)"
+    integration_only: "70% code coverage (doesn't exercise all code)"
+    mixed_recommended: "85% code coverage, 85% behavior coverage"
+    with_e2e: "90% code coverage, 90% behavior coverage"
+
+  confidence:
+    unit_only: "30-40% (misses integration bugs)"
+    integration_only: "70-80% (comprehensive)"
+    mixed_recommended: "85% (good coverage + speed)"
+    with_e2e: "90%+ (nearly all bugs caught)"
+
+  developer_velocity:
+    unit_only: "Runs before commit (3s)"
+    integration_only: "Runs nightly (too slow for dev)"
+    mixed_recommended: "Runs frequently (developers run often)"
+    with_e2e: "Runs in CI only (too slow locally)"
+
+  ci_cd_pipeline:
+    unit_only: "3 seconds (too fast, not enough coverage)"
+    integration_only: "150 seconds (acceptable, good coverage)"
+    mixed_recommended: "90 seconds (fast + confident)"
+    with_e2e: "200+ seconds (slow, not always necessary)"
+
+  cost_analysis:
+    unit_only:
+      dev_time: "Low (mocks quick to write)"
+      maintenance: "Medium (mocks need updating)"
+      bug_escape_rate: "High (integration bugs)"
+      value: "Low (false confidence)"
+
+    integration_only:
+      dev_time: "Medium (DB setup required)"
+      maintenance: "Medium (test data management)"
+      bug_escape_rate: "Low (catches most bugs)"
+      value: "High (real confidence)"
+
+    mixed_recommended:
+      dev_time: "Medium (mix of approaches)"
+      maintenance: "Medium (balanced)"
+      bug_escape_rate: "Very low (85% caught)"
+      value: "Very high (confidence + speed)"
+
+    with_e2e:
+      dev_time: "High (full stack testing)"
+      maintenance: "High (flaky, hard to debug)"
+      bug_escape_rate: "Minimal (< 5% escape)"
+      value: "Very high (but expensive)"
+
+  recommendation: |
+    **For most applications**: Mixed approach (40% unit, 50% integration, 10% E2E)
+    - Full test suite: 90 seconds
+    - Developer runs frequently (good velocity)
+    - Catches 85%+ of bugs (good confidence)
+    - Reasonable maintenance (not too many tests)
+
+    **For critical applications**: Add more E2E tests
+    - Full test suite: 200+ seconds
+    - E2E on critical paths only
+    - Catches 90%+ of bugs
+    - Still maintainable
+
+    **For algorithm-heavy code**: Add property-based tests
+    - Target specific algorithms (pagination, search)
+    - Find edge cases (comprehensive)
+    - Can run separately from main suite
+
+    **Pyramid principle**: Most tests should be fast (unit/integration)
+    - Avoid E2E everywhere (too slow)
+    - Focus E2E on critical paths (high-value only)
+    - Integrate early and often
+
+decision_matrix:
+  deployment_risk_tolerance:
+    question: "What is your deployment risk tolerance?"
+    answer_low_risk: "Mixed approach (FraiseQL recommended)"
+    answer_zero_risk: "Add E2E for critical paths"
+
+  test_frequency:
+    question: "How often do developers run tests?"
+    answer_frequently: "Mixed (90s acceptable)"
+    answer_only_ci: "Can afford integration heavy (150s)"
+
+  api_size:
+    question: "How many endpoints in API?"
+    answer_lt_20: "Mostly E2E (works for small APIs)"
+    answer_20_100: "Mixed (FraiseQL recommended)"
+    answer_gt_100: "Integration heavy (scale considerations)"
+
+  business_criticality:
+    question: "What is critical to your business?"
+    answer_payments: "Add E2E for payments"
+    answer_user_data: "Add E2E for auth"
+    answer_analytics: "Unit/integration sufficient"
+
+trade_off_summary:
+  speed_vs_confidence: |
+    Unit only: Fast (3s), low confidence (30%)
+    Integration: Moderate (90s), high confidence (85%)
+    E2E: Slow (200s), very high confidence (90%)
+
+    FraiseQL chose good balance (85% confidence, 90s speed).
+
+  maintenance_vs_coverage: |
+    Unit: Easy to maintain, low coverage
+    Integration: Moderate to maintain, high coverage
+    E2E: Hard to maintain, highest coverage
+
+    FraiseQL chose balanced maintenance.
+
+  developer_velocity_vs_quality: |
+    Unit only: Fast, lower quality
+    Integration: Moderate speed, high quality
+    E2E: Slow, very high quality
+
+    FraiseQL chose sweet spot (quality + velocity).
+
+recommendations:
+  - "Start with unit tests (fast feedback)"
+  - "Add integration tests (real confidence)"
+  - "Use E2E sparingly (critical paths only)"
+  - "Aim for 85% code coverage (realistic goal)"
+  - "Full suite should run in < 60 seconds (CI/CD)"
+  - "Developers should run full suite before push"
+  - "Property-based for algorithms only"
+  - "Measure bug escape rate (adjust strategy)"
+
+blog_hooks:
+  beginner:
+    focus: "Understanding testing approaches"
+    key_points:
+      - "Unit tests: Fast, narrow, low confidence"
+      - "Integration tests: Moderate, comprehensive, good confidence"
+      - "E2E tests: Slow, real-world, high confidence"
+      - "FraiseQL: Mix of all three"
+
+  intermediate:
+    focus: "Building a practical test suite"
+    key_points:
+      - "40% unit, 50% integration, 10% E2E (recommended)"
+      - "Full suite in 90 seconds (target)"
+      - "85% bug detection rate (realistic)"
+      - "Developers run frequently (good velocity)"
+
+  advanced:
+    focus: "Testing at scale and complex scenarios"
+    key_points:
+      - "Avoid E2E for every endpoint (too slow)"
+      - "Focus E2E on critical business flows"
+      - "Property-based for algorithm testing"
+      - "Measure and adjust strategy"

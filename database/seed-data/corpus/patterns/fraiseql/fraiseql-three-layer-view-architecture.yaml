@@ -1,0 +1,531 @@
+id: fraiseql-three-layer-view-architecture
+name: "FraiseQL Three-Layer View Architecture"
+category: fraiseql
+type: standard
+tags:
+  - fraiseql
+  - architecture
+  - views
+  - performance
+  - denormalization
+  - n-plus-one
+
+summary:
+  short: "Database view layers for write, projection, and composition to eliminate N+1 queries"
+  long: |
+    FraiseQL's three-layer architecture uses database views to eliminate N+1 query problems
+    at the database level rather than the application layer. Layer 1 (tb_* tables) handles
+    writes with internal PKs/FKs. Layer 2 (v_* views) projects scalar fields for composition.
+    Layer 3 (tv_* views) composes complete JSONB objects with nested relationships pre-fetched.
+    This approach provides performance equivalent to application-level DataLoaders but with
+    stronger guarantees and simpler code.
+
+problem:
+  description: |
+    Traditional GraphQL resolvers suffer from N+1 query problems:
+    - Query user → resolver fetches from tb_user (1 query)
+    - For each user, fetch their posts → N queries
+    - For each post, fetch author → N queries again
+    - Total: 1 + N + N = explosive database load
+
+    Even with DataLoaders (batching), multiple network round-trips occur.
+    Window functions and JSONB composition can move work to database layer where
+    the query optimizer can reason about the entire operation.
+
+  symptoms:
+    - name: "Nested queries cause database overload"
+      description: "Fetching 10 users → 1 + 10 + 10 = 21 queries"
+      detection: "Database connection pool exhausted, slow response"
+
+    - name: "DataLoaders still require multiple queries"
+      description: "Batch 10 users → still 1 + 1 (users) + 1 (posts) + 1 (comments) queries"
+      detection: "Multiple database round-trips in network trace"
+
+    - name: "Complex relationships hard to optimize"
+      description: "Users → Posts → Comments → Comment Authors requires careful batching"
+      detection: "N+1 queries unavoidable without denormalization"
+
+  impact: |
+    Database overload, slow response times, high latency, poor scalability,
+    expensive DataLoader implementation, N+1 inevitable without careful orchestration
+
+solution:
+  principle: "Compose complete nested objects at database layer with JSONB before returning to application"
+
+  components:
+    - name: "Layer 1: Write Layer (tb_* tables)"
+      type: "Physical tables"
+      purpose: "Store data with optimal structure for writes"
+      characteristics:
+        - "SERIAL INTEGER primary key (pk_*) for fast joins"
+        - "UUID public identifier (id) for API exposure"
+        - "SERIAL INTEGER foreign keys (fk_*) referencing pk_*"
+        - "Normalized: no denormalization, no JSONB"
+        - "Optimized for INSERT/UPDATE/DELETE"
+      example: |
+        CREATE TABLE benchmark.tb_user (
+            pk_user SERIAL PRIMARY KEY,        -- Fast internal PK
+            id UUID NOT NULL UNIQUE,           -- Public identifier
+            username VARCHAR(255) NOT NULL UNIQUE,
+            email VARCHAR(255) NOT NULL UNIQUE,
+            bio TEXT,
+            created_at TIMESTAMP NOT NULL,
+            updated_at TIMESTAMP NOT NULL
+        );
+
+        CREATE TABLE benchmark.tb_post (
+            pk_post SERIAL PRIMARY KEY,        -- Fast internal PK
+            id UUID NOT NULL UNIQUE,           -- Public identifier
+            fk_author INTEGER NOT NULL REFERENCES tb_user(pk_user),
+            title VARCHAR(500) NOT NULL,
+            content TEXT,
+            created_at TIMESTAMP NOT NULL
+        );
+
+      benefit: "Fast JOINs via integer PK/FK; optimized for writes"
+      index_strategy: |
+        CREATE INDEX idx_tb_user_id ON tb_user(id);
+        CREATE INDEX idx_tb_post_id ON tb_post(id);
+        CREATE INDEX idx_tb_post_fk_author ON tb_post(fk_author);
+
+    - name: "Layer 2: Projection Layer (v_* views)"
+      type: "Database views"
+      purpose: "Extract scalar fields from tb_*, prepare for composition"
+      characteristics:
+        - "SELECTs scalar fields from tb_*"
+        - "Keeps pk_* for internal joining"
+        - "Keeps fk_* for composition JOINs"
+        - "Exposes id (UUID) but not pk_*"
+        - "Field name mapping (snake_case consistency)"
+      example: |
+        CREATE VIEW benchmark.v_user AS
+        SELECT
+            u.pk_user,           -- Keep for internal joining
+            u.id,                -- Public UUID
+            u.username,
+            u.email,
+            u.bio,
+            u.created_at,
+            u.updated_at
+        FROM benchmark.tb_user u;
+
+        CREATE VIEW benchmark.v_post AS
+        SELECT
+            p.pk_post,           -- Keep for internal joining
+            p.id,                -- Public UUID
+            p.fk_author,         -- Keep for composition JOIN
+            p.title,
+            p.content,
+            p.created_at
+        FROM benchmark.tb_post p;
+
+      benefit: "Hides internal pk_* from application; provides single source of truth for field mapping"
+      index_strategy: |
+        -- Views are virtual; indexes on underlying tables apply automatically
+        -- Ensure tb_user and tb_post have indexes on pk_ and fk_
+
+    - name: "Layer 3: Composition Layer (tv_* views)"
+      type: "Database views with JSONB composition"
+      purpose: "Build complete nested objects with all relationships pre-composed"
+      characteristics:
+        - "Uses jsonb_build_object to compose objects"
+        - "Recursively includes nested JSONB from other tv_* views"
+        - "Field names in camelCase (GraphQL convention)"
+        - "Returns single JSONB 'data' column per entity"
+        - "One query returns entire nested object tree"
+      example: |
+        -- Base composition (User)
+        CREATE VIEW benchmark.tv_user AS
+        SELECT
+            u.id,
+            jsonb_build_object(
+                'id', u.id,
+                'username', u.username,
+                'email', u.email,
+                'bio', u.bio,
+                'createdAt', u.created_at,
+                'updatedAt', u.updated_at
+            ) as data
+        FROM benchmark.v_user u;
+
+        -- Composition with nested Author
+        CREATE VIEW benchmark.tv_post AS
+        SELECT
+            p.id,
+            p.fk_author,
+            jsonb_build_object(
+                'id', p.id,
+                'title', p.title,
+                'content', p.content,
+                'createdAt', p.created_at,
+                'author', COALESCE(
+                    (SELECT u.data FROM benchmark.tv_user u
+                     WHERE u.id = (SELECT id FROM v_user WHERE pk_user = p.fk_author)),
+                    jsonb_null()
+                )
+            ) as data
+        FROM benchmark.v_post p;
+
+        -- Composition with multiple nested objects
+        CREATE VIEW benchmark.tv_comment AS
+        SELECT
+            c.id,
+            c.fk_post,
+            c.fk_author,
+            jsonb_build_object(
+                'id', c.id,
+                'content', c.content,
+                'author', COALESCE(
+                    (SELECT u.data FROM tv_user u WHERE u.id = (SELECT id FROM v_user WHERE pk_user = c.fk_author)),
+                    jsonb_null()
+                ),
+                'post', COALESCE(
+                    (SELECT p.data FROM tv_post p WHERE p.id = (SELECT id FROM v_post WHERE pk_post = c.fk_post)),
+                    jsonb_null()
+                ),
+                'createdAt', c.created_at
+            ) as data
+        FROM benchmark.v_comment c;
+
+      benefit: |
+        - Zero N+1: single query returns entire tree
+        - Database optimizer can reason about full query
+        - Network efficiency: one round-trip, not many
+        - Application code simple: deserialize JSONB to dataclass
+
+key_concepts:
+  concept_1: "Layer 1 (tb_*) = write-optimized physical schema"
+  concept_2: "Layer 2 (v_*) = read-optimized scalar extraction"
+  concept_3: "Layer 3 (tv_*) = denormalized JSONB composition for GraphQL"
+  concept_4: "N+1 prevention happens at database layer, not application layer"
+  concept_5: "Integer PK/FK (Layer 1) are 5-10x faster than UUID joins"
+  concept_6: "JSONB composition (Layer 3) pre-fetches entire object tree"
+  concept_7: "Field names converted snake_case → camelCase in JSONB"
+  concept_8: "Recursive tv_* composition handles arbitrary nesting depth"
+
+implementation_considerations:
+  consideration_1: "Design Layer 1 (tb_*) for transactional consistency (normalized)"
+  consideration_2: "Layer 2 (v_*) is intermediate; applications rarely query it directly"
+  consideration_3: "Layer 3 (tv_*) is exposed to GraphQL; queries use tv_* only"
+  consideration_4: "Index all fk_* columns in Layer 1 for composition JOINs"
+  consideration_5: "Use jsonb_build_object for explicit field composition (not SELECT *)"
+  consideration_6: "Handle NULL/missing relationships with COALESCE(..., jsonb_null())"
+  consideration_7: "Recursive tv_* views must avoid infinite loops (tree depth limits)"
+  consideration_8: "Monitor view performance: EXPLAIN ANALYZE on tv_* queries"
+  consideration_9: "Consider materialized views (refreshed periodically) for expensive compositions"
+  consideration_10: "Test view correctness: compare with DataLoader-based approach"
+
+best_practices:
+  - name: "One write layer per entity"
+    description: "One tb_* table per entity type (tb_user, tb_post, tb_comment)"
+
+  - name: "One projection layer per entity"
+    description: "One v_* view per tb_* table"
+
+  - name: "One composition layer per entity"
+    description: "One tv_* view per v_* view, composes nested relationships"
+
+  - name: "Use SERIAL PKs, UUID public IDs"
+    description: "Layer 1: pk_* SERIAL (internal), id UUID (public)"
+
+  - name: "Keep fk_* in projection layer"
+    description: "v_* includes fk_* for composition JOINs, even though hidden from API"
+
+  - name: "Explicit field lists"
+    description: "Use jsonb_build_object(...) not jsonb_agg(*); explicit is better"
+
+  - name: "Handle NULL relationships"
+    description: "Use COALESCE(..., jsonb_null()) for optional nested objects"
+
+  - name: "Monitor composition depth"
+    description: "Avoid infinite recursion; limit nesting to 3-5 levels typically"
+
+anti_patterns:
+  - name: "Layer 1 exposed directly to API"
+    description: "Querying tb_user directly instead of through tv_user"
+    consequence: "Exposes internal pk_* fields, poor field naming (snake_case)"
+    fix: "Always query tv_* views from application code"
+
+  - name: "No Layer 2 projection"
+    description: "Composition (Layer 3) queries tb_* directly"
+    consequence: "Hard to maintain field mappings, duplicate logic"
+    fix: "Always use Layer 2 (v_*) as source for Layer 3 (tv_*)"
+
+  - name: "N+1 queries instead of composition"
+    description: "Query tv_post, then for each post query tv_comment separately"
+    consequence: "Defeats entire purpose of three-layer architecture"
+    fix: "Include comment composition in tv_post (nested JSONB)"
+
+  - name: "Unindexed fk_* columns"
+    description: "Composition layer JOINs on fk_author with no index"
+    consequence: "Slow composition queries; sequential scans on every join"
+    fix: "CREATE INDEX idx_post_fk_author ON tb_post(fk_author)"
+
+  - name: "Infinite recursion in tv_*"
+    description: "tv_post composes tv_comment which composes tv_post (cycle)"
+    consequence: "Query hangs or crashes"
+    fix: "Limit recursion depth; don't include parent in child composition"
+
+  - name: "UUID joins instead of integer"
+    description: "Composition uses UUID joins instead of integer pk_/fk_"
+    consequence: "5-10x slower joins than integer"
+    fix: "Use integer fk_* internally; only UUID externally"
+
+implementation:
+  title: "Implementing Three-Layer Architecture"
+  steps:
+    - number: 1
+      title: "Design Layer 1 (Write Tables)"
+      description: |
+        Create normalized tables with SERIAL PKs, UUID IDs, SERIAL FKs:
+        ```sql
+        CREATE TABLE benchmark.tb_user (
+            pk_user SERIAL PRIMARY KEY,
+            id UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+            username VARCHAR(255) NOT NULL UNIQUE,
+            email VARCHAR(255) NOT NULL UNIQUE,
+            bio TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE benchmark.tb_post (
+            pk_post SERIAL PRIMARY KEY,
+            id UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+            fk_author INTEGER NOT NULL REFERENCES tb_user(pk_user),
+            title VARCHAR(500) NOT NULL,
+            content TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE INDEX idx_post_fk_author ON tb_post(fk_author);
+        ```
+
+    - number: 2
+      title: "Create Layer 2 (Projection Views)"
+      description: |
+        Extract scalar fields, keep fk_* for composition:
+        ```sql
+        CREATE VIEW benchmark.v_user AS
+        SELECT pk_user, id, username, email, bio, created_at, updated_at
+        FROM benchmark.tb_user;
+
+        CREATE VIEW benchmark.v_post AS
+        SELECT pk_post, id, fk_author, title, content, created_at
+        FROM benchmark.tb_post;
+        ```
+
+    - number: 3
+      title: "Build Layer 3 (Composition Views)"
+      description: |
+        Compose nested JSONB from v_* views:
+        ```sql
+        CREATE VIEW benchmark.tv_user AS
+        SELECT
+            u.id,
+            jsonb_build_object(
+                'id', u.id,
+                'username', u.username,
+                'email', u.email,
+                'bio', u.bio,
+                'createdAt', u.created_at
+            ) as data
+        FROM benchmark.v_user u;
+
+        CREATE VIEW benchmark.tv_post AS
+        SELECT
+            p.id,
+            p.fk_author,
+            jsonb_build_object(
+                'id', p.id,
+                'title', p.title,
+                'content', p.content,
+                'createdAt', p.created_at,
+                'author', COALESCE(
+                    (SELECT u.data FROM tv_user u WHERE u.id = (
+                        SELECT id FROM v_user WHERE pk_user = p.fk_author
+                    )),
+                    jsonb_null()
+                )
+            ) as data
+        FROM benchmark.v_post p;
+        ```
+
+    - number: 4
+      title: "Query from Application Code"
+      description: |
+        Always query tv_* views:
+        ```python
+        # Correct: Query composition layer
+        post = await db.find_one("benchmark.tv_post", id=post_id)
+        # Returns: { id: UUID, data: { id, title, content, author: {...} } }
+
+        # Wrong: Query write layer
+        post = await db.find_one("benchmark.tb_post", id=post_id)
+        # Exposes pk_post, fk_author, lacks nested author
+        ```
+
+    - number: 5
+      title: "Verify Query Performance"
+      description: |
+        Check that tv_* queries are fast:
+        ```sql
+        EXPLAIN ANALYZE
+        SELECT * FROM benchmark.tv_post WHERE id = '550e8400-...';
+
+        -- Should show:
+        -- - Index scan on tv_post (fast)
+        -- - Nested index scans for author composition (fast)
+        -- - No sequential scans (all indexes used)
+        -- - Total execution time < 50ms
+        ```
+
+examples:
+  example_1:
+    title: "Three-Layer Architecture for User-Posts"
+    description: "Complete example with all three layers"
+    code: |
+      -- Layer 1: Write tables (normalized)
+      CREATE TABLE tb_user (
+          pk_user SERIAL PRIMARY KEY,
+          id UUID NOT NULL UNIQUE,
+          username VARCHAR(255) NOT NULL UNIQUE,
+          ...
+      );
+
+      CREATE TABLE tb_post (
+          pk_post SERIAL PRIMARY KEY,
+          id UUID NOT NULL UNIQUE,
+          fk_author INTEGER NOT NULL REFERENCES tb_user(pk_user),
+          title VARCHAR(500),
+          ...
+      );
+
+      -- Layer 2: Projection views (scalar extraction)
+      CREATE VIEW v_user AS
+      SELECT pk_user, id, username, email, bio, created_at
+      FROM tb_user;
+
+      CREATE VIEW v_post AS
+      SELECT pk_post, id, fk_author, title, content, created_at
+      FROM tb_post;
+
+      -- Layer 3: Composition views (nested JSONB)
+      CREATE VIEW tv_user AS
+      SELECT u.id, jsonb_build_object(
+          'id', u.id,
+          'username', u.username,
+          'email', u.email,
+          'bio', u.bio
+      ) as data
+      FROM v_user u;
+
+      CREATE VIEW tv_post AS
+      SELECT p.id, jsonb_build_object(
+          'id', p.id,
+          'title', p.title,
+          'content', p.content,
+          'author', (SELECT u.data FROM tv_user u
+                     WHERE u.id = (SELECT id FROM v_user WHERE pk_user = p.fk_author))
+      ) as data
+      FROM v_post p;
+
+      -- Application query
+      SELECT * FROM tv_post WHERE id = %s;
+      -- Returns: { id: UUID, data: { id, title, content, author: {...} } }
+      -- Single query, includes nested author, zero N+1
+
+  example_2:
+    title: "Query Performance Comparison"
+    description: "Three-layer vs traditional approach"
+    code: |
+      -- TRADITIONAL APPROACH (N+1)
+      SELECT * FROM users;                    -- Query 1
+      FOR EACH user:
+          SELECT * FROM posts WHERE user_id = user.id;  -- Query 2-N
+      FOR EACH post:
+          SELECT * FROM users WHERE id = post.user_id;  -- Query N+1-2N
+      Total: 1 + N + N = expensive!
+
+      -- THREE-LAYER APPROACH (single query)
+      SELECT * FROM tv_post;  -- Query 1
+      -- Returns all posts with nested author objects already composed
+      -- Single query, database optimizer handles entire operation
+
+comparison_matrix:
+  approach:
+    traditional: "Application code handles relationships"
+    three_layer: "Database layer composes objects"
+
+  n_plus_one:
+    traditional: "1 + N + M (exponential complexity)"
+    three_layer: "1 (single composition query)"
+
+  database_queries:
+    traditional: "Many (batching helps, but still multiple round-trips)"
+    three_layer: "One (all composition at database layer)"
+
+  network_latency:
+    traditional: "Multiple round-trips × network delay"
+    three_layer: "Single round-trip"
+
+  pk_fk_strategy:
+    traditional: "UUID joins (slow)"
+    three_layer: "SERIAL PK/FK internally, UUID externally"
+
+  join_performance:
+    traditional: "5-10 queries × join cost"
+    three_layer: "Optimized composition cost"
+
+  complexity:
+    traditional: "Application must orchestrate DataLoaders"
+    three_layer: "Database views handle it automatically"
+
+recommendation_matrix:
+  - scenario: "Simple queries (one entity, no relationships)"
+    approach: "Layer 3 (tv_*) still appropriate"
+    reason: "Consistent access pattern, future flexibility"
+
+  - scenario: "Nested relationships (user → posts → comments)"
+    approach: "Three-layer with JSONB composition"
+    reason: "Eliminates N+1 entirely, single query"
+
+  - scenario: "Performance-critical features"
+    approach: "Three-layer with materialized views"
+    reason: "Pre-computed composition, instant response"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Think of three-layer architecture like a restaurant kitchen:
+      - Layer 1 (tb_*) = Raw ingredients (chicken, rice, sauce)
+      - Layer 2 (v_*) = Prepared components (cooked chicken, rice)
+      - Layer 3 (tv_*) = Final plated dish (chicken and rice on plate)
+
+      Customer gets complete dish in one plate delivery, not ingredients separately!
+
+    focus: "Why layers exist and what each does"
+    key_points:
+      - "Layer 1 (tb_*): write-optimized tables with integer PKs"
+      - "Layer 2 (v_*): read-optimized scalar extraction"
+      - "Layer 3 (tv_*): nested JSONB composition for GraphQL"
+      - "Always query tv_* from application; never tb_*"
+
+  intermediate:
+    focus: "Understanding N+1 elimination through composition"
+    key_points:
+      - "Traditional: each relationship requires separate query (N+1)"
+      - "Three-layer: database composes all relationships in one query"
+      - "JSONB composition at database layer is more efficient than DataLoaders"
+      - "Integer fk_* joins are 5-10x faster than UUID joins"
+      - "Recursive tv_* views can compose arbitrary nesting"
+
+  advanced:
+    focus: "Query optimization and materialized views"
+    key_points:
+      - "Use EXPLAIN ANALYZE to verify composition query performance"
+      - "Index all fk_* columns for efficient composition JOINs"
+      - "Materialized views for expensive compositions (refresh periodically)"
+      - "Monitor view query time; trigger refresh if > threshold"
+      - "Composition depth limits: avoid infinite recursion"
+      - "Consider partial composition: some nested objects eager-loaded, others lazy"

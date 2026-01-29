@@ -1,0 +1,302 @@
+id: fraiseql-complex-nested-queries
+name: "FraiseQL Complex Nested Queries"
+category: fraiseql
+type: standard
+tags:
+  - fraiseql
+  - nested-queries
+  - deep-relationships
+  - query-depth
+  - performance
+
+summary:
+  short: "Handling deeply nested GraphQL queries with depth limits and composition strategies"
+  long: |
+    GraphQL allows arbitrary nesting depth, which can cause exponential complexity. FraiseQL addresses
+    this through max_query_depth configuration, composition strategies for different nesting levels,
+    and careful relationship design. Understanding query complexity and setting appropriate limits
+    prevents DoS attacks and performance degradation.
+
+problem:
+  description: |
+    Deeply nested queries can cause exponential database complexity:
+    - user { posts { comments { author { posts { ... }}}}}
+    - Each level multiplies the data fetch
+    - Circular references possible (author → posts → author → ...)
+    - DoS attack vector if not limited
+
+  symptoms:
+    - name: "Slow complex queries"
+      description: "Nested query takes 5 seconds instead of 50ms"
+      detection: "Query depth > 5 levels"
+
+    - name: "Exponential slowdown"
+      description: "Adding one more nesting level makes query 100× slower"
+      detection: "Time scales exponentially with depth"
+
+    - name: "Circular relationships"
+      description: "user → posts → author → posts creates infinite loop"
+      detection: "Query gets stuck or returns duplicate data"
+
+  impact: |
+    Slow APIs, DoS vulnerability, resource exhaustion, poor user experience
+
+solution:
+  principle: "Limit depth, compose strategically, break queries into fragments"
+
+  components:
+    - name: "Query Depth Limits"
+      type: "Configuration"
+      purpose: "Prevent deeply nested queries"
+      setting: |
+        FraiseQLConfig(
+            max_query_depth=10,  # Typical limit
+            complexity_enabled=True,
+            ...
+        )
+      guidance: |
+        - Development: max_query_depth=10 (permissive)
+        - Production: max_query_depth=10 (reasonable)
+        - Maximum ever needed: ~5 levels for typical APIs
+        - Enforce at server level before database queries
+
+    - name: "Safe Nesting Patterns"
+      type: "Design pattern"
+      purpose: "Structure relationships for safe nesting"
+      patterns:
+        level_0: |
+          **User** (entry point)
+          - Top level query
+        level_1: |
+          **User → Posts** (1 composition)
+          - Composed in tv_user JSONB
+          - No additional queries
+        level_2: |
+          **User → Posts → Comments** (2 compositions)
+          - Posts have pre-composed comments
+          - Safe via JSONB
+        level_3: |
+          **User → Posts → Comments → Author** (3 compositions)
+          - Authors pre-composed in comments JSONB
+          - Still safe
+        level_4_plus: |
+          **Avoid deeper nesting**
+          - Clients should use separate queries
+          - Use field arguments for pagination/filtering
+
+    - name: "Composition vs Separate Queries"
+      type: "Strategy"
+      purpose: "Know when to use composition vs separate queries"
+      decision: |
+        Compose if:
+        - Relationship always needed with parent
+        - Data is small/bounded
+        - Relationship rarely changes
+
+        Separate query if:
+        - Relationship is optional
+        - Large collection (100+ items)
+        - Client might not need it
+        - Frequent updates
+
+    - name: "Circular Reference Prevention"
+      type: "Design pattern"
+      purpose: "Break circular references"
+      patterns:
+        problem: |
+          user → posts → author → posts (circular!)
+        solution: |
+          user { posts { author { id name } } }
+          - Include author ID/name, but NOT posts
+          - Prevents circular reference
+          - Still useful for displaying author info
+
+    - name: "Query Fragmentation"
+      type: "Client pattern"
+      purpose: "Split complex queries into fragments"
+      pattern: |
+        Instead of:
+        ```graphql
+        query {
+          user(id: "1") {
+            posts {
+              comments {
+                author {
+                  email
+                }
+              }
+            }
+          }
+        }
+        ```
+
+        Use fragments:
+        ```graphql
+        query GetUser {
+          user(id: "1") { ...UserWithPosts }
+        }
+
+        fragment UserWithPosts on User {
+          posts(limit: 10) { ...PostWithComments }
+        }
+
+        fragment PostWithComments on Post {
+          comments(limit: 5) { ...CommentWithAuthor }
+        }
+
+        fragment CommentWithAuthor on Comment {
+          id content
+          author { id email }
+        }
+        ```
+
+key_concepts:
+  concept_1: "Deeply nested queries cause exponential complexity"
+  concept_2: "Set max_query_depth limit to prevent DoS"
+  concept_3: "Compose safe nesting levels in JSONB"
+  concept_4: "Break circular references with partial composition"
+  concept_5: "Use query fragments for readable complex queries"
+  concept_6: "Client should limit depth, not server relying on limit"
+  concept_7: "Test deeply nested queries before production"
+  concept_8: "Monitor query complexity metrics"
+
+best_practices:
+  - name: "Set reasonable depth limits"
+    description: "max_query_depth=10 is safe, catches most attacks"
+
+  - name: "Compose safe nesting levels"
+    description: "Level 2-3: OK | Level 4+: avoid"
+
+  - name: "Document safe nesting"
+    description: "Tell clients what's safe to query"
+
+  - name: "Use fragments for complex queries"
+    description: "Improves readability, enables reuse"
+
+  - name: "Break circular references"
+    description: "Include author ID, not author.posts"
+
+  - name: "Test with depth analyzers"
+    description: "Verify actual depth < max_query_depth"
+
+anti_patterns:
+  - name: "No depth limits"
+    description: "Allow arbitrary nesting"
+    consequence: "DoS vulnerability, exponential queries"
+    fix: "Set max_query_depth in FraiseQLConfig"
+
+  - name: "Circular compositions"
+    description: "user → posts → author → posts"
+    consequence: "Infinite loops, duplicate data"
+    fix: "Break cycle: author { id name } not posts"
+
+  - name: "All relationships always composed"
+    description: "Every relationship pre-composed in JSONB"
+    consequence: "Large JSONB blobs, slow composition"
+    fix: "Only compose if always needed"
+
+examples:
+  example_1:
+    title: "Safe Nesting (3 Levels)"
+    description: "User → Posts → Comments"
+    code: |
+      query SafeQuery {
+        user(id: "1") {
+          id name email
+          posts(limit: 10) {
+            id title created_at
+            comments(limit: 5) {
+              id content author { id name }
+            }
+          }
+        }
+      }
+
+  example_2:
+    title: "Using Fragments"
+    description: "Structured nested query with fragments"
+    code: |
+      query GetUserWithPosts {
+        user(id: "1") { ...UserFields }
+      }
+
+      fragment UserFields on User {
+        id name email
+        posts(limit: 10) { ...PostFields }
+      }
+
+      fragment PostFields on Post {
+        id title created_at
+        author { id name }
+        comments(limit: 5) { ...CommentFields }
+      }
+
+      fragment CommentFields on Comment {
+        id content created_at
+        author { id name email }
+      }
+
+  example_3:
+    title: "Breaking Circular Reference"
+    description: "User → Posts → Author (no author.posts)"
+    code: |
+      query UserWithAuthors {
+        user(id: "1") {
+          name
+          posts(limit: 10) {
+            title
+            author {
+              id
+              name
+              # NOT author.posts - breaks circular reference
+            }
+          }
+        }
+      }
+
+comparison_matrix:
+  nesting_level:
+    level_1: "user"
+    level_2: "user { posts }"
+    level_3: "user { posts { comments } }"
+    level_4: "user { posts { comments { author } } }"
+    level_5_plus: "user { posts { comments { author { posts } } } }"
+
+  safety:
+    level_1: "Always safe"
+    level_2: "Safe (composed in JSONB)"
+    level_3: "Safe (composed in JSONB)"
+    level_4: "Safe with care (avoid circular)"
+    level_5_plus: "Dangerous (exponential complexity)"
+
+  recommendation:
+    level_1: "Always allow"
+    level_2: "Always allow"
+    level_3: "Generally safe, monitor"
+    level_4: "Limit with complexity analysis"
+    level_5_plus: "Reject with max_query_depth"
+
+blog_hooks:
+  beginner:
+    focus: "Understanding nested query complexity"
+    key_points:
+      - "Each nesting level multiplies data fetches"
+      - "Deep nesting = slow queries"
+      - "Set max_query_depth limit"
+      - "Limit to 3-4 levels typically"
+
+  intermediate:
+    focus: "Safe nesting patterns and composition"
+    key_points:
+      - "Compose small relationships in JSONB"
+      - "Break circular references with partial data"
+      - "Use query fragments for readability"
+      - "Test nesting behavior at scale"
+
+  advanced:
+    focus: "Complexity analysis and optimization"
+    key_points:
+      - "Query complexity analysis algorithms"
+      - "Detecting circular references"
+      - "Optimal composition boundaries"
+      - "Client-side query depth awareness"

@@ -1,0 +1,540 @@
+id: fraiseql-n-plus-one-prevention
+name: "FraiseQL N+1 Prevention Patterns"
+category: fraiseql
+type: standard
+tags:
+  - fraiseql
+  - n-plus-one
+  - performance
+  - query-optimization
+  - jsonb-composition
+
+summary:
+  short: "Preventing N+1 queries through JSONB composition and materialized views"
+  long: |
+    The N+1 query problem occurs when fetching a parent entity requires a separate database query
+    for each child relationship. FraiseQL solves this at the database level using JSONB composition
+    and three-layer view architecture, eliminating N+1 entirely rather than requiring application-level
+    batching or caching. Understanding when to use composition vs views is critical for GraphQL performance.
+
+problem:
+  description: |
+    Traditional GraphQL APIs suffer from N+1 query problems:
+    - Query: "Get user and all their posts"
+    - Result: 1 query for user + 100 queries for posts = 101 total queries
+    - Time: 1 second response time instead of 10ms
+
+    Application-level solutions (DataLoader, batching) push complexity to API code.
+    FraiseQL solves this at the database layer using three-layer architecture.
+
+  symptoms:
+    - name: "Slow relationship queries"
+      description: "user { posts { id } } takes 1000ms (should be <50ms)"
+      detection: "Time increases linearly with number of child records"
+
+    - name: "Database connection exhaustion"
+      description: "Pool connections exhaust during high N+1 workload"
+      detection: "Connection timeout errors during complex queries"
+
+    - name: "Cascading slowness"
+      description: "user { posts { comments { author } } } becomes exponentially slow"
+      detection: "Exponential time growth with nesting depth"
+
+  impact: |
+    Poor GraphQL query performance, database overload, connection pool exhaustion,
+    poor user experience, cascading failures under load
+
+solution:
+  principle: "Prevent N+1 at database layer using JSONB composition and materialized views"
+
+  components:
+    - name: "JSONB Composition (N=1)"
+      type: "Database pattern"
+      purpose: "Embed related entities as JSONB in parent query table"
+      strategy: |
+        Instead of separate queries:
+        ```
+        SELECT * FROM tb_user WHERE id = 1;  -- 1 query
+        SELECT * FROM tb_post WHERE fk_user = 1;  -- 2nd query
+        ```
+
+        Embed in query table:
+        ```
+        SELECT * FROM tv_user WHERE id = 1;
+        -- Response includes:
+        -- {
+        --   "id": "uuid",
+        --   "name": "Alice",
+        --   "posts": [
+        --     {"id": "uuid", "title": "Post 1"},
+        --     {"id": "uuid", "title": "Post 2"}
+        --   ]
+        -- }
+        ```
+      benefit: "1 query always, regardless of relationship count"
+      example: |
+        -- tv_user table pre-composes posts
+        CREATE TABLE tv_user (
+            id UUID PRIMARY KEY,
+            data JSONB NOT NULL  -- includes nested posts
+        );
+
+        -- Query returns pre-composed data
+        SELECT id, data->>'name' as name, data->'posts' as posts
+        FROM tv_user WHERE id = %s;
+        -- Returns 1 row with nested posts (no additional queries)
+
+    - name: "Three-Layer Architecture"
+      type: "Architectural pattern"
+      purpose: "Separate write normalization from read denormalization"
+      layers:
+        - name: "Command Layer (tb_*)"
+          purpose: "Normalized write tables with constraints"
+          queries: "INSERT, UPDATE, DELETE"
+          example: "tb_user, tb_post"
+
+        - name: "Projection Layer (v_*)"
+          purpose: "SQL views that prepare denormalized data"
+          queries: "SELECT (no duplication yet)"
+          example: "v_user_with_post_count"
+
+        - name: "Composition Layer (tv_*)"
+          purpose: "JSONB tables with pre-composed relationships"
+          queries: "SELECT (N+1 prevention)"
+          example: "tv_user (with posts, post_count, etc.)"
+      flow: |
+        tb_user → (trigger) → v_user_with_posts → (materialized) → tv_user
+        (write)              (normalize)           (denormalize)    (read)
+
+    - name: "Composition Strategies"
+      type: "Pattern selection"
+      purpose: "Choose composition approach based on relationship size"
+      strategies:
+        strategy_1: |
+          **Small Fixed Relationships** (always < 10 items):
+          - Embed directly in JSONB
+          - Example: user { profile, settings }
+          - Performance: No penalty
+
+        strategy_2: |
+          **Medium Relationships** (10-100 items):
+          - Embed with metadata (count, pagination cursor)
+          - Example: user { posts (first 10), post_count }
+          - Performance: Minimal (limited to page size)
+
+        strategy_3: |
+          **Large Relationships** (100+ items):
+          - Embed count only, link to separate query
+          - Example: user { post_count }, then query posts separately
+          - Performance: N=1 for user, separate query for posts
+
+        strategy_4: |
+          **Aggregated Data Only**:
+          - Pre-compute aggregates without full records
+          - Example: user { post_count, comment_count, total_views }
+          - Performance: Instant (no N+1, minimal data)
+
+    - name: "Sync Patterns"
+      type: "Operational pattern"
+      purpose: "Keep JSONB views synchronized with source data"
+      patterns:
+        trigger_based: |
+          **Trigger-Based Sync** (Real-time):
+          - PostgreSQL trigger on INSERT/UPDATE/DELETE
+          - Automatically updates tv_* when tb_* changes
+          - Pro: Always consistent
+          - Con: Trigger overhead on writes
+
+        batch_based: |
+          **Batch-Based Sync** (Scheduled):
+          - Periodic process (every 5 minutes)
+          - UPDATE tv_user FROM v_user_with_posts
+          - Pro: No trigger overhead
+          - Con: Slight staleness possible
+
+        event_based: |
+          **Event-Based Sync** (Hybrid):
+          - FraiseQL mutations trigger explicit sync
+          - Confiture handles sync coordination
+          - Pro: Explicit control, testable
+          - Con: Requires application awareness
+
+    - name: "Query Patterns"
+      type: "GraphQL resolution"
+      purpose: "How FraiseQL resolves composed relationships"
+      patterns:
+        nested_objects: |
+          **Nested Object Resolution**:
+          ```python
+          @fraiseql.type(sql_source="benchmark.tv_user")
+          class User:
+              id: UUID
+              name: str
+              posts: list[Post]  # Pre-composed from JSONB
+
+          @fraiseql.type(sql_source="benchmark.tv_post")
+          class Post:
+              id: UUID
+              title: str
+              author: User  # Already in JSONB, no query
+          ```
+
+        pagination_within_composition: |
+          **Paginated Composition**:
+          ```python
+          @fraiseql.type(sql_source="benchmark.tv_user")
+          class User:
+              posts(limit: int = 10, offset: int = 0): list[Post]
+              # JSONB contains all posts, field handles pagination
+              # No N+1: all posts already fetched
+          ```
+
+key_concepts:
+  concept_1: "N+1 happens at database layer; solve it at database layer"
+  concept_2: "JSONB composition embeds relationships in parent query"
+  concept_3: "Three-layer architecture separates write/read optimization"
+  concept_4: "tv_* tables contain pre-composed JSONB relationships"
+  concept_5: "Sync strategies control how JSONB is kept current"
+  concept_6: "Small relationships: embed fully; large: embed count only"
+  concept_7: "Pagination within JSONB: fetch once, paginate in memory"
+  concept_8: "GraphQL resolvers read JSONB directly (no additional queries)"
+
+implementation_considerations:
+  consideration_1: "Profile relationships before deciding composition strategy"
+  consideration_2: "For >100 items, consider separate query instead of embedding"
+  consideration_3: "Set up sync triggers or batch jobs for composition updates"
+  consideration_4: "Test N+1 scenarios with realistic data volume"
+  consideration_5: "Monitor sync lag (triggers should be <50ms)"
+  consideration_6: "Use partial JSONB for large collections (metadata only)"
+  consideration_7: "Document which relationships are composed vs queried separately"
+  consideration_8: "Consider materialized views for expensive compositions"
+  consideration_9: "Test composition queries with EXPLAIN ANALYZE"
+  consideration_10: "Alert if sync jobs fail (data becomes stale)"
+
+best_practices:
+  - name: "Compose small relationships fully"
+    description: "user { settings, profile, preferences } all in JSONB"
+
+  - name: "Compose medium relationships with pagination"
+    description: "user { posts (first 10), post_count } in JSONB"
+
+  - name: "For large relationships, separate query"
+    description: "user { post_count } then posts as separate field"
+
+  - name: "Pre-compute aggregates"
+    description: "user { post_count, comment_count, total_views } from rollups"
+
+  - name: "Test N+1 before and after composition"
+    description: "Verify query count with realistic data (100+)"
+
+  - name: "Document composition boundaries"
+    description: "Which fields are composed, which require separate query"
+
+  - name: "Monitor sync performance"
+    description: "Alert if composition updates take >100ms"
+
+  - name: "Use event-based sync for consistency"
+    description: "Sync on mutations, not on background jobs"
+
+anti_patterns:
+  - name: "Composing large relationships"
+    description: "user { posts (100 items) } in JSONB"
+    consequence: "Large JSONB blobs, network overhead, memory issues"
+    fix: "Compose with pagination: first 10 items + count"
+
+  - name: "No sync strategy"
+    description: "JSONB composition but no updates when data changes"
+    consequence: "Stale data, inconsistent state"
+    fix: "Use trigger-based or event-based sync"
+
+  - name: "Querying composed relationships"
+    description: "GraphQL resolver issues separate query for posts despite composition"
+    consequence: "Defeats purpose of composition, still N+1"
+    fix: "Read directly from JSONB, don't issue queries"
+
+  - name: "Composing mutable data"
+    description: "Including user details that change frequently in posts"
+    consequence: "Stale user info in post composition"
+    fix: "Compose only immutable denormalization"
+
+  - name: "All-or-nothing composition"
+    description: "Either compose everything or nothing"
+    consequence: "Too much data in JSONB or miss optimization opportunities"
+    fix: "Composition per field based on size/mutability"
+
+  - name: "No performance testing"
+    description: "Assume composition solves N+1 without testing"
+    consequence: "May still have N+1 if resolver isn't using JSONB"
+    fix: "Benchmark with realistic data, measure query count"
+
+implementation:
+  title: "Implementing N+1 Prevention"
+  steps:
+    - number: 1
+      title: "Identify N+1 candidates"
+      description: |
+        Find relationships that cause N+1:
+        ```python
+        # This causes N+1 without composition
+        def resolve_user(info, id):
+            user = db.fetch_one("SELECT * FROM tb_user WHERE id = %s", (id,))
+            # For each user field access:
+            posts = db.fetch("SELECT * FROM tb_post WHERE fk_user = %s", (user.pk,))
+            # If querying multiple users, this becomes N+1
+        ```
+
+    - number: 2
+      title: "Create projection view"
+      description: |
+        ```sql
+        -- Project and aggregate relationships
+        CREATE OR REPLACE VIEW v_user_with_posts AS
+        SELECT
+          u.id,
+          u.pk_user,
+          u.name,
+          u.email,
+          json_agg(
+            json_build_object(
+              'id', p.pk_post,
+              'title', p.title,
+              'created_at', p.created_at
+            )
+          ) AS posts,
+          COUNT(p.id) AS post_count
+        FROM tb_user u
+        LEFT JOIN tb_post p ON p.fk_user = u.pk_user
+        GROUP BY u.id, u.pk_user, u.name, u.email;
+        ```
+
+    - number: 3
+      title: "Create composition table"
+      description: |
+        ```sql
+        -- Materialized view with JSONB composition
+        CREATE TABLE tv_user AS
+        SELECT
+          id,
+          json_build_object(
+            'name', name,
+            'email', email,
+            'posts', posts,
+            'post_count', post_count
+          ) AS data
+        FROM v_user_with_posts;
+
+        CREATE UNIQUE INDEX idx_tv_user_id ON tv_user(id);
+        ```
+
+    - number: 4
+      title: "Set up sync strategy"
+      description: |
+        ```sql
+        -- Trigger-based sync (real-time)
+        CREATE FUNCTION sync_tv_user_after_post_change()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          REFRESH MATERIALIZED VIEW CONCURRENTLY tv_user
+          WHERE id IN (
+            SELECT id FROM v_user_with_posts
+            WHERE pk_user = (
+              CASE WHEN TG_OP = 'DELETE' THEN OLD.fk_user
+                   ELSE NEW.fk_user
+              END
+            )
+          );
+          RETURN NULL;
+        END;
+        $$ LANGUAGE plpgsql;
+
+        CREATE TRIGGER trg_sync_tv_user_after_post
+        AFTER INSERT OR UPDATE OR DELETE ON tb_post
+        FOR EACH ROW
+        EXECUTE FUNCTION sync_tv_user_after_post_change();
+        ```
+
+    - number: 5
+      title: "Define GraphQL types"
+      description: |
+        ```python
+        @fraiseql.type(sql_source="benchmark.tv_user")
+        class User:
+            id: UUID
+            name: str
+            email: str
+            posts: list[Post]  # Pre-composed from JSONB
+            post_count: int    # Metadata
+        ```
+
+    - number: 6
+      title: "Benchmark performance"
+      description: |
+        ```python
+        def test_n_plus_one_prevention():
+            # Without composition: N queries
+            users = db.fetch("SELECT * FROM tb_user LIMIT 10")
+            for user in users:
+                posts = db.fetch(
+                    "SELECT * FROM tb_post WHERE fk_user = %s",
+                    (user.pk,)
+                )
+            # Time: 100ms (1 + 10 queries)
+
+            # With composition: 1 query
+            users = db.fetch("SELECT * FROM tv_user LIMIT 10")
+            # All posts already in JSONB data
+            # Time: 10ms (1 query)
+            # Result: 10× speedup!
+        ```
+
+examples:
+  example_1:
+    title: "Small Relationships: Full Composition"
+    description: "User with profile and settings"
+    code: |
+      -- User has 1 profile, 1 settings (always < 2 items)
+      CREATE OR REPLACE VIEW v_user_with_settings AS
+      SELECT
+        u.id,
+        u.name,
+        json_build_object(
+          'theme', s.theme,
+          'notifications_enabled', s.notifications_enabled
+        ) AS settings
+      FROM tb_user u
+      LEFT JOIN tb_settings s ON s.fk_user = u.pk_user;
+
+      -- tv_user has settings already
+      SELECT data->'settings' FROM tv_user WHERE id = 1;
+      -- Returns: {"theme": "dark", "notifications_enabled": true}
+      -- No additional query needed!
+
+  example_2:
+    title: "Medium Relationships: Paginated Composition"
+    description: "User with first 10 posts and post_count"
+    code: |
+      -- User has many posts, but compose only first 10
+      CREATE OR REPLACE VIEW v_user_with_posts_paginated AS
+      SELECT
+        u.id,
+        u.name,
+        (
+          SELECT json_agg(p ORDER BY p.created_at DESC)
+          FROM (
+            SELECT json_build_object('id', pk_post, 'title', title)
+            FROM tb_post
+            WHERE fk_user = u.pk_user
+            ORDER BY created_at DESC
+            LIMIT 10
+          ) p
+        ) AS posts,
+        (SELECT COUNT(*) FROM tb_post WHERE fk_user = u.pk_user) AS post_count
+      FROM tb_user u;
+
+  example_3:
+    title: "Large Relationships: Separate Query"
+    description: "User with post_count (no full composition)"
+    code: |
+      -- Don't compose 10,000 items, just the count
+      CREATE OR REPLACE VIEW v_user_with_stats AS
+      SELECT
+        u.id,
+        u.name,
+        COUNT(p.id) AS post_count,
+        COUNT(c.id) AS comment_count
+      FROM tb_user u
+      LEFT JOIN tb_post p ON p.fk_user = u.pk_user
+      LEFT JOIN tb_comment c ON c.fk_user = u.pk_user
+      GROUP BY u.id, u.name;
+
+      -- GraphQL resolver
+      class User:
+          post_count: int  # From JSONB
+          posts: list[Post]  # Resolved separately with pagination
+
+comparison_matrix:
+  approach:
+    full_composition: "Embed all relationships in JSONB"
+    paginated_composition: "Embed first N items + count"
+    metadata_only: "Embed only aggregates (count, sum)"
+    separate_query: "No composition, query separately"
+
+  best_for:
+    full_composition: "Small fixed relationships (<10)"
+    paginated_composition: "Medium relationships (10-100)"
+    metadata_only: "Large relationships (100+)"
+    separate_query: "Mutable or dynamic data"
+
+  performance:
+    full_composition: "1 query (all data in JSONB)"
+    paginated_composition: "1 query (limited JSONB + pagination)"
+    metadata_only: "1 query (only aggregates)"
+    separate_query: "2+ queries (user + relationship)"
+
+  data_freshness:
+    full_composition: "Depends on sync (trigger/batch)"
+    paginated_composition: "Depends on sync"
+    metadata_only: "Depends on sync"
+    separate_query: "Always current (live queries)"
+
+  jsonb_size:
+    full_composition: "Large (all items)"
+    paginated_composition: "Medium (limited items)"
+    metadata_only: "Small (aggregates only)"
+    separate_query: "None"
+
+recommendation_matrix:
+  - relationship: "User → Profile"
+    size: "1 item"
+    strategy: "Full composition"
+    reasoning: "Always have 1-1, minimal size"
+
+  - relationship: "User → Posts"
+    size: "10-100 items"
+    strategy: "Paginated composition"
+    reasoning: "Common in feed, compose first page"
+
+  - relationship: "Post → Comments"
+    size: "100+ items"
+    strategy: "Metadata only (count)"
+    reasoning: "Too large to compose fully"
+
+  - relationship: "User → Feed"
+    size: "Infinite (pagination)"
+    strategy: "Separate query"
+    reasoning: "Dynamic, query separately with keyset"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      N+1 is like shopping with a bad list:
+      - Bad: Go to store, get bread. Come back home, realize forgot milk. Go back. Etc.
+      - Good: Make complete list, one trip, get everything.
+
+      N+1 is making separate trips for each item. JSONB composition is one trip with everything.
+
+    focus: "Understanding N+1 and basic composition"
+    key_points:
+      - "N+1 = 1 query for parent + N queries for children"
+      - "Composition embeds children in parent JSONB"
+      - "Result: 1 query always, no N+1"
+      - "Small relationships: compose fully"
+
+  intermediate:
+    focus: "Composition strategies based on relationship size"
+    key_points:
+      - "< 10 items: Full composition in JSONB"
+      - "10-100 items: Paginated composition (first page)"
+      - "100+ items: Metadata only (count/aggregates)"
+      - "Sync strategies: trigger-based vs batch-based"
+      - "Test with realistic data volume"
+
+  advanced:
+    focus: "Optimization and edge cases"
+    key_points:
+      - "Partial JSONB for large collections"
+      - "Sync performance tuning (triggers vs batch jobs)"
+      - "Composition consistency guarantees"
+      - "Handling mutable composed data"
+      - "Benchmarking composition effectiveness"
+      - "Stale data handling in eventual consistency"

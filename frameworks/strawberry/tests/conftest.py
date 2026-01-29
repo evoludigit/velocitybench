@@ -226,6 +226,8 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "relationship: relationship tests")
     config.addinivalue_line("markers", "schema: schema integration tests")
     config.addinivalue_line("markers", "boundary: boundary condition tests")
+    config.addinivalue_line("markers", "perf: performance benchmark tests")
+    config.addinivalue_line("markers", "perf_queries: query performance benchmark tests")
 
 
 # ============================================================================

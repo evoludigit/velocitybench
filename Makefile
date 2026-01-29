@@ -1,5 +1,6 @@
 .PHONY: help blog-all blog-pattern blog-fraisier blog-webhooks blog-git-providers blog-cqrs blog-history blog-multi-provider \
-	blog-list blog-clean venv-check venv-setup framework-start framework-stop framework-smoke framework-list
+	blog-list blog-clean venv-check venv-setup framework-start framework-stop framework-smoke framework-list \
+	vllm-start vllm-status vllm-stop
 
 # Project paths
 PROJECT_ROOT := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
@@ -66,6 +67,11 @@ help:
 	@echo "  make db-up                      - Start PostgreSQL database"
 	@echo "  make db-down                    - Stop PostgreSQL database"
 	@echo ""
+	@echo "vLLM Server Commands (for AI-powered generation):"
+	@echo "  make vllm-start                 - Start vLLM server (auto: comments-generate)"
+	@echo "  make vllm-status                - Check vLLM server status"
+	@echo "  make vllm-stop                  - Stop vLLM server"
+	@echo ""
 	@echo "Examples:"
 	@echo "  make personas-test              # Generate 10 test personas"
 	@echo "  make personas-generate          # Generate 2000 full personas"
@@ -98,6 +104,24 @@ venv-setup:
 	else \
 		echo "✓ Virtual environment already exists"; \
 	fi
+
+# Start vLLM server (required for comment generation)
+vllm-start:
+	@echo "======================================================================"
+	@echo "Starting vLLM Server (implementer model)..."
+	@echo "======================================================================"
+	@$(PROJECT_ROOT)bin/vllm-start-helper.sh
+	@echo "======================================================================"
+
+# Check vLLM service status
+vllm-status:
+	@vllm-switch status
+
+# Stop vLLM server
+vllm-stop:
+	@echo "Stopping vLLM server..."
+	@vllm-switch stop
+	@echo "✓ vLLM stopped"
 
 # Generate all blog posts
 blog-all: venv-check
@@ -379,7 +403,7 @@ personas-clean:
 # ======================================================================
 
 # Test comment generation (5 posts, dry-run)
-comments-test: venv-check
+comments-test: venv-check vllm-start
 	@echo "======================================================================"
 	@echo "Testing Comment Generation (5 posts, dry-run)..."
 	@echo "======================================================================"
@@ -388,7 +412,7 @@ comments-test: venv-check
 	@echo "======================================================================"
 
 # Generate comments on all blog posts
-comments-generate: venv-check
+comments-generate: venv-check vllm-start
 	@echo "======================================================================"
 	@echo "Generating Comments on ALL Blog Posts..."
 	@echo "This will generate ~120,000 comments across 9,281 posts (6-8 hours)"

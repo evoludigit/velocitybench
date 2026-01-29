@@ -1,0 +1,345 @@
+id: fraiseql-zero-downtime-deployments
+name: "FraiseQL Zero-Downtime Schema Deployments"
+category: fraiseql
+type: standard
+tags:
+  - fraiseql
+  - confiture
+  - zero-downtime
+  - schema-evolution
+  - production-deployment
+
+summary:
+  short: "Safe production schema migrations with zero application downtime"
+  long: |
+    Production schema changes require careful coordination: the database must remain available
+    while the application updates. Confiture provides migration strategies that enable zero-downtime
+    deployments: add column, update application, backfill data, remove old column. This pattern
+    covers safe deployment strategies, validation checkpoints, and rollback procedures.
+
+problem:
+  description: |
+    Naive schema changes cause downtime:
+    - ALTER TABLE tb_user RENAME COLUMN old_name TO new_name
+    - Table locked during migration (minutes)
+    - Application can't write during lock
+    - Users see errors
+
+    Safe deployments require multi-step approach with application coordination.
+
+  symptoms:
+    - name: "Migration lock causes downtime"
+      description: "Table locked during 30-minute migration"
+      detection: "INSERT/UPDATE timeout errors during migration"
+
+    - name: "Incomplete migration"
+      description: "Application updated but data not backfilled"
+      consequence: "NULL values where code expects data"
+
+    - name: "No rollback plan"
+      description: "Migration fails, can't easily revert"
+      consequence: "Downtime extends while fixing"
+
+  impact: |
+    Application downtime, data loss risk, difficult rollbacks
+
+solution:
+  principle: "Multi-step migrations with validation checkpoints and rollback procedures"
+
+  components:
+    - name: "Safe Migration Strategies"
+      type: "Migration pattern"
+      purpose: "Zero-downtime schema changes"
+      strategies:
+        add_column: |
+          **Step 1: Add Column (Backward Compatible)**
+          ```sql
+          ALTER TABLE tb_user ADD COLUMN new_email TEXT;
+          -- No lock, completes in milliseconds
+          -- Application continues normally
+          ```
+          - No data needs migration
+          - Backward compatible (application ignores new column)
+          - Application can write to new column immediately
+
+        deploy_code: |
+          **Step 2: Deploy New Code**
+          - Canary deploy (1-10% traffic)
+          - New code writes to both old and new columns
+          - Monitor for errors
+          - Gradually increase to 100%
+
+        backfill_data: |
+          **Step 3: Backfill Data**
+          ```sql
+          UPDATE tb_user SET new_email = email WHERE new_email IS NULL;
+          -- Can run during live traffic
+          -- No lock (or very brief locks)
+          -- Gradual: batch updates, not one giant query
+          ```
+
+        validate: |
+          **Step 4: Validate**
+          ```sql
+          SELECT COUNT(*) FROM tb_user WHERE new_email IS NULL;
+          -- Should be 0 (all rows backfilled)
+          -- If not, retry backfill
+          ```
+
+        remove_old: |
+          **Step 5: Remove Old Column**
+          ```sql
+          ALTER TABLE tb_user DROP COLUMN email;
+          -- Only after validation passes
+          -- Application already reading new_email
+          -- No downtime
+          ```
+
+    - name: "Confiture Migration Strategies"
+      type: "Tool integration"
+      purpose: "Enforce multi-step pattern"
+      strategies:
+        strategy_1: |
+          **Strategy 1: Expand-Contract** (add, deploy, backfill, remove)
+          - Safest approach
+          - Zero downtime
+          - Takes longer (multiple steps)
+          - Recommended for production
+
+        strategy_2: |
+          **Strategy 2: Parallel Table** (create new, sync, switch, drop)
+          - Create new table structure
+          - Sync data from old table
+          - Switch application to new table
+          - Drop old table
+          - For major restructuring
+
+        strategy_3: |
+          **Strategy 3: Suppress-Unsuppress** (hide, change, expose)
+          - Mark table unavailable in application
+          - Make schema change (can lock)
+          - Mark table available again
+          - Downtime during change (acceptable if brief)
+          - For < 1 minute downtime acceptable
+
+    - name: "Validation Checkpoints"
+      type: "Safety mechanism"
+      purpose: "Verify migration success at each step"
+      checkpoints: |
+        1. Pre-migration validation
+           - Backup exists
+           - Rollback procedure tested
+           - Application ready for change
+
+        2. Column added
+           - Column exists with correct type
+           - Default values correct
+           - No data corruption
+
+        3. Application deployed
+           - New code running in canary
+           - No errors in logs
+           - Latency normal
+
+        4. Data backfilled
+           - All NULL → values
+           - Data correctness verified
+           - No silent data loss
+
+        5. Old column removed
+           - All code using new column
+           - No references to old column
+           - No data loss
+
+    - name: "Rollback Procedure"
+      type: "Safety mechanism"
+      purpose: "Revert if migration fails"
+      procedure: |
+        If migration fails at any step:
+
+        1. Stop the migration
+        2. Revert application code (canary rollback)
+        3. Leave database as-is (migration incomplete but safe)
+        4. Investigate failure
+        5. Fix and retry
+
+        Database remains consistent because migrations are atomic
+
+    - name: "Dry-Run Testing"
+      type: "Pre-deployment validation"
+      purpose: "Test migration on production-like data"
+      pattern: |
+        # Create test database with production copy
+        pg_dump production | psql test_db
+
+        # Run migration on test database
+        confiture migrate apply --env test --dry-run
+
+        # Verify:
+        # - Migration completes
+        # - No errors
+        # - Data integrity maintained
+        # - Performance acceptable
+
+    - name: "Monitoring During Migration"
+      type: "Operational practice"
+      purpose: "Detect issues in real-time"
+      metrics: |
+        - Query latency (p50, p95, p99)
+        - Error rate
+        - Connection count
+        - Lock wait times
+        - Application error logs
+
+        Alert if any metric degrades > 10%
+
+key_concepts:
+  concept_1: "Expand-contract: add, code, backfill, remove"
+  concept_2: "Each step must be backward compatible"
+  concept_3: "Validation ensures data integrity"
+  concept_4: "Rollback procedure for emergency revert"
+  concept_5: "Dry-run testing before production"
+  concept_6: "Monitoring during migration for issues"
+  concept_7: "Atomic migrations (all-or-nothing)"
+  concept_8: "Zero-downtime requires coordination with code deployment"
+
+best_practices:
+  - name: "Use expand-contract pattern"
+    description: "Add, deploy, backfill, remove (safest approach)"
+
+  - name: "Dry-run on production-like data"
+    description: "Test with realistic data volume before production"
+
+  - name: "Deploy code before database change"
+    description: "Code should handle both old and new schema"
+
+  - name: "Validate at each step"
+    description: "Ensure data integrity, no silent corruption"
+
+  - name: "Monitor closely during migration"
+    description: "Watch for latency spikes, errors, lock contention"
+
+  - name: "Have rollback procedure"
+    description: "Know how to quickly revert if needed"
+
+  - name: "Batch large backfills"
+    description: "UPDATE in chunks, not one massive query"
+
+  - name: "Test on staging first"
+    description: "Verify procedure works before production"
+
+anti_patterns:
+  - name: "Rename column directly"
+    description: "ALTER TABLE RENAME immediately"
+    consequence: "Application breaks if code not updated"
+    fix: "Add new, deploy code, backfill, remove old"
+
+  - name: "No validation after migration"
+    description: "Assume migration worked"
+    consequence: "Silent data loss"
+    fix: "Validate: SELECT COUNT(*) for expected values"
+
+  - name: "No rollback procedure"
+    description: "If migration fails, no way to recover"
+    consequence: "Extended downtime during fix"
+    fix: "Test rollback before production"
+
+  - name: "Large backfill query"
+    description: "UPDATE 10M rows in single query"
+    consequence: "Locks table, long-running, timeout risk"
+    fix: "Batch: UPDATE ... WHERE id IN (SELECT ... LIMIT 10000)"
+
+examples:
+  example_1:
+    title: "Add Column (Backward Compatible)"
+    description: "Add new column without downtime"
+    code: |
+      -- Step 1: Add column (production)
+      ALTER TABLE tb_user ADD COLUMN new_email TEXT DEFAULT NULL;
+
+      -- Step 2: Deploy code (canary)
+      -- Code updates both email and new_email
+
+      -- Step 3: Monitor (5-10 minutes)
+      -- Ensure no errors
+
+      -- Step 4: Full deployment
+      -- All traffic to new code
+
+      -- Step 5: Backfill (low traffic time)
+      UPDATE tb_user
+      SET new_email = email
+      WHERE new_email IS NULL
+      LIMIT 10000;  -- Batch
+
+      -- Step 6: Verify
+      SELECT COUNT(*) FROM tb_user WHERE new_email IS NULL;  -- Should be 0
+
+      -- Step 7: Remove old
+      ALTER TABLE tb_user DROP COLUMN email;
+
+  example_2:
+    title: "Dry-Run Testing"
+    description: "Test migration before production"
+    code: |
+      # Create test database from production
+      $ pg_dump production | psql test_db
+
+      # Test migration
+      $ confiture migrate apply --env test --dry-run
+
+      # Verify result
+      $ psql test_db -c "SELECT COUNT(*) FROM tb_user WHERE new_email IS NULL"
+
+      # If OK, deploy to production
+
+comparison_matrix:
+  aspect:
+    expand_contract: "Add, deploy, backfill, remove"
+    parallel_table: "Create, sync, switch, drop"
+    suppress_unsuppress: "Hide, change, expose"
+
+  downtime:
+    expand_contract: "Zero"
+    parallel_table: "Zero (if background sync)"
+    suppress_unsuppress: "Brief (during change)"
+
+  complexity:
+    expand_contract: "Medium (multiple steps)"
+    parallel_table: "High (dual maintenance)"
+    suppress_unsuppress: "Low (single step)"
+
+  safety:
+    expand_contract: "Very safe (backward compatible)"
+    parallel_table: "Medium (sync issues possible)"
+    suppress_unsuppress: "Medium (brief downtime)"
+
+  duration:
+    expand_contract: "Longest (hours/days)"
+    parallel_table: "Medium (hours)"
+    suppress_unsuppress: "Shortest (minutes)"
+
+blog_hooks:
+  beginner:
+    focus: "Understanding zero-downtime deployments"
+    key_points:
+      - "Expand-contract: add → code → backfill → remove"
+      - "Each step backward compatible"
+      - "No table locks = no downtime"
+      - "Validation ensures data integrity"
+
+  intermediate:
+    focus: "Multi-step migration strategies"
+    key_points:
+      - "Dry-run on production-like data"
+      - "Deploy code before database change"
+      - "Batch large backfills"
+      - "Monitor closely during migration"
+
+  advanced:
+    focus: "Complex scenarios and rollback"
+    key_points:
+      - "Parallel table migrations"
+      - "Rollback procedures"
+      - "Lock contention handling"
+      - "Large-scale backfill strategies"

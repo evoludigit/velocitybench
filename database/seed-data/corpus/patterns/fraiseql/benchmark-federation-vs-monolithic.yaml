@@ -1,0 +1,429 @@
+id: benchmark-federation-vs-monolithic
+name: "Architectural Benchmark: Federation vs Monolithic GraphQL"
+category: fraiseql
+type: benchmark
+tags:
+  - benchmark
+  - architecture
+  - federation
+  - scalability
+  - team-dynamics
+
+summary:
+  short: "Compare federation and monolithic GraphQL architectures, evaluate trade-offs at different scales"
+  long: |
+    As teams grow, a critical decision emerges: maintain a monolithic GraphQL schema or adopt
+    federation. Federation enables independent services and teams but adds complexity. Monolithic
+    is simpler but becomes a bottleneck. This benchmark compares both approaches with real-world
+    metrics: team velocity, schema evolution, query latency, operational complexity.
+    FraiseQL enables both patterns; this comparison helps architects choose wisely.
+
+problem:
+  description: |
+    As organizations scale, monolithic GraphQL creates friction:
+    - All teams must coordinate schema changes
+    - One service down = entire API down
+    - Schema becomes "dumping ground" (no ownership)
+    - Deployment coordination required
+    - Teams blocked by other teams' changes
+
+    Federation solves some problems but creates others:
+    - Independent teams and services
+    - Schema composition overhead
+    - Network hops (slower queries)
+    - Operational complexity (coordinate multiple services)
+
+comparison:
+  approach_1:
+    name: "Monolithic GraphQL"
+    philosophy: "Single schema, single deployment, all resolvers together"
+    implementation: |
+      # Single GraphQL server handles all domains
+      @fraiseql.type
+      class User:
+          id: ID
+          email: str
+          posts: list[Post]  # Resolver from same service
+          orders: list[Order]  # Resolver from same service
+          profile: Profile  # Resolver from same service
+
+      # All resolvers in same codebase
+      @fraiseql.query
+      async def get_user(user_id: str) -> User:
+          # All relationships resolved together
+          user = db.get_user(user_id)
+          user.posts = db.get_user_posts(user_id)
+          user.orders = db.get_user_orders(user_id)
+          user.profile = db.get_user_profile(user_id)
+          return user
+
+    deployment: "Single server, single deployment"
+    schema_ownership: "All teams, shared responsibility"
+    release_cycle: "Coordinated (all changes together)"
+
+    pros:
+      - "Simple to understand (single codebase)"
+      - "No network latency (resolvers local)"
+      - "Easy schema composition (all in one place)"
+      - "Single endpoint (easy for clients)"
+      - "No federation complexity"
+      - "Query latency optimal (no extra hops)"
+      - "Debugging easier (single server)"
+
+    cons:
+      - "Coordination overhead (all teams)"
+      - "Shared responsibility (unclear ownership)"
+      - "Slow feature velocity (bottleneck)"
+      - "Single point of failure (one server down)"
+      - "Schema becomes garbage (no discipline)"
+      - "Deployment risk (all changes together)"
+      - "Doesn't scale with team growth"
+
+    team_scaling: "Degrades with growth (coordination overhead)"
+    schema_evolution: "Slow (requires all teams to agree)"
+    deployment_frequency: "Low (weekly, coordinated)"
+    operational_complexity: "Low initially, high at scale"
+    best_for: "Startups (< 20 engineers), single-domain products"
+
+  approach_2:
+    name: "Federated GraphQL (Apollo Federation v2)"
+    philosophy: "Multiple services, composed schema, independent teams"
+    implementation: |
+      # Users Service (authoritative)
+      @fraiseql.type
+      @key("id")
+      class User:
+          id: ID
+          email: str
+          name: str
+
+      # Posts Service (extends User)
+      @fraiseql.type
+      @extends
+      @key("id")
+      class User:
+          id: ID = external()
+          posts: list[Post]
+
+      # Orders Service (extends User)
+      @fraiseql.type
+      @extends
+      @key("id")
+      class User:
+          id: ID = external()
+          orders: list[Order]
+
+      # Apollo Router composes all services
+
+    deployment: "Multiple services, independent deployments"
+    schema_ownership: "Per-service (clear ownership)"
+    release_cycle: "Independent (teams move at own pace)"
+
+    pros:
+      - "Independent team autonomy (move fast)"
+      - "Clear ownership (service owns schema)"
+      - "Parallel development (no blocking)"
+      - "High deployment frequency (daily)"
+      - "Service isolation (failures localized)"
+      - "Scales with team growth (each team owns service)"
+      - "Async schema evolution (no coordination)"
+
+    cons:
+      - "Query latency increases (network hops)"
+      - "Operational complexity (multiple services)"
+      - "Composition overhead (compile, route)"
+      - "Distributed debugging (trace across services)"
+      - "Network failures (service down affects graph)"
+      - "Consistency challenges (cross-service data)"
+      - "Requires Apollo Router (extra infrastructure)"
+
+    team_scaling: "Scales well (each team independent)"
+    schema_evolution: "Fast (service can evolve freely)"
+    deployment_frequency: "High (daily, per-service)"
+    operational_complexity: "High (manage multiple services)"
+    best_for: "Large teams (> 50 engineers), multiple domains"
+
+  fraiseql_choice:
+    name: "Enables Both Patterns"
+    rationale: |
+      FraiseQL doesn't mandate a choice. Instead, it **enables both patterns**:
+      1. **Start monolithic** (simple, single schema)
+      2. **Federate when needed** (as teams grow)
+      3. **Mix both** (some services federated, some monolithic)
+
+      This pragmatic approach allows organizations to adopt federation incrementally.
+
+    implementation_philosophy: |
+      FraiseQL's federation support means:
+      - @key, @extends, @external() decorators work transparently
+      - Same codebase can be monolithic or federated
+      - Gradual migration path (no big bang refactoring)
+
+      Example progression:
+      1. Start: Single FraiseQL app (monolithic)
+      2. Grow: Split into Users service + Posts service (federated)
+      3. Scale: Compose 5+ services (full federation)
+      4. Hybrid: Core monolithic + federated services (mix)
+
+    assessment_strengths: |
+      ✓ **Flexibility**: Start simple, federate as needed
+      ✓ **No rewrite**: Add @key, @extends decorators gradually
+      ✓ **Best of both**: Get monolithic simplicity + federation scalability
+      ✓ **Team autonomy**: Enable independent teams incrementally
+      ✓ **Observability**: Federation still uses EXPLAIN ANALYZE
+      ✓ **Same patterns**: Use three-layer views in all services
+
+    assessment_weaknesses: |
+      ✗ **Complexity at large scale**: Still need Apollo Router, composition
+      ✗ **Network hops**: Federation adds latency (10-20ms per service)
+      ✗ **Operational overhead**: More services = more to monitor
+      ✗ **Distributed debugging**: Trace across services required
+      ✗ **Eventual consistency**: Cross-service data challenges
+
+    when_to_stay_monolithic: |
+      Remain monolithic when:
+      - Team is small (< 20 engineers)
+      - Single business domain
+      - Schema is stable (not evolving rapidly)
+      - Deployment coordination is acceptable
+      - Latency is critical (< 10ms required)
+      - Operational simplicity valued highly
+
+    when_to_federate: |
+      Federate when:
+      - Team is large (> 50 engineers)
+      - Multiple business domains
+      - Different teams own different services
+      - Deployment frequency matters (daily changes)
+      - Team autonomy is important
+      - You can tolerate 50-100ms queries (federation overhead)
+
+benchmarks:
+  scenario: "Get user with posts and orders, 10,000 users, complex query"
+
+  latency_comparison:
+    monolithic:
+      query_latency: "28ms (all resolvers local)"
+      p99_latency: "85ms"
+      network_hops: 0
+      dependencies: 1
+
+    federation:
+      user_service: "8ms (fetch User)"
+      posts_service: "12ms (fetch Posts)"
+      orders_service: "11ms (fetch Orders)"
+      composition: "2ms (Apollo Router)"
+      network_overhead: "3ms (3 network round-trips)"
+      total_latency: "36ms (8+12+11+2+3)"
+      p99_latency: "125ms"
+      network_hops: 3
+      dependencies: 4
+
+  team_velocity_comparison:
+    monolithic:
+      schema_change_cycle: "2 weeks (all teams coordinate)"
+      deployment_frequency: "1x per week"
+      time_to_merge: "3-5 days (review, coordination)"
+      schema_conflicts: "2-3 per sprint"
+      team_blocking: "5 days/sprint (waiting for others)"
+
+    federation:
+      schema_change_cycle: "1-2 days (teams independent)"
+      deployment_frequency: "Daily per service"
+      time_to_merge: "4 hours (own service, no conflicts)"
+      schema_conflicts: "0 (each team owns schema)"
+      team_blocking: "0 (independent teams)"
+
+  operational_complexity:
+    monolithic:
+      services: 1
+      deployments: 1
+      monitoring_targets: 1
+      failure_domains: 1
+      configuration_files: 1
+      sla_dependencies: "All services (one fails, all down)"
+
+    federation:
+      services: 5 (example)
+      deployments: 5 (independent)
+      monitoring_targets: 5 (each service + Router)
+      failure_domains: 5 (isolated)
+      configuration_files: 6 (5 + federation.yml)
+      sla_dependencies: "Chain (slowest service determines SLA)"
+
+  cost_analysis:
+    monolithic:
+      servers: "4 × $300/month = $1,200"
+      database: "$1,000"
+      monitoring: "$500"
+      total_monthly: "$2,700"
+      scaling: "Vertical (bigger server)"
+
+    federation:
+      services: "5 × $400 = $2,000"
+      databases: "5 × $500 = $2,500"
+      router: "$800"
+      monitoring: "$1,500"
+      total_monthly: "$6,800"
+      scaling: "Horizontal (more services)"
+
+  scalability_metrics:
+    teams_limit_monolithic: "20-30 engineers (bottleneck)"
+    teams_supported_federation: "100+ engineers (scales)"
+
+    deployment_blockers_monolithic: "5-10 per sprint"
+    deployment_blockers_federation: "0-1 per sprint"
+
+    schema_change_latency_monolithic: "2 weeks"
+    schema_change_latency_federation: "1-2 days"
+
+  quality_metrics:
+    monolithic:
+      shared_ownership: "Schema is 'everyone's' (no one's)"
+      code_review_time: "Long (everyone reviews everything)"
+      integration_testing: "High (many interactions)"
+      debugging_difficulty: "Easy (single codebase)"
+
+    federation:
+      shared_ownership: "Each service owns (clear responsibility)"
+      code_review_time: "Short (only service code)"
+      integration_testing: "Lower (fewer interactions)"
+      debugging_difficulty: "Hard (distributed tracing needed)"
+
+  recommendation: |
+    **For teams < 20 engineers**: Monolithic is superior
+    - Simpler, faster, lower operational cost
+    - Latency is better (no network hops)
+    - Coordination overhead is acceptable
+    - Easier to debug and maintain
+
+    **For teams 20-50 engineers**: Hybrid approach
+    - Keep monolithic core (Users, core domain)
+    - Federate new services (Posts, Orders) as they grow
+    - Gradual migration, no big bang rewrite
+
+    **For teams > 50 engineers**: Federation is essential
+    - Team autonomy critical at scale
+    - Deployment frequency matters
+    - Schema coordination becomes nightmare
+    - Federation overhead acceptable trade-off
+
+    **For high-latency requirements (< 20ms)**:
+    Monolithic is only option (federation adds 8-10ms overhead)
+
+    **For high-autonomy requirements (daily deployments)**:
+    Federation is only option (monolithic requires coordination)
+
+decision_matrix:
+  team_size:
+    question: "How many engineers on the team?"
+    answer_lt_20: "Monolithic (simpler)"
+    answer_20_50: "Hybrid (start federation)"
+    answer_gt_50: "Federation (required)"
+
+  business_domains:
+    question: "How many business domains?"
+    answer_single: "Monolithic"
+    answer_multiple: "Federation"
+
+  deployment_frequency:
+    question: "What is deployment frequency target?"
+    answer_weekly: "Monolithic"
+    answer_daily: "Federation"
+
+  team_autonomy:
+    question: "How important is team autonomy?"
+    answer_low: "Monolithic"
+    answer_high: "Federation"
+
+  latency_requirement:
+    question: "What is latency requirement?"
+    answer_lt_20ms: "Monolithic"
+    answer_gt_50ms: "Federation acceptable"
+
+  schema_change_frequency:
+    question: "How often does schema change?"
+    answer_stable: "Monolithic"
+    answer_frequently: "Federation"
+
+evolution_path: |
+  Typical organization evolution:
+
+  Stage 1: Startup (< 10 people)
+  - Single monolithic GraphQL
+  - Fast iteration, simple operations
+  - One deployment per week
+
+  Stage 2: Growth (10-30 people)
+  - Schema becoming hard to manage
+  - Consider federation for 1-2 new services
+  - Others remain monolithic
+  - Coordination becoming friction
+
+  Stage 3: Scale (30-100 people)
+  - Multiple teams, multiple domains
+  - Federation across most services
+  - High deployment frequency (daily)
+  - Clear service ownership
+
+  Stage 4: Enterprise (100+ people)
+  - Fully federated, 10+ services
+  - Team autonomy prioritized
+  - Multiple deployments per day
+  - Sophisticated monitoring and composition
+
+  At each stage, FraiseQL supports the current pattern.
+  Can migrate gradually, no rewrite required.
+
+trade_off_summary:
+  latency_vs_autonomy: |
+    Monolithic: 28ms (local), low autonomy
+    Federation: 36ms (network), high autonomy
+
+    Federation trades 8ms latency for team autonomy.
+
+  simplicity_vs_scalability: |
+    Monolithic: Simple, doesn't scale to 100 people
+    Federation: Complex, scales to 1000 people
+
+    Federation sacrifices simplicity for scale.
+
+  operational_cost_vs_team_velocity: |
+    Monolithic: $2,700/month, 1 deployment/week
+    Federation: $6,800/month, Daily deployments
+
+    Federation costs 2.5x more but enables 5x faster deployment.
+
+recommendations:
+  - "Start monolithic if team < 20 people"
+  - "Plan federation when team reaches 30+ people"
+  - "Adopt gradually (don't rewrite, add @key decorators)"
+  - "Accept 10-15ms latency increase as team benefit"
+  - "Use FraiseQL's flexibility (enables both patterns)"
+  - "Monitor both approaches in your organization"
+  - "Measure team velocity and deployment frequency"
+
+blog_hooks:
+  beginner:
+    focus: "Understanding monolithic vs federation"
+    key_points:
+      - "Monolithic: One server, simple, doesn't scale"
+      - "Federation: Multiple services, complex, scales"
+      - "FraiseQL supports both patterns"
+      - "Choose based on team size and requirements"
+
+  intermediate:
+    focus: "Trade-offs at different scales"
+    key_points:
+      - "Monolithic better for < 20 people"
+      - "Federation better for > 50 people"
+      - "Latency trade-off: +8ms for autonomy"
+      - "Cost trade-off: 2.5x more for team velocity"
+
+  advanced:
+    focus: "Migration strategies and hybrid approaches"
+    key_points:
+      - "Start monolithic, federate gradually"
+      - "Hybrid: core monolithic + federated services"
+      - "FraiseQL enables incremental migration"
+      - "No rewrite required (add @key decorators)"

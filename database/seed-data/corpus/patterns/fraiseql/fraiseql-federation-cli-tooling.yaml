@@ -1,0 +1,556 @@
+id: fraiseql-federation-cli-tooling
+name: "FraiseQL Federation CLI and Composition Tooling"
+category: fraiseql
+type: standard
+tags:
+  - fraiseql
+  - federation
+  - cli
+  - compose
+  - configuration
+  - tooling
+
+summary:
+  short: "CLI tools for composing subgraphs, managing federation configuration, and publishing schemas"
+  long: |
+    FraiseQL provides CLI tools for federation workflows: composing multiple subgraph schemas
+    into a supergraph, managing federation configuration files, validating schemas, and publishing
+    to Apollo Registry. The CLI handles multi-subgraph composition with conflict resolution,
+    YAML configuration for subgraph metadata, and integration with CI/CD pipelines for automated
+    schema validation and deployment.
+
+problem:
+  description: |
+    Managing multi-service federation requires orchestration tools:
+    - How to compose 3+ subgraph schemas?
+    - Where to configure subgraph metadata (URL, name)?
+    - How to detect composition errors?
+    - How to publish schemas to Apollo?
+    - How to integrate with CI/CD?
+    - How to handle composition conflicts?
+
+    Manual composition is error-prone and doesn't scale.
+
+  symptoms:
+    - name: "Manual composition errors"
+      description: "Compose command fails, unclear why"
+      detection: "Composition error messages are confusing"
+
+    - name: "Configuration sprawl"
+      description: "Subgraph config scattered across files"
+      consequence: "Hard to manage multi-service setup"
+
+    - name: "No CI/CD integration"
+      description: "Can't validate schemas in pipeline"
+      consequence: "Errors discovered late"
+
+    - name: "Schema conflicts unresolved"
+      description: "Conflicts detected but no clear fix"
+      consequence: "Deployment blocked"
+
+  impact: |
+    Manual errors, slow schema deployment, difficult federation management, deployment blockers
+
+solution:
+  principle: "Unified CLI for federation composition and management"
+
+  components:
+    - name: "fraiseql compose Command"
+      type: "CLI command"
+      purpose: "Compose multiple subgraph schemas into supergraph"
+      usage: |
+        # Basic usage: compose multiple subgraphs
+        $ fraiseql compose \
+          --subgraph users:users.json \
+          --subgraph orders:orders.json \
+          --subgraph products:products.json \
+          --output supergraph.json
+
+        # With configuration file
+        $ fraiseql compose --config federation.yml --output supergraph.json
+
+        # Output to Apollo Router format
+        $ fraiseql compose --config federation.yml --router-format
+
+      arguments: |
+        --subgraph <name>:<path>
+          - Subgraph name and schema path (repeatable)
+          - Format: name:path/to/schema.json
+          - Required: at least 2 subgraphs
+
+        --config <path>
+          - YAML file with subgraph configuration
+          - Alternative to --subgraph (can't use both)
+          - Supports: URLs, file paths, credentials
+
+        --output <path>
+          - Output path for composed supergraph
+          - Default: supergraph.json
+          - Can write to stdout with --output -
+
+        --router-format
+          - Output in Apollo Router format
+          - Includes composition hints and metadata
+          - For use with Apollo Router
+
+        --validate-only
+          - Validate composition without writing output
+          - Exit code 0 if valid, 1 if errors
+
+    - name: "Federation Configuration File"
+      type: "YAML configuration"
+      purpose: "Centralize subgraph metadata and configuration"
+      format: |
+        # federation.yml (standard naming)
+        federation:
+          version: "v2"
+          router_url: "https://router.example.com"
+
+        subgraphs:
+          users:
+            url: "https://users.example.com/graphql"
+            sdl_path: "./schemas/users.graphql"
+            schema_json_path: "./users-schema.json"
+            credentials:
+              auth_header: "Bearer ${USERS_SERVICE_TOKEN}"
+
+          orders:
+            url: "https://orders.example.com/graphql"
+            schema_json_path: "./orders-schema.json"
+            poll_interval_seconds: 60
+
+          products:
+            url: "https://products.example.com/graphql"
+            schema_json_path: "./products-schema.json"
+            retry_policy:
+              max_retries: 3
+              backoff_ms: 1000
+
+        composition:
+          strategy: "strict"  # or "lenient"
+          error_on_conflict: true
+          timeout_seconds: 30
+
+      semantics: |
+        - url: Service endpoint for live schema polling
+        - sdl_path: Local file path to schema
+        - schema_json_path: Federation schema.json file
+        - credentials: Auth headers for protected services
+        - poll_interval_seconds: How often to refresh schema
+        - strategy: "strict" = fail on conflicts, "lenient" = warn only
+        - error_on_conflict: true = fail if conflicts found
+
+    - name: "Subgraph Registration"
+      type: "Configuration"
+      purpose: "Register subgraphs with federation"
+      registration: |
+        Each subgraph in federation.yml registers:
+        1. **Name**: Identifier for the subgraph (e.g., "users")
+        2. **URL**: GraphQL endpoint
+        3. **Schema Location**: File path or polling endpoint
+        4. **Credentials**: Auth required to access endpoint
+        5. **Metadata**: Service owner, documentation URL
+
+        Registering subgraph:
+        ```yaml
+        subgraphs:
+          users:
+            url: "https://api.example.com/users"
+            schema_json_path: "./schemas/users.json"
+            credentials:
+              api_key: "${USERS_API_KEY}"
+            owner: "users-team@example.com"
+            documentation: "https://wiki.example.com/users-service"
+        ```
+
+    - name: "Composition Strategies"
+      type: "Configuration option"
+      purpose: "Control how conflicts are handled"
+      strategies: |
+        **Strict** (default):
+        - Composition fails on ANY conflict
+        - Clear error messages
+        - Safe, prevents silent issues
+        - Recommended for production
+
+        **Lenient**:
+        - Warnings only, composition succeeds
+        - First subgraph's definition wins
+        - Risk: Silent type inconsistencies
+        - Use only for migration/testing
+
+        **Merge** (if supported):
+        - Intelligent conflict resolution
+        - Merge compatible types
+        - Clear reporting of merged decisions
+        - For compatible scenarios only
+
+    - name: "Error Reporting and Resolution"
+      type: "User experience"
+      purpose: "Help developers fix composition errors"
+      reporting: |
+        When composition fails, report:
+        1. What failed (error type)
+        2. Which subgraph/field (location)
+        3. Why it failed (root cause)
+        4. How to fix (actionable suggestion)
+
+        Example error output:
+        ```
+        ERROR: Composition failed (1 error, 0 warnings)
+
+        Error 1: Type mismatch
+          Location: User.email
+          Subgraph: orders
+          Issue: User.email defined as String in users, Int in orders
+          Suggestion: Ensure User.email is String in all subgraphs
+
+        Fix: Update orders-schema.json, then re-run compose
+        ```
+
+    - name: "Schema Validation"
+      type: "Pre-composition check"
+      purpose: "Validate individual schemas before composition"
+      validation: |
+        Before composing, validate each subgraph:
+        1. Schema JSON is valid (parseable)
+        2. Federation metadata is present
+        3. All @key fields exist
+        4. All @external fields valid
+        5. No syntax errors
+
+        If validation fails:
+        ```
+        ERROR: Validation failed for users-schema.json
+
+        Issue: Missing federation metadata
+        Field: User.email
+        Problem: @external used without @extends
+        Suggestion: Add @extends decorator to User type
+        ```
+
+    - name: "Dry-Run Mode"
+      type: "Testing feature"
+      purpose: "Test composition without writing output"
+      usage: |
+        $ fraiseql compose \
+          --config federation.yml \
+          --validate-only
+
+        # Success output
+        OK: Composition would succeed (0 errors, 0 warnings)
+        - 3 subgraphs would compose
+        - 12 types in supergraph
+        - No conflicts detected
+
+        # Failure output
+        ERROR: Composition would fail (2 errors)
+        [detailed error list...]
+
+    - name: "Integration with Apollo Registry"
+      type: "Publishing"
+      purpose: "Publish composed schemas to Apollo"
+      commands: |
+        # Publish to Apollo Graph Registry
+        $ fraiseql publish \
+          --graph my-graph \
+          --variant prod \
+          --schema supergraph.json \
+          --api-key ${APOLLO_API_KEY}
+
+        # Publish with description
+        $ fraiseql publish \
+          --graph my-graph \
+          --variant prod \
+          --schema supergraph.json \
+          --description "v1.2.3: Added Orders federation"
+
+        # Check publication status
+        $ fraiseql publish status \
+          --graph my-graph \
+          --variant prod
+
+    - name: "CI/CD Integration"
+      type: "Pipeline automation"
+      purpose: "Integrate federation validation into CI/CD"
+      example_github: |
+        # .github/workflows/federation-validate.yml
+        name: Federation Composition
+
+        on: [pull_request, push]
+
+        jobs:
+          compose:
+            runs-on: ubuntu-latest
+            steps:
+              - uses: actions/checkout@v3
+
+              - name: Set up FraiseQL
+                uses: example.com/fraiseql-setup@v1
+
+              - name: Validate composition
+                run: |
+                  fraiseql compose \
+                    --config federation.yml \
+                    --validate-only
+                env:
+                  USERS_SERVICE_TOKEN: ${{ secrets.USERS_SERVICE_TOKEN }}
+                  ORDERS_SERVICE_TOKEN: ${{ secrets.ORDERS_SERVICE_TOKEN }}
+
+              - name: Generate supergraph
+                if: github.ref == 'refs/heads/main'
+                run: |
+                  fraiseql compose \
+                    --config federation.yml \
+                    --output supergraph.json
+
+              - name: Publish to Apollo
+                if: github.ref == 'refs/heads/main'
+                run: |
+                  fraiseql publish \
+                    --graph my-graph \
+                    --variant prod \
+                    --schema supergraph.json
+                env:
+                  APOLLO_API_KEY: ${{ secrets.APOLLO_API_KEY }}
+
+    - name: "Schema Polling and Auto-Updates"
+      type: "Background task"
+      purpose: "Automatically refresh subgraph schemas"
+      polling: |
+        Configuration for periodic schema refresh:
+        ```yaml
+        subgraphs:
+          users:
+            url: "https://users.example.com/graphql"
+            poll_interval_seconds: 60  # Check every minute
+            retry_policy:
+              max_retries: 3
+              backoff_ms: 1000
+        ```
+
+        Polling behavior:
+        1. Every 60 seconds, fetch latest schema from URL
+        2. If schema changed, trigger recomposition
+        3. If fetch fails, retry with exponential backoff
+        4. Alert if fetch fails after max retries
+
+    - name: "Output Formats"
+      type: "Composition output"
+      purpose: "Support different output formats"
+      formats: |
+        **supergraph.json** (default):
+        - Standard federation schema format
+        - Compatible with Apollo Router/Gateway
+        - Contains merged types and metadata
+
+        **Router format** (--router-format):
+        - Apollo Router-specific format
+        - Includes composition hints
+        - Optimized for Router performance
+
+        **OpenAPI** (if supported):
+        - REST API documentation
+        - Derived from GraphQL schema
+        - For non-GraphQL consumers
+
+        **SDL** (GraphQL SDL):
+        - Human-readable schema language
+        - Can be used for documentation
+        - Less precise than JSON format
+
+key_concepts:
+  concept_1: "fraiseql compose orchestrates multi-subgraph composition"
+  concept_2: "federation.yml centralizes subgraph configuration"
+  concept_3: "Composition validates schemas before merging"
+  concept_4: "Error reporting guides developers to fixes"
+  concept_5: "Dry-run mode tests composition without output"
+  concept_6: "CI/CD integration automates schema validation"
+  concept_7: "Apollo Registry publishing for schema management"
+  concept_8: "Schema polling enables auto-updates from live services"
+
+best_practices:
+  - name: "Use federation.yml for configuration"
+    description: "Centralize subgraph metadata"
+
+  - name: "Enable validate-only in CI/CD"
+    description: "Catch errors before deployment"
+
+  - name: "Use strict composition strategy"
+    description: "Fail fast on conflicts"
+
+  - name: "Publish to Apollo Registry"
+    description: "Maintain schema history and versions"
+
+  - name: "Set up schema polling"
+    description: "Auto-detect schema changes"
+
+  - name: "Document subgraph ownership"
+    description: "Clearly mark who owns each service"
+
+  - name: "Test composition locally"
+    description: "Validate before pushing to main"
+
+  - name: "Monitor composition errors"
+    description: "Alert on repeated failures"
+
+anti_patterns:
+  - name: "No federation.yml"
+    description: "Pass all subgraphs via CLI arguments"
+    consequence: "Hard to maintain, error-prone"
+    fix: "Use federation.yml for centralized config"
+
+  - name: "Lenient composition mode in production"
+    description: "Use lenient strategy for prod"
+    consequence: "Silent type inconsistencies"
+    fix: "Use strict strategy in production"
+
+  - name: "No CI/CD validation"
+    description: "Compose only when deploying"
+    consequence: "Errors discovered late"
+    fix: "Validate composition in pull requests"
+
+  - name: "No error handling for polling failures"
+    description: "Polling fails, no alert"
+    consequence: "Stale schemas go unnoticed"
+    fix: "Alert when polling fails repeatedly"
+
+  - name: "Hard-coded credentials in config"
+    description: "API keys in federation.yml"
+    consequence: "Security vulnerability"
+    fix: "Use environment variables for credentials"
+
+  - name: "No schema versioning"
+    description: "Overwrite supergraph.json each time"
+    consequence: "Can't revert if needed"
+    fix: "Version schemas, track history"
+
+examples:
+  example_1:
+    title: "Basic Composition"
+    description: "Compose three subgraphs via CLI"
+    code: |
+      $ fraiseql compose \
+        --subgraph users:./users-schema.json \
+        --subgraph orders:./orders-schema.json \
+        --subgraph products:./products-schema.json \
+        --output supergraph.json \
+        --validate-only
+
+      OK: Composition would succeed
+      - 3 subgraphs
+      - 18 types
+      - 0 conflicts
+
+  example_2:
+    title: "Federation Configuration File"
+    description: "Centralized federation configuration"
+    code: |
+      # federation.yml
+      federation:
+        version: "v2"
+
+      subgraphs:
+        users:
+          url: "https://api.example.com/users"
+          schema_json_path: "./schemas/users.json"
+          credentials:
+            api_key: "${USERS_API_KEY}"
+          poll_interval_seconds: 60
+
+        orders:
+          url: "https://api.example.com/orders"
+          schema_json_path: "./schemas/orders.json"
+          credentials:
+            api_key: "${ORDERS_API_KEY}"
+          poll_interval_seconds: 60
+
+        products:
+          url: "https://api.example.com/products"
+          schema_json_path: "./schemas/products.json"
+
+      composition:
+        strategy: "strict"
+        error_on_conflict: true
+        timeout_seconds: 30
+
+      # Then compose using config
+      $ fraiseql compose --config federation.yml --output supergraph.json
+
+  example_3:
+    title: "CI/CD Integration"
+    description: "GitHub Actions workflow for federation"
+    code: |
+      # .github/workflows/federation.yml
+      name: Federation Validation
+
+      on: [pull_request]
+
+      jobs:
+        validate:
+          runs-on: ubuntu-latest
+          steps:
+            - uses: actions/checkout@v3
+
+            - name: Install FraiseQL
+              run: curl -sSL https://example.com/install.sh | sh
+
+            - name: Validate composition
+              run: fraiseql compose --config federation.yml --validate-only
+              env:
+                USERS_API_KEY: ${{ secrets.USERS_API_KEY }}
+                ORDERS_API_KEY: ${{ secrets.ORDERS_API_KEY }}
+
+            - name: Report errors
+              if: failure()
+              run: echo "Composition failed. Fix errors above."
+
+comparison_matrix:
+  aspect:
+    cli_tooling: "FraiseQL compose command"
+    manual_composition: "Manual schema merging"
+
+  ease_of_use:
+    cli_tooling: "Single command"
+    manual_composition: "Complex, error-prone"
+
+  error_detection:
+    cli_tooling: "Automatic, clear messages"
+    manual_composition: "Manual review"
+
+  ci_cd_integration:
+    cli_tooling: "Built-in support"
+    manual_composition: "Difficult to automate"
+
+  scalability:
+    cli_tooling: "Handles 10+ subgraphs"
+    manual_composition: "Hard beyond 3-4"
+
+  maintenance:
+    cli_tooling: "Configuration-driven"
+    manual_composition: "Script-based, fragile"
+
+blog_hooks:
+  beginner:
+    focus: "Getting started with federation CLI"
+    key_points:
+      - "fraiseql compose command basics"
+      - "Simple CLI arguments for composition"
+      - "Reading composition error messages"
+      - "Validate-only mode for testing"
+
+  intermediate:
+    focus: "Federation configuration and automation"
+    key_points:
+      - "federation.yml centralized configuration"
+      - "CI/CD integration with validation"
+      - "Composition strategies (strict vs lenient)"
+      - "Schema polling and auto-updates"
+
+  advanced:
+    focus: "Production federation workflows"
+    key_points:
+      - "Apollo Registry publishing"
+      - "Complex composition error resolution"
+      - "Multi-service coordination"
+      - "Schema versioning and rollback"

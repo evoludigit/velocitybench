@@ -1,0 +1,377 @@
+id: fraiseql-federation-entity-extension
+name: "FraiseQL Federation Entity Extension and Reference Resolution"
+category: fraiseql
+type: standard
+tags:
+  - fraiseql
+  - federation
+  - entity-extension
+  - external-fields
+  - reference-resolution
+
+summary:
+  short: "Extending federated entities with @extends, @external, @requires, and @provides"
+  long: |
+    Services extend entities defined in other services using @extends and @external decorators.
+    @external marks fields owned by other services. @requires marks field dependencies.
+    @provides marks fields that provide data for other services. Understanding how to safely
+    extend entities while respecting ownership boundaries is critical for federated schemas.
+
+problem:
+  description: |
+    Extending shared entities across services creates challenges:
+    - Which fields belong to which service?
+    - What if extending service needs data from owning service?
+    - How to provide fields that other services need?
+    - Circular dependencies between services?
+
+    Without clear extension semantics, services corrupt shared types.
+
+  symptoms:
+    - name: "Circular dependencies"
+      description: "Users service depends on Orders, Orders extends Users"
+      detection: "Composition fails with cycle error"
+
+    - name: "Field ownership confusion"
+      description: "Order service modifies User.email"
+      consequence: "Data corruption, inconsistency"
+
+    - name: "Missing field dependencies"
+      description: "Extend without declaring required fields"
+      consequence: "Runtime errors during field resolution"
+
+  impact: |
+    Schema validation failures, data corruption, unclear service boundaries
+
+solution:
+  principle: "Explicit field ownership and dependency declaration"
+
+  components:
+    - name: "@extends Decorator"
+      type: "Federation extension marker"
+      purpose: "Extend entity type defined in another service"
+      pattern: |
+        # Users Service (authoritative)
+        @fraiseql.type
+        @key("id")
+        class User:
+            id: str
+            email: str
+
+        # Orders Service (extends User)
+        @fraiseql.type
+        @extends
+        @key("id")
+        class User:
+            id: str = external()          # External field (from Users)
+            email: str = external()       # External field (from Users)
+            orders: list[Order]           # New field (in Orders)
+
+      semantics: |
+        - @extends: This User definition extends the User from Users service
+        - Cannot redefine external fields locally
+        - Can add new fields in this service
+
+    - name: "@external() Marker"
+      type: "Field ownership marker"
+      purpose: "Mark fields owned by other services"
+      pattern: |
+        @fraiseql.type
+        @extends
+        @key("id")
+        class User:
+            id: str = external()          # Owned by Users service
+            email: str = external()       # Owned by Users service
+            phone: str                    # NEW field in this service
+
+      benefit: |
+        - Clear: These fields come from Users service
+        - Composition validator enforces: Can't modify external fields
+        - Gateway routes field resolution to correct service
+
+    - name: "@requires() Dependency"
+      type: "Field resolution dependency"
+      purpose: "Declare field dependencies for resolution"
+      pattern: |
+        @fraiseql.type
+        @extends
+        @key("id")
+        class User:
+            id: str = external()
+            email: str = external()
+            email_domain: str = requires("email")  # Requires email to compute
+            posts: list[Post]
+
+      semantics: |
+        - email_domain depends on email
+        - Apollo Gateway: Fetch email first, then resolve email_domain
+        - Prevents circular dependencies
+
+    - name: "@provides() Data Provision"
+      type: "Inter-service field resolution"
+      purpose: "Mark fields that provide data for other services"
+      pattern: |
+        # Orders Service provides user email to Account Service
+        @fraiseql.type
+        @extends
+        @key("id")
+        class User:
+            id: str = external()
+            email: str = provides(["Account.user_email"])
+            orders: list[Order]
+
+      semantics: |
+        - Orders service can provide email data to Account service
+        - Account service can request email via @requires("email")
+        - Enables efficient cross-service field resolution
+
+    - name: "Reference Resolution (__resolveReference)"
+      type: "Resolution mechanism"
+      purpose: "Resolve referenced entities from other services"
+      pattern: |
+        # When another service requests User(id: "123")
+        @fraiseql.query
+        async def __resolve_reference(info, id: str) -> User:
+            """Resolve User reference by id (for federation)."""
+            db = info.context["db"]
+            user = await db.get_user(id)
+            return User(
+                id=user.id,
+                email=user.email,
+                name=user.name
+            )
+
+      semantics: |
+        - Automatically called by Apollo Gateway
+        - Receives reference (id) from other service
+        - Returns full User object for that id
+        - Critical for federation to work
+
+    - name: "Service Boundaries"
+      type: "Architecture pattern"
+      purpose: "Clear service ownership"
+      pattern: |
+        Users Service owns:
+        - User type (root)
+        - User.id, User.email, User.name
+
+        Orders Service extends with:
+        - User.orders (new relationship)
+        - User.order_count (aggregate)
+
+        Account Service extends with:
+        - User.account (relationship)
+        - User.account_balance (computation)
+
+      benefit: |
+        - Clear: Each service knows what it owns
+        - No conflicts: Explicit external() markers
+        - No duplication: Single source of truth per field
+
+    - name: "Composition Validation"
+      type: "Quality assurance"
+      purpose: "Validate extended schemas compose correctly"
+      mechanism: |
+        fraiseql-cli validates:
+        1. All @extends references valid types
+        2. All @external fields exist in authoritative service
+        3. No @requires circular dependencies
+        4. All @provides targets have matching @requires
+        5. Field ownership never conflicts
+
+key_concepts:
+  concept_1: "@extends allows service to extend type from another service"
+  concept_2: "@external() marks fields owned by authoritative service"
+  concept_3: "@requires(field) declares dependency for resolution"
+  concept_4: "@provides marks fields available for other services"
+  concept_5: "Cannot modify @external fields (composition error)"
+  concept_6: "__resolveReference resolves references by federation key"
+  concept_7: "Composition validator prevents schema errors"
+  concept_8: "Clear field ownership prevents data corruption"
+
+best_practices:
+  - name: "Mark all external fields"
+    description: "Use external() for all non-new fields when extending"
+
+  - name: "Declare field dependencies"
+    description: "Use requires() for computed fields"
+
+  - name: "Never modify external fields"
+    description: "Only original service can change"
+
+  - name: "Implement __resolveReference"
+    description: "Enable entity resolution for federation"
+
+  - name: "Run composition validation"
+    description: "Before publishing, validate schema composes"
+
+  - name: "Document service boundaries"
+    description: "Clear which service extends which types"
+
+  - name: "Test cross-service resolution"
+    description: "Verify references resolve correctly"
+
+anti_patterns:
+  - name: "Forgetting @external()"
+    description: "Extend without marking external fields"
+    consequence: "Composition fails, unclear ownership"
+    fix: "Mark all inherited fields with external()"
+
+  - name: "Modifying external fields"
+    description: "Add validation to external field"
+    consequence: "Composition validation error"
+    fix: "Only original service can modify fields"
+
+  - name: "Circular requires"
+    description: "@requires creating dependency loop"
+    consequence: "Unresolvable field dependencies"
+    fix: "Flatten dependencies, no circular requires"
+
+  - name: "Missing __resolveReference"
+    description: "Extend type but no reference resolver"
+    consequence: "Federation references return null"
+    fix: "Implement __resolveReference for entity"
+
+  - name: "Conflicting extensions"
+    description: "Two services extend same type with same field"
+    consequence: "Composition validation fails"
+    fix: "Only one service can add each field"
+
+examples:
+  example_1:
+    title: "Orders Service Extends User"
+    description: "Add orders relationship to User"
+    code: |
+      from fraiseql.federation import extends, external, key
+
+      @fraiseql.type
+      @extends
+      @key("id")
+      class User:
+          id: str = external()        # From Users service
+          email: str = external()     # From Users service
+          orders: list[Order]         # NEW: in Orders service
+
+      @fraiseql.type
+      @key("id")
+      class Order:
+          id: str
+          user_id: str
+          total: float
+
+      # __resolveReference for federation
+      @fraiseql.query
+      async def resolve_user_reference(info, id: str) -> User:
+          db = info.context["db"]
+          user_data = await db.get_user(id)
+          orders = await db.get_user_orders(id)
+          return User(
+              id=user_data["id"],
+              email=user_data["email"],
+              orders=[Order(**o) for o in orders]
+          )
+
+  example_2:
+    title: "Account Service with Field Dependencies"
+    description: "Compute fields requiring external data"
+    code: |
+      @fraiseql.type
+      @extends
+      @key("id")
+      class User:
+          id: str = external()
+          email: str = external()
+          email_domain: str = requires("email")  # Depends on email
+          account_balance: float = requires("account_id")  # Depends on account
+
+      # Resolver for email_domain
+      async def resolve_email_domain(user: User) -> str:
+          return user.email.split("@")[1]
+
+  example_3:
+    title: "Multi-Service Extension"
+    description: "Multiple services extend same entity"
+    code: |
+      # Users Service (authoritative)
+      @fraiseql.type
+      @key("id")
+      class User:
+          id: str
+          email: str
+          name: str
+
+      # Orders Service extends with orders
+      @fraiseql.type
+      @extends
+      @key("id")
+      class User:
+          id: str = external()
+          email: str = external()
+          name: str = external()
+          orders: list[Order]
+
+      # Account Service extends with account
+      @fraiseql.type
+      @extends
+      @key("id")
+      class User:
+          id: str = external()
+          email: str = external()
+          name: str = external()
+          account: Account
+
+      # Reviews Service extends with reviews
+      @fraiseql.type
+      @extends
+      @key("id")
+      class User:
+          id: str = external()
+          email: str = external()
+          name: str = external()
+          reviews: list[Review]
+
+comparison_matrix:
+  aspect:
+    authoritative: "Original service defining type"
+    extended: "Service extending type"
+
+  ownership:
+    authoritative: "Owns all core fields"
+    extended: "Adds domain-specific fields"
+
+  modifications:
+    authoritative: "Can define and modify fields"
+    extended: "Can only add new fields"
+
+  external_fields:
+    authoritative: "None (type definition source)"
+    extended: "All inherited fields marked external()"
+
+  resolution:
+    authoritative: "Implements __resolveReference for own fields"
+    extended: "Implements __resolveReference with extended data"
+
+blog_hooks:
+  beginner:
+    focus: "Understanding entity extension"
+    key_points:
+      - "@extends: This service extends type from another"
+      - "@external(): These fields belong to other service"
+      - "Can only ADD new fields, never modify external"
+      - "__resolveReference: Enable reference resolution"
+
+  intermediate:
+    focus: "Composition and field dependencies"
+    key_points:
+      - "@requires(field): Declare field dependencies"
+      - "@provides: Mark fields other services need"
+      - "Composition validator catches errors"
+      - "Multiple services can extend same type"
+
+  advanced:
+    focus: "Complex extension patterns"
+    key_points:
+      - "Circular extension prevention"
+      - "Cross-service data dependencies"
+      - "Efficient reference resolution strategy"
+      - "Performance of multi-service field resolution"

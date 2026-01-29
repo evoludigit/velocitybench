@@ -1,0 +1,480 @@
+id: fraiseql-performance-optimization
+name: "FraiseQL Performance Optimization Patterns"
+category: fraiseql
+type: standard
+tags:
+  - fraiseql
+  - performance
+  - optimization
+  - indexing
+  - benchmarking
+  - profiling
+
+summary:
+  short: "Index strategies, query optimization, and performance benchmarking for compiled GraphQL"
+  long: |
+    FraiseQL's performance depends on database indexes, view composition efficiency, and
+    connection pooling configuration. This pattern covers index strategies for different
+    query types (exact match, pattern matching, range, complex filters), performance
+    benchmarking approaches, and optimization techniques for compiled GraphQL queries.
+
+problem:
+  description: |
+    GraphQL queries that seem simple can cause database performance issues:
+    - Filtering 1000 records by email takes 100ms without index (should be <10ms)
+    - Complex filters (3+ conditions) cause full table scans unless multi-column index exists
+    - LIKE queries with leading wildcards cannot use indexes
+    - Relationship composition queries become slow without proper join strategy
+    - N+1 queries drain connection pools and cause timeouts
+
+    Performance problems are hard to diagnose without systematic benchmarking and profiling.
+
+  symptoms:
+    - name: "Slow queries"
+      description: "Database queries take 100ms+ when expected <50ms"
+      detection: "EXPLAIN ANALYZE shows sequential scan instead of index scan"
+
+    - name: "High database load"
+      description: "CPU/memory usage high; connections exhausted"
+      detection: "Connection pool timeout errors"
+
+    - name: "Unpredictable performance"
+      description: "Query fast sometimes, slow other times"
+      detection: "Missing indexes cause query planner to choose different plans"
+
+  impact: |
+    Slow API responses, poor user experience, database overload, cascading failures
+
+solution:
+  principle: "Systematic profiling, strategic indexing, and connection pool tuning"
+
+  components:
+    - name: "Index Strategy for Exact Match"
+      type: "Query optimization"
+      performance: "<10ms"
+      strategy: |
+        Single-column B-tree index on frequently filtered field:
+        ```sql
+        CREATE INDEX idx_user_email ON tb_user(email);
+        ```
+        Query planner uses index for:
+        - WHERE email = %s (fast lookup)
+        - WHERE email IN (list) (set scan)
+
+    - name: "Index Strategy for Pattern Matching"
+      type: "Query optimization"
+      performance: "<100ms"
+      strategy: |
+        For LIKE with prefix (uses index), ILIKE requires special handling:
+        ```sql
+        -- Prefix search (uses index)
+        CREATE INDEX idx_post_title ON tb_post(title);
+        SELECT * FROM tb_post WHERE title LIKE 'Python%';  -- Uses index
+
+        -- Case-insensitive (requires special index)
+        CREATE INDEX idx_post_title_ilike ON tb_post(LOWER(title));
+        SELECT * FROM tb_post WHERE LOWER(title) ILIKE 'python%';  -- Uses index
+        ```
+
+    - name: "Index Strategy for Range Queries"
+      type: "Query optimization"
+      performance: "<50ms"
+      strategy: |
+        B-tree index on range column:
+        ```sql
+        CREATE INDEX idx_post_created ON tb_post(created_at);
+        SELECT * FROM tb_post WHERE created_at > %s AND created_at < %s;
+        ```
+
+    - name: "Index Strategy for Complex AND Filters"
+      type: "Query optimization"
+      performance: "<50ms"
+      strategy: |
+        Multi-column index matching filter order:
+        ```sql
+        CREATE INDEX idx_post_author_status
+        ON tb_post(fk_author, status, created_at);
+
+        -- Uses multi-index efficiently
+        SELECT * FROM tb_post
+        WHERE fk_author = %s AND status = %s ORDER BY created_at DESC;
+        ```
+
+    - name: "Query Analysis with EXPLAIN ANALYZE"
+      type: "Profiling tool"
+      purpose: "Diagnose why query is slow"
+      usage: |
+        Run EXPLAIN ANALYZE before and after index creation:
+        ```sql
+        EXPLAIN ANALYZE
+        SELECT * FROM tb_post WHERE title ILIKE %s;
+
+        -- Output shows:
+        -- - Seq Scan (no index, slow) vs Index Scan (uses index, fast)
+        -- - Rows scanned vs rows returned
+        -- - Actual time in milliseconds
+        ```
+
+    - name: "Connection Pool Optimization"
+      type: "Application configuration"
+      purpose: "Efficient database connection reuse"
+      parameters:
+        pool_size: "Number of persistent connections (typically 10-20)"
+        max_overflow: "Additional connections for spikes (typically 10)"
+        pool_timeout: "Wait time for available connection (typically 5s)"
+      example: |
+        FraiseQLConfig(
+            database_pool_size=20,
+            database_max_overflow=10,
+            ...
+        )
+
+    - name: "Query Depth Limits"
+      type: "Query complexity control"
+      purpose: "Prevent expensive deeply-nested queries"
+      configuration: |
+        FraiseQLConfig(
+            max_query_depth=10,  # Limit nesting depth
+            ...
+        )
+
+key_concepts:
+  concept_1: "Index selection matters more than query code"
+  concept_2: "EXPLAIN ANALYZE shows actual query execution, not estimates"
+  concept_3: "Multi-column indexes enable complex filter combinations"
+  concept_4: "LIKE with leading wildcard cannot use B-tree index (full scan)"
+  concept_5: "Integer joins (pk_/fk_) are 5-10x faster than UUID joins"
+  concept_6: "Connection pooling reuses connections, reducing overhead"
+  concept_7: "Query depth limits prevent exponential complexity"
+  concept_8: "Benchmarking must test real query patterns, not synthetic ones"
+
+implementation_considerations:
+  consideration_1: "Profile before optimizing - measure actual bottlenecks"
+  consideration_2: "Index frequently queried fields (WHERE, ORDER BY, JOIN)"
+  consideration_3: "Avoid over-indexing - each index adds write cost"
+  consideration_4: "Monitor slow_log (PostgreSQL: log_min_duration_statement)"
+  consideration_5: "Test index effectiveness with EXPLAIN ANALYZE"
+  consideration_6: "Use multi-column indexes for common AND filter combinations"
+  consideration_7: "Set connection pool size based on concurrent users"
+  consideration_8: "Monitor connection pool exhaustion errors"
+  consideration_9: "Benchmark with realistic data size and query patterns"
+  consideration_10: "Regular ANALYZE to keep query planner stats current"
+
+best_practices:
+  - name: "Index high-cardinality fields"
+    description: "Unique fields (email, username) benefit most from indexes"
+
+  - name: "Don't index low-cardinality fields"
+    description: "Boolean fields (is_active) have poor index selectivity"
+
+  - name: "Multi-column indexes for AND conditions"
+    description: "WHERE fk_author = %s AND status = %s benefits from (fk_author, status) index"
+
+  - name: "EXPLAIN ANALYZE before and after"
+    description: "Verify index is actually used; confirm improvement"
+
+  - name: "Monitor query performance"
+    description: "Set log_min_duration_statement to track slow queries"
+
+  - name: "Right-size connection pool"
+    description: "Pool size ≈ expected concurrent users (not 1000)"
+
+  - name: "Batch operations where possible"
+    description: "Use WHERE id = ANY(array) instead of individual queries"
+
+  - name: "Denormalize for read-heavy access patterns"
+    description: "Use three-layer architecture with materialized views"
+
+anti_patterns:
+  - name: "No indexes on filtered fields"
+    description: "WHERE email = %s without index on email"
+    consequence: "Full table scan for every query"
+    fix: "CREATE INDEX idx_user_email ON tb_user(email)"
+
+  - name: "Wrong index type"
+    description: "B-tree index for LIKE '%pattern%' (needs full scan anyway)"
+    consequence: "Index wasted; full scan still happens"
+    fix: "Use prefix patterns (LIKE 'pattern%') or GIN/trigram indexes"
+
+  - name: "Over-indexing"
+    description: "Index every column (slows down writes)"
+    consequence: "INSERT/UPDATE slower; query optimization no longer matters"
+    fix: "Index only frequently queried/filtered columns"
+
+  - name: "Connection pool too small"
+    description: "pool_size=1 for high-concurrency application"
+    consequence: "Connection exhaustion, timeout errors"
+    fix: "pool_size = expected concurrent queries (typically 10-20)"
+
+  - name: "Connection pool too large"
+    description: "pool_size=100 for single-threaded application"
+    consequence: "Wasted memory; connections lie idle"
+    fix: "Right-size pool based on actual concurrent users"
+
+  - name: "No query depth limits"
+    description: "Allow arbitrary nesting depth (user → 10 levels deep)"
+    consequence: "Expensive queries possible; DoS risk"
+    fix: "Set max_query_depth=10 (reasonable limit for most APIs)"
+
+  - name: "Benchmark with small dataset"
+    description: "Test with 100 records; production has 1M"
+    consequence: "Indexes perform differently; conclusions invalid"
+    fix: "Benchmark with realistic data volume"
+
+implementation:
+  title: "Implementing Performance Optimization"
+  steps:
+    - number: 1
+      title: "Profile current performance"
+      description: |
+        Measure baseline:
+        ```sql
+        -- Enable slow query logging
+        SET log_min_duration_statement = 100;  -- Log queries > 100ms
+
+        -- Run typical queries
+        -- Check postgresql.log for slow_log entries
+        ```
+
+    - number: 2
+      title: "Identify hot queries"
+      description: |
+        Find most-called queries:
+        ```sql
+        -- PostgreSQL
+        SELECT query, calls, mean_exec_time
+        FROM pg_stat_statements
+        ORDER BY calls DESC LIMIT 10;
+        ```
+
+    - number: 3
+      title: "Analyze expensive queries"
+      description: |
+        Run EXPLAIN ANALYZE on slow queries:
+        ```sql
+        EXPLAIN ANALYZE
+        SELECT * FROM tb_post WHERE title ILIKE %s ORDER BY created_at DESC;
+
+        -- Look for:
+        -- - Seq Scan (bad, full scan)
+        -- - Index Scan (good, indexed)
+        -- - Rows scanned vs returned (filter selectivity)
+        ```
+
+    - number: 4
+      title: "Create indexes strategically"
+      description: |
+        Add indexes for filtering/joining:
+        ```sql
+        -- Filtered fields
+        CREATE INDEX idx_post_title_ilike ON tb_post(LOWER(title));
+        CREATE INDEX idx_post_author ON tb_post(fk_author);
+
+        -- Range fields
+        CREATE INDEX idx_post_created ON tb_post(created_at);
+
+        -- Combined filters
+        CREATE INDEX idx_post_author_status
+        ON tb_post(fk_author, status, created_at);
+        ```
+
+    - number: 5
+      title: "Verify index effectiveness"
+      description: |
+        Run EXPLAIN ANALYZE again:
+        ```sql
+        EXPLAIN ANALYZE
+        SELECT * FROM tb_post WHERE title ILIKE %s ORDER BY created_at DESC;
+
+        -- Should now show:
+        -- - Index Scan on idx_post_title_ilike (much faster)
+        -- - Lower row count
+        -- - Faster execution time
+        ```
+
+    - number: 6
+      title: "Benchmark with realistic load"
+      description: |
+        Use pytest-benchmark to test real patterns:
+        ```python
+        def test_filter_by_title(benchmark, db, factory):
+            # Create realistic dataset
+            user = factory.create_user('author', 'author@example.com')
+            for i in range(100):
+                factory.create_post(user['pk_user'], f'Post {i}', f'post-{i}')
+
+            def query():
+                cursor = db.cursor()
+                cursor.execute(
+                    "SELECT id, title FROM tb_post WHERE title ILIKE %s",
+                    ('%post%',)
+                )
+                return cursor.fetchall()
+
+            result = benchmark(query)
+            assert len(result) == 100
+        ```
+
+examples:
+  example_1:
+    title: "Index Strategy for Email Lookup"
+    description: "Fast exact-match filtering with index"
+    code: |
+      -- From test_perf_filtered_queries.py
+      -- Setup: 50 users
+      CREATE INDEX idx_user_email ON benchmark.tb_user(email);
+
+      -- Query
+      SELECT id, username FROM benchmark.tb_user WHERE email = %s;
+
+      -- Performance: <10ms (vs 100+ms without index)
+
+  example_2:
+    title: "Multi-Column Index for Complex Filters"
+    description: "Efficient filtering with multiple AND conditions"
+    code: |
+      -- From test_perf_filtered_queries.py
+      CREATE INDEX idx_post_author_status
+      ON benchmark.tb_post(fk_author, status);
+
+      -- Query
+      SELECT id, title FROM benchmark.tb_post
+      WHERE fk_author = %s AND status = %s
+      ORDER BY created_at DESC;
+
+      -- Performance: <50ms with index (vs 200+ms sequential scan)
+
+  example_3:
+    title: "Range Query with Index"
+    description: "Efficient date range filtering"
+    code: |
+      -- From test_perf_filtered_queries.py
+      CREATE INDEX idx_post_created ON benchmark.tb_post(created_at);
+
+      -- Query
+      SELECT id, title, created_at FROM benchmark.tb_post
+      WHERE created_at > %s AND created_at < %s
+      ORDER BY created_at DESC;
+
+      -- Performance: <100ms for large dataset
+
+  example_4:
+    title: "EXPLAIN ANALYZE Workflow"
+    description: "Diagnose and fix slow query"
+    code: |
+      -- Step 1: Analyze slow query
+      EXPLAIN ANALYZE
+      SELECT id, title FROM benchmark.tb_post
+      WHERE title ILIKE '%python%' ORDER BY created_at DESC;
+
+      -- Result: Seq Scan (no index, slow)
+      -- Execution time: 250ms
+
+      -- Step 2: Create index
+      CREATE INDEX idx_post_title_ilike ON benchmark.tb_post(LOWER(title));
+
+      -- Step 3: Re-analyze
+      EXPLAIN ANALYZE
+      SELECT id, title FROM benchmark.tb_post
+      WHERE LOWER(title) ILIKE '%python%' ORDER BY created_at DESC;
+
+      -- Result: Index Scan (uses index, fast)
+      -- Execution time: 15ms (17x improvement!)
+
+comparison_matrix:
+  index_type:
+    b_tree: "General purpose, fast lookups"
+    hash: "Equality only, faster than B-tree"
+    gin: "Full-text search, JSONB contains"
+    brin: "Large tables, sequential scans"
+    trigram: "LIKE/ILIKE pattern matching"
+
+  filter_type:
+    exact: "field = value"
+    range: "field > value"
+    like: "field LIKE 'prefix%'"
+    ilike: "field ILIKE 'pattern'"
+    any: "field = ANY(array)"
+
+  index_for_filter:
+    exact: "B-tree"
+    range: "B-tree"
+    like: "B-tree (prefix only)"
+    ilike: "Trigram or function index"
+    any: "B-tree"
+
+  performance_without_index:
+    exact: "100-1000ms"
+    range: "50-500ms"
+    like: "100-2000ms"
+    ilike: "500-5000ms"
+    any: "100-2000ms"
+
+  performance_with_index:
+    exact: "<10ms"
+    range: "<50ms"
+    like: "<50ms"
+    ilike: "<100ms"
+    any: "<50ms"
+
+recommendation_matrix:
+  - dataset_size: "< 10K rows"
+    filtering: "Not critical; indexes nice but not required"
+    strategy: "Single B-tree index on most-filtered field"
+
+  - dataset_size: "10K - 1M rows"
+    filtering: "Critical; missing index causes load"
+    strategy: "Multi-column indexes for common filter combinations"
+
+  - dataset_size: "> 1M rows"
+    filtering: "Essential; impacts usability"
+    strategy: "Comprehensive indexing; partition large tables"
+
+  - query_pattern: "High cardinality (email, username)"
+    strategy: "Single-column B-tree index"
+    expected_impact: "100ms → <10ms"
+
+  - query_pattern: "Low cardinality (status, is_active)"
+    strategy: "Avoid index (poor selectivity)"
+    expected_impact: "No improvement; wasteful"
+
+  - query_pattern: "Complex AND filters"
+    strategy: "Multi-column index matching filter order"
+    expected_impact: "O(n) → O(log n)"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Indexes are like library card catalogs:
+      - Without catalog: Search entire library for book (slow)
+      - With catalog: Look up author, get shelf number, retrieve book (fast)
+      - Wrong catalog: Alphabetical by content (useless for searching by author)
+
+      Right indexes = fast lookups; wrong indexes = wasted space!
+
+    focus: "Why indexes matter for GraphQL query performance"
+    key_points:
+      - "Indexes speed up WHERE clauses dramatically"
+      - "Not all fields need indexes (waste space, slow writes)"
+      - "EXPLAIN ANALYZE shows if index is actually used"
+      - "Connection pooling reuses database connections"
+
+  intermediate:
+    focus: "Index strategy for different query types"
+    key_points:
+      - "Single-column B-tree for exact match (email = %s)"
+      - "Multi-column indexes for complex filters (author AND status)"
+      - "LIKE 'prefix%' uses index; '%pattern%' does not"
+      - "ILIKE needs special index (LOWER() or trigram)"
+      - "Integer joins faster than UUID (use for internal FKs)"
+
+  advanced:
+    focus: "Query profiling and optimization workflow"
+    key_points:
+      - "EXPLAIN ANALYZE is your debugging tool"
+      - "Seq Scan = problem; Index Scan = good"
+      - "Row count shows selectivity (filter effectiveness)"
+      - "Materialized views for expensive compositions"
+      - "Connection pool: size ≈ concurrent queries, not total users"
+      - "Monitor pg_stat_statements to find hot queries"
+      - "Benchmark with realistic data size"

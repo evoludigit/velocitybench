@@ -1,0 +1,294 @@
+id: fraiseql-materialized-views-caching
+name: "FraiseQL Materialized Views and Caching Patterns"
+category: fraiseql
+type: standard
+tags:
+  - fraiseql
+  - materialized-views
+  - caching
+  - denormalization
+  - pg-tviews
+
+summary:
+  short: "Pre-computing expensive queries using materialized views and cache layers"
+  long: |
+    Some queries are too expensive to compute on-demand (aggregations over large datasets, complex
+    joins, statistical computations). FraiseQL uses materialized views and cache layers to pre-compute
+    results, serving them instantly when queried. Understanding when to use materialized views vs
+    cache layers vs on-demand computation is critical for performance.
+
+problem:
+  description: |
+    Some queries are inherently expensive:
+    - "Get user's total view count" (sum over 10K posts)
+    - "Get trending posts" (complex ranking formula)
+    - "Get user feed" (join + filtering + ranking)
+
+    Computing on-demand is too slow. Pre-computing and caching is necessary.
+
+  symptoms:
+    - name: "Slow aggregation queries"
+      description: "user { total_view_count } takes 1000ms"
+      detection: "Query involves SUM, COUNT, or complex join"
+
+    - name: "Stale cache"
+      description: "Cached data doesn't match current state"
+      detection: "User updates post, view_count doesn't increment"
+
+    - name: "Cache invalidation complexity"
+      description: "Hard to know when to invalidate cache"
+      detection: "Inconsistent data in different API calls"
+
+  impact: |
+    Slow APIs, stale data, complexity in cache management
+
+solution:
+  principle: "Pre-compute expensive results with smart cache invalidation strategies"
+
+  components:
+    - name: "Materialized Views"
+      type: "Database pattern"
+      purpose: "Pre-computed query results stored as table"
+      example: |
+        -- Instead of computing on every query:
+        SELECT COUNT(*) FROM tb_post WHERE fk_user = 1;
+
+        -- Pre-compute and cache:
+        CREATE MATERIALIZED VIEW mv_user_stats AS
+        SELECT
+          pk_user,
+          COUNT(*) as post_count,
+          SUM(view_count) as total_views,
+          AVG(view_count) as avg_views
+        FROM tb_post
+        GROUP BY pk_user;
+
+        -- Query is instant: SELECT * FROM mv_user_stats WHERE pk_user = 1;
+
+    - name: "Refresh Strategies"
+      type: "Operational pattern"
+      purpose: "Keep materialized view current"
+      strategies:
+        full_refresh: |
+          **Full Refresh** (complete recompute):
+          ```sql
+          REFRESH MATERIALIZED VIEW mv_user_stats;
+          ```
+          - Pro: Always accurate
+          - Con: Locks table, can be slow
+          - Use: Nightly or low-traffic periods
+
+        concurrent_refresh: |
+          **Concurrent Refresh** (no lock):
+          ```sql
+          REFRESH MATERIALIZED VIEW CONCURRENTLY mv_user_stats;
+          ```
+          - Pro: No lock, queries can still run
+          - Con: Requires unique index on view
+          - Use: Production (safe to refresh anytime)
+
+        trigger_refresh: |
+          **Trigger-Based Refresh** (on change):
+          ```sql
+          CREATE TRIGGER refresh_mv_user_stats
+          AFTER INSERT OR UPDATE OR DELETE ON tb_post
+          EXECUTE FUNCTION refresh_mv_user_stats();
+          ```
+          - Pro: Immediate consistency
+          - Con: Trigger overhead on writes
+          - Use: Critical data, acceptable write overhead
+
+    - name: "Incremental Materialization"
+      type: "Advanced pattern"
+      purpose: "Update only changed rows (using pg_tviews)"
+      benefit: |
+        Instead of full refresh (recompute all), only recompute changed rows.
+        - Refresh of 1M rows: 1000ms → 10ms (100× faster)
+        - Reference: pg_tviews PostgreSQL extension
+
+    - name: "Cache Invalidation"
+      type: "Operational pattern"
+      purpose: "Know when cached data is stale"
+      strategies:
+        ttl_based: |
+          **TTL-Based** (time-based expiration):
+          - Refresh view every N seconds
+          - Pro: Simple
+          - Con: May serve stale data up to TTL
+
+        event_based: |
+          **Event-Based** (refresh on change):
+          - Trigger updates mv_user_stats when post changes
+          - Pro: Always current
+          - Con: Trigger overhead
+
+        lazy_refresh: |
+          **Lazy Refresh** (refresh on access):
+          - Check if view is stale before serving
+          - Refresh only if data changed
+          - Pro: On-demand consistency
+          - Con: First request might be slow
+
+    - name: "Application-Level Caching"
+      type: "Cache layer"
+      purpose: "Cache frequently queried results in memory"
+      approach: |
+        ```python
+        # Cache expensive computation
+        @cache(ttl=300)  # Cache for 5 minutes
+        async def get_user_stats(user_id):
+            return await db.fetchrow("""
+                SELECT * FROM mv_user_stats WHERE pk_user = %s
+            """, user_id)
+        ```
+
+    - name: "Partial Materialization"
+      type: "Optimization"
+      purpose: "Cache only most-accessed data"
+      example: |
+        - Cache top 100 trending posts (not all posts)
+        - Cache most-active users (not all users)
+        - Cache recent comments (not all comments)
+        - Reduces computation while covering 80% of access patterns
+
+key_concepts:
+  concept_1: "Materialized views pre-compute expensive queries"
+  concept_2: "Views are stored tables, queries are instant"
+  concept_3: "Refresh strategies balance consistency vs performance"
+  concept_4: "Concurrent refresh allows queries during refresh"
+  concept_5: "Trigger-based refresh keeps data current"
+  concept_6: "Incremental refresh (pg_tviews) is much faster"
+  concept_7: "Cache invalidation is hard; test carefully"
+  concept_8: "Partial materialization optimizes for common queries"
+
+best_practices:
+  - name: "Use for expensive aggregations"
+    description: "SUM, COUNT, AVG over large datasets"
+
+  - name: "Use concurrent refresh"
+    description: "Allows queries during refresh (production-safe)"
+
+  - name: "Test refresh performance"
+    description: "Ensure refresh doesn't exceed SLA"
+
+  - name: "Document refresh schedule"
+    description: "When is data refreshed? How stale can it be?"
+
+  - name: "Monitor staleness"
+    description: "Alert if refresh fails or lags"
+
+  - name: "Use pg_tviews for incremental updates"
+    description: "100× faster than full refresh"
+
+  - name: "Cache only if significantly faster"
+    description: "If query is already <10ms, caching adds complexity"
+
+anti_patterns:
+  - name: "Materializing everything"
+    description: "Every view becomes materialized"
+    consequence: "High refresh overhead, complex to manage"
+    fix: "Materialize only expensive queries"
+
+  - name: "No refresh strategy"
+    description: "Materialized view exists but never refreshed"
+    consequence: "Data becomes stale, queries return incorrect results"
+    fix: "Schedule regular refresh or use trigger-based"
+
+  - name: "Full refresh during peak traffic"
+    description: "REFRESH MATERIALIZED VIEW locks table during busy hours"
+    consequence: "Queries blocked, API unavailable"
+    fix: "Use REFRESH CONCURRENTLY or schedule off-peak"
+
+  - name: "Ignoring refresh performance"
+    description: "Full refresh takes 5 minutes"
+    consequence: "View becomes stale if refresh can't finish before next cycle"
+    fix: "Test refresh time; use pg_tviews for large views"
+
+examples:
+  example_1:
+    title: "User Stats Materialized View"
+    description: "Pre-compute expensive user aggregations"
+    code: |
+      CREATE MATERIALIZED VIEW mv_user_stats AS
+      SELECT
+        u.pk_user,
+        u.name,
+        COUNT(DISTINCT p.pk_post) as post_count,
+        COALESCE(SUM(p.view_count), 0) as total_views,
+        COALESCE(AVG(p.view_count), 0) as avg_views,
+        MAX(p.created_at) as last_post_at
+      FROM tb_user u
+      LEFT JOIN tb_post p ON p.fk_user = u.pk_user
+      GROUP BY u.pk_user, u.name;
+
+      -- Query is instant
+      SELECT * FROM mv_user_stats WHERE pk_user = 1;
+
+  example_2:
+    title: "Trending Posts Cache"
+    description: "Cache most-viewed posts (partial materialization)"
+    code: |
+      CREATE MATERIALIZED VIEW mv_trending_posts AS
+      SELECT
+        pk_post,
+        title,
+        fk_author,
+        view_count,
+        created_at
+      FROM tb_post
+      WHERE created_at > NOW() - INTERVAL '7 days'
+      ORDER BY view_count DESC
+      LIMIT 100;
+
+      -- Refresh nightly
+      REFRESH MATERIALIZED VIEW CONCURRENTLY mv_trending_posts;
+
+comparison_matrix:
+  approach:
+    on_demand: "Compute query every time"
+    materialized_view: "Pre-compute, store in table"
+    ttl_cache: "Cache with time-based expiration"
+    trigger_refresh: "Refresh on every data change"
+
+  consistency:
+    on_demand: "Always current"
+    materialized_view: "Current at last refresh"
+    ttl_cache: "Current within TTL"
+    trigger_refresh: "Always current"
+
+  performance:
+    on_demand: "Slow (compute every time)"
+    materialized_view: "Fast (select from table)"
+    ttl_cache: "Very fast (memory cache)"
+    trigger_refresh: "Fast (select from table)"
+
+  refresh_overhead:
+    on_demand: "None (compute per query)"
+    materialized_view: "Periodic refresh cost"
+    ttl_cache: "Periodic refresh cost"
+    trigger_refresh: "Write operation overhead"
+
+blog_hooks:
+  beginner:
+    focus: "Understanding materialized views"
+    key_points:
+      - "Materialized view = pre-computed query stored as table"
+      - "Query is instant (just SELECT from view)"
+      - "Refresh view to keep data current"
+      - "Use for expensive aggregations (SUM, COUNT)"
+
+  intermediate:
+    focus: "Refresh strategies and invalidation"
+    key_points:
+      - "Full refresh: recompute entire view"
+      - "Concurrent refresh: no locking"
+      - "Trigger-based: refresh on data change"
+      - "TTL cache: expire after N seconds"
+
+  advanced:
+    focus: "Incremental updates and optimization"
+    key_points:
+      - "Incremental refresh (pg_tviews): 100× faster"
+      - "Partial materialization: cache only hot data"
+      - "Monitoring refresh performance"
+      - "Handling view dependencies"

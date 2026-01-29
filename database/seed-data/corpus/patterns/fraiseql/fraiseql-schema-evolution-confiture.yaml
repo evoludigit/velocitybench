@@ -1,0 +1,280 @@
+id: fraiseql-schema-evolution-confiture
+name: "FraiseQL Schema Evolution with Confiture"
+category: fraiseql
+type: standard
+tags:
+  - fraiseql
+  - confiture
+  - schema-evolution
+  - migrations
+  - ddl-generation
+
+summary:
+  short: "DDL generation from FraiseQL types and safe schema evolution using Confiture migrations"
+  long: |
+    FraiseQL types define both GraphQL schema and database tables. Confiture extends this by
+    generating PostgreSQL DDL from FraiseQL types and managing safe schema evolution for both
+    fresh databases (instant builds from DDL) and existing databases (incremental migrations).
+    This integration provides a unified source of truth: Python types → GraphQL schema & Database schema.
+
+problem:
+  description: |
+    Traditional approaches duplicate schema definitions:
+    - GraphQL schema (TypeScript/Python)
+    - Database schema (SQL migrations)
+    - Keep both in sync = tedious, error-prone
+
+    Schema evolution is slow and fragile:
+    - Fresh test database: Run 200 migrations (10 minutes)
+    - Better: Build from DDL (10 milliseconds)
+
+  symptoms:
+    - name: "Schema drift"
+      description: "GraphQL type and database column don't match"
+      detection: "Type mismatch error when querying"
+
+    - name: "Slow fresh databases"
+      description: "CI test database setup takes 5 minutes"
+      detection: "Schema build time > 1 second"
+
+    - name: "Complex migrations"
+      description: "100+ migration files to manage"
+      detection: "Migration history is burden, not help"
+
+  impact: |
+    Schema consistency issues, slow test setup, complex migration management
+
+solution:
+  principle: "Single source of truth: FraiseQL types → DDL generation → Confiture migrations"
+
+  components:
+    - name: "DDL Generation from Types"
+      type: "Tool integration"
+      purpose: "Generate PostgreSQL schema from FraiseQL types"
+      workflow: |
+        1. Define FraiseQL types (with Trinity pattern)
+        2. Run DDL generation
+        3. Get PostgreSQL CREATE TABLE statements
+        4. Confiture reads DDL files
+        5. Builds database from DDL
+
+      benefits: |
+        - Single source of truth (no duplication)
+        - Type-safe: Python type → GraphQL → Database
+        - Automatic index/constraint generation
+        - Instant fresh database builds
+
+    - name: "Three-Layer Architecture in DDL"
+      type: "Schema generation"
+      purpose: "Generate all three layers from single type definition"
+      pattern: |
+        @fraiseql.type(sql_source="benchmark.tv_user")
+        class User:
+            id: UUID
+            email: str
+            name: str
+
+        Generates:
+        - tb_user (write-optimized, normalized)
+        - v_user (projection view, denormalization)
+        - tv_user (query-optimized, JSONB composition)
+
+    - name: "Confiture Migration Strategies"
+      type: "Schema evolution"
+      purpose: "Safe schema changes for existing databases"
+      strategies:
+        strategy_1: |
+          **Strategy 1: DDL-Only** (fresh databases)
+          - Use case: Test/development databases
+          - Build fresh from DDL files (< 1 second)
+          - No migration files needed
+          - Instant, repeatable, clean
+
+        strategy_2: |
+          **Strategy 2: DDL + Migrations** (existing databases)
+          - Use case: Production databases
+          - Update DDL files (source of truth)
+          - Confiture generates migrations automatically
+          - Safe, reversible, validated
+
+        strategy_3: |
+          **Strategy 3: Custom Migrations** (complex changes)
+          - Use case: Non-standard schema changes
+          - Write Python migration file
+          - Confiture executes with validation
+          - Full control when needed
+
+    - name: "Zero-Downtime Schema Evolution"
+      type: "Production pattern"
+      purpose: "Update schema without downtime"
+      approach: |
+        1. Add new column (backward compatible)
+        2. Deploy code that writes to new column
+        3. Copy old data to new column
+        4. Deploy code that reads from new column
+        5. Remove old column (cleanup)
+
+        Confiture handles step validation and coordination.
+
+    - name: "Multi-Environment Config"
+      type: "Configuration"
+      purpose: "Different schema strategies per environment"
+      example: |
+        confiture.yaml:
+
+        environments:
+          development:
+            strategy: ddl-only  # Fresh builds from DDL
+            auto_refresh: true  # Rebuild on schema change
+
+          staging:
+            strategy: ddl+migrations  # Track changes
+            validation: strict
+
+          production:
+            strategy: ddl+migrations  # Safe migrations
+            validation: strict
+            dry_run: true  # Pre-validate before applying
+
+key_concepts:
+  concept_1: "FraiseQL types are single source of truth"
+  concept_2: "DDL generation creates PostgreSQL schema from types"
+  concept_3: "Confiture manages fresh builds (DDL) and migrations"
+  concept_4: "Fresh databases build from DDL (<1 second)"
+  concept_5: "Existing databases evolve via migrations"
+  concept_6: "Three-layer architecture generated automatically"
+  concept_7: "Zero-downtime deployments via migration strategies"
+  concept_8: "Environment-specific configuration per needs"
+
+best_practices:
+  - name: "Use DDL-only for development"
+    description: "Fresh test database in 100ms, not 10 minutes"
+
+  - name: "Use migrations for production"
+    description: "Validated, reversible, safe changes"
+
+  - name: "Commit DDL files to version control"
+    description: "Schema history tracked alongside code"
+
+  - name: "Generate migrations automatically"
+    description: "Let Confiture detect changes and generate migration files"
+
+  - name: "Validate migrations before deploying"
+    description: "Dry-run in staging to catch issues early"
+
+  - name: "Document schema changes"
+    description: "Why the change, expected impact, rollback plan"
+
+  - name: "Test migrations with realistic data"
+    description: "Performance/correctness depends on data volume"
+
+anti_patterns:
+  - name: "Manual DDL editing"
+    description: "Hand-edit DDL files instead of regenerating from types"
+    consequence: "Drift between types and DDL"
+    fix: "Always regenerate from types"
+
+  - name: "Keeping old migration files"
+    description: "Never delete old migrations"
+    consequence: "Migration history becomes burden"
+    fix: "Use DDL-only for fresh builds, migrations for evolution only"
+
+  - name: "No validation before production"
+    description: "Deploy migration without testing"
+    consequence: "Production outage, data loss"
+    fix: "Dry-run in staging, validate results"
+
+  - name: "Complex custom migrations"
+    description: "Migration does 5 unrelated schema changes"
+    consequence: "Hard to revert, understand, or reuse"
+    fix: "One logical change per migration"
+
+examples:
+  example_1:
+    title: "Fresh Database from DDL"
+    description: "Test setup in 100ms"
+    code: |
+      # Define schema in Python
+      @fraiseql.type(sql_source="benchmark.tv_user")
+      class User:
+          id: UUID
+          email: str
+          name: str
+
+      # Generate DDL
+      $ fraiseql generate-ddl schema.py --output db/schema/
+
+      # Build database from DDL
+      $ confiture build --env test
+
+      # Database ready in 100ms (not 10 minutes of migrations!)
+
+  example_2:
+    title: "Migration for Schema Evolution"
+    description: "Add new field to existing database"
+    code: |
+      # 1. Update Python type
+      @fraiseql.type(sql_source="benchmark.tv_user")
+      class User:
+          id: UUID
+          email: str
+          name: str
+          avatar_url: str | None = None  # New field
+
+      # 2. Regenerate DDL
+      $ fraiseql generate-ddl schema.py --output db/schema/
+
+      # 3. Generate and apply migration
+      $ confiture migrate generate --name add_user_avatar
+      $ confiture migrate apply --env staging --dry-run  # Test first
+      $ confiture migrate apply --env production  # Deploy
+
+comparison_matrix:
+  aspect:
+    fresh_database: "New test database"
+    existing_database: "Running production database"
+
+  build_approach:
+    fresh_database: "Build from DDL files"
+    existing_database: "Apply migrations"
+
+  time_required:
+    fresh_database: "100ms (DDL execution)"
+    existing_database: "Depends on migration size"
+
+  reversibility:
+    fresh_database: "N/A (fresh)"
+    existing_database: "Reversible migrations"
+
+  complexity:
+    fresh_database: "Simple (just execute SQL)"
+    existing_database: "Complex (validate, coordinate)"
+
+  confiture_role:
+    fresh_database: "Build coordinator (confiture build)"
+    existing_database: "Migration manager (confiture migrate)"
+
+blog_hooks:
+  beginner:
+    focus: "Understanding FraiseQL + Confiture workflow"
+    key_points:
+      - "Python types define schema (single source of truth)"
+      - "DDL generation creates SQL from types"
+      - "Fresh database: build from DDL (fast)"
+      - "Existing database: apply migrations (safe)"
+
+  intermediate:
+    focus: "Schema evolution and multi-environment config"
+    key_points:
+      - "Development: DDL-only for instant builds"
+      - "Production: Migrations for safe evolution"
+      - "Confiture detects changes and generates migrations"
+      - "Validate migrations before production deploy"
+
+  advanced:
+    focus: "Zero-downtime deployments and complex changes"
+    key_points:
+      - "Multi-step migrations for zero-downtime"
+      - "Custom migrations for non-standard changes"
+      - "Schema validation and safety checks"
+      - "Coordinate migrations with code deployments"
