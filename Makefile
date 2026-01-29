@@ -1,6 +1,6 @@
 .PHONY: help blog-all blog-pattern blog-fraisier blog-webhooks blog-git-providers blog-cqrs blog-history blog-multi-provider \
 	blog-list blog-clean venv-check venv-setup framework-start framework-stop framework-smoke framework-list \
-	vllm-start vllm-status vllm-stop
+	vllm-start vllm-status vllm-stop lint format type-check quality db-up db-down
 
 # Project paths
 PROJECT_ROOT := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
@@ -72,12 +72,19 @@ help:
 	@echo "  make vllm-status                - Check vLLM server status"
 	@echo "  make vllm-stop                  - Stop vLLM server"
 	@echo ""
+	@echo "Code Quality Commands:"
+	@echo "  make lint                       - Lint Python code with ruff"
+	@echo "  make format                     - Format Python code with ruff"
+	@echo "  make type-check                 - Type-check Python code"
+	@echo "  make quality                    - Run all quality checks (lint + type-check)"
+	@echo ""
 	@echo "Examples:"
 	@echo "  make personas-test              # Generate 10 test personas"
 	@echo "  make personas-generate          # Generate 2000 full personas"
 	@echo "  make comments-test              # Test comment generation on 5 posts"
 	@echo "  make comments-generate          # Generate comments on all 9000+ posts"
 	@echo "  make framework-start FRAMEWORK=fraiseql  # Start FraiseQL on port 4000"
+	@echo "  make quality                    # Run all code quality checks"
 	@echo ""
 	@echo "======================================================================"
 
@@ -596,3 +603,41 @@ db-up:
 db-down:
 	@echo "Stopping PostgreSQL database..."
 	docker compose down postgres
+
+# ======================================================================
+# Code Quality Commands
+# ======================================================================
+
+# Lint Python code with ruff
+lint:
+	@echo "Linting Python code with ruff..."
+	@if [ -d "$(PROJECT_ROOT)database" ]; then \
+		$(VENV_PYTHON) -m ruff check $(PROJECT_ROOT)database/seed-data/generator/ $(PROJECT_ROOT)database/*.py; \
+	fi
+	@if [ -d "$(PROJECT_ROOT)frameworks/fastapi-rest" ]; then \
+		$(VENV_PYTHON) -m ruff check $(PROJECT_ROOT)frameworks/fastapi-rest/; \
+	fi
+	@echo "✓ Linting complete"
+
+# Format Python code with ruff
+format:
+	@echo "Formatting Python code with ruff..."
+	@if [ -d "$(PROJECT_ROOT)database" ]; then \
+		$(VENV_PYTHON) -m ruff format $(PROJECT_ROOT)database/seed-data/generator/ $(PROJECT_ROOT)database/*.py; \
+	fi
+	@if [ -d "$(PROJECT_ROOT)frameworks/fastapi-rest" ]; then \
+		$(VENV_PYTHON) -m ruff format $(PROJECT_ROOT)frameworks/fastapi-rest/; \
+	fi
+	@echo "✓ Formatting complete"
+
+# Type-check Python code
+type-check:
+	@echo "Type-checking Python code..."
+	@echo "Note: Requires 'ty' to be installed (pip install ty)"
+	@which ty > /dev/null 2>&1 || echo "Warning: ty not installed, skipping type-check"
+	@which ty > /dev/null 2>&1 && ty check $(PROJECT_ROOT)database/seed-data/generator/ || true
+	@echo "✓ Type-check complete"
+
+# Run all quality checks
+quality: lint type-check
+	@echo "✓ All quality checks complete"

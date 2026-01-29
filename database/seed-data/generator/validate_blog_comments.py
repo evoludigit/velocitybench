@@ -190,7 +190,7 @@ def is_duplicate(comment_text: str, previous_comments: List[str]) -> bool:
 class CommentValidator:
     """Validate and filter blog comments."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.stats = {
             "total_comments": 0,
             "accepted": 0,
@@ -403,7 +403,7 @@ def filter_comments_directory(comments_dir: Path, strict: bool = False) -> Dict:
 # ============================================================================
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Validate and filter blog comments",
         formatter_class=argparse.RawDescriptionHelpFormatter,

@@ -223,12 +223,12 @@ class CommentGenerator:
                 return json.load(f)
         return {"processed_posts": [], "total_comments": 0}
 
-    def _save_state(self):
+    def _save_state(self) -> None:
         """Save generation state for resuming."""
         with open(STATE_FILE, "w") as f:
             json.dump(self.state, f, indent=2)
 
-    def _extract_keywords(self, text: str) -> set:
+    def _extract_keywords(self, text: str) -> set[str]:
         """Extract meaningful keywords from text (lowercase)."""
         # Remove common words and split on non-alphanumeric
         text = text.lower()
@@ -620,7 +620,7 @@ Guidelines:
         count = int(random.gauss(COMMENTS_MEAN, COMMENTS_STDDEV))
         return max(COMMENTS_MIN, min(COMMENTS_MAX, count))
 
-    def _save_comments(self, post_path: Path, comments: List[Dict]):
+    def _save_comments(self, post_path: Path, comments: list[dict]) -> None:
         """Save comments to JSON file."""
         output_file = self.output_dir / f"{post_path.stem}_comments.json"
 
@@ -643,7 +643,7 @@ Guidelines:
 # ============================================================================
 
 
-def analyze_distribution(num_samples: int = 1000):
+def analyze_distribution(num_samples: int = 1000) -> None:
     """Analyze the comment count distribution."""
     samples = [
         max(COMMENTS_MIN, min(COMMENTS_MAX, int(random.gauss(COMMENTS_MEAN, COMMENTS_STDDEV))))
@@ -694,7 +694,7 @@ def discover_blog_posts() -> List[Path]:
     return posts
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Generate comments for blog posts using vLLM",
         formatter_class=argparse.RawDescriptionHelpFormatter,

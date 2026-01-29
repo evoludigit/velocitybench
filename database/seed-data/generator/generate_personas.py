@@ -398,7 +398,7 @@ LANGUAGE_BACKGROUNDS_BY_REGION = {
 class PersonaGenerator:
     """Generates diverse personas for comment generation."""
 
-    def __init__(self, output_dir: Path = OUTPUT_DIR):
+    def __init__(self, output_dir: Path = OUTPUT_DIR) -> None:
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.generated_count = 0
@@ -716,7 +716,7 @@ class PersonaGenerator:
         except ValidationError as e:
             raise ValidationError(f"Invalid persona {persona_id}: {e.message}")
 
-    def _save_personas(self, personas: List[Dict]):
+    def _save_personas(self, personas: list[dict]) -> None:
         """Save personas to individual JSON files and create index."""
         # Create personas subdirectory
         personas_dir = self.output_dir / "personas"
@@ -848,7 +848,7 @@ class PersonaGenerator:
 
         return None
 
-    def analyze_personas(self, personas_file: Path):
+    def analyze_personas(self, personas_file: Path) -> None:
         """Analyze generated personas."""
         with open(personas_file) as f:
             data = json.load(f)
@@ -913,7 +913,7 @@ class PersonaGenerator:
 # ============================================================================
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Generate personas for comment generation",
         formatter_class=argparse.RawDescriptionHelpFormatter,
