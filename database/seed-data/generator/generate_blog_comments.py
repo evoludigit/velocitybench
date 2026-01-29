@@ -15,6 +15,7 @@ Usage:
 
 import argparse
 import json
+import logging
 import random
 import sys
 import time
@@ -25,6 +26,8 @@ import re
 
 import requests
 import yaml
+
+from logger_config import setup_logging
 
 # ============================================================================
 # Configuration
@@ -760,6 +763,10 @@ Examples:
 
     args = parser.parse_args()
 
+    # Set up structured logging
+    logger = setup_logging(__name__)
+    logger.info("Starting comment generation")
+
     # Handle distribution analysis
     if args.analyze_distribution:
         analyze_distribution()
@@ -770,30 +777,26 @@ Examples:
         try:
             response = requests.get("http://localhost:8000/v1/models", timeout=5)
             response.raise_for_status()
+            logger.info("vLLM server is running")
         except (requests.RequestException, requests.Timeout) as e:
-            print("Error: vLLM server not running at localhost:8000")
-            print("")
-            print("To start vLLM automatically, use:")
-            print("  make vllm-start        # Start vLLM with implementer model")
-            print("")
-            print("Or manually start with:")
-            print("  vllm-switch implementer")
-            print("")
-            print("Note: vllm-switch requires passwordless sudo. If you get sudo errors,")
-            print("configure sudoers with: sudo visudo")
+            logger.error("vLLM server not running at localhost:8000")
+            logger.error(f"Details: {e}")
+            logger.info("To start vLLM automatically, use: make vllm-start")
             sys.exit(1)
 
     # Discover posts
     all_posts = discover_blog_posts()
-    print(f"\nDiscovered {len(all_posts)} blog posts")
+    logger.info(f"Discovered {len(all_posts)} blog posts")
 
     # Determine which posts to process
     if args.test:
         posts_to_process = all_posts[: args.posts]
-        print(f"Test mode: processing first {len(posts_to_process)} posts")
+        logger.info(f"Test mode: processing first {len(posts_to_process)} posts")
     elif args.all:
         posts_to_process = all_posts
+        logger.info(f"Full mode: processing all {len(posts_to_process)} posts")
     else:
+        logger.error("Either --all or --test required")
         parser.error("Either --all or --test required")
 
     # Process posts

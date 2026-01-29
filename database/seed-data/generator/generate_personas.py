@@ -31,6 +31,8 @@ import requests
 import yaml
 from jsonschema import Draft7Validator, ValidationError
 
+from logger_config import setup_logging
+
 # ============================================================================
 # Configuration
 # ============================================================================
@@ -967,6 +969,10 @@ Examples:
 
     args = parser.parse_args()
 
+    # Set up structured logging
+    logger = setup_logging(__name__)
+    logger.info("Starting persona generation")
+
     # Handle analysis mode
     if args.analyze:
         generator = PersonaGenerator(output_dir=args.output)
@@ -978,10 +984,11 @@ Examples:
         try:
             response = requests.get("http://localhost:8000/v1/models", timeout=5)
             response.raise_for_status()
+            logger.info("vLLM server is running")
         except (requests.RequestException, requests.Timeout) as e:
-            print("Error: vLLM server not running at localhost:8000")
-            print(f"Details: {e}")
-            print("Start it with: vllm-switch implementer")
+            logger.error("vLLM server not running at localhost:8000")
+            logger.error(f"Details: {e}")
+            logger.info("Start it with: vllm-switch implementer")
             sys.exit(1)
 
     # Generate personas

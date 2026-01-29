@@ -21,6 +21,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+from logger_config import setup_logging
+
 # ============================================================================
 # Configuration
 # ============================================================================
@@ -431,6 +433,10 @@ Examples:
     )
 
     args = parser.parse_args()
+
+    # Set up structured logging
+    logger = setup_logging(__name__)
+    logger.info("Starting comment validation")
 
     # Run filtering
     stats = filter_comments_directory(args.comments_dir, strict=args.strict)
