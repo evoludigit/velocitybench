@@ -84,3 +84,11 @@ results/
 .AppleDouble
 .LSOverride
 Thumbs.db
+
+# Generated content stored in /data
+database/seed-data/output/
+venv/
+frameworks/*/.venv
+frameworks/*/venv
+database/.venv
+tests/qa/.venv

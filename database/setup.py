@@ -42,39 +42,30 @@ from datetime import datetime
 
 # List of all frameworks in the benchmark suite
 FRAMEWORKS = [
-    # Phase 1-3 (Completed)
     'postgraphile',
     'fraiseql',
-    # Phase 4 Week 1 - Node.js (Completed)
     'apollo-server',
     'graphql-yoga',
     'fastify-graphql',
     'express-graphql',
     'mercurius',
-    # Phase 4 Week 2 - Python (Completed)
     'strawberry',
     'graphene',
     'ariadne',
     'asgi-graphql',
-    # Phase 4 Week 2 - Ruby (Completed)
     'rails',
     'hanami',
-    # Phase 4 Week 2 - Java (Completed)
     'spring-graphql',
     'micronaut-graphql',
     'quarkus-graphql',
     'play-graphql',
-    # Phase 4 Week 3 - C#/.NET (Completed)
     'hot-chocolate',
     'entity-framework-core',
     'graphql-net',
-    # Phase 4 Week 3 - Go (Completed)
     'gqlgen',
     'graphql-go',
-    # Phase 4 Week 3 - PHP (Completed)
     'graphql-core-php',
     'webonyx-graphql-php',
-    # Phase 4 Week 3 - Rust (Completed)
     'async-graphql',
     'juniper',
 ]
