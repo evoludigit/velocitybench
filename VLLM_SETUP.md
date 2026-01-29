@@ -66,6 +66,12 @@ make comments-generate
 2. **Helper script**: `bin/vllm-start-helper.sh` handles the startup with proper error checking
 3. **Passwordless sudo**: The sudoers configuration allows vLLM systemd operations without password prompts
 
+## Security
+
+vLLM runs on `localhost:8000` **without authentication**. This is appropriate for local blog generation and benchmarking.
+
+**Important:** Do not expose vLLM to the internet without adding authentication (API key, reverse proxy with auth, etc.). This tool assumes a trusted local development environment.
+
 ## vLLM Models Available
 
 The `vllm-switch` command can switch between three models:

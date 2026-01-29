@@ -489,8 +489,9 @@ def main():
     try:
         response = requests.get("http://localhost:8000/v1/models", timeout=5)
         response.raise_for_status()
-    except:
+    except (requests.RequestException, requests.Timeout) as e:
         print("Error: vLLM server not running at localhost:8000")
+        print(f"Details: {e}")
         print("Start it with: vllm-switch implementer")
         sys.exit(1)
 

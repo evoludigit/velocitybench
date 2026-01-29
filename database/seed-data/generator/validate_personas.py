@@ -273,7 +273,7 @@ realism, and internal alignment. Be critical but fair. Focus on semantic coheren
         if score_match:
             try:
                 score = int(score_match.group(1))
-            except:
+            except ValueError:
                 score = None
 
         # Extract summary (first sentence mentioning coherent, realistic, etc.)

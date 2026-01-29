@@ -14,6 +14,29 @@ VelocityBench helps developers choose the right framework with real performance 
 - ✅ Multi-language support (Python, Node.js, Go, Java, Rust, PHP, Ruby, C#)
 - ✅ Publication-ready benchmarking methodology
 
+## ⚠️ Intended Use & Security Model
+
+VelocityBench is a **development and benchmarking tool**, optimized for:
+- Local framework performance evaluation
+- Architectural decision-making with real data
+- Educational learning about design patterns
+- Publication-ready benchmarking research
+
+**This is NOT a production service.** It intentionally includes:
+- Hardcoded test credentials (reduces setup friction)
+- No authentication (ensures "testable by anyone")
+- No rate limiting (measures true throughput)
+- Generated test data only (no sensitive information)
+
+**Security Assumptions:**
+- Runs on trusted local machines or private networks
+- Not exposed to the internet without additional security layers
+- All users have repository access (can modify code/queries)
+
+**Why This Design?** Adding production security features (authentication, rate limiting, TLS) would confound benchmark results with security overhead and defeat the core goal: enabling anyone to clone and benchmark frameworks fairly.
+
+**⚠️ Important:** If you expose `docker-compose` to the internet, you'll have an unauthenticated API. Don't do this. Instead, use VelocityBench locally for benchmarking, then implement production security separately.
+
 ## Quick Start
 
 ```bash

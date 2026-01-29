@@ -138,7 +138,7 @@ Use EXACTLY this format - no explanations, no extra text."""
         if score_match:
             try:
                 score = int(score_match.group(1))
-            except:
+            except ValueError:
                 pass
 
         # Extract ISSUES

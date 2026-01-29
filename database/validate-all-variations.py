@@ -68,7 +68,7 @@ class VariationValidator:
         headers = ["Database", "Sample %", "Status", "Users", "Posts", "Comments", "Size"]
         try:
             print(tabulate(results, headers=headers, tablefmt="grid"))
-        except:
+        except (NameError, Exception) as e:
             print(headers)
             for row in results:
                 print(row)

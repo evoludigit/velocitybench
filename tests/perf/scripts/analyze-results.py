@@ -140,7 +140,7 @@ class JMeterStatisticsAnalyzer:
                 stats_dict["ci_95_lower"] = float(ci[0])
                 stats_dict["ci_95_upper"] = float(ci[1])
                 stats_dict["ci_95_width"] = float(ci[1] - ci[0])
-            except:
+            except (ValueError, TypeError):
                 pass
 
         # Fallback confidence interval calculation
@@ -159,7 +159,7 @@ class JMeterStatisticsAnalyzer:
                 data = np.array(response_times)
                 stats_dict["skewness"] = float(scipy_stats.skew(data))
                 stats_dict["kurtosis"] = float(scipy_stats.kurtosis(data))
-            except:
+            except (ValueError, TypeError):
                 stats_dict["skewness"] = 0.0
                 stats_dict["kurtosis"] = 0.0
         else:

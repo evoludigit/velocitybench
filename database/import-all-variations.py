@@ -86,7 +86,7 @@ class BulkImporter:
                     with pg_conn.cursor() as cur:
                         cur.execute("SET session_replication_role = 'origin'")
                     pg_conn.commit()
-                except:
+                except Exception:
                     pass
             atexit.register(re_enable_fks)
 
@@ -95,7 +95,7 @@ class BulkImporter:
                 with pg_conn.cursor() as cur:
                     cur.execute("TRUNCATE benchmark.tb_user CASCADE")
                 pg_conn.commit()
-            except:
+            except Exception:
                 pg_conn.rollback()
 
             # Import tables
@@ -169,7 +169,7 @@ class BulkImporter:
                 try:
                     cur.executemany(insert_sql, batch)
                     pg_conn.commit()
-                except:
+                except Exception:
                     pg_conn.rollback()
 
         print(f"  ✓ {sqlite_table:20} {len(rows):,} rows")

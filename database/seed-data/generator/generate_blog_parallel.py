@@ -636,7 +636,7 @@ def main():
             resp = requests.get("http://localhost:8000/v1/models", timeout=5)
             resp.raise_for_status()
             print("  ✓ vLLM available")
-        except:
+        except (requests.RequestException, requests.Timeout):
             print("  ✗ vLLM not available, removing from backends")
             backends.remove("vllm")
 

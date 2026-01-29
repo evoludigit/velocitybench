@@ -53,7 +53,7 @@ def import_xs(sqlite_path: str, pg_conn_str: str):
             with pg_conn.cursor() as cur:
                 cur.execute("SET session_replication_role = 'origin'")
             pg_conn.commit()
-        except:
+        except Exception:
             pass
     atexit.register(re_enable_fks)
 
@@ -118,7 +118,7 @@ def import_xs(sqlite_path: str, pg_conn_str: str):
             # Final commit
             try:
                 pg_conn.commit()
-            except:
+            except Exception:
                 pass
 
             elapsed = time.time() - table_start

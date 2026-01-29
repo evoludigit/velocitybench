@@ -105,7 +105,7 @@ class BlogPost:
         try:
             with open(self.file_path, "r", encoding="utf-8") as f:
                 content = f.read(500)
-        except:
+        except (IOError, OSError):
             pass
 
         match = re.search(r"^#+\s+(.+)$", content, re.MULTILINE)
@@ -770,7 +770,7 @@ Examples:
         try:
             response = requests.get("http://localhost:8000/v1/models", timeout=5)
             response.raise_for_status()
-        except:
+        except (requests.RequestException, requests.Timeout) as e:
             print("Error: vLLM server not running at localhost:8000")
             print("")
             print("To start vLLM automatically, use:")
