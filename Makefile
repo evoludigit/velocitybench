@@ -632,10 +632,8 @@ format:
 
 # Type-check Python code
 type-check:
-	@echo "Type-checking Python code..."
-	@echo "Note: Requires 'ty' to be installed (pip install ty)"
-	@which ty > /dev/null 2>&1 || echo "Warning: ty not installed, skipping type-check"
-	@which ty > /dev/null 2>&1 && ty check $(PROJECT_ROOT)database/seed-data/generator/ || true
+	@echo "Type-checking Python code with ty..."
+	@ty check $(PROJECT_ROOT)database/seed-data/generator/ $(PROJECT_ROOT)frameworks/fastapi-rest/ || true
 	@echo "✓ Type-check complete"
 
 # Run all quality checks

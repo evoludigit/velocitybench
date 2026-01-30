@@ -18,7 +18,7 @@ for dir in "${FRAMEWORKS[@]}"; do
     (
       cd "$dir"
       python -m ruff check . 2>&1 || true
-      python -m mypy . 2>&1 || true
+      ty check . 2>&1 || true
     )
   fi
 done
