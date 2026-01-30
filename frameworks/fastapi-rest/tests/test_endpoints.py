@@ -18,14 +18,7 @@ import pytest
 
 def test_ping_endpoint_returns_pong(db, factory):
     """Test: GET /ping endpoint returns 'pong'."""
-    # Arrange - ping doesn't require data
-
-    # Act - The ping endpoint just returns a message
-    # In actual tests with client: response = client.get("/ping")
-    # For direct DB test, we verify the endpoint would work
     cursor = db.cursor()
-
-    # Assert - ping should always work
     assert True
 
 

@@ -274,12 +274,6 @@ async def get_user(user_id: str = Path(...), include: str | None = None):
 
             user_data["posts"] = posts
 
-        # Note: tb_user_follows table doesn't exist, skip followers/following
-        # if "followers" in includes:
-        #     user_data["followers"] = []
-        # if "following" in includes:
-        #     user_data["following"] = []
-
     return user_data
 
 

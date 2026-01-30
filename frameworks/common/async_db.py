@@ -151,10 +151,7 @@ class AsyncDatabase:
 
     async def _init_connection(self, conn):
         """Initialize each new connection with performance settings."""
-        # Set application name for pg_stat_activity monitoring
         await conn.execute("SET application_name = 'fraiseql-benchmark';")
-        # Enable query logging (optional, may impact performance)
-        # await conn.execute("SET log_statement = 'all';")
 
     async def close(self):
         """Close connection pool."""
