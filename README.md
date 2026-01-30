@@ -8,8 +8,10 @@ Comprehensive GraphQL & REST Framework Performance Benchmarking Suite
 
 VelocityBench helps developers choose the right framework with real performance data.
 
-- ✅ 28+ framework implementations
-- ✅ 450+ comprehensive tests
+- ✅ 40+ framework implementations across 8 languages
+- ✅ 450+ comprehensive tests (schema, query, N+1, performance)
+- ✅ Production-ready health checks (Kubernetes-compatible probes)
+- ✅ Automated regression detection (statistical analysis)
 - ✅ Throughput, latency, and resource analysis
 - ✅ Multi-language support (Python, Node.js, Go, Java, Rust, PHP, Ruby, C#)
 - ✅ Publication-ready benchmarking methodology
@@ -56,12 +58,29 @@ make perf
 
 ## Documentation
 
+### Core Documentation
 - **[SCOPE_AND_LIMITATIONS.md](SCOPE_AND_LIMITATIONS.md)** - What we test and what we don't (benchmark methodology)
 - **[TESTING_STANDARDS.md](TESTING_STANDARDS.md)** - Universal testing standards and best practices
+- **[SECURITY.md](SECURITY.md)** - Security model and intended use
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - How to contribute to VelocityBench
+
+### Production Readiness
+- **[docs/HEALTH_CHECKS.md](docs/HEALTH_CHECKS.md)** - Health check implementation guide (Kubernetes probes)
+- **[docs/REGRESSION_DETECTION_GUIDE.md](docs/REGRESSION_DETECTION_GUIDE.md)** - Performance regression detection system
+- **[docs/DEPENDENCY_AUDIT_GUIDE.md](docs/DEPENDENCY_AUDIT_GUIDE.md)** - Security vulnerability scanning
+
+### Architecture & Design
+- **[docs/adr/](docs/adr/)** - Architecture Decision Records (12 ADRs)
+- **[docs/api/](docs/api/)** - API documentation and schema reference
+- **[docs/DOCKER_COMPOSE.md](docs/DOCKER_COMPOSE.md)** - Docker orchestration guide
+
+### Testing & Quality
 - **[testing-templates/](testing-templates/)** - Reusable test templates for all languages
-- **[docs/](docs/)** - Complete framework documentation
+- **[docs/PYTEST_CONFIGURATION.md](docs/PYTEST_CONFIGURATION.md)** - Pytest configuration guide
 - **[phase-plans/](phase-plans/)** - Implementation phases and roadmaps
-- **[.github/workflows/](​.github/workflows/)** - CI/CD pipeline configuration
+
+### Future Considerations
+- **[docs/SUBSCRIPTION_SUPPORT.md](docs/SUBSCRIPTION_SUPPORT.md)** - GraphQL subscriptions assessment
 
 ## Frameworks Included
 
@@ -104,8 +123,38 @@ MIT License - See [LICENSE](LICENSE) for details
 
 ---
 
-**Status**: Beta (Phase 9 in progress)
-**Latest Release**: v0.1.0-beta
-**Last Updated**: 2026-01-08
+**Status**: Production-Ready (Health checks, regression detection, and comprehensive documentation complete)
+**Latest Release**: v1.0.0-rc1
+**Last Updated**: 2026-01-30
 
-For more information, see [docs/](docs/) and [phase-plans/](phase-plans/)
+## Features
+
+### ✅ Benchmarking
+- 40+ frameworks across 8 languages (Python, TypeScript, Go, Rust, Java, PHP, Ruby, C#)
+- REST and GraphQL API benchmarking
+- Trinity Pattern database architecture (optimized for read-heavy workloads)
+- JMeter-based load testing with multiple workload profiles
+
+### ✅ Quality Assurance
+- 6-dimensional QA testing (Schema, Query, N+1, Consistency, Config, Performance)
+- 450+ comprehensive tests across all frameworks
+- Automated CI/CD validation
+
+### ✅ Production Observability
+- Kubernetes-compatible health checks (liveness, readiness, startup probes)
+- Standardized health check libraries for all languages
+- Database connectivity and memory monitoring
+
+### ✅ Performance Analysis
+- Automated regression detection with statistical analysis
+- Baseline management and versioning
+- Multiple output formats (CLI, JSON, Markdown for PR comments)
+- Configurable thresholds and severity levels
+
+### ✅ Documentation
+- 12 Architecture Decision Records (ADRs)
+- Comprehensive implementation guides
+- API documentation and schema reference
+- Security model documentation
+
+For more information, see [docs/](docs/)
