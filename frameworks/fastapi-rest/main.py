@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from common.async_db import AsyncDatabase
+from common.health_check import HealthCheckManager
 
 # Metrics
 REQUEST_COUNT = prometheus_client.Counter(
@@ -57,6 +58,16 @@ async def lifespan(app: FastAPI):
     app.state.db = db
     print("Database pool initialized")
 
+    # Initialize health check manager
+    health_manager = HealthCheckManager(
+        service_name="fastapi-rest",
+        version="1.0.0",
+        database=db,
+        environment=os.getenv("ENVIRONMENT", "development"),
+    )
+    app.state.health = health_manager
+    print("Health check manager initialized")
+
     yield
 
     # Shutdown
@@ -71,6 +82,44 @@ app = FastAPI(title="FastAPI REST Comparative Benchmark", lifespan=lifespan)
 def get_db() -> AsyncDatabase:
     """Get database from app state."""
     return app.state.db
+
+
+def get_health() -> HealthCheckManager:
+    """Get health check manager from app state."""
+    return app.state.health
+
+
+# Health check endpoints
+@app.get("/health")
+async def health():
+    """Combined health check (defaults to readiness)"""
+    health_manager = get_health()
+    result = await health_manager.probe("readiness")
+    return result.to_dict()
+
+
+@app.get("/health/live")
+async def health_live():
+    """Liveness probe - Is the process alive?"""
+    health_manager = get_health()
+    result = await health_manager.probe("liveness")
+    return result.to_dict()
+
+
+@app.get("/health/ready")
+async def health_ready():
+    """Readiness probe - Can the service handle traffic?"""
+    health_manager = get_health()
+    result = await health_manager.probe("readiness")
+    return result.to_dict()
+
+
+@app.get("/health/startup")
+async def health_startup():
+    """Startup probe - Has initialization completed?"""
+    health_manager = get_health()
+    result = await health_manager.probe("startup")
+    return result.to_dict()
 
 
 @app.get("/ping")
