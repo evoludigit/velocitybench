@@ -11,6 +11,10 @@ pydantic==2.10.0
 
 # Database
 psycopg==3.2.2
+asyncpg==0.29.0  # Required by common.async_db
+
+# System monitoring
+psutil==5.9.6  # Required for health checks
 
 # Testing - Modern 2025 Stack
 pytest==9.0.2                    # Latest stable

@@ -16,6 +16,7 @@ FraiseQL queries tv_* views which provide JSONB 'data' field with:
 
 import logging
 import os
+import sys
 from typing import Any
 
 # FraiseQL v1.8.1 imports
@@ -27,6 +28,11 @@ from fraiseql.fastapi import FraiseQLConfig, create_fraiseql_app
 from fraiseql.fastapi.config import IntrospectionPolicy
 from fraiseql.types import UUID
 from graphql import GraphQLResolveInfo
+
+# Add parent directory to path for common imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from common.async_db import AsyncDatabase
+from common.health_check import HealthCheckManager
 
 
 # FraiseQL Configuration
@@ -682,11 +688,60 @@ app = create_fraiseql_app(
 )
 
 
-# Add additional routes for health and metrics
+# Initialize health check database and manager on startup
+@app.on_event("startup")
+async def startup_health_check():
+    """Initialize health check infrastructure."""
+    # Create separate database connection for health checks
+    # (FraiseQL manages its own internal pool)
+    health_db = AsyncDatabase()
+    await health_db.connect(min_size=2, max_size=5, statement_cache_size=10)
+    app.state.health_db = health_db
+
+    # Initialize health check manager
+    health_manager = HealthCheckManager(
+        service_name="fraiseql-graphql",
+        version="1.8.1",
+        database=health_db,
+        environment=os.getenv("ENVIRONMENT", "development"),
+    )
+    app.state.health = health_manager
+
+
+@app.on_event("shutdown")
+async def shutdown_health_check():
+    """Close health check database connection."""
+    if hasattr(app.state, 'health_db'):
+        await app.state.health_db.close()
+
+
+# Add health check routes
 @app.get("/health")
-async def health_check():
-    """Health check endpoint."""
-    return {"status": "healthy", "framework": "fraiseql", "version": "1.8.1"}
+async def health():
+    """Combined health check (defaults to readiness)"""
+    result = await app.state.health.probe("readiness")
+    return result.to_dict()
+
+
+@app.get("/health/live")
+async def health_live():
+    """Liveness probe - Is the process alive?"""
+    result = await app.state.health.probe("liveness")
+    return result.to_dict()
+
+
+@app.get("/health/ready")
+async def health_ready():
+    """Readiness probe - Can the service handle traffic?"""
+    result = await app.state.health.probe("readiness")
+    return result.to_dict()
+
+
+@app.get("/health/startup")
+async def health_startup():
+    """Startup probe - Has initialization completed?"""
+    result = await app.state.health.probe("startup")
+    return result.to_dict()
 
 
 @app.get("/metrics")

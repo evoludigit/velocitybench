@@ -5,9 +5,12 @@ Traditional synchronous REST API using psycopg3 connection pool (demonstrates N+
 """
 
 import os
+import time
 from contextlib import contextmanager
+from datetime import datetime, timezone
 
 import prometheus_client
+import psutil
 import psycopg
 from flask import Flask, jsonify, request
 from psycopg.rows import dict_row
@@ -23,6 +26,12 @@ REQUEST_LATENCY = prometheus_client.Histogram(
 
 
 app = Flask(__name__)
+
+# Health check startup time
+app.config["START_TIME"] = time.time()
+app.config["VERSION"] = "1.0.0"
+app.config["SERVICE_NAME"] = "flask-rest"
+app.config["ENVIRONMENT"] = os.getenv("ENVIRONMENT", "development")
 
 
 # Validation functions
@@ -112,6 +121,133 @@ def teardown_db(exception=None):
     pool = app.config.get("DB_POOL")
     if pool:
         pool.close()
+
+
+def _check_database():
+    """Check database health."""
+    try:
+        pool = app.config.get("DB_POOL")
+        if not pool:
+            return {
+                "status": "down",
+                "error": "Database pool not initialized"
+            }
+
+        start = time.time()
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+                cur.fetchone()
+
+        response_time = (time.time() - start) * 1000
+
+        # Get pool stats
+        pool_stats = pool.get_stats()
+
+        return {
+            "status": "up",
+            "response_time_ms": round(response_time, 2),
+            "pool_size": pool_stats.get("pool_size", 0),
+            "pool_available": pool_stats.get("pool_available", 0),
+        }
+    except Exception as e:
+        return {
+            "status": "down",
+            "error": f"Database error: {str(e)}"
+        }
+
+
+def _check_memory():
+    """Check memory usage."""
+    try:
+        process = psutil.Process()
+        memory_info = process.memory_info()
+        rss_mb = memory_info.rss / 1024 / 1024
+
+        virtual_mem = psutil.virtual_memory()
+        total_mb = virtual_mem.total / 1024 / 1024
+        utilization = (rss_mb / total_mb) * 100
+
+        status = "up"
+        warning = None
+        if utilization > 90:
+            status = "degraded"
+            warning = f"High memory usage ({utilization:.1f}%)"
+
+        result = {
+            "status": status,
+            "used_mb": round(rss_mb, 2),
+            "total_mb": round(total_mb, 2),
+            "utilization_percent": round(utilization, 2),
+        }
+        if warning:
+            result["warning"] = warning
+
+        return result
+    except Exception as e:
+        return {
+            "status": "degraded",
+            "warning": f"Memory check error: {str(e)}"
+        }
+
+
+def _get_health_response(probe_type):
+    """Generate health check response."""
+    checks = {}
+
+    if probe_type in ["readiness", "startup"]:
+        checks["database"] = _check_database()
+
+    checks["memory"] = _check_memory()
+
+    # Compute overall status
+    statuses = [c.get("status") for c in checks.values()]
+    if "down" in statuses:
+        overall_status = "down"
+    elif "degraded" in statuses:
+        overall_status = "degraded"
+    else:
+        overall_status = "up"
+
+    uptime_ms = int((time.time() - app.config["START_TIME"]) * 1000)
+
+    response = {
+        "status": overall_status,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "uptime_ms": uptime_ms,
+        "version": app.config["VERSION"],
+        "service": app.config["SERVICE_NAME"],
+        "environment": app.config["ENVIRONMENT"],
+        "probe_type": probe_type,
+        "checks": checks
+    }
+
+    status_code = 503 if overall_status == "down" else 200
+    return jsonify(response), status_code
+
+
+@app.route("/health")
+def health():
+    """Combined health check (defaults to readiness)"""
+    return _get_health_response("readiness")
+
+
+@app.route("/health/live")
+def health_live():
+    """Liveness probe - Is the process alive?"""
+    return _get_health_response("liveness")
+
+
+@app.route("/health/ready")
+def health_ready():
+    """Readiness probe - Can the service handle traffic?"""
+    return _get_health_response("readiness")
+
+
+@app.route("/health/startup")
+def health_startup():
+    """Startup probe - Has initialization completed?"""
+    return _get_health_response("startup")
 
 
 @app.route("/ping")

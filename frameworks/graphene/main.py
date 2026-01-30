@@ -16,6 +16,7 @@ from graphene import List as GrapheneList
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from common.async_db import AsyncDatabase
+from common.health_check import HealthCheckManager
 
 
 # DataLoader classes for batching
@@ -370,11 +371,49 @@ async def startup_event():
     await db.connect(min_size=10, max_size=50, statement_cache_size=100)
     app.state.db = db
 
+    # Initialize health check manager
+    health_manager = HealthCheckManager(
+        service_name="graphene-graphql",
+        version="1.0.0",
+        database=db,
+        environment=os.getenv("ENVIRONMENT", "development"),
+    )
+    app.state.health = health_manager
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Close database pool on shutdown."""
     await app.state.db.close()
+
+
+# Health check endpoints
+@app.get("/health")
+async def health():
+    """Combined health check (defaults to readiness)"""
+    result = await app.state.health.probe("readiness")
+    return result.to_dict()
+
+
+@app.get("/health/live")
+async def health_live():
+    """Liveness probe - Is the process alive?"""
+    result = await app.state.health.probe("liveness")
+    return result.to_dict()
+
+
+@app.get("/health/ready")
+async def health_ready():
+    """Readiness probe - Can the service handle traffic?"""
+    result = await app.state.health.probe("readiness")
+    return result.to_dict()
+
+
+@app.get("/health/startup")
+async def health_startup():
+    """Startup probe - Has initialization completed?"""
+    result = await app.state.health.probe("startup")
+    return result.to_dict()
 
 
 @app.post("/graphql")

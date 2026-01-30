@@ -29,6 +29,7 @@ from strawberry.types import ExecutionResult
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from common.async_db import AsyncDatabase
+from common.health_check import HealthCheckManager
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -611,6 +612,15 @@ async def startup_event():
     )
     app.state.db = db
 
+    # Initialize health check manager
+    health_manager = HealthCheckManager(
+        service_name="strawberry-graphql",
+        version="1.0.0",
+        database=db,
+        environment=os.getenv("ENVIRONMENT", "development"),
+    )
+    app.state.health = health_manager
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -622,9 +632,33 @@ graphql_app = GraphQLRouter(schema, context_getter=get_context)
 app.include_router(graphql_app, prefix="/graphql")
 
 
+# Health check endpoints
 @app.get("/health")
-async def health_check():
-    return {"status": "healthy", "framework": "strawberry"}
+async def health():
+    """Combined health check (defaults to readiness)"""
+    result = await app.state.health.probe("readiness")
+    return result.to_dict()
+
+
+@app.get("/health/live")
+async def health_live():
+    """Liveness probe - Is the process alive?"""
+    result = await app.state.health.probe("liveness")
+    return result.to_dict()
+
+
+@app.get("/health/ready")
+async def health_ready():
+    """Readiness probe - Can the service handle traffic?"""
+    result = await app.state.health.probe("readiness")
+    return result.to_dict()
+
+
+@app.get("/health/startup")
+async def health_startup():
+    """Startup probe - Has initialization completed?"""
+    result = await app.state.health.probe("startup")
+    return result.to_dict()
 
 
 if __name__ == "__main__":
