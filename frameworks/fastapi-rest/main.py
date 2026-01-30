@@ -465,11 +465,6 @@ async def get_post_comments(
     return [dict(c) for c in comments]
 
 
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy", "framework": "fastapi-rest"}
-
-
 @app.get("/metrics")
 async def metrics():
     return prometheus_client.generate_latest()

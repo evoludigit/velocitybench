@@ -275,7 +275,6 @@ def bulk_factory(db):
                             'full_name': row[5],
                             'bio': row[6]
                         })
-            db.commit()
             return users
 
         @staticmethod
@@ -333,7 +332,6 @@ def bulk_factory(db):
                             'fk_author': post_row[5]
                         })
 
-            db.commit()
             return {
                 'user': user,
                 'posts': posts
@@ -406,7 +404,6 @@ def bulk_factory(db):
                             'fk_author': cmt_row[5]
                         })
 
-            db.commit()
             return {
                 'post': post,
                 'comments': comments,

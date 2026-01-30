@@ -146,7 +146,8 @@ class DataValidator:
                 continue
 
             try:
-                row_count = sum(1 for _ in open(filepath))
+                with open(filepath, 'r') as f:
+                    row_count = sum(1 for _ in f)
                 expected_count = expected[key]
 
                 if row_count == expected_count:

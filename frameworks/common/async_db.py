@@ -118,7 +118,7 @@ class AsyncDatabase:
         """
         # Get connection parameters from args or environment
         host = host or os.getenv("DB_HOST", "postgres")
-        port = port or int(os.getenv("DB_PORT", "5432"))
+        port = port if port is not None else int(os.getenv("DB_PORT", "5432"))
         database = database or os.getenv("DB_NAME", "fraiseql_benchmark")
         user = user or os.getenv("DB_USER", "benchmark")
         password = password or os.getenv("DB_PASSWORD", "benchmark123")
@@ -353,10 +353,10 @@ class AsyncDatabase:
 
         return {
             "status": "connected",
-            "min_size": self.pool._minsize,
-            "max_size": self.pool._maxsize,
-            "free_connections": len(self.pool._holders),
-            "size": self.pool._holders.__len__(),
+            "min_size": self.pool.get_min_size(),
+            "max_size": self.pool.get_max_size(),
+            "free_connections": self.pool.get_size(),
+            "size": self.pool.get_size(),
         }
 
 
