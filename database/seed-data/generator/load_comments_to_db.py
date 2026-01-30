@@ -18,11 +18,9 @@ Usage:
 import argparse
 import json
 import random
-import time
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 try:
     import psycopg
@@ -58,7 +56,7 @@ class PersonaToUserMapper:
     def __init__(self, num_users: int = DEFAULT_NUM_USERS):
         self.num_users = num_users
 
-    def get_user_pk_for_persona(self, author_id: Optional[int], author_name: Optional[str]) -> int:
+    def get_user_pk_for_persona(self, author_id: int | None, author_name: str | None) -> int:
         """
         Get valid user PK for a comment author.
 
@@ -91,7 +89,7 @@ class BlogCommentLoader:
             "duration": 0,
         }
 
-    def discover_comment_files(self, comments_dir: Path) -> List[Path]:
+    def discover_comment_files(self, comments_dir: Path) -> list[Path]:
         """Find all comment JSON files."""
         if not comments_dir.exists():
             print(f"Error: Comments directory not found: {comments_dir}")
@@ -101,7 +99,7 @@ class BlogCommentLoader:
         print(f"Found {len(files)} comment files")
         return sorted(files)
 
-    def find_post_by_filename(self, post_filename: str) -> Optional[Tuple[int, str]]:
+    def find_post_by_filename(self, post_filename: str) -> tuple[int, str] | None:
         """
         Find post in database by filename.
 
@@ -116,7 +114,7 @@ class BlogCommentLoader:
         # This will be implemented with actual DB query
         return None
 
-    def generate_comment_author(self, comment_index: int, author_id: Optional[int] = None, author_name: Optional[str] = None) -> int:
+    def generate_comment_author(self, comment_index: int, author_id: int | None = None, author_name: str | None = None) -> int:
         """
         Assign author to comment.
 
@@ -129,7 +127,7 @@ class BlogCommentLoader:
 
     def generate_comment_dates(
         self, post_published_at: datetime
-    ) -> Tuple[datetime, datetime]:
+    ) -> tuple[datetime, datetime]:
         """
         Generate realistic comment dates.
 
@@ -146,7 +144,7 @@ class BlogCommentLoader:
 
     def prepare_comments_tsv(
         self, comments_dir: Path, output_file: Path
-    ) -> Tuple[int, Path]:
+    ) -> tuple[int, Path]:
         """
         Convert comment JSON files to TSV format for PostgreSQL COPY.
 
@@ -236,8 +234,8 @@ class BlogCommentLoader:
         try:
             with psycopg.connect(connection_string) as conn:
                 with conn.cursor() as cur:
-                    # Phase 1: Load comments with NULL fk_post
-                    print(f"  Phase 1: Loading comments (without post associations)...")
+                    # Load comments initially with NULL fk_post, then update in batch
+                    print(f"  Loading comments (without post associations)...")
                     with open(comments_tsv, "r", encoding="utf-8") as f:
                         with cur.copy(
                             "COPY benchmark.tb_comment (id, fk_post, fk_author, fk_parent, content, is_approved, created_at, updated_at) FROM STDIN"
@@ -250,8 +248,8 @@ class BlogCommentLoader:
                     count = cur.fetchone()[0]
                     print(f"  ✓ Loaded {count:,} comments")
 
-                    # Phase 2: Update fk_post by matching post titles
-                    print(f"  Phase 2: Associating comments with posts...")
+                    # Update fk_post by matching post titles
+                    print(f"  Associating comments with posts...")
                     comment_files = self.discover_comment_files(comments_dir)
 
                     updates_made = 0
@@ -334,8 +332,8 @@ class BlogCommentLoader:
     def run(
         self,
         comments_dir: Path,
-        connection_string: Optional[str] = None,
-        output_tsv: Optional[Path] = None,
+        connection_string: str | None = None,
+        output_tsv: Path | None = None,
         dry_run: bool = False,
     ) -> dict:
         """

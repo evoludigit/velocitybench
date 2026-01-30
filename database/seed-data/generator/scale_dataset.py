@@ -31,10 +31,8 @@ Environment:
 
 import argparse
 import sys
-import time
 import yaml
 from pathlib import Path
-from typing import Optional
 import logging
 
 # Setup logging
@@ -56,7 +54,7 @@ from data_validator import DataValidator
 class ScaleDatasetConfig:
     """Configuration for dataset scaling with profile support."""
 
-    def __init__(self, config_file: Optional[Path] = None):
+    def __init__(self, config_file: Path | None = None):
         """
         Load configuration from YAML.
 
@@ -71,7 +69,7 @@ class ScaleDatasetConfig:
         self.profiles = self.config.get('profiles', {})
         self.safety = self.config.get('safety', {})
 
-    def _load_config(self) -> dict[str, any]:
+    def _load_config(self) -> dict:
         """Load YAML configuration file."""
         if not self.config_file.exists():
             logger.warning(f"Config file not found: {self.config_file}")
@@ -84,13 +82,13 @@ class ScaleDatasetConfig:
             logger.error(f"Failed to load config: {e}")
             return {}
 
-    def get_profile(self, profile_name: str) -> dict[str, any]:
+    def get_profile(self, profile_name: str) -> dict:
         """Get configuration for a profile."""
         if profile_name not in self.profiles:
             raise ValueError(f"Unknown profile: {profile_name}. Available: {list(self.profiles.keys())}")
         return self.profiles[profile_name]
 
-    def get_safety_settings(self) -> dict[str, any]:
+    def get_safety_settings(self) -> dict:
         """Get safety check settings."""
         return {
             'safety_margin_gb': self.safety.get('safety_margin_gb', 1.0),
@@ -121,12 +119,12 @@ class ScaleDatasetSystem:
 
     def resolve_scale_parameters(
         self,
-        scale_multiplier: Optional[int] = None,
-        posts: Optional[int] = None,
-        users: Optional[int] = None,
-        comments: Optional[int] = None,
-        profile: Optional[str] = None,
-    ) -> dict[str, any]:
+        scale_multiplier: int | None = None,
+        posts: int | None = None,
+        users: int | None = None,
+        comments: int | None = None,
+        profile: str | None = None,
+    ) -> dict:
         """
         Resolve scale parameters from multiplier, explicit values, or profile.
 
@@ -192,14 +190,12 @@ class ScaleDatasetSystem:
         """
         messages = []
 
-        # Phase 1: Local disk space
         disk_checker = DiskSpaceChecker(self.output_dir)
         disk_ok, disk_msg = disk_checker.check_all(scale_params['posts'], format)
         messages.append(disk_msg)
         if not disk_ok:
             return (False, messages) if not force else (True, messages)
 
-        # Phase 2: Memory resources
         monitor = ResourceMonitor()
         mem_ok, mem_msg = monitor.check_all(process_limit_mb=2048)
         messages.append(mem_msg)
@@ -210,17 +206,17 @@ class ScaleDatasetSystem:
 
     def run(
         self,
-        scale_multiplier: Optional[int] = None,
-        posts: Optional[int] = None,
-        users: Optional[int] = None,
-        comments: Optional[int] = None,
-        profile: Optional[str] = None,
+        scale_multiplier: int | None = None,
+        posts: int | None = None,
+        users: int | None = None,
+        comments: int | None = None,
+        profile: str | None = None,
         format: str = 'both',
         load: bool = False,
-        connection_string: Optional[str] = None,
+        connection_string: str | None = None,
         dry_run: bool = False,
         force: bool = False,
-    ) -> dict[str, any]:
+    ) -> dict:
         """
         Main execution: resolve parameters, check safety, generate, optionally load.
 

@@ -6,7 +6,6 @@ Runs all validators in order and generates comprehensive report.
 
 import asyncio
 from pathlib import Path
-from typing import Dict, List
 import yaml
 import json
 from datetime import datetime
@@ -65,7 +64,7 @@ class FrameworkValidator:
         finally:
             await conn.close()
 
-    async def validate_all_frameworks(self) -> Dict:
+    async def validate_all_frameworks(self) -> dict:
         """
         Run all validation checks against all frameworks.
 
@@ -109,7 +108,7 @@ class FrameworkValidator:
 
         return results
 
-    async def _validate_framework(self, framework: Dict) -> Dict:
+    async def _validate_framework(self, framework: dict) -> dict:
         """Run all validation checks for a single framework."""
         results = {
             'framework': framework['name'],
@@ -189,7 +188,7 @@ class FrameworkValidator:
 
         return results
 
-    def _calculate_status(self, checks: Dict) -> str:
+    def _calculate_status(self, checks: dict) -> str:
         """
         Calculate overall status based on all checks.
 
@@ -216,7 +215,7 @@ class FrameworkValidator:
 
         return 'pass'
 
-    def _generate_summary(self, results: Dict) -> Dict:
+    def _generate_summary(self, results: dict) -> dict:
         """Generate summary statistics."""
         frameworks = results['frameworks']
 
@@ -240,7 +239,7 @@ class FrameworkValidator:
             ]
         }
 
-    async def generate_report(self, results: Dict, output_path: str):
+    async def generate_report(self, results: dict, output_path: str):
         """Generate markdown validation report."""
         report = []
 
@@ -314,7 +313,7 @@ class FrameworkValidator:
 
         print(f"\n✅ Report generated: {output_path}")
 
-    async def generate_json_report(self, results: Dict, output_path: str):
+    async def generate_json_report(self, results: dict, output_path: str):
         """Generate JSON validation report for programmatic use."""
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         with open(output_path, 'w') as f:

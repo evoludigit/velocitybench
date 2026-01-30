@@ -18,10 +18,9 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
 
 
-def run_command(cmd: list[str], cwd: Optional[Path] = None) -> tuple[int, str, str]:
+def run_command(cmd: list[str], cwd: Path | None = None) -> tuple[int, str, str]:
     """Run a shell command and return exit code, stdout, stderr."""
     try:
         result = subprocess.run(

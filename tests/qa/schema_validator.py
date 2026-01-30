@@ -15,7 +15,6 @@ Outputs:
 """
 
 import asyncpg
-from typing import Dict, List, Set
 from dataclasses import dataclass, field
 
 
@@ -23,9 +22,9 @@ from dataclasses import dataclass, field
 class TableSchema:
     schema: str
     table: str
-    columns: List[str] = field(default_factory=list)
-    indexes: List[str] = field(default_factory=list)
-    foreign_keys: List[Dict[str, str]] = field(default_factory=list)
+    columns: list[str] = field(default_factory=list)
+    indexes: list[str] = field(default_factory=list)
+    foreign_keys: list[dict[str, str]] = field(default_factory=list)
 
 
 class SchemaValidator:
@@ -43,7 +42,7 @@ class SchemaValidator:
         if self.conn:
             await self.conn.close()
 
-    async def get_actual_tables(self) -> List[str]:
+    async def get_actual_tables(self) -> list[str]:
         """Query pg_catalog to get all tables in benchmark schema."""
         query = """
             SELECT schemaname, tablename
@@ -54,7 +53,7 @@ class SchemaValidator:
         rows = await self.conn.fetch(query)
         return [f"{row['schemaname']}.{row['tablename']}" for row in rows]
 
-    async def get_table_columns(self, schema: str, table: str) -> List[Dict[str, str]]:
+    async def get_table_columns(self, schema: str, table: str) -> list[dict[str, str]]:
         """Get all columns for a table."""
         query = """
             SELECT column_name, data_type, is_nullable
@@ -72,7 +71,7 @@ class SchemaValidator:
             for row in rows
         ]
 
-    async def get_table_indexes(self, schema: str, table: str) -> List[Dict[str, str]]:
+    async def get_table_indexes(self, schema: str, table: str) -> list[dict[str, str]]:
         """Get all indexes for a table."""
         query = """
             SELECT indexname, indexdef
@@ -88,7 +87,7 @@ class SchemaValidator:
             for row in rows
         ]
 
-    async def get_table_foreign_keys(self, schema: str, table: str) -> List[Dict[str, str]]:
+    async def get_table_foreign_keys(self, schema: str, table: str) -> list[dict[str, str]]:
         """Get all foreign keys for a table."""
         query = """
             SELECT
@@ -133,7 +132,7 @@ class SchemaValidator:
             foreign_keys=foreign_keys
         )
 
-    async def verify_framework_schema(self, framework: Dict) -> Dict:
+    async def verify_framework_schema(self, framework: dict) -> dict:
         """
         Verify a framework references correct tables.
 

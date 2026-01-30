@@ -371,7 +371,6 @@ class TestInputValidation:
 # HELPER FUNCTIONS (Framework-Specific)
 # ============================================================================
 
-# TODO: Implement framework-specific exceptions and helpers
 class AuthenticationError(Exception):
     """Raised when authentication fails."""
     pass
