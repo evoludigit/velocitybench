@@ -6,7 +6,7 @@ projections and framework characteristics.
 
 from dataclasses import dataclass
 from typing import Any
-from load_profiler import LoadProjection
+from .load_profiler import LoadProjection
 
 
 @dataclass

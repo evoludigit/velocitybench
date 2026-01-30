@@ -35,6 +35,9 @@ app.config["VERSION"] = "1.0.0"
 app.config["SERVICE_NAME"] = "flask-rest"
 app.config["ENVIRONMENT"] = os.getenv("ENVIRONMENT", "development")
 
+# Allowed fields for user updates (whitelist for SQL injection prevention)
+ALLOWED_UPDATE_FIELDS = {"full_name", "bio"}
+
 
 # Validation functions
 def validate_update_user_data(data):
@@ -42,7 +45,7 @@ def validate_update_user_data(data):
     errors = []
 
     # Check for unknown fields
-    allowed_fields = {"full_name", "bio"}
+    allowed_fields = ALLOWED_UPDATE_FIELDS
     for field in data.keys():
         if field not in allowed_fields:
             errors.append({"field": field, "error": f"Unknown field: {field}"})
@@ -110,7 +113,7 @@ def execute_query(query: str, params: tuple | None = None):
 
 
 # Initialize pool in app context on first request
-@app.before_first_request
+@app.before_serving
 def setup_db():
     """Initialize database pool."""
     init_pool()
@@ -373,15 +376,13 @@ def update_user(user_id):
     if validation_errors:
         return jsonify({"error": "Validation Error", "details": validation_errors}), 400
 
-    # Update user
+    # Update user using whitelist of allowed fields
     update_fields = []
     params = []
-    if "full_name" in data:
-        update_fields.append("full_name = %s")
-        params.append(data["full_name"])
-    if "bio" in data:
-        update_fields.append("bio = %s")
-        params.append(data["bio"])
+    for field in ALLOWED_UPDATE_FIELDS:
+        if field in data:
+            update_fields.append(f"{field} = %s")
+            params.append(data[field])
 
     if update_fields:
         params.append(user_id)

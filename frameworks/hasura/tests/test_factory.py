@@ -3,7 +3,6 @@
 import uuid
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
-from typing import Optional
 
 
 @dataclass
@@ -12,7 +11,7 @@ class TestUser:
     pk_user: int
     username: str
     full_name: str
-    bio: Optional[str]
+    bio: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -26,7 +25,7 @@ class TestPost:
     content: str
     created_at: datetime
     updated_at: datetime
-    author: Optional[TestUser] = None
+    author: TestUser | None = None
 
 
 @dataclass
@@ -37,8 +36,8 @@ class TestComment:
     fk_author: int
     content: str
     created_at: datetime
-    author: Optional[TestUser] = None
-    post: Optional[TestPost] = None
+    author: TestUser | None = None
+    post: TestPost | None = None
 
 
 class TestFactory:

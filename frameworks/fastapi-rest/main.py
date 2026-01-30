@@ -263,13 +263,16 @@ async def get_user(user_id: str = Path(...), include: str | None = None):
 
                     # Add author info to comments if requested
                     if "posts.comments.author" in includes:
-                        for comment in comments:
-                            comment["author"] = {
-                                "id": comment["author_id"],
-                                "username": comment["author_username"],
+                        comments = [
+                            {
+                                **{k: v for k, v in comment.items() if k not in ("author_id", "author_username")},
+                                "author": {
+                                    "id": comment["author_id"],
+                                    "username": comment["author_username"],
+                                }
                             }
-                            del comment["author_id"]
-                            del comment["author_username"]
+                            for comment in comments
+                        ]
 
                     post["comments"] = comments
 
