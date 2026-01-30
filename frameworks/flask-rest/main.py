@@ -4,11 +4,13 @@ Flask REST Comparative Benchmarking Implementation
 Traditional synchronous REST API using psycopg3 connection pool (demonstrates N+1 problem).
 """
 
+import asyncio
 import os
 import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
+import asyncpg
 import prometheus_client
 import psutil
 import psycopg
@@ -150,7 +152,7 @@ def _check_database():
             "pool_size": pool_stats.get("pool_size", 0),
             "pool_available": pool_stats.get("pool_available", 0),
         }
-    except Exception as e:
+    except (psycopg.DatabaseError, ConnectionError, TimeoutError, OSError) as e:
         return {
             "status": "down",
             "error": f"Database error: {str(e)}"
@@ -184,7 +186,7 @@ def _check_memory():
             result["warning"] = warning
 
         return result
-    except Exception as e:
+    except (OSError, PermissionError) as e:
         return {
             "status": "degraded",
             "warning": f"Memory check error: {str(e)}"

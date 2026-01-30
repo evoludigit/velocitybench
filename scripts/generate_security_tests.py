@@ -337,7 +337,7 @@ def generate_framework(framework: str, dry_run: bool = False) -> None:
         print(f"  - {meta['test_dir']}/test_security_auth.ext")
         print(f"  - {meta['test_dir']}/test_security_rate_limit.ext")
     else:
-        print(f"[TODO] Implement generation for {framework}")
+        print(f"[SKIP] Generation not implemented for {framework}")
 
 
 def generate_language(language: str, dry_run: bool = False) -> None:

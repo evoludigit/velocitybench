@@ -13,6 +13,8 @@ Usage:
     python generate_blog_comments.py --resume
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import logging
@@ -21,7 +23,7 @@ import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 import re
 
 import requests
@@ -438,8 +440,8 @@ class CommentGenerator:
         return types[:num_comments]
 
     def _generate_single_comment(
-        self, post: BlogPost, section: Dict, comment_type: str, persona: Optional[Dict] = None, dry_run: bool = False
-    ) -> Optional[str]:
+        self, post: BlogPost, section: Dict, comment_type: str, persona: Dict | None = None, dry_run: bool = False
+    ) -> str | None:
         """Generate a single comment, optionally from a persona."""
         config = COMMENT_TYPES.get(comment_type, {})
         prompt_suffix = config.get("prompt_suffix", "")
@@ -505,7 +507,7 @@ Guidelines:
 
         return None
 
-    def _call_vllm(self, prompt: str, system_prompt: str) -> Optional[str]:
+    def _call_vllm(self, prompt: str, system_prompt: str) -> str | None:
         """Call vLLM API."""
         messages = [
             {"role": "system", "content": system_prompt},

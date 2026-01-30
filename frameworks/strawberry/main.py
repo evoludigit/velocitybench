@@ -18,9 +18,9 @@ import logging
 import os
 import sys
 import time
-from typing import Optional
 from uuid import uuid4
 
+import asyncpg
 import strawberry
 from fastapi import FastAPI, Request
 from strawberry.dataloader import DataLoader
@@ -62,7 +62,7 @@ async def load_users_batch(keys: list[str], db: AsyncDatabase) -> list[dict | No
     except asyncio.TimeoutError:
         logger.error(f"Timeout loading users: {keys}")
         return [None] * len(keys)
-    except Exception as e:
+    except (asyncpg.PostgresError, KeyError, ValueError, TypeError) as e:
         logger.exception(f"Error loading users batch: {e}")
         return [None] * len(keys)
 
@@ -85,7 +85,7 @@ async def load_posts_batch(keys: list[str], db: AsyncDatabase) -> list[dict | No
     except asyncio.TimeoutError:
         logger.error(f"Timeout loading posts: {keys}")
         return [None] * len(keys)
-    except Exception as e:
+    except (asyncpg.PostgresError, KeyError, ValueError, TypeError) as e:
         logger.exception(f"Error loading posts batch: {e}")
         return [None] * len(keys)
 
@@ -112,7 +112,7 @@ async def load_posts_by_author_batch(keys: list[str], db: AsyncDatabase) -> list
     except asyncio.TimeoutError:
         logger.error(f"Timeout loading posts by author: {keys}")
         return [[] for _ in keys]
-    except Exception as e:
+    except (asyncpg.PostgresError, KeyError, ValueError, TypeError) as e:
         logger.exception(f"Error loading posts by author: {e}")
         return [[] for _ in keys]
 
@@ -141,7 +141,7 @@ async def load_comments_by_post_batch(keys: list[str], db: AsyncDatabase) -> lis
     except asyncio.TimeoutError:
         logger.error(f"Timeout loading comments by post: {keys}")
         return [[] for _ in keys]
-    except Exception as e:
+    except (asyncpg.PostgresError, KeyError, ValueError, TypeError) as e:
         logger.exception(f"Error loading comments by post: {e}")
         return [[] for _ in keys]
 
@@ -161,7 +161,7 @@ class Comment:
     )
 
     @strawberry.field(description="Author who wrote this comment")
-    async def author(self, info) -> Optional["User"]:
+    async def author(self, info) -> "User" | None:
         if not self.author_id:
             return None
         try:
@@ -173,12 +173,12 @@ class Comment:
                     full_name=user_data.get("full_name"),
                     bio=user_data.get("bio"),
                 )
-        except Exception as e:
+        except (asyncpg.PostgresError, KeyError, ValueError, TypeError) as e:
             logger.exception(f"Error loading author for comment {self.id}: {e}")
         return None
 
     @strawberry.field(description="Post this comment belongs to")
-    async def post(self, info) -> Optional["Post"]:
+    async def post(self, info) -> "Post" | None:
         if not self.post_id:
             return None
         try:
@@ -190,7 +190,7 @@ class Comment:
                     content=post_data.get("content"),
                     author_id=strawberry.ID(post_data.get("author_id")) if post_data.get("author_id") else None,
                 )
-        except Exception as e:
+        except (asyncpg.PostgresError, KeyError, ValueError, TypeError) as e:
             logger.exception(f"Error loading post for comment {self.id}: {e}")
         return None
 
@@ -210,7 +210,7 @@ class Post:
     )
 
     @strawberry.field(description="Author who wrote this post")
-    async def author(self, info) -> Optional["User"]:
+    async def author(self, info) -> "User" | None:
         if not self.author_id:
             return None
         try:
@@ -222,7 +222,7 @@ class Post:
                     full_name=user_data.get("full_name"),
                     bio=user_data.get("bio"),
                 )
-        except Exception as e:
+        except (asyncpg.PostgresError, KeyError, ValueError, TypeError) as e:
             logger.exception(f"Error loading author for post {self.id}: {e}")
         return None
 
@@ -241,7 +241,7 @@ class Post:
                 )
                 for comment in comments_data[:limit]
             ]
-        except Exception as e:
+        except (asyncpg.PostgresError, KeyError, ValueError, TypeError) as e:
             logger.exception(f"Error loading comments for post {self.id}: {e}")
             return []
 
@@ -280,7 +280,7 @@ class User:
                 )
                 for post in posts_data[:limit]
             ]
-        except Exception as e:
+        except (asyncpg.PostgresError, KeyError, ValueError, TypeError) as e:
             logger.exception(f"Error loading posts for user {self.id}: {e}")
             return []
 
@@ -323,7 +323,7 @@ class Query:
         except asyncio.TimeoutError:
             logger.error(f"Timeout fetching user {id}")
             raise
-        except Exception as e:
+        except (asyncpg.PostgresError, ConnectionError, OSError) as e:
             logger.exception(f"Error fetching user {id}: {e}")
             raise
 
@@ -354,7 +354,7 @@ class Query:
         except asyncio.TimeoutError:
             logger.error(f"Timeout fetching users with limit {limit}")
             raise
-        except Exception as e:
+        except (asyncpg.PostgresError, ConnectionError, OSError) as e:
             logger.exception(f"Error fetching users: {e}")
             raise
 
@@ -391,7 +391,7 @@ class Query:
         except asyncio.TimeoutError:
             logger.error(f"Timeout fetching post {id}")
             raise
-        except Exception as e:
+        except (asyncpg.PostgresError, ConnectionError, OSError) as e:
             logger.exception(f"Error fetching post {id}: {e}")
             raise
 
@@ -428,7 +428,7 @@ class Query:
         except asyncio.TimeoutError:
             logger.error(f"Timeout fetching posts with limit {limit}")
             raise
-        except Exception as e:
+        except (asyncpg.PostgresError, ConnectionError, OSError) as e:
             logger.exception(f"Error fetching posts: {e}")
             raise
 
@@ -466,7 +466,7 @@ class Query:
         except asyncio.TimeoutError:
             logger.error(f"Timeout fetching comment {id}")
             raise
-        except Exception as e:
+        except (asyncpg.PostgresError, ConnectionError, OSError) as e:
             logger.exception(f"Error fetching comment {id}: {e}")
             raise
 
@@ -537,7 +537,7 @@ class Mutation:
         except asyncio.TimeoutError:
             logger.error(f"Timeout updating user {id}")
             raise
-        except Exception as e:
+        except (asyncpg.PostgresError, ConnectionError, OSError) as e:
             logger.exception(f"Error updating user {id}: {e}")
             raise
 

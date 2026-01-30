@@ -3,7 +3,6 @@
  fraiseql>=1.8.1
  asyncpg>=0.29.0
  psycopg[pool]>=3.3.1
- psycopg-pool>=3.3.0
  pydantic==2.10.0
  pydantic-settings==2.7.0
  prometheus-client>=0.19.0

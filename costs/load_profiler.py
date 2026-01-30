@@ -52,9 +52,9 @@ class LoadProfiler:
     # Default peak load multiplier (2.5x average is typical for web traffic)
     DEFAULT_PEAK_MULTIPLIER = 2.5
 
-    # Data growth estimates (GB per month)
-    DATA_GROWTH_MULTIPLIER = 0.0001  # ~0.1 MB per request for typical app
-    LOGS_GROWTH_MULTIPLIER = 0.00005  # ~0.05 MB per request for logs
+    # Data growth estimates (MB per request)
+    DATA_GROWTH_MULTIPLIER = 0.1  # ~0.1 MB per request for typical app
+    LOGS_GROWTH_MULTIPLIER = 0.05  # ~0.05 MB per request for logs
 
     def __init__(self, peak_multiplier: float = DEFAULT_PEAK_MULTIPLIER):
         """Initialize load profiler.
@@ -88,9 +88,9 @@ class LoadProfiler:
         rpm_month = rpd * self.DAYS_PER_MONTH
         rpm_year = rpm_month * self.MONTHS_PER_YEAR
 
-        # Data growth estimates
-        data_growth_gb = rpm_month * self.DATA_GROWTH_MULTIPLIER / (1024 ** 3)
-        logs_growth_gb = rpm_month * self.LOGS_GROWTH_MULTIPLIER / (1024 ** 3)
+        # Data growth estimates (convert MB to GB)
+        data_growth_gb = rpm_month * self.DATA_GROWTH_MULTIPLIER / 1024
+        logs_growth_gb = rpm_month * self.LOGS_GROWTH_MULTIPLIER / 1024
 
         return LoadProjection(
             rps_average=rps,

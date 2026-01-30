@@ -9,6 +9,7 @@ import os
 import sys
 from contextlib import asynccontextmanager
 from typing import Any
+from uuid import UUID
 
 import prometheus_client
 from fastapi import FastAPI, HTTPException, Path, Query
@@ -37,7 +38,7 @@ class UserUpdate(BaseModel):
 
 
 class UserResponse(BaseModel):
-    id: str
+    id: UUID
     username: str
     full_name: str | None
     bio: str | None
@@ -45,7 +46,7 @@ class UserResponse(BaseModel):
 
 
 class PostResponse(BaseModel):
-    id: str
+    id: UUID
     title: str
     content: str | None
     author: dict[str, Any] | None = None

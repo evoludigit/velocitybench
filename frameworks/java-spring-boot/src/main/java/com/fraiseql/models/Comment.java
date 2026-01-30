@@ -2,31 +2,32 @@ package com.fraiseql.models;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
+import java.util.UUID;
 
 @Entity
 @Table(name = "tb_comment", schema = "benchmark")
 public class Comment {
 
     @Id
-    @Column(length = 36)
-    private String id;
+    @Column(columnDefinition = "uuid")
+    private UUID id;
 
-    @Column(name = "post_id", nullable = false)
-    private String postId;
+    @Column(name = "post_id", nullable = false, columnDefinition = "uuid")
+    private UUID postId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "post_id", insertable = false, updatable = false)
     private Post post;
 
-    @Column(name = "author_id", nullable = false)
-    private String authorId;
+    @Column(name = "author_id", nullable = false, columnDefinition = "uuid")
+    private UUID authorId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id", insertable = false, updatable = false)
     private User author;
 
-    @Column(name = "parent_id")
-    private String parentId;
+    @Column(name = "parent_id", columnDefinition = "uuid")
+    private UUID parentId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_id", insertable = false, updatable = false)
@@ -46,23 +47,23 @@ public class Comment {
     private java.time.LocalDateTime updatedAt;
 
     // Getters and setters
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
 
-    public String getPostId() { return postId; }
-    public void setPostId(String postId) { this.postId = postId; }
+    public UUID getPostId() { return postId; }
+    public void setPostId(UUID postId) { this.postId = postId; }
 
     public Post getPost() { return post; }
     public void setPost(Post post) { this.post = post; }
 
-    public String getAuthorId() { return authorId; }
-    public void setAuthorId(String authorId) { this.authorId = authorId; }
+    public UUID getAuthorId() { return authorId; }
+    public void setAuthorId(UUID authorId) { this.authorId = authorId; }
 
     public User getAuthor() { return author; }
     public void setAuthor(User author) { this.author = author; }
 
-    public String getParentId() { return parentId; }
-    public void setParentId(String parentId) { this.parentId = parentId; }
+    public UUID getParentId() { return parentId; }
+    public void setParentId(UUID parentId) { this.parentId = parentId; }
 
     public Comment getParent() { return parent; }
     public void setParent(Comment parent) { this.parent = parent; }

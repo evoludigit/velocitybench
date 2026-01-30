@@ -271,7 +271,7 @@ class HealthCheckManager:
                 status=HealthStatus.DOWN,
                 error="Database query timeout (>3s)",
             )
-        except Exception as e:
+        except (asyncpg.PostgresError, ConnectionError, OSError) as e:
             logger.exception("Database health check failed")
             return HealthCheck(
                 status=HealthStatus.DOWN,
@@ -289,7 +289,8 @@ class HealthCheckManager:
                 virtual_mem = psutil.virtual_memory()
                 total_mb = virtual_mem.total / 1024 / 1024
                 utilization = (rss_mb / total_mb) * 100
-            except Exception:
+            except (OSError, PermissionError):
+                # System memory may not be available on all platforms
                 total_mb = None
                 utilization = None
 
@@ -318,7 +319,7 @@ class HealthCheckManager:
                 additional_data=additional_data,
             )
 
-        except Exception as e:
+        except (OSError, PermissionError) as e:
             logger.exception("Memory check failed")
             return HealthCheck(
                 status=HealthStatus.DEGRADED,

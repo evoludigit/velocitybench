@@ -1,10 +1,11 @@
 package com.velocitybench.model;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 public class User {
     private int pkUser;
-    private String id;
+    private UUID id;
     private String username;
     private String fullName;
     private String bio;
@@ -13,7 +14,7 @@ public class User {
 
     public User() {}
 
-    public User(int pkUser, String id, String username, String fullName, String bio,
+    public User(int pkUser, UUID id, String username, String fullName, String bio,
                 LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.pkUser = pkUser;
         this.id = id;
@@ -26,8 +27,8 @@ public class User {
 
     public int getPkUser() { return pkUser; }
     public void setPkUser(int pkUser) { this.pkUser = pkUser; }
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
     public String getUsername() { return username; }
     public void setUsername(String username) { this.username = username; }
     public String getFullName() { return fullName; }

@@ -1,4 +1,4 @@
-"""Integration tests for Phase 2: Database schema and resolvers.
+"""Integration tests for database schema and resolvers.
 
 Tests verify:
 1. Database schema creation and initialization

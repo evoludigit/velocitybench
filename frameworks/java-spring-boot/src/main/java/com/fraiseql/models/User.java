@@ -3,14 +3,15 @@ package com.fraiseql.models;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.util.List;
+import java.util.UUID;
 
 @Entity
 @Table(name = "tb_user", schema = "benchmark")
 public class User {
 
     @Id
-    @Column(length = 36)
-    private String id;
+    @Column(columnDefinition = "uuid")
+    private UUID id;
 
     @NotBlank
     @Email
@@ -48,8 +49,8 @@ public class User {
     private List<Comment> comments;
 
     // Getters and setters
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
 
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }

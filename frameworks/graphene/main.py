@@ -4,9 +4,12 @@ Async GraphQL Benchmarking Server for Graphene with DataLoader
 Uses asyncpg connection pooling and aiodataloader to prevent N+1 queries.
 """
 
+import asyncio
+import json
 import os
 import sys
 
+import asyncpg
 import graphene
 from aiodataloader import DataLoader
 from fastapi import FastAPI, Request
@@ -442,7 +445,7 @@ async def graphql_endpoint(request: Request):
             response_data["errors"] = [{"message": str(e)} for e in result.errors]
 
         return JSONResponse(content=response_data)
-    except Exception as e:
+    except (asyncpg.PostgresError, json.JSONDecodeError, ValueError, ConnectionError, OSError) as e:
         return JSONResponse(status_code=400, content={"errors": [{"message": str(e)}]})
 
 

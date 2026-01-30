@@ -14,12 +14,14 @@ Usage:
     python validate_blog_comments.py --comments-dir /tmp/blog_comments --strict
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import re
 from collections import Counter
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 from logger_config import setup_logging
 
@@ -255,7 +257,7 @@ class CommentValidator:
         post_content: str,
         previous_comments: List[str],
         strict: bool = False,
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Validate single comment.
 

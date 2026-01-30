@@ -1,18 +1,20 @@
 package models
 
+import "github.com/google/uuid"
+
 // Post represents a post in the system
 type Post struct {
-	ID       string    `json:"id" db:"id"`
+	ID       uuid.UUID `json:"id" db:"id"`
 	Title    string    `json:"title" db:"title"`
 	Content  *string   `json:"content,omitempty" db:"content"`
-	AuthorID string    `json:"author_id" db:"author_id"`
+	AuthorID uuid.UUID `json:"author_id" db:"author_id"`
 	Author   *User     `json:"author,omitempty"`
 	Comments []Comment `json:"comments,omitempty"`
 }
 
 // PostResponse represents the post data returned in API responses
 type PostResponse struct {
-	ID       string    `json:"id"`
+	ID       uuid.UUID `json:"id"`
 	Title    string    `json:"title"`
 	Content  *string   `json:"content,omitempty"`
 	Author   *User     `json:"author,omitempty"`

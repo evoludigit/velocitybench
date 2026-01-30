@@ -12,13 +12,15 @@ Usage:
     python load_blog_posts.py --generate-only --output output/sql/03-data-blog.sql
 """
 
+from __future__ import annotations
+
 import argparse
 import random
 import time
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 import sys
 
 try:
@@ -36,7 +38,7 @@ from markdown_parser import extract_blog_metadata
 class BlogPostLoader:
     """Loader for blog posts with Faker-generated users."""
 
-    def __init__(self, num_users: int = 5000, output_dir: Optional[Path] = None):
+    def __init__(self, num_users: int = 5000, output_dir: Path | None = None):
         """
         Initialize blog post loader.
 
@@ -155,7 +157,7 @@ class BlogPostLoader:
         # Round-robin across all users
         return 1 + (post_index % self.num_users)
 
-    def parse_post(self, file_path: Path, post_index: int) -> Optional[dict]:
+    def parse_post(self, file_path: Path, post_index: int) -> dict | None:
         """
         Parse markdown file and prepare post data.
 
@@ -333,7 +335,7 @@ class BlogPostLoader:
             print(f"❌ Error loading to PostgreSQL: {e}")
             return False
 
-    def run(self, connection_string: Optional[str] = None, dry_run: bool = False) -> dict:
+    def run(self, connection_string: str | None = None, dry_run: bool = False) -> dict:
         """
         Main workflow: generate users, parse posts, load to database.
 

@@ -17,6 +17,8 @@ Usage:
                                        --all
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import random
@@ -25,7 +27,7 @@ import time
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import requests
 
@@ -148,7 +150,7 @@ class CommentReplyGenerator:
         original_comment: Dict,
         post_content: str,
         reply_type: str,
-    ) -> Optional[Dict]:
+    ) -> Dict | None:
         """Generate a single reply to a comment."""
         config = REPLY_TYPES.get(reply_type, {})
         system_prompt = config.get("system_prompt", "")
@@ -296,7 +298,7 @@ Do not use markdown formatting."""
         self,
         comments_dir: Path,
         output_dir: Path,
-        num_posts: Optional[int] = None,
+        num_posts: int | None = None,
         dry_run: bool = False,
     ) -> Dict:
         """Process all comment files and generate replies."""
@@ -359,7 +361,7 @@ Do not use markdown formatting."""
         total_stats["duration"] = time.time() - self.start_time
         return total_stats
 
-    def _call_vllm(self, prompt: str, system_prompt: str) -> Optional[str]:
+    def _call_vllm(self, prompt: str, system_prompt: str) -> str | None:
         """Call vLLM API."""
         messages = [
             {"role": "system", "content": system_prompt},

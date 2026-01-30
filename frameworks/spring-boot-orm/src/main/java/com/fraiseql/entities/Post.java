@@ -7,6 +7,7 @@ import lombok.Builder;
 
 import javax.persistence.*;
 import java.time.LocalDateTime;
+import java.util.UUID;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
@@ -23,8 +24,8 @@ public class Post {
     @Column(name = "pk_post")
     private Integer pkPost;
 
-    @Column(name = "id")
-    private String id;
+    @Column(name = "id", columnDefinition = "uuid")
+    private UUID id;
 
     @Column(name = "fk_author")
     private Integer fkAuthor;

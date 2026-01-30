@@ -1,10 +1,11 @@
 package models
 
 import java.time.LocalDateTime
+import java.util.UUID
 
 case class User(
   pkUser: Int,
-  id: String,
+  id: UUID,
   username: String,
   fullName: Option[String],
   bio: Option[String],
@@ -14,7 +15,7 @@ case class User(
 
 case class Post(
   pkPost: Int,
-  id: String,
+  id: UUID,
   fkAuthor: Int,
   title: String,
   content: Option[String],
@@ -24,7 +25,7 @@ case class Post(
 
 case class Comment(
   pkComment: Int,
-  id: String,
+  id: UUID,
   fkPost: Int,
   fkAuthor: Int,
   content: String,

@@ -1,7 +1,7 @@
 """FraiseQL Resolvers for Benchmark Analytics.
 
 Implements resolver functions that:
-1. Wrap Phase 1 cost calculation modules
+1. Wrap core cost calculation modules
 2. Handle database persistence
 3. Return properly typed FraiseQL objects
 
@@ -35,7 +35,7 @@ class BenchmarkResolvers:
     Uses psycopg3 connection pool with cursor context managers.
     """
 
-    def __init__(self, db_connection):
+    def __init__(self, db_connection: Any):
         """Initialize resolvers with database connection.
 
         Args:
@@ -466,7 +466,7 @@ class BenchmarkResolvers:
 
         Args:
             provider: "aws", "gcp", or "azure"
-            requirements: ResourceRequirements from Phase 1
+            requirements: ResourceRequirements from core module
 
         Returns:
             CloudCostBreakdown with calculated costs

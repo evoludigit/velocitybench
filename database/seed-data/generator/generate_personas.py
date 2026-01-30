@@ -18,6 +18,8 @@ Usage:
     python generate_personas.py --count 2000 --resume
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import random
@@ -25,7 +27,7 @@ import sys
 import time
 import uuid
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import requests
 import yaml
@@ -457,7 +459,7 @@ class PersonaGenerator:
 
         return ""
 
-    def generate_single_persona(self, persona_id: int, dry_run: bool = False) -> Optional[Dict]:
+    def generate_single_persona(self, persona_id: int, dry_run: bool = False) -> Dict | None:
         """Generate a single persona by requesting individual fields and assembling them.
 
         Args:
@@ -759,7 +761,7 @@ class PersonaGenerator:
                 indent=2,
             )
 
-    def _extract_structured_from_response(self, response: str) -> Optional[Dict]:
+    def _extract_structured_from_response(self, response: str) -> Dict | None:
         """Extract structured data (JSON or YAML) from response and return as dict."""
         if not response:
             return None
@@ -819,7 +821,7 @@ class PersonaGenerator:
 
         return None
 
-    def _call_vllm(self, prompt: str, system_prompt: str) -> Optional[str]:
+    def _call_vllm(self, prompt: str, system_prompt: str) -> str | None:
         """Call vLLM API."""
         messages = [
             {"role": "system", "content": system_prompt},

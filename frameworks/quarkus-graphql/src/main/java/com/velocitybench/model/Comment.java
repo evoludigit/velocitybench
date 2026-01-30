@@ -1,10 +1,11 @@
 package com.velocitybench.model;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 public class Comment {
     private int pkComment;
-    private String id;
+    private UUID id;
     private int fkPost;
     private int fkAuthor;
     private String content;
@@ -13,7 +14,7 @@ public class Comment {
 
     public Comment() {}
 
-    public Comment(int pkComment, String id, int fkPost, int fkAuthor, String content,
+    public Comment(int pkComment, UUID id, int fkPost, int fkAuthor, String content,
                    LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.pkComment = pkComment;
         this.id = id;
@@ -26,8 +27,8 @@ public class Comment {
 
     public int getPkComment() { return pkComment; }
     public void setPkComment(int pkComment) { this.pkComment = pkComment; }
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
     public int getFkPost() { return fkPost; }
     public void setFkPost(int fkPost) { this.fkPost = fkPost; }
     public int getFkAuthor() { return fkAuthor; }

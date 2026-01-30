@@ -31,12 +31,14 @@ Environment variables:
     SEED_SIZE            - Dataset size: xs, medium, large (default: xs)
 """
 
+from __future__ import annotations
+
 import os
 import sys
 import subprocess
 import json
 from pathlib import Path
-from typing import List, Optional, Dict
+from typing import List, Dict
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -92,7 +94,7 @@ class DatabaseConfig:
 class DatabaseSetup:
     """Orchestrates per-framework database setup"""
 
-    def __init__(self, config: Optional[DatabaseConfig] = None):
+    def __init__(self, config: DatabaseConfig | None = None):
         """Initialize with database configuration"""
         self.config = config or self._load_config()
         self.setup_log: List[Dict] = []
@@ -362,7 +364,7 @@ class DatabaseSetup:
         print(f"✅ {framework} database ready ({db_name})")
         return self._log_success(framework)
 
-    def setup_all(self, frameworks: Optional[List[str]] = None) -> bool:
+    def setup_all(self, frameworks: list[str] | None = None) -> bool:
         """Setup all or specified frameworks sequentially"""
         to_setup = frameworks or FRAMEWORKS
 

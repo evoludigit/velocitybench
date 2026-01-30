@@ -2,7 +2,7 @@ import { Entity, Column, PrimaryColumn, OneToMany, ManyToMany, JoinTable, Create
 
 @Entity({ name: 'benchmark.tb_user', synchronize: false })
 export class User {
-  @PrimaryColumn({ type: 'varchar' })
+  @PrimaryColumn({ type: 'uuid' })
   id!: string;
 
   @Column({ type: 'integer' })

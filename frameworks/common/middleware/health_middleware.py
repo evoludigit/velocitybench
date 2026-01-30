@@ -101,7 +101,7 @@ class HealthCheckMiddleware:
                 body=result.to_dict(),
             )
 
-        except Exception as e:
+        except (OSError, asyncio.TimeoutError) as e:
             logger.exception(f"Health check failed: {e}")
             await self._send_response(
                 send,

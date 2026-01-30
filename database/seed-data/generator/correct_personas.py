@@ -17,12 +17,14 @@ Usage:
     python correct_personas.py --input-dir output/personas/personas --dry-run (analyze only)
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import requests
 
@@ -54,7 +56,7 @@ class PersonaCorrector:
         self.failed_count = 0
         self.improvements_made = []
 
-    def _call_vllm(self, prompt: str, system_prompt: str = "") -> Optional[str]:
+    def _call_vllm(self, prompt: str, system_prompt: str = "") -> str | None:
         """Call vLLM API and return response text."""
         try:
             messages = []
@@ -208,7 +210,7 @@ Respond with ONLY the corrected value, no explanation.{' For arrays, use comma-s
 
         return None
 
-    def _map_issue_to_field(self, persona: Dict, issue: str) -> Optional[Tuple[str, str]]:
+    def _map_issue_to_field(self, persona: Dict, issue: str) -> tuple[str, str] | None:
         """
         Map an issue description to a specific field and correction strategy.
         Returns (field_name, correction_type)
@@ -292,8 +294,8 @@ Respond with ONLY the corrected value, no explanation.{' For arrays, use comma-s
     def process_all(
         self,
         input_dir: Path,
-        output_dir: Optional[Path] = None,
-        count: Optional[int] = None,
+        output_dir: Path | None = None,
+        count: int | None = None,
         dry_run: bool = False,
     ) -> Dict:
         """Process all personas for correction."""

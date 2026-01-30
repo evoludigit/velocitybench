@@ -26,7 +26,7 @@ func NewTestFactory(t *testing.T) *TestFactory {
 
 // CreateTestUser creates a test user
 func (tf *TestFactory) CreateTestUser(username, email, fullName, bio string) *models.User {
-	id := uuid.New().String()
+	id := uuid.New()
 	user := &models.User{
 		ID:       id,
 		Username: username,
@@ -39,35 +39,38 @@ func (tf *TestFactory) CreateTestUser(username, email, fullName, bio string) *mo
 		user.Bio = &bio
 	}
 
-	tf.users[id] = user
+	tf.users[id.String()] = user
 	return user
 }
 
 // CreateTestPost creates a test post
 func (tf *TestFactory) CreateTestPost(authorID, title, content string) *models.Post {
-	id := uuid.New().String()
+	id := uuid.New()
+	authorUUID := uuid.MustParse(authorID)
 	post := &models.Post{
 		ID:       id,
 		Title:    title,
-		AuthorID: authorID,
+		AuthorID: authorUUID,
 	}
 
 	if content != "" {
 		post.Content = &content
 	}
 
-	tf.posts[id] = post
+	tf.posts[id.String()] = post
 	return post
 }
 
 // CreateTestComment creates a test comment
 func (tf *TestFactory) CreateTestComment(authorID, postID, content string) *models.Comment {
-	id := uuid.New().String()
+	id := uuid.New()
+	authorUUID := uuid.MustParse(authorID)
+	postUUID := uuid.MustParse(postID)
 	comment := &models.Comment{
 		ID:       id,
 		Content:  content,
-		AuthorID: authorID,
-		PostID:   postID,
+		AuthorID: authorUUID,
+		PostID:   postUUID,
 	}
 	return comment
 }

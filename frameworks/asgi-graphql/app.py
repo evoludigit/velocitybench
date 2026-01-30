@@ -21,6 +21,8 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
+import asyncpg
+
 from graphql import (
     GraphQLSchema,
     GraphQLObjectType,
@@ -91,7 +93,7 @@ class DataLoader:
                 self._cache[key] = result
                 if not future.done():
                     future.set_result(result)
-        except Exception as e:
+        except (asyncpg.PostgresError, KeyError, ValueError, TypeError) as e:
             for future in futures:
                 if not future.done():
                     future.set_exception(e)
@@ -111,7 +113,7 @@ async def load_users_batch(keys: list[str], db: AsyncDatabase) -> list[dict | No
         )
         user_map = {str(user["id"]): user for user in result}
         return [user_map.get(key) for key in keys]
-    except Exception as e:
+    except (asyncpg.PostgresError, KeyError, ValueError, TypeError) as e:
         logger.exception(f"Error loading users batch: {e}")
         return [None] * len(keys)
 
@@ -131,7 +133,7 @@ async def load_posts_batch(keys: list[str], db: AsyncDatabase) -> list[dict | No
         )
         post_map = {str(post["id"]): post for post in result}
         return [post_map.get(key) for key in keys]
-    except Exception as e:
+    except (asyncpg.PostgresError, KeyError, ValueError, TypeError) as e:
         logger.exception(f"Error loading posts batch: {e}")
         return [None] * len(keys)
 
@@ -156,7 +158,7 @@ async def load_posts_by_author_batch(keys: list[str], db: AsyncDatabase) -> list
             if author_id in posts_by_author:
                 posts_by_author[author_id].append(post)
         return [posts_by_author[key] for key in keys]
-    except Exception as e:
+    except (asyncpg.PostgresError, KeyError, ValueError, TypeError) as e:
         logger.exception(f"Error loading posts by author: {e}")
         return [[] for _ in keys]
 
@@ -182,7 +184,7 @@ async def load_comments_by_post_batch(keys: list[str], db: AsyncDatabase) -> lis
             if post_id in comments_by_post:
                 comments_by_post[post_id].append(comment)
         return [comments_by_post[key] for key in keys]
-    except Exception as e:
+    except (asyncpg.PostgresError, KeyError, ValueError, TypeError) as e:
         logger.exception(f"Error loading comments by post: {e}")
         return [[] for _ in keys]
 

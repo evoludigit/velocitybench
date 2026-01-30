@@ -4,17 +4,19 @@ Async GraphQL Benchmarking Server for Graphene with SQLAlchemy ORM
 Uses SQLAlchemy async ORM with aiodataloader for N+1 prevention.
 """
 
+import asyncio
+import json
 import os
 from datetime import datetime
 
+import asyncpg
 import graphene
 from aiodataloader import DataLoader
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from graphene import ID, Field, Int, ObjectType, String
 from graphene import List as GrapheneList
-from sqlalchemy import UUID, Column, DateTime, Text, func, select
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import UUID, Column, DateTime, Integer, Text, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import declarative_base
 
@@ -37,38 +39,55 @@ Base = declarative_base()
 
 
 class UserModel(Base):
-    """SQLAlchemy model for benchmark.tv_user"""
+    """SQLAlchemy model for benchmark.tb_user"""
 
-    __tablename__ = "tv_user"
+    __tablename__ = "tb_user"
     __table_args__ = {"schema": "benchmark"}
 
-    id = Column(UUID, primary_key=True)
-    identifier = Column(Text, unique=True, nullable=False)
-    data = Column(JSONB, nullable=False)
+    pk_user = Column(Integer, primary_key=True)
+    id = Column(UUID, unique=True, nullable=False)
+    email = Column(Text, unique=True, nullable=False)
+    username = Column(Text, unique=True, nullable=False)
+    full_name = Column(Text, nullable=True)
+    bio = Column(Text, nullable=True)
+    avatar_url = Column(Text, nullable=True)
+    is_active = Column(Text, nullable=False, default=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
 class PostModel(Base):
-    """SQLAlchemy model for benchmark.tv_post"""
+    """SQLAlchemy model for benchmark.tb_post"""
 
-    __tablename__ = "tv_post"
+    __tablename__ = "tb_post"
     __table_args__ = {"schema": "benchmark"}
 
-    id = Column(UUID, primary_key=True)
-    identifier = Column(Text, unique=True, nullable=False)
-    data = Column(JSONB, nullable=False)
+    pk_post = Column(Integer, primary_key=True)
+    id = Column(UUID, unique=True, nullable=False)
+    fk_author = Column(Integer, nullable=False)
+    title = Column(Text, nullable=False)
+    content = Column(Text, nullable=True)
+    excerpt = Column(Text, nullable=True)
+    status = Column(Text, nullable=False, default="published")
+    published_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
 class CommentModel(Base):
-    """SQLAlchemy model for benchmark.tv_comment"""
+    """SQLAlchemy model for benchmark.tb_comment"""
 
-    __tablename__ = "tv_comment"
+    __tablename__ = "tb_comment"
     __table_args__ = {"schema": "benchmark"}
 
-    id = Column(UUID, primary_key=True)
-    identifier = Column(Text, unique=False)
-    data = Column(JSONB, nullable=False)
+    pk_comment = Column(Integer, primary_key=True)
+    id = Column(UUID, unique=True, nullable=False)
+    fk_post = Column(Integer, nullable=False)
+    fk_author = Column(Integer, nullable=False)
+    parent_id = Column(Integer, nullable=True)
+    content = Column(Text, nullable=False)
+    is_approved = Column(Text, nullable=False, default="true")
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
@@ -87,7 +106,12 @@ class UserLoader(DataLoader):
             stmt = select(UserModel).where(UserModel.id.in_(keys))
             result = await session.execute(stmt)
             users = result.scalars().all()
-            user_map = {str(user.id): user.data for user in users}
+            user_map = {str(user.id): {
+                "id": str(user.id),
+                "username": user.username,
+                "fullName": user.full_name,
+                "bio": user.bio,
+            } for user in users}
             return [user_map.get(key) for key in keys]
 
 
@@ -101,7 +125,12 @@ class PostLoader(DataLoader):
             stmt = select(PostModel).where(PostModel.id.in_(keys))
             result = await session.execute(stmt)
             posts = result.scalars().all()
-            post_map = {str(post.id): post.data for post in posts}
+            post_map = {str(post.id): {
+                "id": str(post.id),
+                "title": post.title,
+                "content": post.content,
+                "author": {"id": str(post.fk_author)},
+            } for post in posts}
             return [post_map.get(key) for key in keys]
 
 
@@ -112,19 +141,38 @@ class PostsByAuthorLoader(DataLoader):
 
     async def batch_load_fn(self, keys: list[str]) -> list[list[dict]]:
         async with self.session_maker() as session:
+            # Get pk_user values for the given user IDs
+            user_stmt = select(UserModel.pk_user).where(UserModel.id.in_(keys))
+            user_result = await session.execute(user_stmt)
+            pk_users = [row[0] for row in user_result.all()]
+
+            if not pk_users:
+                return [[] for _ in keys]
+
+            # Query posts by pk_user values
             stmt = (
                 select(PostModel)
-                .where(func.jsonb_extract_path_text(PostModel.data, "author", "id").in_(keys))
-                .order_by(func.jsonb_extract_path_text(PostModel.data, "createdAt").desc())
+                .where(PostModel.fk_author.in_(pk_users))
+                .order_by(PostModel.created_at.desc())
             )
             result = await session.execute(stmt)
             posts = result.scalars().all()
 
+            # Group by author_id (user.id)
             posts_by_author = {key: [] for key in keys}
             for post in posts:
-                author_id = post.data.get("author", {}).get("id")
-                if author_id in posts_by_author:
-                    posts_by_author[author_id].append(post.data)
+                # Find the user ID for this post's fk_author
+                user_stmt = select(UserModel.id).where(UserModel.pk_user == post.fk_author)
+                user_result = await session.execute(user_stmt)
+                user_id = user_result.scalar_one_or_none()
+
+                if user_id and str(user_id) in posts_by_author:
+                    posts_by_author[str(user_id)].append({
+                        "id": str(post.id),
+                        "title": post.title,
+                        "content": post.content,
+                        "author": {"id": str(user_id)},
+                    })
 
             return [posts_by_author[key] for key in keys]
 
@@ -136,21 +184,40 @@ class CommentsByPostLoader(DataLoader):
 
     async def batch_load_fn(self, keys: list[str]) -> list[list[dict]]:
         async with self.session_maker() as session:
+            # Get pk_post values for the given post IDs
+            post_stmt = select(PostModel.pk_post).where(PostModel.id.in_(keys))
+            post_result = await session.execute(post_stmt)
+            pk_posts = [row[0] for row in post_result.all()]
+
+            if not pk_posts:
+                return [[] for _ in keys]
+
+            # Query comments by pk_post values
             stmt = (
                 select(CommentModel)
-                .where(func.jsonb_extract_path_text(CommentModel.data, "post", "id").in_(keys))
-                .order_by(func.jsonb_extract_path_text(CommentModel.data, "createdAt").desc())
+                .where(CommentModel.fk_post.in_(pk_posts))
+                .order_by(CommentModel.created_at.desc())
             )
             result = await session.execute(stmt)
             comments = result.scalars().all()
 
+            # Group by post_id
             comments_by_post = {key: [] for key in keys}
             for comment in comments:
-                post_id = comment.data.get("post", {}).get("id")
-                if post_id in comments_by_post:
-                    comments_by_post[post_id].append(comment.data)
+                # Find the post ID for this comment's fk_post
+                post_stmt = select(PostModel.id).where(PostModel.pk_post == comment.fk_post)
+                post_result = await session.execute(post_stmt)
+                post_id = post_result.scalar_one_or_none()
 
-            return [comments_by_post[key][:5] for key in keys]
+                if post_id and str(post_id) in comments_by_post:
+                    comments_by_post[str(post_id)].append({
+                        "id": str(comment.id),
+                        "content": comment.content,
+                        "author": {"id": str(comment.fk_author)},
+                        "post": {"id": str(post_id)},
+                    })
+
+            return [comments_by_post[key][:50] for key in keys]
 
 
 # ============================================================================
@@ -282,13 +349,12 @@ class Query(ObjectType):
             if not user_model:
                 return None
 
-            data = user_model.data
             return User(
-                id=data["id"],
-                username=data.get("username"),
-                first_name=data.get("fullName"),
+                id=str(user_model.id),
+                username=user_model.username,
+                first_name=user_model.full_name,
                 last_name=None,
-                bio=data.get("bio"),
+                bio=user_model.bio,
             )
 
     async def resolve_users(self, info, limit):
@@ -300,14 +366,13 @@ class Query(ObjectType):
 
             return [
                 User(
-                    id=data["id"],
-                    username=data.get("username"),
-                    first_name=data.get("fullName"),
+                    id=str(user.id),
+                    username=user.username,
+                    first_name=user.full_name,
                     last_name=None,
-                    bio=data.get("bio"),
+                    bio=user.bio,
                 )
                 for user in users
-                if (data := user.data)
             ]
 
     async def resolve_post(self, info, id):
@@ -318,12 +383,11 @@ class Query(ObjectType):
             post_model = result.scalar_one_or_none()
 
             if post_model:
-                data = post_model.data
                 return Post(
-                    id=data["id"],
-                    title=data["title"],
-                    content=data.get("content"),
-                    author_id=data.get("author", {}).get("id"),
+                    id=str(post_model.id),
+                    title=post_model.title,
+                    content=post_model.content,
+                    author_id=str(post_model.fk_author),
                 )
             return None
 
@@ -336,13 +400,12 @@ class Query(ObjectType):
 
             return [
                 Post(
-                    id=data["id"],
-                    title=data["title"],
-                    content=data.get("content"),
-                    author_id=data.get("author", {}).get("id"),
+                    id=str(post.id),
+                    title=post.title,
+                    content=post.content,
+                    author_id=str(post.fk_author),
                 )
                 for post in posts
-                if (data := post.data)
             ]
 
     async def resolve_comment(self, info, id):
@@ -353,12 +416,11 @@ class Query(ObjectType):
             comment_model = result.scalar_one_or_none()
 
             if comment_model:
-                data = comment_model.data
                 return Comment(
-                    id=data["id"],
-                    content=data["content"],
-                    author_id=data.get("author", {}).get("id"),
-                    post_id=data.get("post", {}).get("id"),
+                    id=str(comment_model.id),
+                    content=comment_model.content,
+                    author_id=str(comment_model.fk_author),
+                    post_id=str(comment_model.fk_post),
                 )
             return None
 
@@ -383,14 +445,12 @@ class UpdateUser(graphene.Mutation):
             if not user_model:
                 return UpdateUser(user=None)
 
-            # Update JSONB data
-            data = user_model.data.copy()
+            # Update user fields
             if bio is not None:
-                data["bio"] = bio
+                user_model.bio = bio
             if first_name is not None:
-                data["fullName"] = first_name
+                user_model.full_name = first_name
 
-            user_model.data = data
             user_model.updated_at = datetime.utcnow()
 
             await session.commit()
@@ -398,11 +458,11 @@ class UpdateUser(graphene.Mutation):
 
             return UpdateUser(
                 user=User(
-                    id=data["id"],
-                    username=data.get("username"),
-                    first_name=data.get("fullName"),
+                    id=str(user_model.id),
+                    username=user_model.username,
+                    first_name=user_model.full_name,
                     last_name=None,
-                    bio=data.get("bio"),
+                    bio=user_model.bio,
                 )
             )
 
@@ -462,7 +522,7 @@ async def graphql_endpoint(request: Request):
             response_data["errors"] = [{"message": str(e)} for e in result.errors]
 
         return JSONResponse(content=response_data)
-    except Exception as e:
+    except (asyncpg.PostgresError, json.JSONDecodeError, ValueError, ConnectionError, OSError) as e:
         return JSONResponse(status_code=400, content={"errors": [{"message": str(e)}]})
 
 

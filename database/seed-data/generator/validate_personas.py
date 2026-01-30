@@ -14,11 +14,13 @@ Usage:
     python validate_personas.py --input-dir output/personas/personas --count 100 (validate first 100)
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, Tuple
 
 import requests
 
@@ -49,7 +51,7 @@ class PersonaValidator:
         self.refined_count = 0
         self.failed_count = 0
 
-    def _call_vllm(self, prompt: str, system_prompt: str = "") -> Optional[str]:
+    def _call_vllm(self, prompt: str, system_prompt: str = "") -> str | None:
         """Call vLLM API and return response text."""
         try:
             response = requests.post(
@@ -160,7 +162,7 @@ class PersonaValidator:
 
         return len(issues) == 0, "; ".join(issues)
 
-    def _refine_persona(self, persona: Dict, coherence_issue: str) -> Optional[Dict]:
+    def _refine_persona(self, persona: Dict, coherence_issue: str) -> Dict | None:
         """
         Use vLLM to refine a persona that has coherence issues.
         Returns refined persona or None if refinement fails.
@@ -333,7 +335,7 @@ realism, and internal alignment. Be critical but fair. Focus on semantic coheren
     def validate_all(
         self,
         input_dir: Path,
-        count: Optional[int] = None,
+        count: int | None = None,
         dry_run: bool = False,
         use_vllm: bool = True,
     ) -> Dict:

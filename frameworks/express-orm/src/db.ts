@@ -63,7 +63,7 @@ export class Comment extends Model {
 // Initialize models
 User.init({
   id: {
-    type: DataTypes.STRING,
+    type: DataTypes.UUID,
     primaryKey: true,
   },
   pk_user: {
@@ -99,7 +99,7 @@ User.init({
 
 Post.init({
   id: {
-    type: DataTypes.STRING,
+    type: DataTypes.UUID,
     primaryKey: true,
   },
   pk_post: {
@@ -139,7 +139,7 @@ Post.init({
 
 Comment.init({
   id: {
-    type: DataTypes.STRING,
+    type: DataTypes.UUID,
     primaryKey: true,
   },
   pk_comment: {

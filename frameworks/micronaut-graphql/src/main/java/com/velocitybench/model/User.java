@@ -1,10 +1,11 @@
 package com.velocitybench.model;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 public record User(
     int pkUser,
-    String id,
+    UUID id,
     String username,
     String fullName,
     String bio,

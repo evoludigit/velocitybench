@@ -1,10 +1,11 @@
 package com.velocitybench.model;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 public class Post {
     private int pkPost;
-    private String id;
+    private UUID id;
     private int fkAuthor;
     private String title;
     private String content;
@@ -13,7 +14,7 @@ public class Post {
 
     public Post() {}
 
-    public Post(int pkPost, String id, int fkAuthor, String title, String content,
+    public Post(int pkPost, UUID id, int fkAuthor, String title, String content,
                 LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.pkPost = pkPost;
         this.id = id;
@@ -26,8 +27,8 @@ public class Post {
 
     public int getPkPost() { return pkPost; }
     public void setPkPost(int pkPost) { this.pkPost = pkPost; }
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
     public int getFkAuthor() { return fkAuthor; }
     public void setFkAuthor(int fkAuthor) { this.fkAuthor = fkAuthor; }
     public String getTitle() { return title; }

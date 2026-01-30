@@ -48,7 +48,7 @@ impl UserRepository {
 
         let rows = client
             .query(
-                "SELECT id::text, username, full_name, bio
+                "SELECT id, username, full_name, bio
                  FROM benchmark.tb_user
                  ORDER BY id
                  LIMIT $1 OFFSET $2",
@@ -77,11 +77,11 @@ impl UserRepository {
 
         let rows = client
             .query(
-                "SELECT p.id::text, p.title, p.content, p.created_at::text,
+                "SELECT p.id::text, p.title, p.content, p.created_at,
                         u.id::text as user_id, u.username, u.full_name, u.bio
                  FROM benchmark.tb_post p
                  JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-                 WHERE u.id::text = $1 AND p.published = true
+                 WHERE u.id = $1 AND p.published = true
                  ORDER BY p.created_at DESC
                  LIMIT $2",
                 &[&user_id, &limit],
@@ -142,11 +142,11 @@ impl PostRepository {
 
         let row = client
             .query_one(
-                "SELECT p.id::text, p.title, p.content, p.fk_author, p.created_at::text,
+                "SELECT p.id::text, p.title, p.content, p.fk_author, p.created_at,
                         u.id::text as user_id, u.username, u.full_name, u.bio
                  FROM benchmark.tb_post p
                  JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-                 WHERE p.id::text = $1",
+                 WHERE p.id = $1",
                 &[&id],
             )
             .await
@@ -182,7 +182,7 @@ impl PostRepository {
 
         let rows = client
             .query(
-                "SELECT p.id::text, p.title, p.content, p.fk_author, p.created_at::text,
+                "SELECT p.id::text, p.title, p.content, p.fk_author, p.created_at,
                         u.id::text as user_id, u.username, u.full_name, u.bio
                  FROM benchmark.tb_post p
                  JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
@@ -229,11 +229,11 @@ impl PostRepository {
 
         let rows = client
             .query(
-                "SELECT p.id::text, p.title, p.content, p.fk_author, p.created_at::text,
+                "SELECT p.id::text, p.title, p.content, p.fk_author, p.created_at,
                         u.id::text as user_id, u.username, u.full_name, u.bio
                  FROM benchmark.tb_post p
                  JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-                 WHERE u.id::text = $1 AND p.published = true
+                 WHERE u.id = $1 AND p.published = true
                  ORDER BY p.created_at DESC
                  LIMIT $2 OFFSET $3",
                 &[&author_id, &limit, &offset],
@@ -294,7 +294,7 @@ impl CommentRepository {
 
         let rows = client
             .query(
-                "SELECT c.id::text, c.content, c.created_at::text,
+                "SELECT c.id::text, c.content, c.created_at,
                         u.id::text as user_id, u.username, u.full_name, u.bio
                  FROM benchmark.tb_comment c
                  JOIN benchmark.tb_user u ON c.fk_author = u.pk_user

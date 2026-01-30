@@ -14,10 +14,13 @@ FraiseQL queries tv_* views which provide JSONB 'data' field with:
 - No need for N+1 queries - all composition done at database layer
 """
 
+import asyncio
 import logging
 import os
 import sys
 from typing import Any
+
+import asyncpg
 
 # FraiseQL v1.8.1 imports
 import fraiseql
@@ -379,7 +382,7 @@ async def update_user_impl(
         user = await db.find_one("benchmark.tv_user", id=id)
         return UpdateUserSuccess(user=user)
 
-    except Exception as e:
+    except (asyncpg.PostgresError, KeyError, ValueError, asyncio.TimeoutError) as e:
         return UpdateUserError(
             message=f"Failed to update user: {str(e)}",
             code="UPDATE_FAILED",
@@ -432,7 +435,7 @@ async def create_post_impl(
                 code="CREATE_FAILED",
             )
 
-    except Exception as e:
+    except (asyncpg.PostgresError, KeyError, ValueError, asyncio.TimeoutError) as e:
         return CreatePostError(
             message=f"Failed to create post: {str(e)}",
             code="CREATE_ERROR",
@@ -502,7 +505,7 @@ async def create_comment_impl(
                 code="CREATE_FAILED",
             )
 
-    except Exception as e:
+    except (asyncpg.PostgresError, KeyError, ValueError, asyncio.TimeoutError) as e:
         return CreateCommentError(
             message=f"Failed to create comment: {str(e)}",
             code="CREATE_ERROR",

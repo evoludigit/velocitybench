@@ -2,7 +2,7 @@ import { Entity, Column, PrimaryColumn, ManyToOne, OneToMany, JoinColumn, Create
 
 @Entity({ name: 'benchmark.tb_post', synchronize: false })
 export class Post {
-  @PrimaryColumn({ type: 'varchar' })
+  @PrimaryColumn({ type: 'uuid' })
   id!: string;
 
   @Column({ type: 'integer' })

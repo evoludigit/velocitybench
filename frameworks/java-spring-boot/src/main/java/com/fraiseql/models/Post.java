@@ -3,17 +3,18 @@ package com.fraiseql.models;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.util.List;
+import java.util.UUID;
 
 @Entity
 @Table(name = "tb_post", schema = "benchmark")
 public class Post {
 
     @Id
-    @Column(length = 36)
-    private String id;
+    @Column(columnDefinition = "uuid")
+    private UUID id;
 
-    @Column(name = "author_id", nullable = false)
-    private String authorId;
+    @Column(name = "author_id", nullable = false, columnDefinition = "uuid")
+    private UUID authorId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id", insertable = false, updatable = false)
@@ -46,11 +47,11 @@ public class Post {
     private List<Comment> comments;
 
     // Getters and setters
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
 
-    public String getAuthorId() { return authorId; }
-    public void setAuthorId(String authorId) { this.authorId = authorId; }
+    public UUID getAuthorId() { return authorId; }
+    public void setAuthorId(UUID authorId) { this.authorId = authorId; }
 
     public User getAuthor() { return author; }
     public void setAuthor(User author) { this.author = author; }

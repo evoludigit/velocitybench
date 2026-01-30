@@ -146,7 +146,7 @@ class AsyncDatabase:
                 init=self._init_connection,
             )
             logger.info("✅ Connection pool created successfully")
-        except Exception as e:
+        except (asyncpg.PostgresError, ConnectionError, TimeoutError, OSError) as e:
             logger.error(f"❌ Failed to create connection pool: {e}")
             raise
 

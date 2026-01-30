@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate JMeter workload test plans and supporting files for Phase 7 testing.
+Generate JMeter workload test plans and supporting files.
 """
 
 import json

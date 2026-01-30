@@ -7,6 +7,7 @@ import lombok.Builder;
 
 import javax.persistence.*;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Entity
 @Table(name = "tb_comment", schema = "benchmark")
@@ -20,8 +21,8 @@ public class Comment {
     @Column(name = "pk_comment")
     private Integer pkComment;
 
-    @Column(name = "id")
-    private String id;
+    @Column(name = "id", columnDefinition = "uuid")
+    private UUID id;
 
     @Column(name = "fk_post")
     private Integer fkPost;
