@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from common.async_db import AsyncDatabase
 from common.health_check import HealthCheckManager
+from common.config import get_db_config, ConfigurationError
 
 # Metrics
 REQUEST_COUNT = prometheus_client.Counter(
@@ -55,9 +56,24 @@ class PostResponse(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application startup and shutdown."""
-    # Startup
+    # Startup - validate configuration first
+    try:
+        config = get_db_config()
+    except ConfigurationError as e:
+        logger.error(f"Configuration error: {e}")
+        raise
+
     db = AsyncDatabase()
-    await db.connect(min_size=10, max_size=50, statement_cache_size=100)
+    await db.connect(
+        host=config.host,
+        port=config.port,
+        database=config.name,
+        user=config.user,
+        password=config.password,
+        min_size=10,
+        max_size=50,
+        statement_cache_size=100,
+    )
     app.state.db = db
     logger.info("Database pool initialized")
 

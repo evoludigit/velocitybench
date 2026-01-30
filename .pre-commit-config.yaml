@@ -4,9 +4,9 @@
 # Run manually: pre-commit run --all-files
 
 repos:
-  # Ruff linting
+  # Ruff linting and formatting
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.8
+    rev: v0.14.14
     hooks:
       - id: ruff
         args: [--fix]
@@ -14,9 +14,22 @@ repos:
       - id: ruff-format
         stages: [commit]
 
+  # Type checking with mypy
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.19.1
+    hooks:
+      - id: mypy
+        args: [--ignore-missing-imports, --show-error-codes]
+        additional_dependencies:
+          - types-setuptools
+          - pydantic==2.10.0
+          - asyncpg==0.29.0
+        files: ^frameworks/.*\.py$
+        exclude: ^(frameworks/.*/tests/|database/)
+
   # General file checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
+    rev: v5.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -31,7 +44,7 @@ repos:
 
   # YAML/Markdown
   - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v3.1.0
+    rev: v4.0.0
     hooks:
       - id: prettier
         types_or: [markdown, yaml, json]
@@ -39,7 +52,7 @@ repos:
 
   # Security checks
   - repo: https://github.com/PyCQA/bandit
-    rev: 1.7.5
+    rev: 1.8.0
     hooks:
       - id: bandit
         args: [-ll, --skip=B101,B601]
