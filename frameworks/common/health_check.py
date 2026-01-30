@@ -9,6 +9,7 @@ Provides unified health check functionality with support for:
 """
 
 import asyncio
+import asyncpg
 import logging
 import psutil
 import time

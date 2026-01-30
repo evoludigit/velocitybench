@@ -4,13 +4,11 @@ Flask REST Comparative Benchmarking Implementation
 Traditional synchronous REST API using psycopg3 connection pool (demonstrates N+1 problem).
 """
 
-import asyncio
 import os
 import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
-import asyncpg
 import prometheus_client
 import psutil
 import psycopg

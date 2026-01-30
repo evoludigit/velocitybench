@@ -14,6 +14,7 @@ Features:
 import asyncpg
 import os
 import time
+from contextlib import asynccontextmanager
 from typing import Any
 import logging
 
@@ -326,6 +327,7 @@ class AsyncDatabase:
             self.metrics.record_release()
             self.metrics.record_wait(wait_time)
 
+    @asynccontextmanager
     async def transaction(self):
         """
         Start a transaction context manager.
