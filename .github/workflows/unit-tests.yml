@@ -231,12 +231,15 @@ jobs:
 
   # Summary and Coverage Requirements
   coverage-check:
-    needs: [python-tests, typescript-tests, go-tests, java-tests, rust-tests, php-tests, ruby-tests, csharp-tests, integration-tests]
+    needs: [python-tests, typescript-tests, go-tests, java-tests, rust-tests, php-tests, ruby-tests, csharp-tests, integration-tests, lint]
     runs-on: ubuntu-latest
     if: always()
     steps:
+      - uses: actions/checkout@v4
+
       - name: Check framework test results
         run: |
+          # Determine if tests passed
           if [[ "${{ needs.python-tests.result }}" == "failure" ]] || \
              [[ "${{ needs.typescript-tests.result }}" == "failure" ]] || \
              [[ "${{ needs.go-tests.result }}" == "failure" ]] || \
@@ -245,14 +248,39 @@ jobs:
              [[ "${{ needs.php-tests.result }}" == "failure" ]] || \
              [[ "${{ needs.ruby-tests.result }}" == "failure" ]] || \
              [[ "${{ needs.csharp-tests.result }}" == "failure" ]]; then
-            echo "One or more framework test suites failed"
+            echo "❌ One or more framework test suites failed"
             exit 1
           fi
           echo "✅ All framework tests passed successfully!"
 
+          # Integration tests are optional
           if [[ "${{ needs.integration-tests.result }}" == "failure" ]]; then
             echo "⚠️  Integration tests failed (this is expected - requires additional setup)"
           fi
+
+          # Quality checks
+          if [[ "${{ needs.lint.result }}" != "success" ]]; then
+            echo "⚠️  Linting warnings detected (see details above)"
+          fi
+
+      - name: Generate coverage summary
+        if: always()
+        run: |
+          echo "## 📊 Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Suite | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Python Tests | ${{ needs.python-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| TypeScript Tests | ${{ needs.typescript-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Go Tests | ${{ needs.go-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Java Tests | ${{ needs.java-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Rust Tests | ${{ needs.rust-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| PHP Tests | ${{ needs.php-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Ruby Tests | ${{ needs.ruby-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| C# Tests | ${{ needs.csharp-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Linting | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 See job logs for detailed coverage reports uploaded to Codecov."
 
   # Integration tests (verify all frameworks can run)
   integration-tests:
@@ -304,7 +332,7 @@ jobs:
         run: |
           python -m pytest test_frameworks.py -v || echo "Integration tests require additional test fixtures - this is expected"
 
-  # Lint and format checks (optional, but recommended)
+  # Lint and format checks with Ruff
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -315,20 +343,27 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install linting tools
+      - name: Install linting and type-checking tools
         run: |
           python -m pip install --upgrade pip
-          pip install flake8 black isort
+          pip install ruff pyright
 
-      - name: Lint Python code
+      - name: Lint Python code with Ruff
         run: |
-          # Check for common issues in all Python frameworks
-          flake8 frameworks/strawberry frameworks/graphene frameworks/fastapi-rest frameworks/flask-rest --count --select=E9,F63,F7,F82 --show-source --statistics --max-line-length=100 || true
-          echo "Python linting passed"
+          # Lint database and framework Python code
+          ruff check database/seed-data/generator/ frameworks/strawberry frameworks/graphene frameworks/fastapi-rest frameworks/flask-rest || true
+          echo "✅ Ruff linting completed"
 
-      - name: Check code formatting
+      - name: Format check with Ruff
         run: |
-          black --check frameworks/strawberry frameworks/graphene frameworks/fastapi-rest frameworks/flask-rest 2>/dev/null || echo "Note: Some files need formatting with 'black'"
+          ruff format --check database/seed-data/generator/ frameworks/strawberry frameworks/graphene frameworks/fastapi-rest frameworks/flask-rest || true
+          echo "✅ Code format check completed"
+
+      - name: Type check Python code with Pyright
+        run: |
+          # Type check Python frameworks
+          pyright database/seed-data/generator/ 2>/dev/null || echo "⚠️  Type checking has warnings (non-blocking)"
+          echo "✅ Type checking completed"
 
   # Final status
   test-status:
