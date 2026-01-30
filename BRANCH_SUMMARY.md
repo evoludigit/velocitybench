@@ -2,7 +2,7 @@
 
 ## Overview
 
-This branch implements a comprehensive 6-phase upgrade to VelocityBench, adding production-ready observability, automated regression detection, and extensive documentation.
+This branch implements a comprehensive 6-phase upgrade to VelocityBench, adding improved observability, automated regression detection, and extensive documentation.
 
 **Branch**: `feat/modern-2025-test-suite-upgrade`
 **Base**: `main`
@@ -282,7 +282,7 @@ No migration needed. New features are opt-in.
 
 ## Post-Merge Actions
 
-1. **Tag release**: `git tag v1.0.0-rc1`
+1. **Tag release**: `git tag v0.2.0`
 2. **Update CI/CD**: Add regression detection to GitHub Actions
 3. **Announce**: Share release notes with community
 4. **Gather feedback**: Request testing from framework maintainers
@@ -297,7 +297,7 @@ No migration needed. New features are opt-in.
 git checkout main
 git merge --no-ff feat/modern-2025-test-suite-upgrade -m "Merge feat/modern-2025-test-suite-upgrade: Production health checks and regression detection
 
-This merge adds comprehensive production-ready features to VelocityBench:
+This merge adds comprehensive new features to VelocityBench:
 
 - Health check libraries for 8 languages (Python, TypeScript, Go, Rust, Java, PHP, Ruby, C#)
 - Automated performance regression detection with statistical analysis
@@ -312,11 +312,22 @@ See CHANGELOG.md for detailed changes.
 "
 
 # Tag the release
-git tag -a v1.0.0-rc1 -m "Release Candidate 1: Production-ready observability"
+git tag -a v0.2.0 -m "v0.2.0: Health checks and regression detection
+
+New features:
+- Kubernetes-compatible health checks across 8 languages
+- Automated regression detection with statistical analysis
+- Comprehensive documentation (12 ADRs, 10+ guides)
+- Integration test suite for health checks
+
+This release significantly improves VelocityBench's observability
+and production readiness while maintaining its focus as a
+development and benchmarking tool.
+"
 
 # Push to remote
 git push origin main
-git push origin v1.0.0-rc1
+git push origin v0.2.0
 ```
 
 ---
@@ -332,4 +343,4 @@ git push origin v1.0.0-rc1
 
 **Status**: ✅ **READY TO MERGE**
 
-This branch represents 10 weeks of focused development, adding enterprise-grade features while maintaining backward compatibility. All phases are complete, tested, and documented.
+This branch represents 10 weeks of focused development, adding comprehensive features while maintaining backward compatibility. All phases are complete, tested, and documented.

@@ -1,10 +1,10 @@
 # VelocityBench Changelog
 
-## [1.0.0-rc1] - 2026-01-30
+## [0.2.0] - 2026-01-30
 
-### Major Release: Production-Ready Observability & Documentation
+### Feature Release: Health Checks & Regression Detection
 
-This release transforms VelocityBench from a development benchmarking tool into a production-ready, enterprise-grade framework comparison suite with comprehensive observability, automated regression detection, and extensive documentation.
+This release adds comprehensive health checks, automated regression detection, and extensive documentation to VelocityBench, significantly improving observability while maintaining its focus as a development and benchmarking tool.
 
 ---
 
@@ -245,9 +245,9 @@ This release transforms VelocityBench from a development benchmarking tool into 
 ### Changed
 - **Updated README.md**:
   - Reorganized documentation sections (Core, Production, Architecture, Testing)
-  - Added production-ready features section
+  - Added improved features section
   - Updated feature list with health checks and regression detection
-  - Updated status to "Production-Ready"
+  - Updated status to "Beta"
   - Updated last updated date to 2026-01-30
 
 ### Commits (1)
@@ -349,7 +349,7 @@ None. This is a new feature release with no breaking changes to existing functio
 
 ## 🙏 Acknowledgments
 
-This release represents a comprehensive upgrade to VelocityBench, transforming it from a development tool into a production-ready benchmarking suite with enterprise-grade observability.
+This release represents a comprehensive upgrade to VelocityBench, transforming it from a development tool into a improved benchmarking suite with comprehensive observability.
 
 **Key Contributions**:
 - 6 phases of development over 10 weeks
@@ -374,7 +374,7 @@ This release represents a comprehensive upgrade to VelocityBench, transforming i
 ## 🎯 Next Steps
 
 1. **Merge to main**: Branch `feat/modern-2025-test-suite-upgrade` ready for merge
-2. **Tag release**: Create `v1.0.0-rc1` tag
+2. **Tag release**: Create `v0.2.0` tag
 3. **Update CI/CD**: Integrate regression detection in GitHub Actions
 4. **Community feedback**: Gather feedback on health check implementations
 5. **Future work**: GraphQL subscriptions (Phase 2, see SUBSCRIPTION_SUPPORT.md)

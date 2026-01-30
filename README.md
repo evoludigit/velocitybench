@@ -123,8 +123,8 @@ MIT License - See [LICENSE](LICENSE) for details
 
 ---
 
-**Status**: Production-Ready (Health checks, regression detection, and comprehensive documentation complete)
-**Latest Release**: v1.0.0-rc1
+**Status**: Beta (Health checks, regression detection, and comprehensive documentation complete)
+**Latest Release**: v0.2.0
 **Last Updated**: 2026-01-30
 
 ## Features
