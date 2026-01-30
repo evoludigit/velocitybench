@@ -1,0 +1,90 @@
+# VelocityBench Regression Detection Configuration
+
+# Statistical thresholds for detecting performance regressions
+thresholds:
+  # Response time thresholds (percentile-based)
+  response_time:
+    p50:
+      warning_percent: 15    # 15% increase triggers warning
+      critical_percent: 50   # 50% increase triggers critical alert
+    p95:
+      warning_percent: 20    # 20% increase triggers warning
+      critical_percent: 60   # 60% increase triggers critical alert
+    p99:
+      warning_percent: 25    # 25% increase triggers warning
+      critical_percent: 80   # 80% increase triggers critical alert
+
+  # Throughput thresholds (requests per second)
+  throughput_rps:
+    warning_percent: -15     # 15% decrease triggers warning
+    critical_percent: -40    # 40% decrease triggers critical alert
+
+  # Error rate thresholds (percentage points)
+  error_rate:
+    warning_percent: 5       # 5 percentage point increase triggers warning
+    critical_percent: 25     # 25 percentage point increase triggers critical alert
+
+# Statistical analysis settings
+statistics:
+  # Confidence level for statistical tests (95%)
+  confidence_level: 0.95
+
+  # Minimum sample size required for comparison
+  min_sample_size: 30
+
+  # Multiple comparison correction method
+  correction_method: "bonferroni"
+
+  # Minimum effect size to report (Cohen's d)
+  min_effect_size: 0.2
+
+# Baseline management
+baselines:
+  # Directory for storing baseline metrics
+  directory: ".baselines"
+
+  # Default baseline to compare against
+  default: "stable"
+
+  # Auto-update baseline after N successful runs
+  auto_update_threshold: 5
+
+  # Keep history of last N baselines
+  history_retention: 10
+
+# CI/CD integration
+ci_integration:
+  # Fail CI build on critical regressions
+  fail_on_critical: true
+
+  # Fail CI build on warnings
+  fail_on_warnings: false
+
+  # Post regression report as PR comment
+  comment_on_pr: true
+
+  # Maximum comment length (GitHub limit)
+  max_comment_length: 65536
+
+# Report formatting
+reporting:
+  # Output formats: cli, json, markdown, html
+  default_format: "cli"
+
+  # Show detailed metrics in report
+  show_details: true
+
+  # Include comparison charts (requires matplotlib)
+  include_charts: false
+
+  # Highlight severity levels with colors (CLI only)
+  colored_output: true
+
+# Framework-specific overrides
+framework_overrides:
+  # Example: Increase thresholds for known slower frameworks
+  # "php-laravel":
+  #   response_time:
+  #     p50:
+  #       warning_percent: 25
+  #       critical_percent: 75
