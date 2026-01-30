@@ -7,10 +7,9 @@ Includes:
 - Type aliases
 """
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Dict, Any, Optional
-from datetime import datetime
+from typing import Any
 
 
 class HealthStatus(str, Enum):
@@ -35,13 +34,13 @@ class HealthCheck:
     """Individual health check result."""
 
     status: HealthStatus
-    response_time_ms: Optional[float] = None
-    error: Optional[str] = None
-    warning: Optional[str] = None
-    info: Optional[str] = None
-    additional_data: Dict[str, Any] = field(default_factory=dict)
+    response_time_ms: float | None = None
+    error: str | None = None
+    warning: str | None = None
+    info: str | None = None
+    additional_data: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary, excluding None values."""
         result = {
             "status": self.status.value,
@@ -76,9 +75,9 @@ class HealthCheckResponse:
     service: str
     environment: str
     probe_type: ProbeType
-    checks: Dict[str, HealthCheck]
+    checks: dict[str, HealthCheck]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
             "status": self.status.value,
@@ -112,4 +111,4 @@ class HealthCheckResponse:
 
 
 # Type aliases for common use cases
-ChecksDict = Dict[str, HealthCheck]
+ChecksDict = dict[str, HealthCheck]

@@ -13,7 +13,6 @@ import logging
 import psutil
 import time
 from datetime import datetime, timezone
-from typing import Optional
 
 from .async_db import AsyncDatabase
 from .types import (
@@ -44,7 +43,7 @@ class HealthCheckManager:
         self,
         service_name: str,
         version: str,
-        database: Optional[AsyncDatabase] = None,
+        database: AsyncDatabase | None = None,
         environment: str = "development",
         startup_duration_ms: int = 30000,  # 30 seconds warmup
     ):
@@ -67,7 +66,7 @@ class HealthCheckManager:
         self.process = psutil.Process()
 
         # Cache for health check results (avoid hammering DB)
-        self._cache: Dict[str, tuple[HealthCheckResponse, float]] = {}
+        self._cache: dict[str, tuple[HealthCheckResponse, float]] = {}
         self._cache_ttl = 5.0  # 5 seconds
 
     async def probe(self, probe_type: str) -> HealthCheckResponse:
@@ -102,7 +101,7 @@ class HealthCheckManager:
 
         return result
 
-    def _get_cached_result(self, probe_type: ProbeType) -> Optional[HealthCheckResponse]:
+    def _get_cached_result(self, probe_type: ProbeType) -> HealthCheckResponse | None:
         """Get cached health check result if still valid."""
         if probe_type.value in self._cache:
             result, cached_at = self._cache[probe_type.value]

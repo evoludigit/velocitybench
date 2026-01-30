@@ -14,8 +14,7 @@ Features:
 import asyncpg
 import os
 import time
-from typing import List, Dict, Any, Optional, Callable
-from datetime import datetime
+from typing import Any
 import logging
 
 logger = logging.getLogger(__name__)
@@ -54,7 +53,7 @@ class PoolMetrics:
     def record_statement_miss(self):
         self.statement_cache_misses += 1
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get metrics summary for logging/monitoring."""
         total_statements = self.statement_cache_hits + self.statement_cache_misses
         cache_hit_rate = (
@@ -87,17 +86,17 @@ class AsyncDatabase:
     """
 
     def __init__(self):
-        self.pool: Optional[asyncpg.Pool] = None
+        self.pool: asyncpg.Pool | None = None
         self.metrics = PoolMetrics()
-        self._connection_semaphore: Optional[asyncpg.pool.Pool] = None
+        self._connection_semaphore: asyncpg.pool.Pool | None = None
 
     async def connect(
         self,
-        host: Optional[str] = None,
-        port: Optional[int] = None,
-        database: Optional[str] = None,
-        user: Optional[str] = None,
-        password: Optional[str] = None,
+        host: str | None = None,
+        port: int | None = None,
+        database: str | None = None,
+        user: str | None = None,
+        password: str | None = None,
         min_size: int = 10,
         max_size: int = 50,
         statement_cache_size: int = 100,
@@ -179,8 +178,8 @@ class AsyncDatabase:
         self,
         query: str,
         *args,
-        timeout: Optional[float] = None
-    ) -> List[Dict[str, Any]]:
+        timeout: float | None = None
+    ) -> list[dict[str, Any]]:
         """
         Execute query and return results as list of dicts.
 
@@ -212,8 +211,8 @@ class AsyncDatabase:
         self,
         query: str,
         *args,
-        timeout: Optional[float] = None
-    ) -> Optional[Dict[str, Any]]:
+        timeout: float | None = None
+    ) -> dict[str, Any] | None:
         """
         Execute query and return single row as dict.
 
@@ -244,7 +243,7 @@ class AsyncDatabase:
         self,
         query: str,
         *args,
-        timeout: Optional[float] = None
+        timeout: float | None = None
     ) -> Any:
         """
         Execute query and return single scalar value.
@@ -275,7 +274,7 @@ class AsyncDatabase:
         self,
         query: str,
         *args,
-        timeout: Optional[float] = None
+        timeout: float | None = None
     ) -> str:
         """
         Execute query without returning results.
@@ -306,7 +305,7 @@ class AsyncDatabase:
         self,
         query: str,
         args,
-        timeout: Optional[float] = None
+        timeout: float | None = None
     ) -> None:
         """
         Execute query multiple times with different parameter sets.
@@ -346,11 +345,11 @@ class AsyncDatabase:
             async with conn.transaction():
                 yield conn
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get current metrics snapshot."""
         return self.metrics.get_summary()
 
-    def get_pool_info(self) -> Dict[str, Any]:
+    def get_pool_info(self) -> dict[str, Any]:
         """Get connection pool information."""
         if not self.pool:
             return {"status": "not_connected"}
@@ -365,7 +364,7 @@ class AsyncDatabase:
 
 
 # Global instance for shared use
-_db_instance: Optional[AsyncDatabase] = None
+_db_instance: AsyncDatabase | None = None
 
 
 def get_database() -> AsyncDatabase:

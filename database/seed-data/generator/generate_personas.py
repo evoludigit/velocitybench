@@ -32,6 +32,7 @@ import yaml
 from jsonschema import Draft7Validator, ValidationError
 
 from logger_config import setup_logging
+from .exceptions import VLLMTimeoutError, VLLMConnectionError, VLLMError
 
 # ============================================================================
 # Configuration
@@ -842,11 +843,11 @@ class PersonaGenerator:
                 return result["choices"][0]["message"]["content"].strip()
 
         except requests.exceptions.Timeout:
-            raise Exception("vLLM request timed out")
+            raise VLLMTimeoutError("Request timed out after 60s") from None
         except requests.exceptions.ConnectionError:
-            raise Exception("Cannot connect to vLLM server at localhost:8000")
+            raise VLLMConnectionError("Cannot connect to vLLM server at localhost:8000") from None
         except Exception as e:
-            raise Exception(f"vLLM error: {e}")
+            raise VLLMError(f"vLLM error: {e}") from e
 
         return None
 
