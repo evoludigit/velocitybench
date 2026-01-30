@@ -4,6 +4,7 @@ FastAPI REST Comparative Benchmarking Implementation
 Async REST API with asyncpg connection pooling that matches GraphQL operations using include parameters.
 """
 
+import logging
 import os
 import sys
 from contextlib import asynccontextmanager
@@ -12,6 +13,8 @@ from typing import Any
 import prometheus_client
 from fastapi import FastAPI, HTTPException, Path, Query
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from common.async_db import AsyncDatabase
@@ -56,7 +59,7 @@ async def lifespan(app: FastAPI):
     db = AsyncDatabase()
     await db.connect(min_size=10, max_size=50, statement_cache_size=100)
     app.state.db = db
-    print("Database pool initialized")
+    logger.info("Database pool initialized")
 
     # Initialize health check manager
     health_manager = HealthCheckManager(
@@ -66,13 +69,13 @@ async def lifespan(app: FastAPI):
         environment=os.getenv("ENVIRONMENT", "development"),
     )
     app.state.health = health_manager
-    print("Health check manager initialized")
+    logger.info("Health check manager initialized")
 
     yield
 
     # Shutdown
     await app.state.db.close()
-    print("Database pool closed")
+    logger.info("Database pool closed")
 
 
 # FastAPI app with lifespan
