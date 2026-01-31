@@ -8,7 +8,7 @@ HealthCheckManager without requiring framework-specific endpoint definitions.
 import asyncio
 import json
 import logging
-from typing import Callable, Awaitable
+from typing import Any, Callable, Awaitable
 
 from ..health_check import HealthCheckManager
 from ..types import ProbeType
@@ -43,7 +43,7 @@ class HealthCheckMiddleware:
         self,
         app: Callable,
         health_manager: HealthCheckManager,
-    ):
+    ) -> None:
         """
         Initialize health check middleware.
 
@@ -54,7 +54,9 @@ class HealthCheckMiddleware:
         self.app = app
         self.health_manager = health_manager
 
-    async def __call__(self, scope, receive, send):
+    async def __call__(
+        self, scope: dict[str, Any], receive: Callable, send: Callable
+    ) -> None:
         """ASGI application interface."""
         if scope["type"] != "http":
             # Not an HTTP request, pass through
@@ -71,7 +73,9 @@ class HealthCheckMiddleware:
             # Not a health check, pass to application
             await self.app(scope, receive, send)
 
-    async def _handle_health_check(self, scope, receive, send, path: str):
+    async def _handle_health_check(
+        self, scope: dict[str, Any], receive: Callable, send: Callable, path: str
+    ) -> None:
         """Handle health check request."""
         # Determine probe type from path
         if path == "/health":
@@ -113,20 +117,26 @@ class HealthCheckMiddleware:
                 },
             )
 
-    async def _send_response(self, send, status: int, body: dict):
+    async def _send_response(
+        self, send: Callable, status: int, body: dict[str, Any]
+    ) -> None:
         """Send JSON response."""
         body_bytes = json.dumps(body, indent=2).encode("utf-8")
 
-        await send({
-            "type": "http.response.start",
-            "status": status,
-            "headers": [
-                [b"content-type", b"application/json"],
-                [b"content-length", str(len(body_bytes)).encode()],
-            ],
-        })
+        await send(
+            {
+                "type": "http.response.start",
+                "status": status,
+                "headers": [
+                    [b"content-type", b"application/json"],
+                    [b"content-length", str(len(body_bytes)).encode()],
+                ],
+            }
+        )
 
-        await send({
-            "type": "http.response.body",
-            "body": body_bytes,
-        })
+        await send(
+            {
+                "type": "http.response.body",
+                "body": body_bytes,
+            }
+        )
