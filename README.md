@@ -2,13 +2,13 @@
 
 Comprehensive GraphQL & REST Framework Performance Benchmarking Suite
 
-**28 frameworks across 8 languages.** Measure throughput, latency, and resources with publication-ready methodology.
+**38 frameworks across 8 languages.** Measure throughput, latency, and resources with publication-ready methodology.
 
 ## Overview
 
 VelocityBench helps developers choose the right framework with real performance data.
 
-- ✅ 40+ framework implementations across 8 languages
+- ✅ 38 framework implementations across 8 languages
 - ✅ 450+ comprehensive tests (schema, query, N+1, performance)
 - ✅ Production-ready health checks (Kubernetes-compatible probes)
 - ✅ Automated regression detection (statistical analysis)
