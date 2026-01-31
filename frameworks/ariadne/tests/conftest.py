@@ -20,6 +20,11 @@ from tests.common import (
     test_security_integrity,
 )
 
+# Import shared error scenario tests
+from tests.common import (
+    test_error_scenarios_base,
+)
+
 # Import shared performance tests
 from tests.common import (
     test_perf_simple_queries,
