@@ -8,6 +8,7 @@ import os
 import time
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from typing import Any
 
 import prometheus_client
 import psutil
@@ -38,7 +39,7 @@ ALLOWED_UPDATE_FIELDS = {"full_name", "bio"}
 
 
 # Validation functions
-def validate_update_user_data(data):
+def validate_update_user_data(data: dict[str, Any]) -> list[dict[str, str]]:
     """Validate user update data and return list of validation errors."""
     errors = []
 
@@ -55,7 +56,10 @@ def validate_update_user_data(data):
             errors.append({"field": "full_name", "error": "Full name must be a string"})
         elif len(full_name) > 255:
             errors.append(
-                {"field": "full_name", "error": "Full name must be at most 255 characters"}
+                {
+                    "field": "full_name",
+                    "error": "Full name must be at most 255 characters",
+                }
             )
 
     # Validate bio
@@ -64,12 +68,14 @@ def validate_update_user_data(data):
         if not isinstance(bio, str):
             errors.append({"field": "bio", "error": "Bio must be a string"})
         elif len(bio) > 1000:
-            errors.append({"field": "bio", "error": "Bio must be at most 1000 characters"})
+            errors.append(
+                {"field": "bio", "error": "Bio must be at most 1000 characters"}
+            )
 
     return errors
 
 
-def init_pool():
+def init_pool() -> ConnectionPool:
     """Initialize psycopg3 connection pool in app context."""
     # Password is REQUIRED - fail fast if not provided
     password = os.getenv("DATABASE_PASSWORD")
@@ -100,14 +106,14 @@ def init_pool():
 
 
 @contextmanager
-def get_db_connection():
+def get_db_connection() -> Any:
     """Get database connection from app context."""
     pool = app.config["DB_POOL"]
     with pool.connection() as conn:
         yield conn
 
 
-def execute_query(query: str, params: tuple | None = None):
+def execute_query(query: str, params: tuple | None = None) -> list[dict[str, Any]]:
     """Execute query and return results."""
     with get_db_connection() as conn:
         with conn.cursor(row_factory=dict_row) as cur:
@@ -119,29 +125,26 @@ def execute_query(query: str, params: tuple | None = None):
 
 # Initialize pool in app context on first request
 @app.before_serving
-def setup_db():
+def setup_db() -> None:
     """Initialize database pool."""
     init_pool()
 
 
 # Register cleanup on app teardown
 @app.teardown_appcontext
-def teardown_db(exception=None):
+def teardown_db(exception: BaseException | None = None) -> None:
     """Close pool on app shutdown."""
     pool = app.config.get("DB_POOL")
     if pool:
         pool.close()
 
 
-def _check_database():
+def _check_database() -> dict[str, Any]:
     """Check database health."""
     try:
         pool = app.config.get("DB_POOL")
         if not pool:
-            return {
-                "status": "down",
-                "error": "Database pool not initialized"
-            }
+            return {"status": "down", "error": "Database pool not initialized"}
 
         start = time.time()
         with pool.connection() as conn:
@@ -161,13 +164,10 @@ def _check_database():
             "pool_available": pool_stats.get("pool_available", 0),
         }
     except (psycopg.DatabaseError, ConnectionError, TimeoutError, OSError) as e:
-        return {
-            "status": "down",
-            "error": f"Database error: {str(e)}"
-        }
+        return {"status": "down", "error": f"Database error: {str(e)}"}
 
 
-def _check_memory():
+def _check_memory() -> dict[str, Any]:
     """Check memory usage."""
     try:
         process = psutil.Process()
@@ -195,13 +195,10 @@ def _check_memory():
 
         return result
     except (OSError, PermissionError) as e:
-        return {
-            "status": "degraded",
-            "warning": f"Memory check error: {str(e)}"
-        }
+        return {"status": "degraded", "warning": f"Memory check error: {str(e)}"}
 
 
-def _get_health_response(probe_type):
+def _get_health_response(probe_type: str) -> tuple[Any, int]:
     """Generate health check response."""
     checks = {}
 
@@ -229,7 +226,7 @@ def _get_health_response(probe_type):
         "service": app.config["SERVICE_NAME"],
         "environment": app.config["ENVIRONMENT"],
         "probe_type": probe_type,
-        "checks": checks
+        "checks": checks,
     }
 
     status_code = 503 if overall_status == "down" else 200
@@ -543,7 +540,9 @@ def metrics():
 @app.errorhandler(404)
 def handle_not_found(error):
     """Handle 404 errors."""
-    return jsonify({"error": "Not Found", "message": "The requested resource was not found"}), 404
+    return jsonify(
+        {"error": "Not Found", "message": "The requested resource was not found"}
+    ), 404
 
 
 @app.errorhandler(500)
@@ -568,7 +567,9 @@ def handle_exception(error):
 def handle_database_error(error):
     """Handle database-specific errors."""
     app.logger.error(f"Database error: {error}")
-    return jsonify({"error": "Database Error", "message": "A database error occurred"}), 503
+    return jsonify(
+        {"error": "Database Error", "message": "A database error occurred"}
+    ), 503
 
 
 if __name__ == "__main__":
