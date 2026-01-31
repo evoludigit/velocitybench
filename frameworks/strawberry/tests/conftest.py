@@ -19,3 +19,13 @@ from tests.common import (
     test_security_validation,
     test_security_integrity,
 )
+
+# Import shared performance tests
+from tests.common import (
+    test_perf_simple_queries,
+    test_perf_list_queries,
+    test_perf_relationship_queries,
+    test_perf_n_plus_one,
+    test_perf_filtered_queries,
+    test_perf_complex_nested,
+)
