@@ -8,6 +8,7 @@ import logging
 import os
 import sys
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 from uuid import UUID
 
@@ -17,7 +18,7 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 from common.async_db import AsyncDatabase
 from common.health_check import HealthCheckManager
 from common.config import get_db_config, ConfigurationError
@@ -159,7 +160,9 @@ async def ping():
 async def list_users(
     limit: int = Query(10, ge=1, le=100),
     include: str | None = None,
-    ids: str | None = Query(None, description="Comma-separated list of user IDs for batch fetch"),
+    ids: str | None = Query(
+        None, description="Comma-separated list of user IDs for batch fetch"
+    ),
 ):
     """List users with optional includes or batch fetch by IDs"""
     REQUEST_COUNT.labels(method="GET", endpoint="/users").inc()
@@ -271,11 +274,15 @@ async def get_user(user_id: str = Path(...), include: str | None = None):
                     if "posts.comments.author" in includes:
                         comments = [
                             {
-                                **{k: v for k, v in comment.items() if k not in ("author_id", "author_username")},
+                                **{
+                                    k: v
+                                    for k, v in comment.items()
+                                    if k not in ("author_id", "author_username")
+                                },
                                 "author": {
                                     "id": comment["author_id"],
                                     "username": comment["author_username"],
-                                }
+                                },
                             }
                             for comment in comments
                         ]

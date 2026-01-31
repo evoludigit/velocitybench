@@ -8,6 +8,7 @@ import asyncio
 import json
 import os
 import sys
+from pathlib import Path
 
 import asyncpg
 import graphene
@@ -17,7 +18,7 @@ from fastapi.responses import JSONResponse
 from graphene import ID, Field, Int, ObjectType, String
 from graphene import List as GrapheneList
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 from common.async_db import AsyncDatabase
 from common.health_check import HealthCheckManager
 
@@ -30,7 +31,8 @@ class UserLoader(DataLoader):
 
     async def batch_load_fn(self, keys: list[str]) -> list[dict | None]:
         result = await self.db.fetch(
-            "SELECT id, username, full_name, bio FROM benchmark.tb_user WHERE id = ANY($1)", keys
+            "SELECT id, username, full_name, bio FROM benchmark.tb_user WHERE id = ANY($1)",
+            keys,
         )
         user_map = {user["id"]: user for user in result}
         return [user_map.get(key) for key in keys]
@@ -214,7 +216,8 @@ class Query(ObjectType):
     async def resolve_user(self, info, id):
         db = info.context["db"]
         result = await db.fetchrow(
-            "SELECT id, username, full_name, bio FROM benchmark.tb_user WHERE id = $1", id
+            "SELECT id, username, full_name, bio FROM benchmark.tb_user WHERE id = $1",
+            id,
         )
         if not result:
             return None
@@ -317,7 +320,9 @@ class UpdateUser(graphene.Mutation):
         # Basic input validation
         if bio is not None and (not isinstance(bio, str) or len(bio) > 1000):
             raise ValueError("Bio must be a string with maximum length 1000")
-        if full_name is not None and (not isinstance(full_name, str) or len(full_name) > 255):
+        if full_name is not None and (
+            not isinstance(full_name, str) or len(full_name) > 255
+        ):
             raise ValueError("Full name must be a string with maximum length 255")
 
         db = info.context["db"]
@@ -344,7 +349,8 @@ class UpdateUser(graphene.Mutation):
 
         # Return updated user
         result = await db.fetchrow(
-            "SELECT id, username, full_name, bio FROM benchmark.tb_user WHERE id = $1", id
+            "SELECT id, username, full_name, bio FROM benchmark.tb_user WHERE id = $1",
+            id,
         )
         if result:
             return UpdateUser(
@@ -380,7 +386,7 @@ async def startup_event():
     await db.connect(
         min_size=pool_min_size,
         max_size=pool_max_size,
-        statement_cache_size=pool_statement_cache
+        statement_cache_size=pool_statement_cache,
     )
     app.state.db = db
 
@@ -448,14 +454,22 @@ async def graphql_endpoint(request: Request):
         }
 
         # Execute GraphQL query
-        result = await schema.execute_async(query, context_value=context, variable_values=variables)
+        result = await schema.execute_async(
+            query, context_value=context, variable_values=variables
+        )
 
         response_data = {"data": result.data}
         if result.errors:
             response_data["errors"] = [{"message": str(e)} for e in result.errors]
 
         return JSONResponse(content=response_data)
-    except (asyncpg.PostgresError, json.JSONDecodeError, ValueError, ConnectionError, OSError) as e:
+    except (
+        asyncpg.PostgresError,
+        json.JSONDecodeError,
+        ValueError,
+        ConnectionError,
+        OSError,
+    ) as e:
         return JSONResponse(status_code=400, content={"errors": [{"message": str(e)}]})
 
 
