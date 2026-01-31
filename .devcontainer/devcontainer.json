@@ -1,0 +1,125 @@
+{
+	"name": "VelocityBench Development",
+	"image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+	"features": {
+		"ghcr.io/devcontainers/features/python:1": {
+			"version": "3.12",
+			"installTools": true
+		},
+		"ghcr.io/devcontainers/features/node:1": {
+			"version": "18",
+			"installTools": true
+		},
+		"ghcr.io/devcontainers/features/go:1": {
+			"version": "1.21"
+		},
+		"ghcr.io/devcontainers/features/rust:1": {
+			"version": "latest"
+		},
+		"ghcr.io/devcontainers/features/java:1": {
+			"version": "17"
+		},
+		"ghcr.io/devcontainers/features/docker-in-docker:1": {}
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-python.python",
+				"ms-python.vscode-pylance",
+				"ms-python.black-formatter",
+				"charliermarsh.ruff",
+				"ms-vscode.makefile-tools",
+				"golang.Go",
+				"rust-lang.rust-analyzer",
+				"redhat.java",
+				"vscode.typescript-javascript",
+				"esbenp.prettier-vscode",
+				"ms-docker.docker",
+				"GitHub.copilot",
+				"ms-vscode-remote.remote-containers"
+			],
+			"settings": {
+				"python.defaultInterpreterPath": "/usr/local/bin/python",
+				"python.linting.enabled": true,
+				"python.linting.pylintEnabled": false,
+				"python.formatting.provider": "black",
+				"[python]": {
+					"editor.defaultFormatter": "ms-python.black-formatter",
+					"editor.formatOnSave": true,
+					"editor.codeActionsOnSave": {
+						"source.organizeImports": "explicit"
+					}
+				},
+				"[javascript]": {
+					"editor.defaultFormatter": "esbenp.prettier-vscode",
+					"editor.formatOnSave": true
+				},
+				"[typescript]": {
+					"editor.defaultFormatter": "esbenp.prettier-vscode",
+					"editor.formatOnSave": true
+				},
+				"[go]": {
+					"editor.formatOnSave": true,
+					"editor.codeActionsOnSave": {
+						"source.organizeImports": "explicit"
+					}
+				},
+				"[rust]": {
+					"editor.formatOnSave": true
+				},
+				"rust-analyzer.checkOnSave.command": "clippy"
+			}
+		}
+	},
+	"postCreateCommand": "bash .devcontainer/post-create.sh",
+	"remoteEnv": {
+		"PATH": "${containerEnv:PATH}:/root/.cargo/bin"
+	},
+	"mounts": [
+		"source=${localEnv:HOME}/.ssh,target=/root/.ssh,readonly"
+	],
+	"forwardPorts": [
+		3000,
+		4000,
+		4002,
+		4005,
+		4010,
+		5000,
+		8000,
+		8001,
+		8002,
+		8003,
+		8004,
+		8005,
+		8006,
+		8007,
+		8010,
+		8011,
+		8012,
+		8015,
+		8016,
+		5433
+	],
+	"portsAttributes": {
+		"3000": {
+			"label": "Node.js Dev Server",
+			"onAutoForward": "ignore"
+		},
+		"4000": {
+			"label": "GraphQL Endpoints",
+			"onAutoForward": "ignore"
+		},
+		"8003": {
+			"label": "FastAPI",
+			"onAutoForward": "ignore"
+		},
+		"8004": {
+			"label": "Flask",
+			"onAutoForward": "ignore"
+		},
+		"5433": {
+			"label": "PostgreSQL",
+			"onAutoForward": "ignore"
+		}
+	}
+}
