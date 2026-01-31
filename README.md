@@ -68,6 +68,7 @@ make perf
 - **[docs/HEALTH_CHECKS.md](docs/HEALTH_CHECKS.md)** - Health check implementation guide (Kubernetes probes)
 - **[docs/REGRESSION_DETECTION_GUIDE.md](docs/REGRESSION_DETECTION_GUIDE.md)** - Performance regression detection system
 - **[docs/DEPENDENCY_AUDIT_GUIDE.md](docs/DEPENDENCY_AUDIT_GUIDE.md)** - Security vulnerability scanning
+- **[docs/VERSIONING.md](docs/VERSIONING.md)** - Semantic versioning scheme and release process
 
 ### Architecture & Design
 - **[docs/adr/](docs/adr/)** - Architecture Decision Records (12 ADRs)
