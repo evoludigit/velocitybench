@@ -5,6 +5,7 @@ Intercepts requests to /health* endpoints and routes them to the
 HealthCheckManager without requiring framework-specific endpoint definitions.
 """
 
+import asyncio
 import json
 import logging
 from typing import Callable, Awaitable
