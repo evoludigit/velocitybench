@@ -1,0 +1,203 @@
+name: Performance Regression Detection
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'frameworks/**'
+      - 'database/**'
+      - '.github/workflows/performance-regression.yml'
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  detect-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for potential performance regressions
+        id: check-regression
+        run: |
+          echo "## 📊 Performance Regression Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Check for common performance anti-patterns
+          echo "### Checking for common regressions..." >> $GITHUB_STEP_SUMMARY
+
+          issues_found=0
+
+          # Check for N+1 queries
+          echo "#### N+1 Query Detection" >> $GITHUB_STEP_SUMMARY
+          for file in frameworks/*/src/**/*.py frameworks/*/src/**/*.ts frameworks/*/src/**/*.js; do
+            if [ -f "$file" ]; then
+              # Look for common N+1 patterns
+              if grep -l "for.*in.*query\|for.*in.*fetch\|forEach.*query" "$file" 2>/dev/null; then
+                echo "⚠️  Potential N+1 in: $(basename $file)" >> $GITHUB_STEP_SUMMARY
+                issues_found=$((issues_found + 1))
+              fi
+            fi
+          done
+
+          # Check for missing indexes
+          echo "#### Index Coverage" >> $GITHUB_STEP_SUMMARY
+          if [ -f "database/schema.sql" ]; then
+            table_count=$(grep -c "CREATE TABLE" database/schema.sql || echo 0)
+            index_count=$(grep -c "CREATE INDEX" database/schema.sql || echo 0)
+            echo "Tables: $table_count, Indexes: $index_count" >> $GITHUB_STEP_SUMMARY
+
+            if [ $index_count -lt $((table_count / 2)) ]; then
+              echo "⚠️  Low index coverage detected" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "✅ Index coverage looks good" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+
+          # Check for synchronous code blocks in async context
+          echo "#### Async/Await Compliance" >> $GITHUB_STEP_SUMMARY
+          suspicious_sync=0
+          for file in frameworks/*/src/**/*.py frameworks/*/src/**/*.ts; do
+            if grep -q "async def\|async function" "$file" 2>/dev/null; then
+              if grep -q "\.get()\|\.fetch()\|time\.sleep" "$file" 2>/dev/null; then
+                echo "⚠️  Potential blocking operation in async function: $(basename $file)" >> $GITHUB_STEP_SUMMARY
+                suspicious_sync=$((suspicious_sync + 1))
+              fi
+            fi
+          done
+
+          # Check connection pool configuration
+          echo "#### Connection Pool Configuration" >> $GITHUB_STEP_SUMMARY
+          for config_file in frameworks/*/src/**/*.py frameworks/*/src/**/*.ts; do
+            if grep -q "pool_size\|max_size\|connections" "$config_file" 2>/dev/null; then
+              pool_size=$(grep -oP "(?<=pool_size=)\d+|(?<=max_size=)\d+|(?<=connections=)\d+" "$config_file" | head -1)
+              if [ -n "$pool_size" ] && [ "$pool_size" -lt 5 ]; then
+                echo "⚠️  Small connection pool ($pool_size) in $(basename $config_file)" >> $GITHUB_STEP_SUMMARY
+              fi
+            fi
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ $issues_found -gt 0 ]; then
+            echo "⚠️ **$issues_found potential regressions detected**" >> $GITHUB_STEP_SUMMARY
+            echo "### Recommendations" >> $GITHUB_STEP_SUMMARY
+            echo "- Review flagged files for N+1 query patterns" >> $GITHUB_STEP_SUMMARY
+            echo "- Ensure indexes are created for foreign keys" >> $GITHUB_STEP_SUMMARY
+            echo "- Use connection pooling for database access" >> $GITHUB_STEP_SUMMARY
+            echo "- Profile endpoints before merging" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ **No obvious performance issues detected**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Compare file sizes
+        run: |
+          echo "### Binary/Build Size Check" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Check Docker image sizes (estimate)
+          echo "#### Estimated Size Changes" >> $GITHUB_STEP_SUMMARY
+          for dockerfile in frameworks/*/Dockerfile; do
+            if [ -f "$dockerfile" ]; then
+              framework=$(dirname "$dockerfile" | xargs basename)
+              # Count dependencies to estimate bloat
+              deps=$(grep -E "pip install|npm install|apt-get install" "$dockerfile" | wc -l)
+              echo "- **$framework**: ~$((deps * 50))MB (estimate)" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+      - name: Check for memory leaks
+        id: memory-check
+        run: |
+          echo "### Memory Usage Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Look for common memory leak patterns
+          for file in frameworks/*/src/**/*.py frameworks/*/src/**/*.ts; do
+            if [ -f "$file" ]; then
+              # Global variables that grow over time
+              if grep -q "^[A-Z_]*\s*=\s*\[\]\|^[A-Z_]*\s*=\s*{}" "$file" 2>/dev/null; then
+                echo "⚠️  Global mutable state in $(basename $file)" >> $GITHUB_STEP_SUMMARY
+              fi
+
+              # Missing cleanup (destructors, finally blocks)
+              if grep -q "open(\|\.connect(\|asyncio\.Event(" "$file" 2>/dev/null; then
+                if ! grep -q "close\|disconnect\|finally" "$file" 2>/dev/null; then
+                  echo "⚠️  Potential resource leak in $(basename $file)" >> $GITHUB_STEP_SUMMARY
+                fi
+              fi
+            fi
+          done
+
+      - name: Upload regression report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: regression-report
+          path: ${{ github.step_summary }}
+          retention-days: 30
+
+      - name: Comment on PR with regression check
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summaryFile = process.env.GITHUB_STEP_SUMMARY;
+            const summary = fs.readFileSync(summaryFile, 'utf8');
+
+            let comment = summary;
+            comment += '\n\n**What to do**:\n';
+            comment += '- [ ] Review flagged performance issues\n';
+            comment += '- [ ] Profile endpoint changes (if applicable)\n';
+            comment += '- [ ] Run performance benchmark\n';
+            comment += '- [ ] Compare results against baseline\n\n';
+            comment += '📈 **Tip**: Use `make perf` to run full performance benchmark suite locally.';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  baseline-check:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check baseline staleness
+        run: |
+          echo "## 📈 Performance Baseline Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -d "tests/perf/results" ]; then
+            echo "### Recent Baseline Results" >> $GITHUB_STEP_SUMMARY
+            ls -lt tests/perf/results/ | head -10 >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check if baseline is stale (more than 30 days)
+          if [ -f "tests/perf/results/baseline.json" ]; then
+            baseline_age=$(find tests/perf/results/baseline.json -mtime +30)
+            if [ -n "$baseline_age" ]; then
+              echo "⚠️ **Baseline is stale** (>30 days old)" >> $GITHUB_STEP_SUMMARY
+              echo "Run \`make perf\` and commit new baseline results" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "✅ **Baseline is current**" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "⚠️ **No baseline found** - Run \`make perf\` to create baseline" >> $GITHUB_STEP_SUMMARY
+          fi
