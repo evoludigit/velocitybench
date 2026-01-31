@@ -131,7 +131,8 @@ class AsyncDatabase:
             password = os.getenv("DB_PASSWORD")
             if not password:
                 raise ValueError(
-                    "Database password is required. Set DB_PASSWORD environment variable."
+                    "Database password is required. "
+                    "Set DB_PASSWORD environment variable."
                 )
 
         logger.info(
