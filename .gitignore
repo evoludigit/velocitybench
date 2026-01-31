@@ -106,3 +106,4 @@ frameworks/*/.venv
 frameworks/*/venv
 database/.venv
 tests/qa/.venv
+.plan/
