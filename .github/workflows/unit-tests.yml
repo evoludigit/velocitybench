@@ -40,7 +40,7 @@ jobs:
       - name: Run tests with coverage
         working-directory: frameworks/${{ matrix.framework }}
         run: |
-          pytest tests/ --cov=src --cov-report=xml --cov-report=html --junitxml=junit.xml || exit 1
+          pytest tests/ --cov=src --cov-report=xml --cov-report=html --cov-fail-under=70 --junitxml=junit.xml || exit 1
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -510,18 +510,18 @@ jobs:
       - name: Lint Python code with Ruff
         run: |
           # Lint database and framework Python code
-          ruff check database/seed-data/generator/ frameworks/strawberry frameworks/graphene frameworks/fastapi-rest frameworks/flask-rest || true
+          ruff check database/seed-data/generator/ frameworks/strawberry frameworks/graphene frameworks/fastapi-rest frameworks/flask-rest
           echo "✅ Ruff linting completed"
 
       - name: Format check with Ruff
         run: |
-          ruff format --check database/seed-data/generator/ frameworks/strawberry frameworks/graphene frameworks/fastapi-rest frameworks/flask-rest || true
+          ruff format --check database/seed-data/generator/ frameworks/strawberry frameworks/graphene frameworks/fastapi-rest frameworks/flask-rest
           echo "✅ Code format check completed"
 
       - name: Type check Python code with ty
         run: |
           # Type check Python frameworks
-          ty check database/seed-data/generator/ 2>/dev/null || echo "⚠️  Type checking has warnings (non-blocking)"
+          ty check database/seed-data/generator/
           echo "✅ Type checking completed"
 
   # Final status

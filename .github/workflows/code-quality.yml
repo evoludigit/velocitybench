@@ -30,25 +30,22 @@ jobs:
 
       - name: Run Ruff linter
         id: ruff
-        continue-on-error: true
         run: |
           echo "### 🔍 Ruff Linter Report" >> $GITHUB_STEP_SUMMARY
-          ruff check . --format=github >> $GITHUB_STEP_SUMMARY || true
+          ruff check . --format=github >> $GITHUB_STEP_SUMMARY
 
       - name: Run Ruff formatter check
         id: ruff-format
-        continue-on-error: true
         run: |
           echo "### 📝 Code Format Check" >> $GITHUB_STEP_SUMMARY
-          ruff format --check . --diff >> $GITHUB_STEP_SUMMARY || true
+          ruff format --check . --diff >> $GITHUB_STEP_SUMMARY
 
       - name: Run Bandit security check
         id: bandit
-        continue-on-error: true
         run: |
           echo "### 🔒 Security Issues (Bandit)" >> $GITHUB_STEP_SUMMARY
-          bandit -r frameworks/ database/ scripts/ -ll -f json > /tmp/bandit.json 2>/dev/null || true
-          bandit -r frameworks/ database/ scripts/ -ll >> $GITHUB_STEP_SUMMARY || true
+          bandit -r frameworks/ database/ scripts/ -ll -f json > /tmp/bandit.json 2>/dev/null
+          bandit -r frameworks/ database/ scripts/ -ll >> $GITHUB_STEP_SUMMARY
 
       - name: Comment on PR with quality results
         if: github.event_name == 'pull_request'
@@ -120,8 +117,9 @@ jobs:
             --cov=src \
             --cov-report=json \
             --cov-report=term \
+            --cov-report=xml \
             --cov-fail-under=70 \
-            --junitxml=coverage.json || echo "Coverage check passed or warnings only"
+            --junitxml=coverage.json
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
@@ -207,15 +205,7 @@ jobs:
       - name: Run type check
         working-directory: frameworks/${{ matrix.framework }}
         id: typecheck
-        continue-on-error: true
         run: |
           echo "### 🔍 Type Check Report - ${{ matrix.framework }}" >> $GITHUB_STEP_SUMMARY
-          ty check src/ >> $GITHUB_STEP_SUMMARY 2>&1 || true
-
-      - name: Report results
-        run: |
-          if [ "${{ steps.typecheck.outcome }}" == "success" ]; then
-            echo "✅ Type checking passed for ${{ matrix.framework }}"
-          else
-            echo "⚠️ Type checking found issues for ${{ matrix.framework }}"
-          fi
+          ty check src/ >> $GITHUB_STEP_SUMMARY 2>&1
+          echo "✅ Type checking passed for ${{ matrix.framework }}"
