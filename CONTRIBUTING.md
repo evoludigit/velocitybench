@@ -387,17 +387,44 @@ Reviewers will check:
 
 ## Adding New Frameworks
 
-For detailed instructions on adding a new framework implementation, see [DEVELOPMENT.md - Adding New Frameworks](DEVELOPMENT.md#adding-new-frameworks).
+Adding a new framework to VelocityBench involves implementing API endpoints, tests, Docker configuration, and registration. We provide comprehensive guidance:
 
-Quick checklist:
+### Full Implementation Guide
+👉 **[docs/ADD_FRAMEWORK_GUIDE.md](docs/ADD_FRAMEWORK_GUIDE.md)** - Complete step-by-step tutorial covering:
+- Framework directory structure
+- Endpoint implementation (REST or GraphQL)
+- Test setup and coverage
+- Health checks
+- Docker configuration
+- Framework registration
+- Documentation
+- Verification checklist
+- Troubleshooting
 
-1. Create framework directory with required structure
-2. Implement all required endpoints (REST or GraphQL)
-3. Add tests with minimum 70% coverage
-4. Register in `tests/qa/framework_registry.yaml`
-5. Update `docker-compose.yml`
-6. Document in `frameworks/YOUR_FRAMEWORK/README.md`
-7. Ensure CI/CD passes
+**Time required**: 3-8 hours depending on API type
+
+### Quick Checklist
+For experienced contributors:
+
+1. ✅ Create framework directory with standard structure
+2. ✅ Implement all required endpoints (REST or GraphQL)
+3. ✅ Add tests with minimum 70% coverage
+4. ✅ Implement health check endpoint
+5. ✅ Register in `tests/qa/framework_registry.yaml`
+6. ✅ Create Dockerfile
+7. ✅ Update `docker-compose.yml`
+8. ✅ Write comprehensive README.md
+9. ✅ Verify CI/CD passes
+10. ✅ Test with smoke tests
+
+### Reference Implementations
+Study these before adding your framework:
+- **Python REST**: `frameworks/fastapi-rest/`
+- **Python GraphQL**: `frameworks/strawberry/`
+- **Node REST**: `frameworks/express-rest/`
+- **Node GraphQL**: `frameworks/apollo-server/`
+- **Go GraphQL**: `frameworks/go-gqlgen/`
+- **Rust GraphQL**: `frameworks/async-graphql/`
 
 ---
 
