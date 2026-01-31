@@ -63,6 +63,7 @@ make perf
 - **[TESTING_STANDARDS.md](TESTING_STANDARDS.md)** - Universal testing standards and best practices
 - **[SECURITY.md](SECURITY.md)** - Security model and intended use
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** - How to contribute to VelocityBench
+- **[docs/FRAMEWORK_SELECTION_GUIDE.md](docs/FRAMEWORK_SELECTION_GUIDE.md)** - Choose the right framework for your needs
 - **[docs/ADD_FRAMEWORK_GUIDE.md](docs/ADD_FRAMEWORK_GUIDE.md)** - Complete tutorial for adding new frameworks
 
 ### Production Readiness
