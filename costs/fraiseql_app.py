@@ -37,8 +37,15 @@ logger = logging.getLogger(__name__)
 
 def create_fraiseql_config() -> FraiseQLConfig:
     """Create FraiseQL configuration for VelocityBench analytics."""
+    # Password is REQUIRED - fail fast if not provided
+    db_password = os.getenv("DB_PASSWORD")
+    if not db_password:
+        raise ValueError(
+            "Database password is required. Set DB_PASSWORD environment variable."
+        )
+
     return FraiseQLConfig(
-        database_url=f"postgresql://{os.getenv('DB_USER', 'benchmark')}:{os.getenv('DB_PASSWORD', 'benchmark123')}@{os.getenv('DB_HOST', 'localhost')}:{os.getenv('DB_PORT', '5432')}/{os.getenv('DB_NAME', 'velocitybench')}",
+        database_url=f"postgresql://{os.getenv('DB_USER', 'benchmark')}:{db_password}@{os.getenv('DB_HOST', 'localhost')}:{os.getenv('DB_PORT', '5432')}/{os.getenv('DB_NAME', 'velocitybench')}",
         environment=os.getenv("ENVIRONMENT", "development"),
         introspection_policy=IntrospectionPolicy.PUBLIC,
         enable_playground=True,

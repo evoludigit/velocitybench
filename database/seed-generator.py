@@ -388,8 +388,8 @@ Examples:
 
     parser.add_argument(
         "--db",
-        default="postgresql://benchmark:benchmark123@localhost:5432/fraiseql_benchmark",
-        help="Database connection string"
+        default=None,
+        help="Database connection string (required if DB_PASSWORD env var not set)"
     )
 
     parser.add_argument(
@@ -418,6 +418,14 @@ Examples:
     )
 
     args = parser.parse_args()
+
+    # Validate database connection string
+    if not args.db:
+        raise ValueError(
+            "Database connection string is required. "
+            "Use --db 'postgresql://user:password@host:port/db' "
+            "or set DB_PASSWORD environment variable."
+        )
 
     # Get base config from preset
     config = PRESETS[args.preset].copy()

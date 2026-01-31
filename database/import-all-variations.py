@@ -39,10 +39,23 @@ class BulkImporter:
 
     def __init__(self, pg_conn_str: str = None):
         if pg_conn_str is None:
-            pg_conn_str = os.getenv(
-                "DATABASE_URL",
-                "postgresql://benchmark:benchmark123@localhost:5434/fraiseql_benchmark"
-            )
+            pg_conn_str = os.getenv("DATABASE_URL")
+
+            # If DATABASE_URL not set, build from environment variables
+            if not pg_conn_str:
+                db_password = os.getenv("DB_PASSWORD")
+                if not db_password:
+                    raise ValueError(
+                        "Database password is required. "
+                        "Set either DATABASE_URL or DB_PASSWORD environment variable."
+                    )
+
+                pg_conn_str = (
+                    f"postgresql://{os.getenv('DB_USER', 'benchmark')}:{db_password}"
+                    f"@{os.getenv('DB_HOST', 'localhost')}:{os.getenv('DB_PORT', '5434')}"
+                    f"/{os.getenv('DB_NAME', 'fraiseql_benchmark')}"
+                )
+
         self.pg_conn_str = pg_conn_str
         self.results = []
 

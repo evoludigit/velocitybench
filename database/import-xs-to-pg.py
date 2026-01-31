@@ -160,10 +160,21 @@ if __name__ == "__main__":
     import os
 
     sqlite_path = sys.argv[1] if len(sys.argv) > 1 else "datasets/fraiseql_xs_test.db"
-    pg_conn_str = os.getenv(
-        "DATABASE_URL",
-        "postgresql://benchmark:benchmark123@localhost:5434/fraiseql_benchmark"
-    )
+    pg_conn_str = os.getenv("DATABASE_URL")
+
+    # If DATABASE_URL not set, build from environment variables
+    if not pg_conn_str:
+        db_password = os.getenv("DB_PASSWORD")
+        if not db_password:
+            print("❌ Database password is required.")
+            print("Set either DATABASE_URL or DB_PASSWORD environment variable.")
+            sys.exit(1)
+
+        pg_conn_str = (
+            f"postgresql://{os.getenv('DB_USER', 'benchmark')}:{db_password}"
+            f"@{os.getenv('DB_HOST', 'localhost')}:{os.getenv('DB_PORT', '5434')}"
+            f"/{os.getenv('DB_NAME', 'fraiseql_benchmark')}"
+        )
 
     success = import_xs(sqlite_path, pg_conn_str)
     sys.exit(0 if success else 1)

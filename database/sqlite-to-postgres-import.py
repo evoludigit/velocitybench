@@ -11,6 +11,7 @@ Usage:
     python database/sqlite-to-postgres-import.py xxlarge
 """
 
+import os
 import sqlite3
 import sys
 import time
@@ -37,10 +38,22 @@ def import_sqlite_to_postgres(db_name: str):
     sqlite_cursor = sqlite_conn.cursor()
 
     # Connect to PostgreSQL
+    db_password = os.getenv("DB_PASSWORD")
+    if not db_password:
+        print("❌ Database password is required. Set DB_PASSWORD environment variable.")
+        sqlite_conn.close()
+        return False
+
+    pg_conninfo = psycopg.conninfo.make_conninfo(
+        host=os.getenv("DB_HOST", "localhost"),
+        port=int(os.getenv("DB_PORT", "5435")),
+        dbname=os.getenv("DB_NAME", "fraiseql_benchmark"),
+        user=os.getenv("DB_USER", "benchmark"),
+        password=db_password,
+    )
+
     try:
-        pg_conn = psycopg.connect(
-            "host=localhost port=5435 dbname=fraiseql_benchmark user=benchmark password=benchmark123"
-        )
+        pg_conn = psycopg.connect(pg_conninfo)
         pg_cursor = pg_conn.cursor()
     except Exception as e:
         print(f"❌ Failed to connect to PostgreSQL: {e}")
