@@ -78,6 +78,7 @@ make perf
 ### Testing & Quality
 - **[testing-templates/](testing-templates/)** - Reusable test templates for all languages
 - **[docs/PYTEST_CONFIGURATION.md](docs/PYTEST_CONFIGURATION.md)** - Pytest configuration guide
+- **[docs/TEST_COVERAGE_VERIFICATION.md](docs/TEST_COVERAGE_VERIFICATION.md)** - Test infrastructure and coverage report
 - **[phase-plans/](phase-plans/)** - Implementation phases and roadmaps
 
 ### Future Considerations
