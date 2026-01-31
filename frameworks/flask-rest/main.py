@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""
-Flask REST Comparative Benchmarking Implementation
-Traditional synchronous REST API using psycopg3 connection pool (demonstrates N+1 problem).
+"""Flask REST Comparative Benchmarking Implementation.
+
+Traditional synchronous REST API using psycopg3 connection pool
+(demonstrates N+1 problem).
 """
 
 import os
+import sys
 import time
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from pathlib import Path as PathlibPath
 from typing import Any
 
 import prometheus_client
@@ -16,6 +19,15 @@ import psycopg
 from flask import Flask, jsonify, request
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
+
+sys.path.insert(0, str(PathlibPath(__file__).parent.parent))
+from common.errors import (
+    AppError,
+    InputValidationError,
+    ResourceNotFoundError,
+)
+from common.logging_middleware import FlaskLoggingMiddleware
+from common.validators import Validator
 
 # Metrics
 REQUEST_COUNT = prometheus_client.Counter(
@@ -27,6 +39,9 @@ REQUEST_LATENCY = prometheus_client.Histogram(
 
 
 app = Flask(__name__)
+
+# Initialize request logging middleware
+FlaskLoggingMiddleware(app)
 
 # Health check startup time
 app.config["START_TIME"] = time.time()
@@ -45,7 +60,7 @@ def validate_update_user_data(data: dict[str, Any]) -> list[dict[str, str]]:
 
     # Check for unknown fields
     allowed_fields = ALLOWED_UPDATE_FIELDS
-    for field in data.keys():
+    for field in data:
         if field not in allowed_fields:
             errors.append({"field": field, "error": f"Unknown field: {field}"})
 
@@ -115,12 +130,11 @@ def get_db_connection() -> Any:
 
 def execute_query(query: str, params: tuple | None = None) -> list[dict[str, Any]]:
     """Execute query and return results."""
-    with get_db_connection() as conn:
-        with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute(query, params or ())
-            if cur.description:
-                return cur.fetchall()
-            return []
+    with get_db_connection() as conn, conn.cursor(row_factory=dict_row) as cur:
+        cur.execute(query, params or ())
+        if cur.description:
+            return cur.fetchall()
+        return []
 
 
 # Initialize pool in app context on first request
@@ -147,10 +161,9 @@ def _check_database() -> dict[str, Any]:
             return {"status": "down", "error": "Database pool not initialized"}
 
         start = time.time()
-        with pool.connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT 1")
-                cur.fetchone()
+        with pool.connection() as conn, conn.cursor() as cur:
+            cur.execute("SELECT 1")
+            cur.fetchone()
 
         response_time = (time.time() - start) * 1000
 
@@ -164,7 +177,7 @@ def _check_database() -> dict[str, Any]:
             "pool_available": pool_stats.get("pool_available", 0),
         }
     except (psycopg.DatabaseError, ConnectionError, TimeoutError, OSError) as e:
-        return {"status": "down", "error": f"Database error: {str(e)}"}
+        return {"status": "down", "error": f"Database error: {e!s}"}
 
 
 def _check_memory() -> dict[str, Any]:
@@ -195,7 +208,7 @@ def _check_memory() -> dict[str, Any]:
 
         return result
     except (OSError, PermissionError) as e:
-        return {"status": "degraded", "warning": f"Memory check error: {str(e)}"}
+        return {"status": "degraded", "warning": f"Memory check error: {e!s}"}
 
 
 def _get_health_response(probe_type: str) -> tuple[Any, int]:
@@ -220,7 +233,7 @@ def _get_health_response(probe_type: str) -> tuple[Any, int]:
 
     response = {
         "status": overall_status,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "uptime_ms": uptime_ms,
         "version": app.config["VERSION"],
         "service": app.config["SERVICE_NAME"],
@@ -272,7 +285,10 @@ def list_users():
     # Check for batch fetch by IDs
     ids = request.args.get("ids")
     if ids:
-        id_list = [id.strip() for id in ids.split(",") if id.strip()]
+        try:
+            id_list = Validator.validate_uuid_list(ids, max_count=100)
+        except InputValidationError:
+            raise
         if not id_list:
             return jsonify({"users": []})
 
@@ -287,7 +303,12 @@ def list_users():
         )
         return jsonify({"users": users})
 
-    limit = int(request.args.get("limit", 10))
+    try:
+        limit = Validator.validate_limit(
+            request.args.get("limit", 10), min_val=1, max_val=100
+        )
+    except InputValidationError:
+        raise
     users = execute_query(
         """
         SELECT id, username, full_name, bio
@@ -306,6 +327,12 @@ def get_user(user_id):
     """Get user by ID with optional includes"""
     REQUEST_COUNT.labels(method="GET", endpoint="/users/{id}").inc()
 
+    # Validate user_id format
+    try:
+        Validator.validate_uuid(user_id, "user_id")
+    except InputValidationError:
+        raise
+
     user = execute_query(
         """
         SELECT id, username, full_name, bio
@@ -316,28 +343,34 @@ def get_user(user_id):
     )
 
     if not user:
-        return jsonify({"error": "User not found"}), 404
+        raise ResourceNotFoundError(f"User with ID {user_id} not found")
 
     user_data = user[0]
 
     # Handle includes parameter
+    allowed_includes = {"posts", "posts.comments", "posts.comments.author"}
     include = request.args.get("include", "")
     if include:
-        includes = include.split(",")
+        try:
+            includes = Validator.validate_include_fields(include, allowed_includes)
+        except InputValidationError:
+            raise
+    else:
+        includes = []
 
-        if "posts" in includes:
-            posts = execute_query(
-                """
-                SELECT p.id, p.title, p.content
-                FROM benchmark.tb_post p
-                JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-                WHERE u.id = %s
-                ORDER BY p.created_at DESC
-                LIMIT 10
-            """,
-                (user_id,),
-            )
-            user_data["posts"] = posts
+    if "posts" in includes:
+        posts = execute_query(
+            """
+            SELECT p.id, p.title, p.content
+            FROM benchmark.tb_post p
+            JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+            WHERE u.id = %s
+            ORDER BY p.created_at DESC
+            LIMIT 10
+        """,
+            (user_id,),
+        )
+        user_data["posts"] = posts
 
     return jsonify(user_data)
 
@@ -388,8 +421,9 @@ def update_user(user_id):
 
     if update_fields:
         params.append(user_id)
+        update_clause = ", ".join(update_fields)
         execute_query(
-            f"UPDATE benchmark.tb_user SET {', '.join(update_fields)}, updated_at = NOW() WHERE id = %s",
+            f"UPDATE benchmark.tb_user SET {update_clause}, updated_at = NOW() WHERE id = %s",
             tuple(params),
         )
 
@@ -402,11 +436,25 @@ def list_posts():
     """List posts with optional includes"""
     REQUEST_COUNT.labels(method="GET", endpoint="/posts").inc()
 
-    limit = int(request.args.get("limit", 10))
+    try:
+        limit = Validator.validate_limit(
+            request.args.get("limit", 10), min_val=1, max_val=100
+        )
+    except InputValidationError:
+        raise
+
+    allowed_includes = {"author", "comments", "comments.author"}
     include = request.args.get("include", "")
+    if include:
+        try:
+            includes = Validator.validate_include_fields(include, allowed_includes)
+        except InputValidationError:
+            raise
+    else:
+        includes = []
 
     # Query posts with author if needed
-    if "author" in include:
+    if "author" in includes:
         posts = execute_query(
             """
             SELECT p.id, p.title, p.content,
@@ -446,6 +494,12 @@ def get_post(post_id):
     """Get post by ID (basic info only - matches benchmarking expectations)"""
     REQUEST_COUNT.labels(method="GET", endpoint="/posts/{id}").inc()
 
+    # Validate post_id format
+    try:
+        Validator.validate_uuid(post_id, "post_id")
+    except InputValidationError:
+        raise
+
     post = execute_query(
         """
         SELECT id, title, content
@@ -456,7 +510,7 @@ def get_post(post_id):
     )
 
     if not post:
-        return jsonify({"error": "Post not found"}), 404
+        raise ResourceNotFoundError(f"Post with ID {post_id} not found")
 
     return jsonify(post[0])
 
@@ -465,6 +519,12 @@ def get_post(post_id):
 def get_post_author(post_id):
     """Get post's author (separate endpoint - N+1)"""
     REQUEST_COUNT.labels(method="GET", endpoint="/posts/{id}/author").inc()
+
+    # Validate post_id format
+    try:
+        Validator.validate_uuid(post_id, "post_id")
+    except InputValidationError:
+        raise
 
     author = execute_query(
         """
@@ -477,7 +537,7 @@ def get_post_author(post_id):
     )
 
     if not author:
-        return jsonify({"error": "Post not found"}), 404
+        raise ResourceNotFoundError(f"Post with ID {post_id} not found")
 
     return jsonify(author[0])
 
@@ -486,6 +546,12 @@ def get_post_author(post_id):
 def get_comment(comment_id):
     """Get comment by ID (basic info only)"""
     REQUEST_COUNT.labels(method="GET", endpoint="/comments/{id}").inc()
+
+    # Validate comment_id format
+    try:
+        Validator.validate_uuid(comment_id, "comment_id")
+    except InputValidationError:
+        raise
 
     comment = execute_query(
         """
@@ -497,7 +563,7 @@ def get_comment(comment_id):
     )
 
     if not comment:
-        return jsonify({"error": "Comment not found"}), 404
+        raise ResourceNotFoundError(f"Comment with ID {comment_id} not found")
 
     return jsonify(comment[0])
 
@@ -507,12 +573,24 @@ def get_post_comments(post_id):
     """Get comments for a specific post"""
     REQUEST_COUNT.labels(method="GET", endpoint="/posts/{id}/comments").inc()
 
-    limit = int(request.args.get("limit", 10))
+    # Validate post_id format
+    try:
+        Validator.validate_uuid(post_id, "post_id")
+    except InputValidationError:
+        raise
+
+    try:
+        limit = Validator.validate_limit(
+            request.args.get("limit", 10), min_val=1, max_val=100
+        )
+    except InputValidationError:
+        raise
 
     comments = execute_query(
         """
         SELECT c.id, c.content, c.created_at, c.is_approved,
-               u.id as author_id, u.username as author_username, u.avatar_url as author_avatar
+               u.id as author_id, u.username as author_username,
+               u.avatar_url as author_avatar
         FROM benchmark.tb_comment c
         JOIN benchmark.tb_post p ON c.fk_post = p.pk_post
         JOIN benchmark.tb_user u ON c.fk_author = u.pk_user
@@ -537,6 +615,16 @@ def metrics():
 
 
 # Error handlers
+@app.errorhandler(AppError)
+def handle_app_error(error: AppError):
+    """Handle application errors with proper status codes."""
+    app.logger.error(
+        f"Application error: {error.message}",
+        extra={"error_code": error.error_code},
+    )
+    return jsonify(error.to_dict()), error.status_code
+
+
 @app.errorhandler(404)
 def handle_not_found(error):
     """Handle 404 errors."""
