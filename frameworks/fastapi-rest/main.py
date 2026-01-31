@@ -1,27 +1,37 @@
 #!/usr/bin/env python3
-"""
-FastAPI REST Comparative Benchmarking Implementation
-Async REST API with asyncpg connection pooling that matches GraphQL operations using include parameters.
+"""FastAPI REST Comparative Benchmarking Implementation.
+
+Async REST API with asyncpg connection pooling that matches GraphQL
+operations using include parameters.
 """
 
 import logging
 import os
 import sys
 from contextlib import asynccontextmanager
-from pathlib import Path
+from pathlib import Path as PathlibPath
 from typing import Any
 from uuid import UUID
 
 import prometheus_client
-from fastapi import FastAPI, HTTPException, Path, Query
+from fastapi import FastAPI, Path, Query
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from common.async_db import AsyncDatabase
-from common.health_check import HealthCheckManager
-from common.config import get_db_config, ConfigurationError
+sys.path.insert(0, str(PathlibPath(__file__).parent.parent))
+from common.config import ConfigurationError, get_db_config  # noqa: E402
+from common.errors import (  # noqa: E402
+    AppError,
+    InputValidationError,
+    ResourceNotFoundError,
+)
+from common.health_check import HealthCheckManager  # noqa: E402
+from common.logging_middleware import FastAPILoggingMiddleware  # noqa: E402
+from common.validators import Validator  # noqa: E402
+
+from common.async_db import AsyncDatabase  # noqa: E402
 
 # Metrics
 REQUEST_COUNT = prometheus_client.Counter(
@@ -105,6 +115,20 @@ async def lifespan(app: FastAPI):
 # FastAPI app with lifespan
 app = FastAPI(title="FastAPI REST Comparative Benchmark", lifespan=lifespan)
 
+# Add logging middleware
+app.add_middleware(FastAPILoggingMiddleware)
+
+
+# Exception handler for application errors
+@app.exception_handler(AppError)
+async def app_error_handler(_request, exc: AppError):
+    """Handle application errors with proper status codes."""
+    logger.error(
+        f"Application error: {exc.message}",
+        extra={"error_code": exc.error_code},
+    )
+    return JSONResponse(status_code=exc.status_code, content=exc.to_dict())
+
 
 def get_db() -> AsyncDatabase:
     """Get database from app state."""
@@ -171,7 +195,10 @@ async def list_users(
 
     # Batch fetch by IDs if provided
     if ids:
-        id_list = [id.strip() for id in ids.split(",") if id.strip()]
+        try:
+            id_list = Validator.validate_uuid_list(ids, max_count=100)
+        except InputValidationError:
+            raise
         if not id_list:
             return {"users": []}
 
@@ -221,6 +248,12 @@ async def get_user(user_id: str = Path(...), include: str | None = None):
 
     db = get_db()
 
+    # Validate user_id format
+    try:
+        Validator.validate_uuid(user_id, "user_id")
+    except InputValidationError:
+        raise
+
     # Base user query
     user = await db.fetchrow(
         """
@@ -232,13 +265,19 @@ async def get_user(user_id: str = Path(...), include: str | None = None):
     )
 
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise ResourceNotFoundError(f"User with ID {user_id} not found")
 
     user_data = dict(user)
 
-    # Handle includes
+    # Validate include parameter
+    allowed_includes = {"posts", "posts.comments", "posts.comments.author"}
     if include:
-        includes = include.split(",")
+        try:
+            includes = Validator.validate_include_fields(include, allowed_includes)
+        except InputValidationError:
+            raise
+    else:
+        includes = []
 
         if "posts" in includes:
             posts = await db.fetch(
@@ -400,6 +439,12 @@ async def get_post(post_id: str = Path(...), include: str | None = None):
 
     db = get_db()
 
+    # Validate post_id format
+    try:
+        Validator.validate_uuid(post_id, "post_id")
+    except InputValidationError:
+        raise
+
     # Base post query with author
     post = await db.fetchrow(
         """
@@ -413,7 +458,7 @@ async def get_post(post_id: str = Path(...), include: str | None = None):
     )
 
     if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
+        raise ResourceNotFoundError(f"Post with ID {post_id} not found")
 
     post_data = dict(post)
 
@@ -467,7 +512,8 @@ async def get_post_comments(
     comments = await db.fetch(
         """
         SELECT c.id, c.content, c.created_at, c.is_approved,
-               u.id as author_id, u.username as author_username, u.avatar_url as author_avatar
+               u.id as author_id, u.username as author_username,
+               u.avatar_url as author_avatar
         FROM benchmark.tb_comment c
         JOIN benchmark.tb_post p ON c.fk_post = p.pk_post
         JOIN benchmark.tb_user u ON c.fk_author = u.pk_user
