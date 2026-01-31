@@ -13,7 +13,7 @@ This release adds comprehensive health checks, automated regression detection, a
 - ✅ **Production Health Checks**: Kubernetes-compatible health probes across 8 languages
 - ✅ **Automated Regression Detection**: Statistical analysis with baseline management
 - ✅ **Comprehensive Documentation**: 12 ADRs, 10+ implementation guides
-- ✅ **40+ Frameworks**: Python, TypeScript, Go, Rust, Java, PHP, Ruby, C#
+- ✅ **35 Frameworks in CI**: Python, TypeScript, Go, Rust, Java, PHP, Ruby, C# (45+ configurations including ORM variations)
 - ✅ **Enterprise-Ready**: Security model, dependency auditing, CI/CD integration
 
 ---

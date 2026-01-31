@@ -93,6 +93,9 @@ jobs:
           - fastapi-rest
           - flask-rest
           - strawberry
+          - graphene
+          - ariadne
+          - asgi-graphql
 
     steps:
       - name: Checkout repository
@@ -184,6 +187,9 @@ jobs:
           - fastapi-rest
           - flask-rest
           - strawberry
+          - graphene
+          - ariadne
+          - asgi-graphql
 
     steps:
       - name: Checkout repository

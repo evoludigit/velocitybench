@@ -225,6 +225,153 @@
       "language": "go",
       "category": "rest-orm-naive",
       "note": "Naive implementation with N+1 query problems (lazy loading)"
+    },
+    "ariadne": {
+      "port": 8025,
+      "type": "graphql",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "language": "python",
+      "category": "graphql-library"
+    },
+    "asgi-graphql": {
+      "port": 8026,
+      "type": "graphql",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "language": "python",
+      "category": "graphql-library"
+    },
+    "express-graphql": {
+      "port": 8027,
+      "type": "graphql",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "language": "typescript",
+      "category": "graphql-library"
+    },
+    "fastify-graphql": {
+      "port": 8028,
+      "type": "graphql",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "language": "typescript",
+      "category": "graphql-library"
+    },
+    "graphql-yoga": {
+      "port": 8029,
+      "type": "graphql",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "language": "typescript",
+      "category": "graphql-library"
+    },
+    "mercurius": {
+      "port": 8030,
+      "type": "graphql",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "language": "typescript",
+      "category": "graphql-library"
+    },
+    "postgraphile": {
+      "port": 8031,
+      "type": "graphql",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "language": "typescript",
+      "category": "graphql-engine",
+      "note": "Auto-generates GraphQL API from PostgreSQL schema"
+    },
+    "graphql-go": {
+      "port": 8032,
+      "type": "graphql",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "language": "go",
+      "category": "graphql-library"
+    },
+    "juniper": {
+      "port": 8033,
+      "type": "graphql",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "language": "rust",
+      "category": "graphql-library"
+    },
+    "webonyx-graphql-php": {
+      "port": 8034,
+      "type": "graphql",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "language": "php",
+      "category": "graphql-library"
+    },
+    "ruby-rails": {
+      "port": 8035,
+      "type": "rest",
+      "health": "/api/health",
+      "endpoint": "/api/users",
+      "language": "ruby",
+      "category": "rest-framework"
+    },
+    "ruby-rails-fixed": {
+      "port": 8036,
+      "type": "rest",
+      "health": "/api/health",
+      "endpoint": "/api/users",
+      "language": "ruby",
+      "category": "rest-framework",
+      "note": "Fixed version with optimized queries"
+    },
+    "hanami": {
+      "port": 8037,
+      "type": "rest",
+      "health": "/api/health",
+      "endpoint": "/api/users",
+      "language": "ruby",
+      "category": "rest-framework"
+    },
+    "php-laravel": {
+      "port": 8038,
+      "type": "rest",
+      "health": "/api/health",
+      "endpoint": "/api/users",
+      "language": "php",
+      "category": "rest-framework"
+    },
+    "micronaut-graphql": {
+      "port": 8039,
+      "type": "graphql",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "language": "java",
+      "category": "graphql-framework"
+    },
+    "quarkus-graphql": {
+      "port": 8040,
+      "type": "graphql",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "language": "java",
+      "category": "graphql-framework"
+    },
+    "play-graphql": {
+      "port": 8041,
+      "type": "graphql",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "language": "scala",
+      "category": "graphql-framework"
+    },
+    "spring-graphql": {
+      "port": 8042,
+      "type": "graphql",
+      "health": "/health",
+      "endpoint": "/graphql",
+      "language": "java",
+      "category": "graphql-framework",
+      "note": "Test-only stub (no build configuration)"
     }
   },
   "test_queries": {

@@ -426,6 +426,67 @@ Study these before adding your framework:
 - **Go GraphQL**: `frameworks/go-gqlgen/`
 - **Rust GraphQL**: `frameworks/async-graphql/`
 
+### Adding Framework Tests to CI
+
+Once your framework implementation is complete with tests, add it to the GitHub Actions CI pipeline:
+
+1. **Identify test requirements**:
+   - Determine your test runner (pytest, npm test, cargo test, etc.)
+   - Verify tests can run without user interaction
+   - Ensure tests produce coverage reports in standard formats
+
+2. **Update `.github/workflows/unit-tests.yml`**:
+   - Add framework to appropriate language matrix (Python, TypeScript, Go, etc.)
+   - If new language, create dedicated job following existing patterns
+   - **IMPORTANT**: Never use silent failure fallbacks (no `|| echo "skipped"`)
+   - Always exit with error code on test failure: `|| exit 1`
+
+3. **Test runner detection** (if needed):
+   For frameworks with variable test runners, implement detection logic:
+   ```yaml
+   - name: Run tests
+     run: |
+       if grep -q '"vitest"' package.json; then
+         npm test -- --coverage || exit 1
+       elif grep -q '"jest"' package.json; then
+         npm test || exit 1
+       else
+         echo "ERROR: No recognized test runner found"
+         exit 1
+       fi
+   ```
+
+4. **Coverage reporting**:
+   - Configure framework to generate coverage in standard format
+   - Update codecov action with correct file paths
+   - Verify coverage uploads successfully in CI logs
+
+5. **Update dependencies**:
+   - Modify coverage-check job dependencies to include new job name
+   - Update failure detection logic
+   - Update summary report generation
+
+6. **Verify locally**:
+   ```bash
+   # Test framework tests locally first
+   cd frameworks/your-framework
+   # Run tests (your framework's command)
+
+   # Verify coverage reports generate
+   ls coverage.xml  # or equivalent
+   ```
+
+**CI Matrix Structure**:
+- Python: pytest-based frameworks
+- TypeScript: npm test-based frameworks (with runner detection)
+- Go: `go test` frameworks
+- Java: Maven/Gradle frameworks
+- Rust: `cargo test` frameworks
+- PHP: PHPUnit frameworks (with framework detection)
+- Ruby: RSpec/Minitest frameworks (with detection)
+- JVM Multi-tool: Frameworks using different build tools (Gradle, Maven, sbt)
+- Special: Configuration-based or managed services (Hasura)
+
 ---
 
 ## Reporting Issues

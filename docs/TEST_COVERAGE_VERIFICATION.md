@@ -35,7 +35,8 @@ VelocityBench has a comprehensive, multi-layered test infrastructure designed fo
   - `config_validator.py` - Framework configuration validation
 
 **Status**: ✅ Operational
-- Framework registry configured with 38 frameworks
+- Framework registry configured with 45 framework variations
+- CI pipeline tests 35 frameworks automatically
 - Validation config in `validation_config.yaml`
 - Test fixtures in `fixtures/` directory
 
@@ -118,7 +119,10 @@ python -m pytest tests/
 | **Configuration** | Framework config validation | ✅ Full |
 | **Performance** | Throughput, latency, resources | ✅ Full |
 | **Health** | Kubernetes-compatible probes | ✅ Full |
-| **Frameworks** | 38 frameworks across 8 languages | ✅ Full |
+| **Frameworks (CI)** | 35 frameworks tested in GitHub Actions | ✅ Full |
+| **Frameworks (Config)** | 45 framework configurations across 8 languages | ✅ Full |
+
+**Note on CI Coverage**: 35 actively maintained frameworks are tested in the GitHub Actions CI pipeline. An additional 10 framework variations (ORM implementations, N+1 demos) are available for specialized testing.
 
 ## Dependency Audit
 
@@ -175,11 +179,44 @@ Tests are designed to be CI/CD-friendly:
 4. **Run Performance Suite**: `make perf`
 5. **Run Dependency Audit**: `python scripts/audit-dependencies.py`
 
+## CI Matrix Summary
+
+The GitHub Actions workflow (`/.github/workflows/unit-tests.yml`) maintains comprehensive test coverage:
+
+| Language | Test Job | Frameworks | Build Tools |
+|----------|----------|------------|-------------|
+| Python | python-tests | 6 | pytest |
+| TypeScript | typescript-tests | 9 | npm test (Vitest/Jest) |
+| Go | go-tests | 4 | go test |
+| Java | java-tests | 3 | Maven |
+| JVM | jvm-tests | 3 | Gradle, Maven, sbt |
+| Rust | rust-tests | 3 | cargo |
+| PHP | php-tests | 2 | PHPUnit/artisan |
+| Ruby | ruby-tests | 3 | RSpec/Minitest |
+| C# | csharp-tests | 1 | dotnet |
+| Special | hasura-tests | 1 | pytest (API tests) |
+| **Total** | **10 jobs** | **35 frameworks** | **Multiple** |
+
+**Key Features**:
+- ✅ No silent test failures (all failures are detected)
+- ✅ Test runner auto-detection (Vitest, Jest, etc.)
+- ✅ Build tool detection (Gradle, Maven, sbt)
+- ✅ Coverage reporting for all 35 frameworks
+- ✅ Codecov integration
+- ✅ Comprehensive CI summary reporting
+- ✅ SBOM generation for all 35 frameworks (supply chain security)
+
 ## Conclusion
 
-VelocityBench's test infrastructure is **production-ready** and comprehensive. All testing systems are operational and properly configured for benchmarking, validation, and regression detection across 38 frameworks in 8 programming languages.
+VelocityBench's test infrastructure is **production-ready** and comprehensive:
+- ✅ **35 frameworks tested in CI** (100% of active frameworks)
+- ✅ All testing systems operational
+- ✅ No silent test failures
+- ✅ Coverage tracking via Codecov
+- ✅ Proper benchmarking validation and regression detection
 
 ---
 
 **Report Generated**: 2026-01-31
+**Updated**: 2026-01-31 (CI Matrix Expansion)
 **Verifying Engineer**: Claude Haiku 4.5

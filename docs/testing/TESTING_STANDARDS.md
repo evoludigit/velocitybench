@@ -926,6 +926,73 @@ docker-compose logs postgres
 
 ---
 
+## CI/CD Integration Requirements
+
+All new frameworks **must be added to the CI pipeline** in `.github/workflows/unit-tests.yml`. This ensures:
+
+### Required for All Frameworks
+
+1. **Test Runner Integration**
+   - Framework tests must be executable via standard command (pytest, npm test, go test, cargo test, etc.)
+   - Tests must run without user interaction
+   - Tests must exit with code 0 on success, non-zero on failure
+
+2. **Coverage Reporting**
+   - Framework must generate coverage reports in standard format
+   - Coverage format: `coverage.xml` (Cobertura), `coverage.out` (Go), or equivalent
+   - Coverage must be uploaded to Codecov for tracking
+
+3. **No Silent Failures**
+   - ❌ NEVER use `|| echo "No tests found"` (hides real failures)
+   - ✅ ALWAYS exit with error code: `|| exit 1`
+   - Test failures must be visible in CI logs
+
+4. **Matrix Placement**
+   - Add framework to appropriate language matrix in CI workflow
+   - Or create new job if using unique build tool (see jvm-tests, hasura-tests examples)
+   - Update `needs:` dependencies in coverage-check and test-status jobs
+
+### Language-Specific CI Matrix
+
+| Language | Test Runner | Coverage Format | Example Frameworks |
+|----------|-------------|-----------------|-------------------|
+| Python | pytest | coverage.xml | strawberry, graphene, fastapi-rest, ariadne |
+| TypeScript | npm test (Vitest/Jest) | coverage/ | apollo-server, express-rest, graphql-yoga |
+| Go | go test | coverage.out | go-gqlgen, gin-rest, graphql-go |
+| Java (Maven) | mvn test | target/site/jacoco/jacoco.xml | java-spring-boot |
+| Java (Other) | Custom | target/site/jacoco/jacoco.xml | Gradle, sbt |
+| Rust | cargo test | (optional) | async-graphql, actix-web-rest |
+| PHP | PHPUnit/artisan | coverage.xml | php-laravel, webonyx-graphql-php |
+| Ruby | RSpec/Minitest | (optional) | ruby-rails, hanami |
+| C# | dotnet test | opencover format | csharp-dotnet |
+| Special | Custom | framework-dependent | hasura |
+
+### Test Validation Strategy
+
+Before adding framework to CI:
+
+1. **Local Validation**
+   ```bash
+   cd frameworks/your-framework
+   # Run your test command
+   # Verify coverage reports generate
+   # Confirm test command fails properly on test failure
+   ```
+
+2. **CI Workflow Addition**
+   - Add to appropriate matrix or create new job
+   - Update dependencies in coverage-check
+   - Update failure check logic
+   - Update summary generation
+
+3. **Test Merge Validation**
+   - Run CI workflow on PR
+   - Verify test results show in summary
+   - Confirm coverage uploads to Codecov
+   - Verify test failure detection works (introduce intentional failure)
+
+---
+
 ## CI/CD Pipeline
 
 The GitHub Actions pipeline automatically:

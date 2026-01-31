@@ -2,13 +2,13 @@
 
 Comprehensive GraphQL & REST Framework Performance Benchmarking Suite
 
-**38 frameworks across 8 languages.** Measure throughput, latency, and resources with publication-ready methodology.
+**35 frameworks tested in CI** across 8 languages. Measure throughput, latency, and resources with publication-ready methodology.
 
 ## Overview
 
 VelocityBench helps developers choose the right framework with real performance data.
 
-- ✅ 38 framework implementations across 8 languages
+- ✅ 35 framework implementations tested in CI across 8 languages
 - ✅ 450+ comprehensive tests (schema, query, N+1, performance)
 - ✅ Production-ready health checks (Kubernetes-compatible probes)
 - ✅ Automated regression detection (statistical analysis)
@@ -134,7 +134,8 @@ MIT License - See [LICENSE](LICENSE) for details
 ## Features
 
 ### ✅ Benchmarking
-- 40+ frameworks across 8 languages (Python, TypeScript, Go, Rust, Java, PHP, Ruby, C#)
+- 35 frameworks tested in CI across 8 languages (Python, TypeScript, Go, Rust, Java, PHP, Ruby, C#)
+- 45+ framework configurations (including ORM variations and N+1 demonstration patterns)
 - REST and GraphQL API benchmarking
 - Trinity Pattern database architecture (optimized for read-heavy workloads)
 - JMeter-based load testing with multiple workload profiles
