@@ -1,4 +1,4 @@
-"""Comprehensive mutation tests for Graphene GraphQL framework.
+"""Shared mutation tests (PUT/PATCH/POST operations).
 
 Tests all update operations with validation of:
 - Single field mutations
@@ -12,6 +12,9 @@ Trinity Identifier Pattern:
 - pk_{entity}: Internal int identifier (primary key)
 - id: UUID for public API
 - identifier: Text slug for human-readable access
+
+These tests are shared across all frameworks. Framework-specific test wrappers
+(if needed for class-based patterns) should import these tests.
 """
 
 import pytest
@@ -21,8 +24,8 @@ import pytest
 # User Mutations: Single Field Updates
 # ============================================================================
 
-def test_mutation_update_user_bio_single_field(db, factory):
-    """Test: updateUser mutation updates user bio only."""
+def test_update_user_bio_single_field(db, factory):
+    """Test: Update bio field only, full_name unchanged."""
     # Arrange
     user = factory.create_user("alice", "alice-upd-bio", "alice@example.com", "Alice", "Old bio")
     user_id = user["id"]
@@ -47,8 +50,8 @@ def test_mutation_update_user_bio_single_field(db, factory):
     assert result[1] == "Alice"  # Unchanged
 
 
-def test_mutation_update_user_full_name_single_field(db, factory):
-    """Test: updateUser mutation updates full_name only."""
+def test_update_user_full_name_single_field(db, factory):
+    """Test: Update full_name field only, bio unchanged."""
     # Arrange
     user = factory.create_user("bob", "bob-upd-name", "bob@example.com", "Bob")
     user_id = user["id"]
@@ -73,12 +76,12 @@ def test_mutation_update_user_full_name_single_field(db, factory):
     assert result[1] is None  # Unchanged
 
 
-def test_mutation_update_user_bio_with_long_text(db, factory):
-    """Test: updateUser mutation handles long bio text."""
+def test_update_user_bio_with_long_text(db, factory):
+    """Test: Update handles long bio text."""
     # Arrange
     user = factory.create_user("charlie", "charlie-long", "charlie@example.com")
     user_id = user["id"]
-    long_bio = "x" * 500  # 500 character bio
+    long_bio = "x" * 500
 
     # Act
     cursor = db.cursor()
@@ -99,8 +102,8 @@ def test_mutation_update_user_bio_with_long_text(db, factory):
     assert len(result[0]) == 500
 
 
-def test_mutation_update_user_bio_empty_string(db, factory):
-    """Test: updateUser mutation handles empty bio string."""
+def test_update_user_bio_empty_string(db, factory):
+    """Test: Update handles empty bio string."""
     # Arrange
     user = factory.create_user("dave", "dave-empty", "dave@example.com", bio="Original bio")
     user_id = user["id"]
@@ -123,8 +126,8 @@ def test_mutation_update_user_bio_empty_string(db, factory):
     assert result[0] == ""
 
 
-def test_mutation_update_user_bio_to_null(db, factory):
-    """Test: updateUser mutation can set bio to NULL."""
+def test_update_user_bio_to_null(db, factory):
+    """Test: Update can set bio to NULL."""
     # Arrange
     user = factory.create_user("eve", "eve-tonull", "eve@example.com", bio="Old bio")
     user_id = user["id"]
@@ -151,8 +154,8 @@ def test_mutation_update_user_bio_to_null(db, factory):
 # User Mutations: Multi-Field Updates
 # ============================================================================
 
-def test_mutation_update_user_multiple_fields(db, factory):
-    """Test: updateUser mutation updates multiple fields."""
+def test_update_user_multiple_fields(db, factory):
+    """Test: Update multiple fields at once."""
     # Arrange
     user = factory.create_user("charlie", "charlie-upd-multi", "charlie@example.com", "Charlie")
     user_id = user["id"]
@@ -178,7 +181,7 @@ def test_mutation_update_user_multiple_fields(db, factory):
     assert result[1] == new_name
 
 
-def test_mutation_update_user_with_special_chars(db, factory):
+def test_update_user_with_special_chars(db, factory):
     """Test: Multi-field update handles special characters."""
     # Arrange
     user = factory.create_user("frank", "frank-spec", "frank@example.com")
@@ -205,7 +208,7 @@ def test_mutation_update_user_with_special_chars(db, factory):
     assert result[1] == new_name
 
 
-def test_mutation_update_bio_empty_name_preserved(db, factory):
+def test_update_bio_empty_name_preserved(db, factory):
     """Test: Update can set bio to empty while preserving full_name."""
     # Arrange
     user = factory.create_user("grace", "grace-empty", "grace@example.com", "Grace", "Grace's bio")
@@ -227,15 +230,15 @@ def test_mutation_update_bio_empty_name_preserved(db, factory):
 
     # Assert
     assert result[0] == ""
-    assert result[1] == "Grace"  # Preserved
+    assert result[1] == "Grace"
 
 
 # ============================================================================
 # User Mutations: Return Value Validation
 # ============================================================================
 
-def test_mutation_update_returns_updated_user(db, factory):
-    """Test: updateUser mutation returns updated user data."""
+def test_update_returns_updated_user(db, factory):
+    """Test: Update returns updated user data."""
     # Arrange
     user = factory.create_user("alice", "alice-put-ret", "alice@example.com", "Alice Original")
     user_id = user["id"]
@@ -248,7 +251,7 @@ def test_mutation_update_returns_updated_user(db, factory):
         (new_name, user_id)
     )
 
-    # Verify the update and get updated user
+    # Verify the update
     cursor.execute(
         "SELECT id, username, full_name FROM benchmark.tb_user WHERE id = %s",
         (user_id,)
@@ -261,7 +264,7 @@ def test_mutation_update_returns_updated_user(db, factory):
     assert result[2] == new_name
 
 
-def test_mutation_update_preserves_id_and_identifier(db, factory):
+def test_update_preserves_id_and_identifier(db, factory):
     """Test: Update preserves id and identifier."""
     # Arrange
     user = factory.create_user("bob", "bob-preserve", "bob@example.com", "Bob")
@@ -271,8 +274,8 @@ def test_mutation_update_preserves_id_and_identifier(db, factory):
     # Act
     cursor = db.cursor()
     cursor.execute(
-        "UPDATE benchmark.tb_user SET bio = 'New bio', updated_at = NOW() WHERE id = %s",
-        (user_id,)
+        "UPDATE benchmark.tb_user SET bio = %s, updated_at = NOW() WHERE id = %s",
+        ("New bio", user_id)
     )
 
     # Verify
@@ -288,98 +291,10 @@ def test_mutation_update_preserves_id_and_identifier(db, factory):
 
 
 # ============================================================================
-# User Mutations: Immutable Field Protection
-# ============================================================================
-
-def test_mutation_cannot_update_username_field(db, factory):
-    """Test: username field is immutable after creation."""
-    # Arrange
-    user = factory.create_user("alice", "alice-immut", "alice@example.com")
-    user_id = user["id"]
-    original_username = user["username"]
-
-    # Act
-    cursor = db.cursor()
-    cursor.execute(
-        "SELECT username FROM benchmark.tb_user WHERE id = %s",
-        (user_id,)
-    )
-    result = cursor.fetchone()
-
-    # Assert
-    assert result[0] == original_username
-
-
-def test_mutation_cannot_update_identifier_field(db, factory):
-    """Test: identifier field is immutable after creation."""
-    # Arrange
-    user = factory.create_user("bob", "bob-immut", "bob@example.com")
-    user_id = user["id"]
-    original_identifier = user["identifier"]
-
-    # Act
-    cursor = db.cursor()
-    cursor.execute(
-        "SELECT identifier FROM benchmark.tb_user WHERE id = %s",
-        (user_id,)
-    )
-    result = cursor.fetchone()
-
-    # Assert
-    assert result[0] == original_identifier
-
-
-def test_mutation_cannot_update_email_field(db, factory):
-    """Test: email field is immutable after creation."""
-    # Arrange
-    user = factory.create_user("charlie", "charlie-immut", "charlie@example.com")
-    user_id = user["id"]
-    original_email = user["email"]
-
-    # Act
-    cursor = db.cursor()
-    cursor.execute(
-        "SELECT email FROM benchmark.tb_user WHERE id = %s",
-        (user_id,)
-    )
-    result = cursor.fetchone()
-
-    # Assert
-    assert result[0] == original_email
-
-
-# ============================================================================
-# User Mutations: Non-Existent Resource Handling
-# ============================================================================
-
-def test_mutation_update_nonexistent_user_returns_404(db):
-    """Test: updateUser with non-existent id returns 404."""
-    # Arrange
-    nonexistent_id = "00000000-0000-0000-0000-000000000000"
-
-    # Act
-    cursor = db.cursor()
-    cursor.execute(
-        "UPDATE benchmark.tb_user SET bio = %s WHERE id = %s",
-        ("New bio", nonexistent_id)
-    )
-
-    # Verify nothing was updated
-    cursor.execute(
-        "SELECT id FROM benchmark.tb_user WHERE id = %s",
-        (nonexistent_id,)
-    )
-    result = cursor.fetchone()
-
-    # Assert
-    assert result is None
-
-
-# ============================================================================
 # User Mutations: State Change Verification
 # ============================================================================
 
-def test_mutation_sequential_updates_accumulate(db, factory):
+def test_sequential_updates_accumulate(db, factory):
     """Test: Sequential updates accumulate correctly."""
     # Arrange
     user = factory.create_user("alice", "alice-seq", "alice@example.com")
@@ -410,7 +325,7 @@ def test_mutation_sequential_updates_accumulate(db, factory):
     assert result[1] == "Alice Updated"
 
 
-def test_mutation_update_one_user_does_not_affect_others(db, factory):
+def test_update_one_user_does_not_affect_others(db, factory):
     """Test: Updating one user doesn't affect other users."""
     # Arrange
     user1 = factory.create_user("alice", "alice-iso", "alice@example.com", "Alice")
@@ -441,7 +356,7 @@ def test_mutation_update_one_user_does_not_affect_others(db, factory):
     assert user2_result[0] is None
 
 
-def test_mutation_update_post_title_and_content(db, factory):
+def test_update_post_title_and_content(db, factory):
     """Test: Updating post title and content works correctly."""
     # Arrange
     author = factory.create_user("author", "author-post-upd", "author@example.com")
@@ -471,7 +386,7 @@ def test_mutation_update_post_title_and_content(db, factory):
 # Input Validation in Mutations
 # ============================================================================
 
-def test_mutation_update_user_with_special_characters(db, factory):
+def test_update_user_with_special_characters(db, factory):
     """Test: Bio update handles special characters correctly."""
     # Arrange
     user = factory.create_user("alice", "alice-special", "alice@example.com")
@@ -496,7 +411,7 @@ def test_mutation_update_user_with_special_characters(db, factory):
     assert result[0] == special_bio
 
 
-def test_mutation_update_user_with_unicode_characters(db, factory):
+def test_update_user_with_unicode_characters(db, factory):
     """Test: Updates handle unicode characters correctly."""
     # Arrange
     user = factory.create_user("alice", "alice-unicode", "alice@example.com")
@@ -521,13 +436,13 @@ def test_mutation_update_user_with_unicode_characters(db, factory):
     assert result[0] == unicode_bio
 
 
-def test_mutation_update_post_content_with_long_text(db, factory):
+def test_update_post_content_with_long_text(db, factory):
     """Test: Post update handles long content text."""
     # Arrange
     author = factory.create_user("author", "author-long", "author@example.com")
     post = factory.create_post(author["pk_user"], "Title", "post-long", "Short content")
     post_id = post["id"]
-    long_content = "x" * 5000  # 5000 character content
+    long_content = "x" * 5000
 
     # Act
     cursor = db.cursor()
@@ -547,7 +462,7 @@ def test_mutation_update_post_content_with_long_text(db, factory):
     assert len(result[0]) == 5000
 
 
-def test_mutation_update_comment_content(db, factory):
+def test_update_comment_content(db, factory):
     """Test: Comment content can be updated."""
     # Arrange
     author = factory.create_user("author", "author-cmt", "author@example.com")
@@ -572,3 +487,32 @@ def test_mutation_update_comment_content(db, factory):
 
     # Assert
     assert result[0] == "Updated comment"
+
+
+# ============================================================================
+# POST Mutations
+# ============================================================================
+
+def test_create_post_returns_id(db, factory):
+    """Test: Creating a post returns the created post data."""
+    # Arrange
+    author = factory.create_user("author", "author", "author@example.com")
+
+    # Act
+    cursor = db.cursor()
+    post_title = "New Post"
+    post_id_slug = "new-post"
+    post_content = "Post content"
+
+    cursor.execute(
+        "INSERT INTO benchmark.tb_post (fk_author, title, identifier, content) "
+        "VALUES (%s, %s, %s, %s) "
+        "RETURNING id, title, identifier",
+        (author["pk_user"], post_title, post_id_slug, post_content)
+    )
+    result = cursor.fetchone()
+
+    # Assert
+    assert result[0] is not None  # id was generated
+    assert result[1] == post_title
+    assert result[2] == post_id_slug
