@@ -14,12 +14,12 @@ env:
   RUST_VERSION: '1.70'
 
 jobs:
-  # Python frameworks: Strawberry, Graphene, FastAPI, Flask
+  # Python frameworks: Strawberry, Graphene, FastAPI, Flask, Ariadne, ASGI-GraphQL
   python-tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        framework: [strawberry, graphene, fastapi-rest, flask-rest]
+        framework: [strawberry, graphene, fastapi-rest, flask-rest, ariadne, asgi-graphql]
     steps:
       - uses: actions/checkout@v4
 
@@ -28,6 +28,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: 'pip'
+          cache-dependency-path: 'frameworks/${{ matrix.framework }}/requirements*.txt'
 
       - name: Install dependencies
         working-directory: frameworks/${{ matrix.framework }}
@@ -39,7 +40,7 @@ jobs:
       - name: Run tests with coverage
         working-directory: frameworks/${{ matrix.framework }}
         run: |
-          pytest tests/ --cov=src --cov-report=xml --cov-report=html --junitxml=junit.xml 2>/dev/null || echo "No tests found for ${{ matrix.framework }}"
+          pytest tests/ --cov=src --cov-report=xml --cov-report=html --junitxml=junit.xml || exit 1
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -49,12 +50,12 @@ jobs:
           flags: python-${{ matrix.framework }}
           fail_ci_if_error: false
 
-  # TypeScript/Node.js frameworks: Apollo, Express
+  # TypeScript/Node.js frameworks: Apollo, Express, GraphQL Yoga, Mercurius, Fastify, PostGraphile
   typescript-tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        framework: [apollo-server, express-rest, express-orm]
+        framework: [apollo-server, express-rest, express-orm, apollo-orm, express-graphql, fastify-graphql, graphql-yoga, mercurius, postgraphile]
     steps:
       - uses: actions/checkout@v4
 
@@ -62,6 +63,7 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
 
       - name: Install dependencies
         working-directory: frameworks/${{ matrix.framework }}
@@ -69,7 +71,16 @@ jobs:
 
       - name: Run tests with coverage
         working-directory: frameworks/${{ matrix.framework }}
-        run: npm test -- --coverage 2>/dev/null || npm test 2>/dev/null || echo "No tests found for ${{ matrix.framework }}"
+        run: |
+          # Detect test runner (most use Vitest, postgraphile uses Jest)
+          if grep -q '"vitest"' package.json; then
+            npm test -- --coverage || npm test || exit 1
+          elif grep -q '"jest"' package.json; then
+            npm test || exit 1
+          else
+            echo "ERROR: No recognized test runner found in package.json"
+            exit 1
+          fi
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -79,12 +90,12 @@ jobs:
           flags: typescript-${{ matrix.framework }}
           fail_ci_if_error: false
 
-  # Go frameworks: gqlgen, gin, graphql-go
+  # Go frameworks: gqlgen, gin, graphql-go, graphql-go
   go-tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        framework: [go-gqlgen, gin-rest, go-graphql-go]
+        framework: [go-gqlgen, gin-rest, go-graphql-go, graphql-go]
     steps:
       - uses: actions/checkout@v4
 
@@ -92,11 +103,12 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache: true
 
       - name: Run tests with coverage
         working-directory: frameworks/${{ matrix.framework }}
         run: |
-          go test -v -coverprofile=coverage.out -covermode=atomic ./... 2>/dev/null || echo "No tests found for ${{ matrix.framework }}"
+          go test -v -coverprofile=coverage.out -covermode=atomic ./... || exit 1
           go tool cover -func=coverage.out || true
 
       - name: Upload coverage to Codecov
@@ -125,7 +137,7 @@ jobs:
 
       - name: Run tests with Maven
         working-directory: frameworks/${{ matrix.framework }}
-        run: mvn clean test jacoco:report 2>/dev/null || echo "No tests found for ${{ matrix.framework }}"
+        run: mvn clean test jacoco:report || exit 1
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -135,12 +147,60 @@ jobs:
           flags: java-${{ matrix.framework }}
           fail_ci_if_error: false
 
-  # Rust frameworks: async-graphql, actix-web
+  # JVM frameworks with different build tools (Gradle, Maven, sbt)
+  jvm-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - framework: micronaut-graphql
+            build-tool: gradle
+            java-version: '21'
+          - framework: quarkus-graphql
+            build-tool: maven
+            java-version: '21'
+          - framework: play-graphql
+            build-tool: sbt
+            java-version: '17'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: 'temurin'
+          cache: ${{ matrix.build-tool }}
+
+      - name: Run tests
+        working-directory: frameworks/${{ matrix.framework }}
+        run: |
+          case "${{ matrix.build-tool }}" in
+            maven)
+              mvn clean test jacoco:report || exit 1
+              ;;
+            gradle)
+              ./gradlew test || exit 1
+              ;;
+            sbt)
+              sbt test || exit 1
+              ;;
+          esac
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        if: always()
+        with:
+          files: ./frameworks/${{ matrix.framework }}/target/site/jacoco/jacoco.xml
+          flags: jvm-${{ matrix.framework }}
+          fail_ci_if_error: false
+
+  # Rust frameworks: async-graphql, actix-web, juniper
   rust-tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        framework: [async-graphql, actix-web-rest]
+        framework: [async-graphql, actix-web-rest, juniper]
     steps:
       - uses: actions/checkout@v4
 
@@ -150,16 +210,28 @@ jobs:
           toolchain: ${{ env.RUST_VERSION }}
           override: true
 
+      - name: Cache Rust/Cargo
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
       - name: Run tests
         working-directory: frameworks/${{ matrix.framework }}
-        run: cargo test --verbose --all-features 2>/dev/null || echo "No tests found for ${{ matrix.framework }}"
+        run: cargo test --verbose --all-features || exit 1
 
-  # PHP frameworks: Laravel
+  # PHP frameworks: Laravel, Webonyx GraphQL PHP
   php-tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        framework: [php-laravel]
+        framework: [php-laravel, webonyx-graphql-php]
     steps:
       - uses: actions/checkout@v4
 
@@ -169,6 +241,14 @@ jobs:
           php-version: '8.2'
           extensions: pdo, pdo_pgsql
           tools: composer, phpunit
+          coverage: pcov
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.composer/cache
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
 
       - name: Install dependencies
         working-directory: frameworks/${{ matrix.framework }}
@@ -176,7 +256,17 @@ jobs:
 
       - name: Run tests with coverage
         working-directory: frameworks/${{ matrix.framework }}
-        run: phpunit --coverage-clover coverage.xml 2>/dev/null || echo "No tests found for ${{ matrix.framework }}"
+        run: |
+          if [ -f "artisan" ]; then
+            # Laravel
+            php artisan test || exit 1
+          elif [ -f "phpunit.xml" ]; then
+            # Standard PHPUnit
+            vendor/bin/phpunit --coverage-clover coverage.xml || exit 1
+          else
+            echo "ERROR: No recognized PHP test framework found"
+            exit 1
+          fi
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -186,12 +276,12 @@ jobs:
           flags: php-${{ matrix.framework }}
           fail_ci_if_error: false
 
-  # Ruby frameworks: Rails
+  # Ruby frameworks: Rails, Hanami
   ruby-tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        framework: [ruby-rails, ruby-rails-fixed]
+        framework: [ruby-rails, ruby-rails-fixed, hanami]
     steps:
       - uses: actions/checkout@v4
 
@@ -205,7 +295,51 @@ jobs:
       - name: Run tests with coverage
         working-directory: frameworks/${{ matrix.framework }}
         run: |
-          bundle exec rspec 2>/dev/null || echo "No tests found for ${{ matrix.framework }}"
+          if [ -d "spec" ]; then
+            # RSpec (Rails frameworks)
+            bundle exec rspec || exit 1
+          elif [ -d "test" ]; then
+            # Minitest (Hanami)
+            bundle exec rake test || exit 1
+          else
+            echo "ERROR: No test directory found (spec/ or test/)"
+            exit 1
+          fi
+
+  # Hasura - configuration-based GraphQL with API integration tests
+  hasura-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: 'frameworks/hasura/requirements*.txt'
+
+      - name: Install dependencies
+        working-directory: frameworks/hasura
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+          pip install pytest pytest-cov
+
+      - name: Run Hasura API integration tests
+        working-directory: frameworks/hasura/tests
+        run: |
+          pytest . --cov --cov-report=xml --junitxml=junit.xml || exit 1
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        if: always()
+        with:
+          files: ./frameworks/hasura/tests/coverage.xml
+          flags: hasura
+          fail_ci_if_error: false
 
   # C# frameworks: .NET
   csharp-tests:
@@ -221,17 +355,24 @@ jobs:
         with:
           dotnet-version: '6.0'
 
+      - name: Cache NuGet packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+          restore-keys: ${{ runner.os }}-nuget-
+
       - name: Install dependencies
         working-directory: frameworks/${{ matrix.framework }}
         run: dotnet restore || echo "No project files found"
 
       - name: Run tests with coverage
         working-directory: frameworks/${{ matrix.framework }}
-        run: dotnet test /p:CollectCoverage=true /p:CoverageFormat=opencover 2>/dev/null || echo "No tests found for ${{ matrix.framework }}"
+        run: dotnet test /p:CollectCoverage=true /p:CoverageFormat=opencover || exit 1
 
   # Summary and Coverage Requirements
   coverage-check:
-    needs: [python-tests, typescript-tests, go-tests, java-tests, rust-tests, php-tests, ruby-tests, csharp-tests, integration-tests, lint]
+    needs: [python-tests, typescript-tests, go-tests, java-tests, jvm-tests, rust-tests, php-tests, ruby-tests, csharp-tests, hasura-tests, integration-tests, lint]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -244,10 +385,12 @@ jobs:
              [[ "${{ needs.typescript-tests.result }}" == "failure" ]] || \
              [[ "${{ needs.go-tests.result }}" == "failure" ]] || \
              [[ "${{ needs.java-tests.result }}" == "failure" ]] || \
+             [[ "${{ needs.jvm-tests.result }}" == "failure" ]] || \
              [[ "${{ needs.rust-tests.result }}" == "failure" ]] || \
              [[ "${{ needs.php-tests.result }}" == "failure" ]] || \
              [[ "${{ needs.ruby-tests.result }}" == "failure" ]] || \
-             [[ "${{ needs.csharp-tests.result }}" == "failure" ]]; then
+             [[ "${{ needs.csharp-tests.result }}" == "failure" ]] || \
+             [[ "${{ needs.hasura-tests.result }}" == "failure" ]]; then
             echo "❌ One or more framework test suites failed"
             exit 1
           fi
@@ -265,19 +408,32 @@ jobs:
 
       - name: Generate coverage summary
         if: always()
+        # NOTE: When adding new frameworks to CI:
+        # 1. Add framework to appropriate language matrix above
+        # 2. Update counts below to match actual framework lists
+        # 3. Helper: Count with: grep "framework:" .github/workflows/unit-tests.yml | grep -oE "\[.*\]" | tr ',' '\n' | grep -v "^\[" | wc -l
         run: |
           echo "## 📊 Test Results Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Suite | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "| Language | Frameworks | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|------------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Python | 6 | ${{ needs.python-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| TypeScript | 9 | ${{ needs.typescript-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Go | 4 | ${{ needs.go-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Java (Maven) | 3 | ${{ needs.java-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| JVM (Multi-tool) | 3 | ${{ needs.jvm-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Rust | 3 | ${{ needs.rust-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| PHP | 2 | ${{ needs.php-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Ruby | 3 | ${{ needs.ruby-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| C# | 1 | ${{ needs.csharp-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Hasura | 1 | ${{ needs.hasura-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Total: 35 frameworks tested in CI**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_Note: Additional framework variations available for N+1 testing (apollorm-naive, strawberry-orm-naive, etc.)_" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Other | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Python Tests | ${{ needs.python-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| TypeScript Tests | ${{ needs.typescript-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Go Tests | ${{ needs.go-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Java Tests | ${{ needs.java-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Rust Tests | ${{ needs.rust-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| PHP Tests | ${{ needs.php-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Ruby Tests | ${{ needs.ruby-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| C# Tests | ${{ needs.csharp-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Linting | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "🔗 See job logs for detailed coverage reports uploaded to Codecov."
@@ -306,6 +462,8 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: 'tests/integration/requirements.txt'
 
       - name: Install integration test dependencies
         run: |
@@ -342,6 +500,7 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
 
       - name: Install linting and type-checking tools
         run: |
@@ -367,7 +526,7 @@ jobs:
 
   # Final status
   test-status:
-    needs: [python-tests, typescript-tests, go-tests, java-tests, rust-tests, php-tests, ruby-tests, csharp-tests, integration-tests, coverage-check]
+    needs: [python-tests, typescript-tests, go-tests, java-tests, jvm-tests, rust-tests, php-tests, ruby-tests, csharp-tests, hasura-tests, integration-tests, coverage-check]
     runs-on: ubuntu-latest
     if: always()
     steps:
