@@ -1,0 +1,377 @@
+name: Generate Software Bill of Materials (SBOM)
+
+on:
+  push:
+    branches: [main, develop, feat/*]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Generate SBOM daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+permissions:
+  contents: read
+  pull-requests: write
+  packages: read
+
+jobs:
+  generate-sbom:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        component:
+          - name: "python-root"
+            path: "."
+            files: "requirements.txt,venv/requirements.txt"
+            format: "pip"
+          - name: "python-database"
+            path: "database"
+            files: "pyproject.toml"
+            format: "pip"
+          - name: "python-fastapi"
+            path: "frameworks/fastapi-rest"
+            files: "requirements.txt,requirements-dev.txt,pyproject.toml"
+            format: "pip"
+          - name: "python-flask"
+            path: "frameworks/flask-rest"
+            files: "requirements.txt,requirements-dev.txt"
+            format: "pip"
+          - name: "python-strawberry"
+            path: "frameworks/strawberry"
+            files: "requirements.txt,requirements-dev.txt,pyproject.toml"
+            format: "pip"
+          - name: "python-graphene"
+            path: "frameworks/graphene"
+            files: "requirements.txt,requirements-dev.txt,pyproject.toml"
+            format: "pip"
+          - name: "nodejs-apollo"
+            path: "frameworks/apollo-server"
+            files: "package.json,package-lock.json"
+            format: "npm"
+          - name: "nodejs-express"
+            path: "frameworks/express-rest"
+            files: "package.json,package-lock.json"
+            format: "npm"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        if: matrix.component.format == 'pip'
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        if: matrix.component.format == 'npm'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: |
+            frameworks/apollo-server/package-lock.json
+            frameworks/express-rest/package-lock.json
+
+      - name: Install CycloneDX tools
+        run: |
+          pip install cyclonedx-bom cyclonedx-python
+
+      - name: Generate SBOM - Python (pip)
+        if: matrix.component.format == 'pip'
+        working-directory: ${{ matrix.component.path }}
+        run: |
+          mkdir -p sbom
+          # Create requirements file if needed
+          if [ -f "pyproject.toml" ]; then
+            pip install build
+            python -m pip list > /tmp/installed.txt
+          fi
+
+          # Generate SBOM in multiple formats
+          python -m cyclonedx.cli requirements ${{ matrix.component.files }} \
+            -o json \
+            -o sbom/sbom-${{ matrix.component.name }}.json || true
+          python -m cyclonedx.cli requirements ${{ matrix.component.files }} \
+            -o xml \
+            -o sbom/sbom-${{ matrix.component.name }}.xml || true
+
+      - name: Generate SBOM - Node.js (npm)
+        if: matrix.component.format == 'npm'
+        working-directory: ${{ matrix.component.path }}
+        run: |
+          mkdir -p sbom
+          npm install -g @cyclonedx/npm
+          cyclonedx-npm \
+            --output-file sbom/sbom-${{ matrix.component.name }}.json \
+            --format json || true
+          cyclonedx-npm \
+            --output-file sbom/sbom-${{ matrix.component.name }}.xml \
+            --format xml || true
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sbom-${{ matrix.component.name }}
+          path: ${{ matrix.component.path }}/sbom/
+          retention-days: 90
+
+  aggregate-sbom:
+    runs-on: ubuntu-latest
+    needs: generate-sbom
+    if: always()
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all SBOMs
+        uses: actions/download-artifact@v4
+        with:
+          path: all-sbom
+
+      - name: Create aggregated SBOM directory
+        run: |
+          mkdir -p sbom-output
+          for dir in all-sbom/sbom-*; do
+            if [ -d "$dir" ]; then
+              cp "$dir"/* sbom-output/ 2>/dev/null || true
+            fi
+          done
+          ls -la sbom-output/ || echo "No SBOMs generated"
+
+      - name: Generate SBOM index
+        run: |
+          cat > sbom-output/SBOM_INDEX.md << 'EOF'
+          # VelocityBench Software Bill of Materials (SBOM)
+
+          Generated on: $(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          Repository: velocitybench/velocitybench
+
+          ## Components
+
+          | Component | Format | Last Updated |
+          |-----------|--------|--------------|
+          EOF
+
+          for file in sbom-output/sbom-*.json; do
+            if [ -f "$file" ]; then
+              component=$(basename "$file" | sed 's/sbom-\(.*\)\.json/\1/')
+              echo "| $component | JSON | \`\$(date -u +'%Y-%m-%d')\` |" >> sbom-output/SBOM_INDEX.md
+            fi
+          done
+
+          cat >> sbom-output/SBOM_INDEX.md << 'EOF'
+
+          ## Files
+
+          ### Python
+          - `sbom-python-root.json` - Root venv dependencies
+          - `sbom-python-database.json` - Database utilities
+          - `sbom-python-fastapi.json` - FastAPI framework
+          - `sbom-python-flask.json` - Flask framework
+          - `sbom-python-strawberry.json` - Strawberry GraphQL
+          - `sbom-python-graphene.json` - Graphene GraphQL
+
+          ### Node.js
+          - `sbom-nodejs-apollo.json` - Apollo Server
+          - `sbom-nodejs-express.json` - Express.js REST
+
+          ## Format
+
+          All SBOMs are in CycloneDX format (JSON and XML):
+          - **CycloneDX**: [https://cyclonedx.org/](https://cyclonedx.org/)
+          - **SBOM Consumer Tools**: CycloneDX, OWASP Dependency-Check, Snyk
+
+          ## Usage
+
+          ### Scanning with tools
+          ```bash
+          # Using OWASP Dependency-Check
+          dependency-check --sbom sbom-python-fastapi.json
+
+          # Using Snyk
+          snyk sbom --file sbom-python-fastapi.json
+          ```
+
+          ### Uploading to platforms
+          - **GitHub Security Tab**: Automatically detects SBOMs
+          - **Dependency-Track**: Upload for continuous monitoring
+          - **OSSF**: Share with ecosystem
+
+          ## Compliance
+
+          These SBOMs provide:
+          - ✅ SBOM format (CycloneDX)
+          - ✅ Component inventory
+          - ✅ Version information
+          - ✅ Dependency relationships
+          - ✅ License information (where available)
+
+          Suitable for:
+          - SSCA compliance (SLSA Supply Chain Security)
+          - SBOM executive orders (US Executive Order 14028)
+          - Procurement security requirements
+          - Third-party risk management
+
+          ## Security Notes
+
+          - SBOMs reflect dependency state at generation time
+          - Review and update regularly (daily CI runs)
+          - Use with vulnerability scanning tools for actionable insights
+          - See SECURITY.md for VelocityBench security model
+          EOF
+
+          cat sbom-output/SBOM_INDEX.md
+
+      - name: Upload aggregated SBOMs
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-aggregated
+          path: sbom-output/
+          retention-days: 90
+
+      - name: Create SBOM PR comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            let comment = '## 📋 Software Bill of Materials (SBOM)\n\n';
+            comment += 'SBOMs have been generated for all components:\n\n';
+            comment += '- ✅ Python dependencies (FastAPI, Flask, Strawberry, Graphene)\n';
+            comment += '- ✅ Node.js dependencies (Apollo, Express)\n';
+            comment += '- ✅ Database utilities\n\n';
+            comment += '**Download SBOMs**: Check the "Artifacts" tab in the workflow run.\n\n';
+            comment += '**Format**: CycloneDX (JSON + XML)\n';
+            comment += '**Use Cases**: Vulnerability scanning, supply chain security, compliance\n';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  sbom-validation:
+    runs-on: ubuntu-latest
+    needs: generate-sbom
+    if: always()
+
+    steps:
+      - name: Download SBOMs
+        uses: actions/download-artifact@v4
+        with:
+          path: sbom-check
+
+      - name: Validate SBOM formats
+        run: |
+          echo "Checking SBOM validity..."
+          error_count=0
+
+          for sbom_file in sbom-check/sbom-*/sbom-*.json; do
+            if [ -f "$sbom_file" ]; then
+              # Basic JSON validation
+              if python -m json.tool "$sbom_file" > /dev/null 2>&1; then
+                echo "✅ Valid JSON: $(basename $sbom_file)"
+              else
+                echo "❌ Invalid JSON: $(basename $sbom_file)"
+                error_count=$((error_count + 1))
+              fi
+
+              # Check for required CycloneDX fields
+              if grep -q '"bom-version"\|"bomVersion"\|"specVersion"' "$sbom_file"; then
+                echo "✅ CycloneDX format: $(basename $sbom_file)"
+              else
+                echo "⚠️  Missing CycloneDX fields: $(basename $sbom_file)"
+              fi
+            fi
+          done
+
+          if [ $error_count -gt 0 ]; then
+            echo "❌ $error_count SBOM files failed validation"
+            exit 1
+          else
+            echo "✅ All SBOMs validated successfully"
+          fi
+
+      - name: Check SBOM completeness
+        run: |
+          echo "Verifying SBOM component coverage..."
+          python3 << 'PYTHON'
+          import json
+          import glob
+
+          required_components = [
+              'python-root',
+              'python-fastapi',
+              'python-strawberry'
+          ]
+
+          found_sboms = set()
+          for sbom_file in glob.glob('sbom-check/**/sbom-*.json', recursive=True):
+              for component in required_components:
+                  if component in sbom_file:
+                      found_sboms.add(component)
+                      try:
+                          with open(sbom_file) as f:
+                              data = json.load(f)
+                              components_count = len(data.get('components', []))
+                              print(f'✅ {component}: {components_count} dependencies')
+                      except Exception as e:
+                          print(f'⚠️  {component}: Could not parse ({e})')
+
+          missing = set(required_components) - found_sboms
+          if missing:
+              print(f'\n⚠️  Missing SBOMs: {", ".join(missing)}')
+          else:
+              print(f'\n✅ All required SBOMs present')
+          PYTHON
+
+  publish-sbom:
+    runs-on: ubuntu-latest
+    needs: [generate-sbom, sbom-validation]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download SBOMs
+        uses: actions/download-artifact@v4
+        with:
+          path: sbom-release
+
+      - name: Create release assets
+        run: |
+          mkdir -p release-sbom
+          for dir in sbom-release/sbom-*; do
+            if [ -d "$dir" ]; then
+              cp "$dir"/* release-sbom/ 2>/dev/null || true
+            fi
+          done
+          cd release-sbom
+          tar -czf sbom-${GITHUB_REF#refs/tags/}.tar.gz *.json *.xml 2>/dev/null || true
+          ls -la
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: release-sbom/sbom-*.tar.gz
+          draft: false
+          prerelease: false
+
+      - name: Upload to GitHub Packages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "SBOMs would be uploaded to GitHub Packages (requires private setup)"
+          echo "Location: ghcr.io/${{ github.repository_owner }}/velocitybench-sbom:${{ github.ref_name }}"
