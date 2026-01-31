@@ -21,20 +21,66 @@ class BulkImporter:
     """Import SQLite databases to PostgreSQL"""
 
     VARIATIONS = [
-        ('xs', 0.5),
-        ('small', 1.0),
-        ('medium', 5.0),
-        ('large', 10.0),
-        ('xlarge', 50.0),
-        ('xxlarge', 100.0),
+        ("xs", 0.5),
+        ("small", 1.0),
+        ("medium", 5.0),
+        ("large", 10.0),
+        ("xlarge", 50.0),
+        ("xxlarge", 100.0),
     ]
 
     TABLE_MAPPINGS = [
-        ('users', 'tb_user', ['id', 'identifier', 'email', 'username', 'full_name', 'bio', 'created_at', 'updated_at']),
-        ('posts', 'tb_post', ['id', 'identifier', 'title', 'content', 'fk_author', 'published', 'created_at', 'updated_at']),
-        ('comments', 'tb_comment', ['id', 'identifier', 'content', 'fk_post', 'fk_author', 'created_at', 'updated_at']),
-        ('user_follows', 'tb_user_follows', ['fk_follower', 'fk_following', 'created_at']),
-        ('post_likes', 'tb_post_like', ['fk_user', 'fk_post', 'reaction_type', 'created_at']),
+        (
+            "users",
+            "tb_user",
+            [
+                "id",
+                "identifier",
+                "email",
+                "username",
+                "full_name",
+                "bio",
+                "created_at",
+                "updated_at",
+            ],
+        ),
+        (
+            "posts",
+            "tb_post",
+            [
+                "id",
+                "identifier",
+                "title",
+                "content",
+                "fk_author",
+                "published",
+                "created_at",
+                "updated_at",
+            ],
+        ),
+        (
+            "comments",
+            "tb_comment",
+            [
+                "id",
+                "identifier",
+                "content",
+                "fk_post",
+                "fk_author",
+                "created_at",
+                "updated_at",
+            ],
+        ),
+        (
+            "user_follows",
+            "tb_user_follows",
+            ["fk_follower", "fk_following", "created_at"],
+        ),
+        (
+            "post_likes",
+            "tb_post_like",
+            ["fk_user", "fk_post", "reaction_type", "created_at"],
+        ),
     ]
 
     def __init__(self, pg_conn_str: str = None):
@@ -72,9 +118,9 @@ class BulkImporter:
                 print(f"\n⚠️  Skipping {name}: database not found")
                 continue
 
-            print(f"\n{'='*90}")
+            print(f"\n{'=' * 90}")
             print(f"Importing {name.upper()} ({percent}%) from {sqlite_path}")
-            print(f"{'='*90}")
+            print(f"{'=' * 90}")
 
             self._import_variation(sqlite_path, name)
 
@@ -101,6 +147,7 @@ class BulkImporter:
                     pg_conn.commit()
                 except Exception:
                     pass
+
             atexit.register(re_enable_fks)
 
             # Clear existing data
@@ -125,30 +172,32 @@ class BulkImporter:
 
             # Get file size
             db_size = Path(sqlite_path).stat().st_size / (1024 * 1024)
-            size_str = f"{db_size:.1f}MB" if db_size < 1024 else f"{db_size/1024:.1f}GB"
+            size_str = (
+                f"{db_size:.1f}MB" if db_size < 1024 else f"{db_size / 1024:.1f}GB"
+            )
 
-            self.results.append({
-                'name': name,
-                'rows': total_rows,
-                'size': size_str,
-                'time': elapsed,
-                'status': '✅'
-            })
+            self.results.append(
+                {
+                    "name": name,
+                    "rows": total_rows,
+                    "size": size_str,
+                    "time": elapsed,
+                    "status": "✅",
+                }
+            )
 
-            print(f"\n✅ Import complete: {total_rows:,} rows in {elapsed:.1f}s ({db_size:.1f}MB)")
+            print(
+                f"\n✅ Import complete: {total_rows:,} rows in {elapsed:.1f}s ({db_size:.1f}MB)"
+            )
 
             sqlite_conn.close()
             pg_conn.close()
 
         except Exception as e:
             print(f"\n❌ Import failed: {e}")
-            self.results.append({
-                'name': name,
-                'rows': 0,
-                'size': '?',
-                'time': 0,
-                'status': '❌'
-            })
+            self.results.append(
+                {"name": name, "rows": 0, "size": "?", "time": 0, "status": "❌"}
+            )
 
     def _import_table(self, sqlite_conn, pg_conn, sqlite_table, pg_table, columns):
         """Import a single table"""
@@ -169,7 +218,7 @@ class BulkImporter:
         rows = [[row[i] for i in col_indices] for row in all_rows]
 
         # Cast published boolean
-        if pg_table == 'tb_post':
+        if pg_table == "tb_post":
             rows = [[*row[:5], bool(row[5]), row[6], row[7]] for row in rows]
 
         # Insert in batches
@@ -199,7 +248,9 @@ class BulkImporter:
         print("─" * 65)
 
         for result in self.results:
-            print(f"{result['name']:<15} {result['status']:<10} {result['rows']:>13,} {result['size']:>13} {result['time']:>8.1f}s")
+            print(
+                f"{result['name']:<15} {result['status']:<10} {result['rows']:>13,} {result['size']:>13} {result['time']:>8.1f}s"
+            )
 
         print()
         print("=" * 90)

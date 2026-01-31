@@ -85,7 +85,7 @@ def is_too_long(comment_text: str) -> bool:
     return len(comment_text) > MAX_COMMENT_LENGTH
 
 
-def extract_claims(comment_text: str) -> List[Dict]:
+def extract_claims(comment_text: str) -> list[dict]:
     """
     Extract technical claims from comment.
 
@@ -177,7 +177,7 @@ def similarity_score(text1: str, text2: str) -> float:
     return intersection / union if union > 0 else 0.0
 
 
-def is_duplicate(comment_text: str, previous_comments: List[str]) -> bool:
+def is_duplicate(comment_text: str, previous_comments: list[str]) -> bool:
     """Check if comment is too similar to previous comments."""
     for prev in previous_comments:
         if similarity_score(comment_text, prev) > DUPLICATE_SIMILARITY_THRESHOLD:
@@ -209,9 +209,9 @@ class CommentValidator:
     def validate_comments_for_post(
         self,
         post_content: str,
-        comments: List[Dict],
+        comments: list[dict],
         strict: bool = False,
-    ) -> Tuple[List[Dict], List[Tuple[Dict, str]]]:
+    ) -> tuple[list[dict], list[tuple[dict, str]]]:
         """
         Validate comments for a post.
 
@@ -255,7 +255,7 @@ class CommentValidator:
         self,
         comment_text: str,
         post_content: str,
-        previous_comments: List[str],
+        previous_comments: list[str],
         strict: bool = False,
     ) -> str | None:
         """
@@ -295,7 +295,7 @@ class CommentValidator:
         return None
 
 
-def filter_comments_directory(comments_dir: Path, strict: bool = False) -> Dict:
+def filter_comments_directory(comments_dir: Path, strict: bool = False) -> dict:
     """
     Filter all comments in a directory.
 
@@ -328,9 +328,7 @@ def filter_comments_directory(comments_dir: Path, strict: bool = False) -> Dict:
             comments = data.get("comments", [])
 
             # Get post content for hallucination checking
-            post_file = comment_file.parent.parent / "blog" / data.get(
-                "post_file", ""
-            )
+            post_file = comment_file.parent.parent / "blog" / data.get("post_file", "")
             post_content = ""
             if post_file.exists():
                 with open(post_file) as f:
@@ -376,9 +374,9 @@ def filter_comments_directory(comments_dir: Path, strict: bool = False) -> Dict:
             print(f"Error processing {comment_file}: {e}")
 
     # Print statistics
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("VALIDATION RESULTS")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(f"Total comments processed:   {validator.stats['total_comments']:,}")
     print(f"Accepted (valid):           {validator.stats['accepted']:,}")
     print(f"Rejected (generic praise):  {validator.stats['rejected_generic_praise']:,}")
@@ -397,7 +395,7 @@ def filter_comments_directory(comments_dir: Path, strict: bool = False) -> Dict:
     print(f"\nOutput directories:")
     print(f"  Accepted comments:  {accepted_dir}")
     print(f"  Rejected comments:  {rejected_dir}")
-    print(f"{'='*70}\n")
+    print(f"{'=' * 70}\n")
 
     return validator.stats
 

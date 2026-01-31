@@ -23,7 +23,7 @@ def import_database(db_name: str):
 
     print(f"\n{'=' * 70}")
     print(f"IMPORTING: {db_name.upper()}")
-    print('=' * 70)
+    print("=" * 70)
 
     sqlite_path = f"datasets/fraiseql_{db_name}.db"
     if not Path(sqlite_path).exists():
@@ -55,7 +55,7 @@ def import_database(db_name: str):
 
         # Clear existing data
         print("Clearing existing data...")
-        tables = ['post_likes', 'user_follows', 'comments', 'posts', 'users']
+        tables = ["post_likes", "user_follows", "comments", "posts", "users"]
         for table in tables:
             pg_cursor.execute(f"DELETE FROM {table}")
         pg_conn.commit()
@@ -65,17 +65,21 @@ def import_database(db_name: str):
 
         # Users table
         print("  Importing users...", flush=True)
-        sqlite_cursor.execute("SELECT id, identifier, email, username, full_name, bio, created_at, updated_at FROM users")
+        sqlite_cursor.execute(
+            "SELECT id, identifier, email, username, full_name, bio, created_at, updated_at FROM users"
+        )
         users = sqlite_cursor.fetchall()
 
         with pg_cursor.copy(
             "COPY tb_user (id, identifier, email, username, full_name, bio, created_at, updated_at) FROM STDIN"
         ) as copy:
             for user in users:
-                copy.write(b"\t".join([
-                    str(v).encode() if v is not None else b"\\N"
-                    for v in user
-                ]) + b"\n")
+                copy.write(
+                    b"\t".join(
+                        [str(v).encode() if v is not None else b"\\N" for v in user]
+                    )
+                    + b"\n"
+                )
         pg_conn.commit()
         print(f"    ✓ {len(users):,} users imported")
 
@@ -95,10 +99,15 @@ def import_database(db_name: str):
                 post_list = list(post)
                 post_list[5] = "true" if post_list[5] else "false"
 
-                copy.write(b"\t".join([
-                    str(v).encode() if v is not None else b"\\N"
-                    for v in post_list
-                ]) + b"\n")
+                copy.write(
+                    b"\t".join(
+                        [
+                            str(v).encode() if v is not None else b"\\N"
+                            for v in post_list
+                        ]
+                    )
+                    + b"\n"
+                )
         pg_conn.commit()
         print(f"    ✓ {len(posts):,} posts imported")
 
@@ -114,10 +123,12 @@ def import_database(db_name: str):
             "COPY tb_comment (id, content, fk_post, fk_author, created_at, updated_at) FROM STDIN"
         ) as copy:
             for comment in comments:
-                copy.write(b"\t".join([
-                    str(v).encode() if v is not None else b"\\N"
-                    for v in comment
-                ]) + b"\n")
+                copy.write(
+                    b"\t".join(
+                        [str(v).encode() if v is not None else b"\\N" for v in comment]
+                    )
+                    + b"\n"
+                )
         pg_conn.commit()
         print(f"    ✓ {len(comments):,} comments imported")
 
@@ -133,10 +144,12 @@ def import_database(db_name: str):
             "COPY tb_user_follows (fk_follower, fk_following, created_at) FROM STDIN"
         ) as copy:
             for follow in follows:
-                copy.write(b"\t".join([
-                    str(v).encode() if v is not None else b"\\N"
-                    for v in follow
-                ]) + b"\n")
+                copy.write(
+                    b"\t".join(
+                        [str(v).encode() if v is not None else b"\\N" for v in follow]
+                    )
+                    + b"\n"
+                )
         pg_conn.commit()
         print(f"    ✓ {len(follows):,} follows imported")
 
@@ -152,10 +165,12 @@ def import_database(db_name: str):
             "COPY tb_post_likes (fk_user, fk_post, reaction, created_at) FROM STDIN"
         ) as copy:
             for like in likes:
-                copy.write(b"\t".join([
-                    str(v).encode() if v is not None else b"\\N"
-                    for v in like
-                ]) + b"\n")
+                copy.write(
+                    b"\t".join(
+                        [str(v).encode() if v is not None else b"\\N" for v in like]
+                    )
+                    + b"\n"
+                )
         pg_conn.commit()
         print(f"    ✓ {len(likes):,} likes imported")
 
@@ -198,6 +213,7 @@ def import_database(db_name: str):
     except Exception as e:
         print(f"❌ Error during import: {e}")
         import traceback
+
         traceback.print_exc()
         pg_conn.close()
         sqlite_conn.close()

@@ -46,7 +46,13 @@ def load_yaml(path: Path) -> dict[str, Any]:
 
 def find_pattern(pattern_id: str) -> dict[str, Any] | None:
     """Find pattern definition in corpus."""
-    for category in ["identifiers", "queries", "architecture", "relationships", "performance"]:
+    for category in [
+        "identifiers",
+        "queries",
+        "architecture",
+        "relationships",
+        "performance",
+    ]:
         pattern_path = CORPUS_PATH / "patterns" / category / f"{pattern_id}.yaml"
         if pattern_path.exists():
             return load_yaml(pattern_path)
@@ -65,7 +71,7 @@ def generate_tutorial_prompt(pattern: dict, depth: str = "beginner") -> str:
     """Generate tutorial-style blog post prompt."""
     blog_hooks = pattern.get("blog_hooks", {}).get(depth, {})
 
-    prompt = f"""You are a senior backend engineer writing educational content about database and API design patterns. Write a tutorial blog post about the "{pattern['name']}" pattern.
+    prompt = f"""You are a senior backend engineer writing educational content about database and API design patterns. Write a tutorial blog post about the "{pattern["name"]}" pattern.
 
 ## Target Audience
 {depth.title()} backend developers (1-3 years experience for beginner, 3-5 for intermediate, 5+ for advanced).
@@ -73,28 +79,28 @@ def generate_tutorial_prompt(pattern: dict, depth: str = "beginner") -> str:
 ## Source Material
 
 ### Summary
-{pattern['summary']['long']}
+{pattern["summary"]["long"]}
 
 ### The Problem
-{pattern['problem']['description']}
+{pattern["problem"]["description"]}
 
 ### The Solution
-{pattern['solution']['principle']}
+{pattern["solution"]["principle"]}
 
 ### Components
 """
 
     for component in pattern["solution"]["components"]:
         prompt += f"""
-**{component['name']}** ({component['type']}):
-- Purpose: {component['purpose']}
-- Visibility: {component.get('visibility', 'N/A')}
+**{component["name"]}** ({component["type"]}):
+- Purpose: {component["purpose"]}
+- Visibility: {component.get("visibility", "N/A")}
 """
 
     prompt += f"""
 ### Schema Example
 ```sql
-{pattern['schema']['sql']}
+{pattern["schema"]["sql"]}
 ```
 
 ### Performance Data
@@ -108,7 +114,7 @@ def generate_tutorial_prompt(pattern: dict, depth: str = "beginner") -> str:
     if "analogy" in blog_hooks:
         prompt += f"""
 ### Analogy for {depth.title()} Audience
-{blog_hooks['analogy']}
+{blog_hooks["analogy"]}
 """
 
     if "common_mistakes" in blog_hooks:
@@ -141,12 +147,14 @@ Write a blog post with:
     return prompt
 
 
-def generate_comparison_prompt(framework_a: str, framework_b: str, pattern: dict) -> str:
+def generate_comparison_prompt(
+    framework_a: str, framework_b: str, pattern: dict
+) -> str:
     """Generate framework comparison blog post prompt."""
-    prompt = f"""You are a senior backend engineer writing honest, balanced comparison content. Write a comparison blog post: "{framework_a}" vs "{framework_b}" for implementing the {pattern['name']}.
+    prompt = f"""You are a senior backend engineer writing honest, balanced comparison content. Write a comparison blog post: "{framework_a}" vs "{framework_b}" for implementing the {pattern["name"]}.
 
 ## Pattern Being Compared
-{pattern['summary']['short']}
+{pattern["summary"]["short"]}
 
 ## Framework A: {framework_a}
 (Provide implementation details for {framework_a})
@@ -157,7 +165,7 @@ def generate_comparison_prompt(framework_a: str, framework_b: str, pattern: dict
 ## Output Requirements
 
 Write a comparison post with:
-1. **Title**: "[{framework_a}] vs [{framework_b}]: {pattern['name']} Implementation Compared"
+1. **Title**: "[{framework_a}] vs [{framework_b}]: {pattern["name"]} Implementation Compared"
 2. **TL;DR**: 2-3 sentence summary with recommendation
 3. **Introduction**: Why this comparison matters
 4. **Head-to-Head Comparison Table**: Quick reference
@@ -180,20 +188,20 @@ def generate_troubleshooting_prompt(pattern: dict, depth: str = "intermediate") 
     """Generate troubleshooting guide prompt."""
     problem = pattern.get("problem", {})
 
-    prompt = f"""You are a senior backend engineer writing a troubleshooting guide. Create a debugging guide for the "{pattern['name']}" pattern.
+    prompt = f"""You are a senior backend engineer writing a troubleshooting guide. Create a debugging guide for the "{pattern["name"]}" pattern.
 
 ## Pattern Overview
-{pattern['summary']['short']}
+{pattern["summary"]["short"]}
 
 ## Common Symptoms to Address
 """
 
     for symptom in problem.get("symptoms", []):
         prompt += f"""
-**{symptom['name']}**:
-- Description: {symptom['description']}
-- Example: {symptom.get('example', 'N/A')}
-- Detection: {symptom.get('detection', 'N/A')}
+**{symptom["name"]}**:
+- Description: {symptom["description"]}
+- Example: {symptom.get("example", "N/A")}
+- Detection: {symptom.get("detection", "N/A")}
 """
 
     prompt += """
@@ -222,14 +230,14 @@ Write a troubleshooting guide with:
 
 def generate_reference_prompt(pattern: dict) -> str:
     """Generate API/reference documentation prompt."""
-    prompt = f"""You are a technical writer creating reference documentation. Write a reference guide for the "{pattern['name']}" pattern.
+    prompt = f"""You are a technical writer creating reference documentation. Write a reference guide for the "{pattern["name"]}" pattern.
 
 ## Pattern Definition
-{pattern['summary']['long']}
+{pattern["summary"]["long"]}
 
 ## Schema
 ```sql
-{pattern['schema']['sql']}
+{pattern["schema"]["sql"]}
 ```
 
 ## Components
@@ -237,10 +245,10 @@ def generate_reference_prompt(pattern: dict) -> str:
 
     for component in pattern["solution"]["components"]:
         prompt += f"""
-### {component['name']}
-- **Type**: {component['type']}
-- **Purpose**: {component['purpose']}
-- **Visibility**: {component.get('visibility', 'N/A')}
+### {component["name"]}
+- **Type**: {component["type"]}
+- **Purpose**: {component["purpose"]}
+- **Visibility**: {component.get("visibility", "N/A")}
 """
 
     prompt += """
@@ -272,10 +280,10 @@ def save_prompt(prompt: str, filename: str, metadata: dict) -> Path:
     content = f"""---
 # Prompt Metadata
 generated: {datetime.now().isoformat()}
-pattern: {metadata.get('pattern', 'N/A')}
-type: {metadata.get('type', 'N/A')}
-depth: {metadata.get('depth', 'N/A')}
-recommended_model: {metadata.get('model', 'opencode')}
+pattern: {metadata.get("pattern", "N/A")}
+type: {metadata.get("type", "N/A")}
+depth: {metadata.get("depth", "N/A")}
+recommended_model: {metadata.get("model", "opencode")}
 ---
 
 {prompt}
@@ -292,49 +300,38 @@ def main():
         description="Generate AI prompts for blog posts from YAML corpus"
     )
     parser.add_argument(
-        "--pattern",
-        help="Pattern ID to generate prompt for (e.g., trinity-pattern)"
+        "--pattern", help="Pattern ID to generate prompt for (e.g., trinity-pattern)"
     )
     parser.add_argument(
         "--type",
         choices=["tutorial", "comparison", "troubleshooting", "reference"],
         default="tutorial",
-        help="Type of blog post to generate"
+        help="Type of blog post to generate",
     )
     parser.add_argument(
         "--depth",
         choices=["beginner", "intermediate", "advanced"],
         default="beginner",
-        help="Target audience depth"
+        help="Target audience depth",
     )
     parser.add_argument(
         "--framework-a",
-        help="First framework for comparison (required for --type comparison)"
+        help="First framework for comparison (required for --type comparison)",
     )
     parser.add_argument(
         "--framework-b",
-        help="Second framework for comparison (required for --type comparison)"
+        help="Second framework for comparison (required for --type comparison)",
     )
     parser.add_argument(
-        "--all-types",
-        action="store_true",
-        help="Generate all types for the pattern"
+        "--all-types", action="store_true", help="Generate all types for the pattern"
     )
     parser.add_argument(
-        "--all-depths",
-        action="store_true",
-        help="Generate all depths for the pattern"
+        "--all-depths", action="store_true", help="Generate all depths for the pattern"
     )
     parser.add_argument(
-        "--stdout",
-        action="store_true",
-        help="Output prompt to stdout instead of file"
+        "--stdout", action="store_true", help="Output prompt to stdout instead of file"
     )
-    parser.add_argument(
-        "--output",
-        type=Path,
-        help="Custom output path"
-    )
+    parser.add_argument("--output", type=Path, help="Custom output path")
 
     args = parser.parse_args()
 
@@ -355,7 +352,7 @@ def main():
             "pattern": args.pattern,
             "type": "comparison",
             "frameworks": [args.framework_a, args.framework_b],
-            "model": "claude-code"  # Comparisons need judgment
+            "model": "claude-code",  # Comparisons need judgment
         }
 
     else:
@@ -367,8 +364,16 @@ def main():
             print(f"Pattern not found: {args.pattern}")
             return
 
-        types = ["tutorial", "troubleshooting", "reference"] if args.all_types else [args.type]
-        depths = ["beginner", "intermediate", "advanced"] if args.all_depths else [args.depth]
+        types = (
+            ["tutorial", "troubleshooting", "reference"]
+            if args.all_types
+            else [args.type]
+        )
+        depths = (
+            ["beginner", "intermediate", "advanced"]
+            if args.all_depths
+            else [args.depth]
+        )
 
         for t in types:
             for d in depths:
@@ -385,7 +390,7 @@ def main():
                     "pattern": args.pattern,
                     "type": t,
                     "depth": d,
-                    "model": "opencode"  # Most prompts can use free tier
+                    "model": "opencode",  # Most prompts can use free tier
                 }
 
                 if args.stdout:

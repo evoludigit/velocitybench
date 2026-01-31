@@ -84,7 +84,9 @@ def import_sqlite_to_postgres(db_name: str):
 
         # Import users
         print(f"Importing {user_count} users...")
-        sqlite_cursor.execute("SELECT id, email, username, full_name, bio, created_at, updated_at FROM users")
+        sqlite_cursor.execute(
+            "SELECT id, email, username, full_name, bio, created_at, updated_at FROM users"
+        )
         users = sqlite_cursor.fetchall()
 
         for user_id, email, username, full_name, bio, created_at, updated_at in users:
@@ -98,20 +100,23 @@ def import_sqlite_to_postgres(db_name: str):
             updated_at_pg = updated_at.replace("T", " ") if updated_at else None
 
             try:
-                pg_cursor.execute("""
+                pg_cursor.execute(
+                    """
                     INSERT INTO benchmark.tb_user
                     (id, email, username, first_name, last_name, bio, is_active, created_at, updated_at)
                     VALUES (%s, %s, %s, %s, %s, %s, true, %s, %s)
-                """, (
-                    uuid_module.UUID(user_id),  # SQLite text UUID → PostgreSQL UUID
-                    email,
-                    username,
-                    first_name,
-                    last_name,
-                    bio,
-                    created_at_pg,
-                    updated_at_pg
-                ))
+                """,
+                    (
+                        uuid_module.UUID(user_id),  # SQLite text UUID → PostgreSQL UUID
+                        email,
+                        username,
+                        first_name,
+                        last_name,
+                        bio,
+                        created_at_pg,
+                        updated_at_pg,
+                    ),
+                )
             except ValueError as e:
                 print(f"  ⚠ Skipping user {user_id}: invalid UUID - {e}")
                 continue
@@ -121,7 +126,9 @@ def import_sqlite_to_postgres(db_name: str):
 
         # Create mapping table: SQLite pk_post → PostgreSQL UUID id + author mapping
         print("Building post ID mapping...")
-        sqlite_cursor.execute("SELECT pk_post, id, fk_author FROM posts ORDER BY pk_post")
+        sqlite_cursor.execute(
+            "SELECT pk_post, id, fk_author FROM posts ORDER BY pk_post"
+        )
         post_rows = sqlite_cursor.fetchall()
         post_id_map = {row[0]: row[1] for row in post_rows}
         post_author_map = {row[0]: row[2] for row in post_rows}
@@ -135,7 +142,15 @@ def import_sqlite_to_postgres(db_name: str):
         """)
         posts = sqlite_cursor.fetchall()
 
-        for post_id, title, content, fk_author, published, created_at, updated_at in posts:
+        for (
+            post_id,
+            title,
+            content,
+            fk_author,
+            published,
+            created_at,
+            updated_at,
+        ) in posts:
             # Get author UUID from mapping
             author_uuid = user_id_map.get(fk_author)
             if not author_uuid:
@@ -147,19 +162,24 @@ def import_sqlite_to_postgres(db_name: str):
             updated_at_pg = updated_at.replace("T", " ") if updated_at else None
 
             try:
-                pg_cursor.execute("""
+                pg_cursor.execute(
+                    """
                     INSERT INTO benchmark.tb_post
                     (id, author_id, title, content, status, created_at, updated_at)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
-                """, (
-                    uuid_module.UUID(post_id),
-                    uuid_module.UUID(author_uuid),
-                    title,
-                    content,
-                    'published' if published else 'draft',  # Convert int flag to status
-                    created_at_pg,
-                    updated_at_pg
-                ))
+                """,
+                    (
+                        uuid_module.UUID(post_id),
+                        uuid_module.UUID(author_uuid),
+                        title,
+                        content,
+                        "published"
+                        if published
+                        else "draft",  # Convert int flag to status
+                        created_at_pg,
+                        updated_at_pg,
+                    ),
+                )
             except (ValueError, psycopg.Error) as e:
                 print(f"  ⚠ Skipping post {post_id}: {e}")
                 continue
@@ -191,18 +211,21 @@ def import_sqlite_to_postgres(db_name: str):
             updated_at_pg = updated_at.replace("T", " ") if updated_at else None
 
             try:
-                pg_cursor.execute("""
+                pg_cursor.execute(
+                    """
                     INSERT INTO benchmark.tb_comment
                     (id, post_id, author_id, content, is_approved, created_at, updated_at)
                     VALUES (%s, %s, %s, %s, true, %s, %s)
-                """, (
-                    uuid_module.UUID(comment_id),
-                    uuid_module.UUID(post_uuid),
-                    uuid_module.UUID(author_uuid),
-                    content,
-                    created_at_pg,
-                    updated_at_pg
-                ))
+                """,
+                    (
+                        uuid_module.UUID(comment_id),
+                        uuid_module.UUID(post_uuid),
+                        uuid_module.UUID(author_uuid),
+                        content,
+                        created_at_pg,
+                        updated_at_pg,
+                    ),
+                )
                 comment_count += 1
             except (ValueError, psycopg.Error) as e:
                 skipped_count += 1
@@ -229,15 +252,18 @@ def import_sqlite_to_postgres(db_name: str):
             created_at_pg = created_at.replace("T", " ") if created_at else None
 
             try:
-                pg_cursor.execute("""
+                pg_cursor.execute(
+                    """
                     INSERT INTO benchmark.user_follows
                     (follower_id, following_id, created_at)
                     VALUES (%s, %s, %s)
-                """, (
-                    uuid_module.UUID(follower_uuid),
-                    uuid_module.UUID(following_uuid),
-                    created_at_pg
-                ))
+                """,
+                    (
+                        uuid_module.UUID(follower_uuid),
+                        uuid_module.UUID(following_uuid),
+                        created_at_pg,
+                    ),
+                )
                 follow_count += 1
             except psycopg.Error:
                 continue
@@ -263,16 +289,19 @@ def import_sqlite_to_postgres(db_name: str):
             created_at_pg = created_at.replace("T", " ") if created_at else None
 
             try:
-                pg_cursor.execute("""
+                pg_cursor.execute(
+                    """
                     INSERT INTO benchmark.post_likes
                     (user_id, post_id, reaction_type, created_at)
                     VALUES (%s, %s, %s, %s)
-                """, (
-                    uuid_module.UUID(user_uuid),
-                    uuid_module.UUID(post_uuid),
-                    reaction_type,
-                    created_at_pg
-                ))
+                """,
+                    (
+                        uuid_module.UUID(user_uuid),
+                        uuid_module.UUID(post_uuid),
+                        reaction_type,
+                        created_at_pg,
+                    ),
+                )
                 like_count += 1
             except psycopg.Error:
                 continue
@@ -319,6 +348,7 @@ def import_sqlite_to_postgres(db_name: str):
     except Exception as e:
         print(f"❌ Error during import: {e}")
         import traceback
+
         traceback.print_exc()
         pg_conn.close()
         sqlite_conn.close()
@@ -331,7 +361,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     db_name = sys.argv[1].lower()
-    if db_name not in ['xxs', 'xs', 'xxlarge']:
+    if db_name not in ["xxs", "xs", "xxlarge"]:
         print("Error: Database name must be one of: xxs, xs, xxlarge")
         sys.exit(1)
 

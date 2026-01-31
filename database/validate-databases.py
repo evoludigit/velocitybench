@@ -16,14 +16,14 @@ def validate_database(db_path: str):
 
     print(f"\n{'=' * 70}")
     print(f"VALIDATING: {Path(db_path).name}")
-    print('=' * 70)
+    print("=" * 70)
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
     # Check record counts
     print("\nRecord counts:")
-    tables = ['users', 'posts', 'comments', 'user_follows', 'post_likes']
+    tables = ["users", "posts", "comments", "user_follows", "post_likes"]
 
     counts = {}
     for table in tables:
@@ -35,9 +35,9 @@ def validate_database(db_path: str):
     # Check for primary key uniqueness
     print("\nPrimary key uniqueness:")
     pk_columns = {
-        'users': 'pk_user',
-        'posts': 'pk_post',
-        'comments': 'pk_comment',
+        "users": "pk_user",
+        "posts": "pk_post",
+        "comments": "pk_comment",
     }
 
     all_unique = True
@@ -106,7 +106,9 @@ def validate_database(db_path: str):
     null_content = cursor.fetchone()[0]
     print(f"  Posts with null/empty content: {null_content}")
 
-    cursor.execute("SELECT COUNT(*) FROM comments WHERE content IS NULL OR content = ''")
+    cursor.execute(
+        "SELECT COUNT(*) FROM comments WHERE content IS NULL OR content = ''"
+    )
     null_content = cursor.fetchone()[0]
     print(f"  Comments with null/empty content: {null_content}")
 
@@ -122,18 +124,18 @@ def validate_database(db_path: str):
     row = cursor.fetchone()
     if row:
         content = row[0]
-        preview = content[:100].replace('\n', ' ')
+        preview = content[:100].replace("\n", " ")
         print(f"  Post content preview: {preview}...")
 
     cursor.execute("SELECT content FROM comments WHERE content IS NOT NULL LIMIT 2")
     print("  Comment samples:")
     for row in cursor.fetchall():
-        preview = row[0][:80].replace('\n', ' ')
+        preview = row[0][:80].replace("\n", " ")
         print(f"    - {preview}")
 
     # File size check
     size_mb = Path(db_path).stat().st_size / (1024 * 1024)
-    size_str = f"{size_mb:.1f}MB" if size_mb < 1024 else f"{size_mb/1024:.1f}GB"
+    size_str = f"{size_mb:.1f}MB" if size_mb < 1024 else f"{size_mb / 1024:.1f}GB"
     print(f"\nFile size: {size_str}")
 
     conn.close()

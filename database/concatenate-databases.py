@@ -34,14 +34,18 @@ def concatenate_databases(db1_path: str, db2_path: str, output_path: str):
     try:
         # Get table info from first database (skip internal SQLite tables)
         cursor1 = db1.cursor()
-        cursor1.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+        cursor1.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+        )
         tables = [row[0] for row in cursor1.fetchall()]
 
         print(f"\nTables to concatenate: {', '.join(tables)}")
 
         # First, create schema from first database
         print("\nCreating schema from first database...")
-        cursor1.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+        cursor1.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+        )
         for row in cursor1.fetchall():
             if row[0]:
                 output.execute(row[0])
@@ -70,12 +74,11 @@ def concatenate_databases(db1_path: str, db2_path: str, output_path: str):
             if rows:
                 # Get column count
                 num_cols = len(rows[0])
-                placeholders = ', '.join(['?' for _ in range(num_cols)])
+                placeholders = ", ".join(["?" for _ in range(num_cols)])
 
                 cursor_out = output.cursor()
                 cursor_out.executemany(
-                    f"INSERT INTO {table} VALUES ({placeholders})",
-                    rows
+                    f"INSERT INTO {table} VALUES ({placeholders})", rows
                 )
                 output.commit()
                 print(f"  ✓ {table}: {len(rows)} rows")
@@ -83,7 +86,9 @@ def concatenate_databases(db1_path: str, db2_path: str, output_path: str):
                 print(f"  ✓ {table}: 0 rows")
 
         # Copy data from second database, adjusting primary keys and unique fields
-        print("\nCopying data from second database (adjusting keys and unique fields)...")
+        print(
+            "\nCopying data from second database (adjusting keys and unique fields)..."
+        )
         cursor2 = db2.cursor()
 
         for table in tables:
@@ -104,11 +109,16 @@ def concatenate_databases(db1_path: str, db2_path: str, output_path: str):
                     if col[5] > 0:  # pk > 0 means primary key
                         pk_idx = i
                     # Check for UNIQUE constraints
-                    if table == 'users' and col_name in ['id', 'identifier', 'email', 'username']:
+                    if table == "users" and col_name in [
+                        "id",
+                        "identifier",
+                        "email",
+                        "username",
+                    ]:
                         unique_indices[col_name] = i
-                    elif table == 'posts' and col_name in ['id', 'identifier']:
+                    elif table == "posts" and col_name in ["id", "identifier"]:
                         unique_indices[col_name] = i
-                    elif table == 'comments' and col_name == 'id':
+                    elif table == "comments" and col_name == "id":
                         unique_indices[col_name] = i
 
                 # Adjust rows
@@ -121,37 +131,44 @@ def concatenate_databases(db1_path: str, db2_path: str, output_path: str):
                         row_list[pk_idx] = row_list[pk_idx] + pk_map[table]
 
                     # Adjust unique fields
-                    if table == 'users':
-                        user_offset = pk_map['users']
-                        if 'id' in unique_indices:
-                            row_list[unique_indices['id']] = str(uuid.uuid4())
-                        if 'identifier' in unique_indices:
-                            row_list[unique_indices['identifier']] = f"{row_list[unique_indices['identifier']]}_{user_offset}"
-                        if 'email' in unique_indices:
-                            parts = row_list[unique_indices['email']].split('@')
-                            row_list[unique_indices['email']] = f"{parts[0]}_xs{user_offset}@{parts[1]}"
-                        if 'username' in unique_indices:
-                            row_list[unique_indices['username']] = f"{row_list[unique_indices['username']]}_xs{user_offset}"
+                    if table == "users":
+                        user_offset = pk_map["users"]
+                        if "id" in unique_indices:
+                            row_list[unique_indices["id"]] = str(uuid.uuid4())
+                        if "identifier" in unique_indices:
+                            row_list[unique_indices["identifier"]] = (
+                                f"{row_list[unique_indices['identifier']]}_{user_offset}"
+                            )
+                        if "email" in unique_indices:
+                            parts = row_list[unique_indices["email"]].split("@")
+                            row_list[unique_indices["email"]] = (
+                                f"{parts[0]}_xs{user_offset}@{parts[1]}"
+                            )
+                        if "username" in unique_indices:
+                            row_list[unique_indices["username"]] = (
+                                f"{row_list[unique_indices['username']]}_xs{user_offset}"
+                            )
 
-                    elif table == 'posts':
-                        if 'id' in unique_indices:
-                            row_list[unique_indices['id']] = str(uuid.uuid4())
-                        if 'identifier' in unique_indices:
-                            row_list[unique_indices['identifier']] = f"{row_list[unique_indices['identifier']]}_{pk_map['posts']}"
+                    elif table == "posts":
+                        if "id" in unique_indices:
+                            row_list[unique_indices["id"]] = str(uuid.uuid4())
+                        if "identifier" in unique_indices:
+                            row_list[unique_indices["identifier"]] = (
+                                f"{row_list[unique_indices['identifier']]}_{pk_map['posts']}"
+                            )
 
-                    elif table == 'comments':
-                        if 'id' in unique_indices:
-                            row_list[unique_indices['id']] = str(uuid.uuid4())
+                    elif table == "comments":
+                        if "id" in unique_indices:
+                            row_list[unique_indices["id"]] = str(uuid.uuid4())
 
                     adjusted_rows.append(tuple(row_list))
 
                 num_cols = len(adjusted_rows[0])
-                placeholders = ', '.join(['?' for _ in range(num_cols)])
+                placeholders = ", ".join(["?" for _ in range(num_cols)])
 
                 cursor_out = output.cursor()
                 cursor_out.executemany(
-                    f"INSERT INTO {table} VALUES ({placeholders})",
-                    adjusted_rows
+                    f"INSERT INTO {table} VALUES ({placeholders})", adjusted_rows
                 )
                 output.commit()
                 print(f"  ✓ {table}: {len(adjusted_rows)} rows")
@@ -184,11 +201,13 @@ def concatenate_databases(db1_path: str, db2_path: str, output_path: str):
 
             expected = count1 + count2
             status = "✓" if count == expected else "❌"
-            print(f"  {status} {table}: {count} rows (expected: {expected} = {count1} + {count2})")
+            print(
+                f"  {status} {table}: {count} rows (expected: {expected} = {count1} + {count2})"
+            )
 
         # Report final size
         size_mb = Path(output_path).stat().st_size / (1024 * 1024)
-        size_str = f"{size_mb:.1f}MB" if size_mb < 1024 else f"{size_mb/1024:.1f}GB"
+        size_str = f"{size_mb:.1f}MB" if size_mb < 1024 else f"{size_mb / 1024:.1f}GB"
         print(f"\n✓ Output database: {size_str}")
 
         print("\n" + "=" * 70)

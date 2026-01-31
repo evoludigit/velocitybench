@@ -29,12 +29,12 @@ class BulkLoader:
         """
         self.output_dir = Path(output_dir)
         self.stats = {
-            'users_loaded': 0,
-            'posts_loaded': 0,
-            'comments_loaded': 0,
+            "users_loaded": 0,
+            "posts_loaded": 0,
+            "comments_loaded": 0,
         }
 
-    def load_to_postgres(self, connection_string: str) -> Tuple[bool, dict]:
+    def load_to_postgres(self, connection_string: str) -> tuple[bool, dict]:
         """
         Load TSV files to PostgreSQL using COPY.
 
@@ -54,27 +54,27 @@ class BulkLoader:
             with psycopg.connect(connection_string) as conn:
                 with conn.cursor() as cur:
                     # Load users
-                    users_file = self.output_dir / 'blog_users.tsv'
+                    users_file = self.output_dir / "blog_users.tsv"
                     if users_file.exists():
                         logger.info(f"  Loading users from {users_file.name}...")
                         users_loaded = self._load_users(cur, users_file)
-                        self.stats['users_loaded'] = users_loaded
+                        self.stats["users_loaded"] = users_loaded
                         logger.info(f"    ✓ Loaded {users_loaded:,} users")
 
                     # Load posts
-                    posts_file = self.output_dir / 'blog_posts.tsv'
+                    posts_file = self.output_dir / "blog_posts.tsv"
                     if posts_file.exists():
                         logger.info(f"  Loading posts from {posts_file.name}...")
                         posts_loaded = self._load_posts(cur, posts_file)
-                        self.stats['posts_loaded'] = posts_loaded
+                        self.stats["posts_loaded"] = posts_loaded
                         logger.info(f"    ✓ Loaded {posts_loaded:,} posts")
 
                     # Load comments
-                    comments_file = self.output_dir / 'blog_comments.tsv'
+                    comments_file = self.output_dir / "blog_comments.tsv"
                     if comments_file.exists():
                         logger.info(f"  Loading comments from {comments_file.name}...")
                         comments_loaded = self._load_comments(cur, comments_file)
-                        self.stats['comments_loaded'] = comments_loaded
+                        self.stats["comments_loaded"] = comments_loaded
                         logger.info(f"    ✓ Loaded {comments_loaded:,} comments")
 
                     conn.commit()
@@ -85,6 +85,7 @@ class BulkLoader:
         except Exception as e:
             logger.error(f"Error loading to PostgreSQL: {e}")
             import traceback
+
             traceback.print_exc()
             return (False, self.stats)
 
@@ -99,10 +100,12 @@ class BulkLoader:
         Returns:
             Number of users loaded
         """
-        with open(users_file, 'r', encoding='utf-8') as f:
-            with cur.copy("COPY benchmark.tb_user (pk_user, id, email, username, first_name, last_name, bio, is_active, created_at, updated_at) FROM STDIN") as copy:
+        with open(users_file, encoding="utf-8") as f:
+            with cur.copy(
+                "COPY benchmark.tb_user (pk_user, id, email, username, first_name, last_name, bio, is_active, created_at, updated_at) FROM STDIN"
+            ) as copy:
                 for line in f:
-                    copy.write(line.encode('utf-8'))
+                    copy.write(line.encode("utf-8"))
 
         # Verify load
         cur.execute("SELECT COUNT(*) FROM benchmark.tb_user;")
@@ -119,10 +122,12 @@ class BulkLoader:
         Returns:
             Number of posts loaded
         """
-        with open(posts_file, 'r', encoding='utf-8') as f:
-            with cur.copy("COPY benchmark.tb_post (pk_post, id, title, content, excerpt, fk_author, status, published_at, created_at, updated_at, views, likes, bookmarks) FROM STDIN") as copy:
+        with open(posts_file, encoding="utf-8") as f:
+            with cur.copy(
+                "COPY benchmark.tb_post (pk_post, id, title, content, excerpt, fk_author, status, published_at, created_at, updated_at, views, likes, bookmarks) FROM STDIN"
+            ) as copy:
                 for line in f:
-                    copy.write(line.encode('utf-8'))
+                    copy.write(line.encode("utf-8"))
 
         # Verify load
         cur.execute("SELECT COUNT(*) FROM benchmark.tb_post;")
@@ -152,10 +157,12 @@ class BulkLoader:
             );
         """)
 
-        with open(comments_file, 'r', encoding='utf-8') as f:
-            with cur.copy("COPY benchmark.tb_comment (pk_comment, id, fk_post, fk_author, content, created_at, updated_at) FROM STDIN") as copy:
+        with open(comments_file, encoding="utf-8") as f:
+            with cur.copy(
+                "COPY benchmark.tb_comment (pk_comment, id, fk_post, fk_author, content, created_at, updated_at) FROM STDIN"
+            ) as copy:
                 for line in f:
-                    copy.write(line.encode('utf-8'))
+                    copy.write(line.encode("utf-8"))
 
         # Verify load
         cur.execute("SELECT COUNT(*) FROM benchmark.tb_comment;")

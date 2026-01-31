@@ -30,7 +30,7 @@ class DatabaseSafetyChecker:
         self.connection_string = connection_string
         self.timeout_sec = timeout_sec
 
-    def check_connectivity(self) -> Tuple[bool, str]:
+    def check_connectivity(self) -> tuple[bool, str]:
         """
         Check if database is reachable.
 
@@ -41,15 +41,20 @@ class DatabaseSafetyChecker:
             return (True, "Database connectivity: ⊘ psycopg not installed (skipped)")
 
         try:
-            with psycopg.connect(self.connection_string, connect_timeout=self.timeout_sec) as conn:
+            with psycopg.connect(
+                self.connection_string, connect_timeout=self.timeout_sec
+            ) as conn:
                 with conn.cursor() as cur:
                     cur.execute("SELECT version();")
                     version = cur.fetchone()[0]
-                    return (True, f"Database connectivity: ✅ OK\n  PostgreSQL {version.split(',')[0]}")
+                    return (
+                        True,
+                        f"Database connectivity: ✅ OK\n  PostgreSQL {version.split(',')[0]}",
+                    )
         except Exception as e:
             return (False, f"Database connectivity: ❌ {e}")
 
-    def check_schema_exists(self, schema: str = 'benchmark') -> Tuple[bool, str]:
+    def check_schema_exists(self, schema: str = "benchmark") -> tuple[bool, str]:
         """
         Check if benchmark schema exists.
 
@@ -63,20 +68,25 @@ class DatabaseSafetyChecker:
             return (True, f"Schema check: ⊘ skipped (psycopg not installed)")
 
         try:
-            with psycopg.connect(self.connection_string, connect_timeout=self.timeout_sec) as conn:
+            with psycopg.connect(
+                self.connection_string, connect_timeout=self.timeout_sec
+            ) as conn:
                 with conn.cursor() as cur:
                     cur.execute(
                         f"SELECT 1 FROM information_schema.schemata WHERE schema_name = %s;",
-                        (schema,)
+                        (schema,),
                     )
                     if cur.fetchone():
                         return (True, f"Schema check: ✅ Schema '{schema}' exists")
                     else:
-                        return (False, f"Schema check: ❌ Schema '{schema}' does not exist")
+                        return (
+                            False,
+                            f"Schema check: ❌ Schema '{schema}' does not exist",
+                        )
         except Exception as e:
             return (False, f"Schema check: ❌ {e}")
 
-    def check_table_sizes(self, schema: str = 'benchmark') -> Tuple[bool, dict]:
+    def check_table_sizes(self, schema: str = "benchmark") -> tuple[bool, dict]:
         """
         Check sizes of existing tables.
 
@@ -90,14 +100,19 @@ class DatabaseSafetyChecker:
             return (True, {})
 
         try:
-            with psycopg.connect(self.connection_string, connect_timeout=self.timeout_sec) as conn:
+            with psycopg.connect(
+                self.connection_string, connect_timeout=self.timeout_sec
+            ) as conn:
                 with conn.cursor() as cur:
-                    cur.execute(f"""
+                    cur.execute(
+                        f"""
                         SELECT tablename, pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename))
                         FROM pg_tables
                         WHERE schemaname = %s
                         ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
-                    """, (schema,))
+                    """,
+                        (schema,),
+                    )
 
                     sizes = {}
                     for tablename, size in cur.fetchall():
@@ -107,7 +122,7 @@ class DatabaseSafetyChecker:
         except Exception as e:
             return (False, {})
 
-    def check_available_disk_on_database(self) -> Tuple[bool, str]:
+    def check_available_disk_on_database(self) -> tuple[bool, str]:
         """
         Check available disk space on database server.
 
@@ -121,7 +136,9 @@ class DatabaseSafetyChecker:
             return (True, "Database disk check: ⊘ skipped (psycopg not installed)")
 
         try:
-            with psycopg.connect(self.connection_string, connect_timeout=self.timeout_sec) as conn:
+            with psycopg.connect(
+                self.connection_string, connect_timeout=self.timeout_sec
+            ) as conn:
                 with conn.cursor() as cur:
                     # Check PostgreSQL tablespace
                     cur.execute("""
@@ -141,7 +158,7 @@ class DatabaseSafetyChecker:
             # This check is optional, so don't fail
             return (True, f"Database disk: ⊘ {e}")
 
-    def check_all(self, schema: str = 'benchmark') -> Tuple[bool, List[str]]:
+    def check_all(self, schema: str = "benchmark") -> tuple[bool, list[str]]:
         """
         Run all database checks.
 

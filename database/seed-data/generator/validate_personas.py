@@ -59,7 +59,9 @@ class PersonaValidator:
                 json={
                     "model": MODEL_ID,
                     "messages": [
-                        {"role": "system", "content": system_prompt} if system_prompt else {},
+                        {"role": "system", "content": system_prompt}
+                        if system_prompt
+                        else {},
                         {"role": "user", "content": prompt},
                     ],
                     "max_tokens": MAX_TOKENS,
@@ -76,7 +78,7 @@ class PersonaValidator:
             print(f"  vLLM error: {e}")
         return None
 
-    def _check_coherence(self, persona: Dict) -> Tuple[bool, str]:
+    def _check_coherence(self, persona: dict) -> tuple[bool, str]:
         """
         Check if persona dimensions are logically coherent.
         Returns (is_coherent, issue_description)
@@ -88,19 +90,64 @@ class PersonaValidator:
         lang_bg = persona.get("language_background", "")
 
         region_lang_map = {
-            "United States": ["Native English", "Bilingual English/Spanish", "Bilingual English/Mandarin", "Bilingual English/Hindi"],
+            "United States": [
+                "Native English",
+                "Bilingual English/Spanish",
+                "Bilingual English/Mandarin",
+                "Bilingual English/Hindi",
+            ],
             "Canada": ["Native English", "Bilingual English/French"],
             "United Kingdom": ["Native English", "Bilingual English/Polish"],
-            "Western Europe": ["Native speaker of regional language", "Bilingual English/German", "Bilingual English/French", "Bilingual English/Dutch"],
-            "Eastern Europe": ["Native speaker of regional language", "Bilingual English/Polish", "Bilingual English/Czech", "Bilingual English/Russian"],
-            "Nordics": ["Native speaker of Nordic", "Bilingual English/Swedish", "Bilingual English/Norwegian", "Bilingual English/Danish", "Bilingual English/Finnish"],
-            "Southern Europe": ["Native speaker of regional language", "Bilingual English/Spanish", "Bilingual English/Italian", "Bilingual English/Portuguese"],
-            "India": ["Native speaker of Indian", "Bilingual English/Hindi", "Bilingual English/Tamil", "Bilingual English/Telugu"],
-            "Singapore and Southeast Asia": ["Native speaker of regional", "Bilingual English/Mandarin", "Bilingual English/Malay", "Bilingual English/Vietnamese", "Bilingual English/Thai"],
+            "Western Europe": [
+                "Native speaker of regional language",
+                "Bilingual English/German",
+                "Bilingual English/French",
+                "Bilingual English/Dutch",
+            ],
+            "Eastern Europe": [
+                "Native speaker of regional language",
+                "Bilingual English/Polish",
+                "Bilingual English/Czech",
+                "Bilingual English/Russian",
+            ],
+            "Nordics": [
+                "Native speaker of Nordic",
+                "Bilingual English/Swedish",
+                "Bilingual English/Norwegian",
+                "Bilingual English/Danish",
+                "Bilingual English/Finnish",
+            ],
+            "Southern Europe": [
+                "Native speaker of regional language",
+                "Bilingual English/Spanish",
+                "Bilingual English/Italian",
+                "Bilingual English/Portuguese",
+            ],
+            "India": [
+                "Native speaker of Indian",
+                "Bilingual English/Hindi",
+                "Bilingual English/Tamil",
+                "Bilingual English/Telugu",
+            ],
+            "Singapore and Southeast Asia": [
+                "Native speaker of regional",
+                "Bilingual English/Mandarin",
+                "Bilingual English/Malay",
+                "Bilingual English/Vietnamese",
+                "Bilingual English/Thai",
+            ],
             "China": ["Native Mandarin", "Bilingual English/Mandarin"],
-            "Japan and South Korea": ["Native speaker of East Asian", "Bilingual English/Japanese", "Bilingual English/Korean"],
+            "Japan and South Korea": [
+                "Native speaker of East Asian",
+                "Bilingual English/Japanese",
+                "Bilingual English/Korean",
+            ],
             "Australia and New Zealand": ["Native English"],
-            "Latin America": ["Native speaker of regional", "Bilingual English/Spanish", "Bilingual English/Portuguese"],
+            "Latin America": [
+                "Native speaker of regional",
+                "Bilingual English/Spanish",
+                "Bilingual English/Portuguese",
+            ],
             "Middle East": ["Native speaker of Arabic", "Bilingual English/Arabic"],
         }
 
@@ -110,7 +157,9 @@ class PersonaValidator:
             if key.lower() in region.lower():
                 expected_langs = region_lang_map[key]
                 if not any(expected in lang_bg for expected in expected_langs):
-                    issues.append(f"Language mismatch: {lang_bg} doesn't match {region}")
+                    issues.append(
+                        f"Language mismatch: {lang_bg} doesn't match {region}"
+                    )
                 matched = True
                 break
 
@@ -132,7 +181,9 @@ class PersonaValidator:
         if exp_level in exp_ranges:
             min_y, max_y = exp_ranges[exp_level]
             if not (min_y <= years <= max_y):
-                issues.append(f"Experience mismatch: {years} years doesn't match {exp_level} level ({min_y}-{max_y})")
+                issues.append(
+                    f"Experience mismatch: {years} years doesn't match {exp_level} level ({min_y}-{max_y})"
+                )
 
         # 3. Check that title is reasonable (not empty, reasonable length)
         title = persona.get("title", "")
@@ -141,8 +192,13 @@ class PersonaValidator:
 
         # 4. Check preferred comment types are from allowed list
         allowed_types = {
-            "technical_issue", "missing_edge_case", "question",
-            "tradeoff", "validation", "critical_analysis", "experience_sharing"
+            "technical_issue",
+            "missing_edge_case",
+            "question",
+            "tradeoff",
+            "validation",
+            "critical_analysis",
+            "experience_sharing",
         }
         comment_types = set(persona.get("preferred_comment_types", []))
         invalid_types = comment_types - allowed_types
@@ -150,7 +206,12 @@ class PersonaValidator:
             issues.append(f"Invalid comment types: {invalid_types}")
 
         # 5. Check expertise areas, interests, traits have items
-        for field in ["expertise_areas", "personality_traits", "example_phrases", "interests"]:
+        for field in [
+            "expertise_areas",
+            "personality_traits",
+            "example_phrases",
+            "interests",
+        ]:
             items = persona.get(field, [])
             if not items or len(items) == 0:
                 issues.append(f"Empty field: {field}")
@@ -162,7 +223,7 @@ class PersonaValidator:
 
         return len(issues) == 0, "; ".join(issues)
 
-    def _refine_persona(self, persona: Dict, coherence_issue: str) -> Dict | None:
+    def _refine_persona(self, persona: dict, coherence_issue: str) -> dict | None:
         """
         Use vLLM to refine a persona that has coherence issues.
         Returns refined persona or None if refinement fails.
@@ -172,14 +233,14 @@ class PersonaValidator:
 Review and refine this persona profile. The identified issue is: {coherence_issue}
 
 Current persona:
-- Name: {persona.get('name')}
-- Title: {persona.get('title')}
-- Years Experience: {persona.get('years_experience')}
-- Experience Level: {persona.get('experience_level')}
-- Geographic Region: {persona.get('geographic_region')}
-- Language Background: {persona.get('language_background')}
-- Company Type: {persona.get('company_type')}
-- Business Domain: {persona.get('business_domain')}
+- Name: {persona.get("name")}
+- Title: {persona.get("title")}
+- Years Experience: {persona.get("years_experience")}
+- Experience Level: {persona.get("experience_level")}
+- Geographic Region: {persona.get("geographic_region")}
+- Language Background: {persona.get("language_background")}
+- Company Type: {persona.get("company_type")}
+- Business Domain: {persona.get("business_domain")}
 
 Your task:
 1. Identify why the issue exists
@@ -207,7 +268,7 @@ Be concise and practical in your suggestions."""
         # Return None to indicate manual review needed
         return None
 
-    def _validate_with_vllm(self, persona: Dict) -> Tuple[bool, str]:
+    def _validate_with_vllm(self, persona: dict) -> tuple[bool, str]:
         """
         Use vLLM to perform semantic coherence analysis of the entire persona.
         Returns (is_coherent, analysis_summary)
@@ -222,18 +283,18 @@ Analyze this persona profile for semantic coherence and realism. Check:
 6. Do the personality traits support the communication/reply style?
 
 Persona:
-- Name: {persona.get('name')}
-- Title: {persona.get('title')}
-- Years: {persona.get('years_experience')} ({persona.get('experience_level')})
-- Region: {persona.get('geographic_region')}
-- Language: {persona.get('language_background')}
-- Company: {persona.get('company_type')}
-- Domain: {persona.get('business_domain')}
-- Communication style: {persona.get('communication_style')}
-- Reply style: {persona.get('reply_style')}
-- Expertise: {', '.join(persona.get('expertise_areas', []))}
-- Traits: {', '.join(persona.get('personality_traits', []))}
-- Background: {persona.get('background')[:100]}...
+- Name: {persona.get("name")}
+- Title: {persona.get("title")}
+- Years: {persona.get("years_experience")} ({persona.get("experience_level")})
+- Region: {persona.get("geographic_region")}
+- Language: {persona.get("language_background")}
+- Company: {persona.get("company_type")}
+- Domain: {persona.get("business_domain")}
+- Communication style: {persona.get("communication_style")}
+- Reply style: {persona.get("reply_style")}
+- Expertise: {", ".join(persona.get("expertise_areas", []))}
+- Traits: {", ".join(persona.get("personality_traits", []))}
+- Background: {persona.get("background")[:100]}...
 
 Respond with:
 COHERENT: yes/no
@@ -257,7 +318,9 @@ realism, and internal alignment. Be critical but fair. Focus on semantic coheren
         is_coherent = None
         # Check various formats that vLLM might use
         if "coherent:" in text:
-            coherent_section = text[text.find("coherent:"):text.find("coherent:") + 50]
+            coherent_section = text[
+                text.find("coherent:") : text.find("coherent:") + 50
+            ]
             if "yes" in coherent_section:
                 is_coherent = True
             elif "no" in coherent_section:
@@ -266,12 +329,13 @@ realism, and internal alignment. Be critical but fair. Focus on semantic coheren
         # Extract SCORE
         score = None
         import re
+
         # Robust pattern matching multiple vLLM formats:
         # - **SCORE:** **95/100** (markdown with asterisks)
         # - score: 85 (plain text with colon)
         # - SCORE:90 (no spaces)
         # - Score: 100 (mixed case)
-        score_match = re.search(r'score[\s:*]*\**(\d+)', text, re.IGNORECASE)
+        score_match = re.search(r"score[\s:*]*\**(\d+)", text, re.IGNORECASE)
         if score_match:
             try:
                 score = int(score_match.group(1))
@@ -297,7 +361,9 @@ realism, and internal alignment. Be critical but fair. Focus on semantic coheren
 
         return is_coherent, details
 
-    def validate_persona(self, persona: Dict, persona_id: int, use_vllm: bool = True) -> Tuple[bool, str]:
+    def validate_persona(
+        self, persona: dict, persona_id: int, use_vllm: bool = True
+    ) -> tuple[bool, str]:
         """
         Validate a single persona.
         Returns (is_valid, notes)
@@ -319,7 +385,10 @@ realism, and internal alignment. Be critical but fair. Focus on semantic coheren
                     return True, f"✓ Coherent - {vllm_analysis}"
                 else:
                     # vLLM disagrees with local checks - show both
-                    return True, f"✓ vLLM coherent (local issue: {local_issue}) - {vllm_analysis}"
+                    return (
+                        True,
+                        f"✓ vLLM coherent (local issue: {local_issue}) - {vllm_analysis}",
+                    )
             else:
                 # vLLM found issues
                 self.refined_count += 1
@@ -338,17 +407,17 @@ realism, and internal alignment. Be critical but fair. Focus on semantic coheren
         count: int | None = None,
         dry_run: bool = False,
         use_vllm: bool = True,
-    ) -> Dict:
+    ) -> dict:
         """Validate all personas in input directory."""
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print("PERSONA VALIDATION")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
         print(f"Input directory: {input_dir}")
         print(f"Dry run: {dry_run}")
         print(f"vLLM analysis: {'enabled' if use_vllm and not dry_run else 'disabled'}")
         if count:
             print(f"Limit: {count}")
-        print(f"{'='*70}\n")
+        print(f"{'=' * 70}\n")
 
         results = {
             "validated": 0,
@@ -390,16 +459,16 @@ realism, and internal alignment. Be critical but fair. Focus on semantic coheren
                 results["failed"] += 1
 
         # Print summary
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print("VALIDATION SUMMARY")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
         print(f"Validated (coherent):      {results['validated']}")
         print(f"Incoherent/Issues:         {results['incoherent']}")
         print(f"Refined:                   {results['refined']}")
         print(f"Failed:                    {results['failed']}")
         if use_vllm and not dry_run:
             print(f"vLLM analysis performed:   yes")
-        print(f"{'='*70}\n")
+        print(f"{'=' * 70}\n")
 
         if results["issues_found"] and results["incoherent"] <= 20:
             print("Issues found:")

@@ -133,7 +133,8 @@ class CommentReplyGenerator:
     def select_reply_type(self, hallucination_score: float) -> str:
         """Select reply type based on hallucination score."""
         candidates = [
-            (rtype, config) for rtype, config in REPLY_TYPES.items()
+            (rtype, config)
+            for rtype, config in REPLY_TYPES.items()
             if config["trigger"](hallucination_score)
         ]
 
@@ -147,10 +148,10 @@ class CommentReplyGenerator:
 
     def generate_single_reply(
         self,
-        original_comment: Dict,
+        original_comment: dict,
         post_content: str,
         reply_type: str,
-    ) -> Dict | None:
+    ) -> dict | None:
         """Generate a single reply to a comment."""
         config = REPLY_TYPES.get(reply_type, {})
         system_prompt = config.get("system_prompt", "")
@@ -186,10 +187,10 @@ Do not use markdown formatting."""
 
     def generate_replies_for_comment(
         self,
-        comment: Dict,
+        comment: dict,
         post_content: str,
         dry_run: bool = False,
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """Generate 1-2 replies to a single comment."""
         replies = []
 
@@ -197,9 +198,7 @@ Do not use markdown formatting."""
         num_replies = random.randint(REPLIES_PER_COMMENT_MIN, REPLIES_PER_COMMENT_MAX)
 
         for i in range(num_replies):
-            reply_type = self.select_reply_type(
-                comment.get("hallucination_score", 0.5)
-            )
+            reply_type = self.select_reply_type(comment.get("hallucination_score", 0.5))
 
             if dry_run:
                 replies.append(
@@ -219,7 +218,7 @@ Do not use markdown formatting."""
 
         return replies
 
-    def should_generate_replies(self, comment: Dict) -> bool:
+    def should_generate_replies(self, comment: dict) -> bool:
         """Decide if a comment should get replies."""
         # Only reply to comments with scores in debate range
         score = comment.get("hallucination_score", 0.5)
@@ -242,7 +241,7 @@ Do not use markdown formatting."""
         comments_file: Path,
         output_file: Path,
         dry_run: bool = False,
-    ) -> Dict:
+    ) -> dict:
         """Process a single comments file and generate replies."""
         stats = {"comments_with_replies": 0, "total_replies": 0, "failed": 0}
 
@@ -300,21 +299,25 @@ Do not use markdown formatting."""
         output_dir: Path,
         num_posts: int | None = None,
         dry_run: bool = False,
-    ) -> Dict:
+    ) -> dict:
         """Process all comment files and generate replies."""
         comment_files = sorted(list(comments_dir.glob("*_comments.json")))
 
         if num_posts:
             comment_files = comment_files[:num_posts]
 
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print(f"COMMENT REPLY GENERATION")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
         print(f"Comment files to process: {len(comment_files)}")
-        print(f"Reply generation probability: {REPLY_PROBABILITY*100:.0f}%")
-        print(f"Replies per comment: {REPLIES_PER_COMMENT_MIN}-{REPLIES_PER_COMMENT_MAX}")
-        print(f"Hallucination score range: {HALLUCINATION_SCORE_MIN}-{HALLUCINATION_SCORE_MAX}")
-        print(f"{'='*70}\n")
+        print(f"Reply generation probability: {REPLY_PROBABILITY * 100:.0f}%")
+        print(
+            f"Replies per comment: {REPLIES_PER_COMMENT_MIN}-{REPLIES_PER_COMMENT_MAX}"
+        )
+        print(
+            f"Hallucination score range: {HALLUCINATION_SCORE_MIN}-{HALLUCINATION_SCORE_MAX}"
+        )
+        print(f"{'=' * 70}\n")
 
         output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -355,7 +358,7 @@ Do not use markdown formatting."""
                 rate = i / elapsed
                 remaining = (len(comment_files) - i) / rate if rate > 0 else 0
                 print(
-                    f"  ✓ Processed {i}/{len(comment_files)} files ({rate:.1f} files/sec, ~{remaining/60:.0f}min remaining)\n"
+                    f"  ✓ Processed {i}/{len(comment_files)} files ({rate:.1f} files/sec, ~{remaining / 60:.0f}min remaining)\n"
                 )
 
         total_stats["duration"] = time.time() - self.start_time
@@ -387,7 +390,9 @@ Do not use markdown formatting."""
         except requests.exceptions.Timeout:
             raise VLLMTimeoutError("Request timed out after 60s") from None
         except requests.exceptions.ConnectionError:
-            raise VLLMConnectionError("Cannot connect to vLLM server at localhost:8000") from None
+            raise VLLMConnectionError(
+                "Cannot connect to vLLM server at localhost:8000"
+            ) from None
         except Exception as e:
             raise VLLMError(f"vLLM error: {e}") from e
 
@@ -509,19 +514,19 @@ Examples:
     )
 
     # Print summary
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("SUMMARY")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(f"Files processed:        {stats['files_processed']:,}")
     print(f"Comments with replies:  {stats['comments_with_replies']:,}")
     print(f"Total replies generated:{stats['total_replies']:,}")
     print(f"Failed files:           {stats['failed']:,}")
-    print(f"Duration:               {stats['duration']/60:.1f} min")
+    print(f"Duration:               {stats['duration'] / 60:.1f} min")
     if stats["comments_with_replies"] > 0:
         avg_replies = stats["total_replies"] / stats["comments_with_replies"]
         print(f"Avg replies/comment:    {avg_replies:.2f}")
     print(f"Output directory:       {output_dir}")
-    print(f"{'='*70}\n")
+    print(f"{'=' * 70}\n")
 
     sys.exit(0 if stats["failed"] == 0 else 1)
 

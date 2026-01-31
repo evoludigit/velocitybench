@@ -25,9 +25,9 @@ class DataValidator:
             output_dir: Directory with generated files
         """
         self.output_dir = Path(output_dir)
-        self.manifest_file = self.output_dir / 'MANIFEST.json'
+        self.manifest_file = self.output_dir / "MANIFEST.json"
 
-    def compute_checksums(self, algorithm: str = 'sha256') -> Dict[str, str]:
+    def compute_checksums(self, algorithm: str = "sha256") -> dict[str, str]:
         """
         Compute checksums for generated files.
 
@@ -39,14 +39,14 @@ class DataValidator:
         """
         checksums = {}
 
-        for tsv_file in self.output_dir.glob('blog_*.tsv'):
+        for tsv_file in self.output_dir.glob("blog_*.tsv"):
             checksum = self._compute_file_checksum(tsv_file, algorithm)
             checksums[tsv_file.name] = checksum
             logger.info(f"  {tsv_file.name}: {checksum[:16]}...")
 
         return checksums
 
-    def _compute_file_checksum(self, filepath: Path, algorithm: str = 'sha256') -> str:
+    def _compute_file_checksum(self, filepath: Path, algorithm: str = "sha256") -> str:
         """
         Compute checksum for a single file.
 
@@ -59,13 +59,13 @@ class DataValidator:
         """
         h = hashlib.new(algorithm)
 
-        with open(filepath, 'rb') as f:
-            for chunk in iter(lambda: f.read(8192), b''):
+        with open(filepath, "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
                 h.update(chunk)
 
         return h.hexdigest()
 
-    def save_checksums(self, checksums: Dict[str, str]) -> bool:
+    def save_checksums(self, checksums: dict[str, str]) -> bool:
         """
         Save checksums to MANIFEST.json.
 
@@ -77,11 +77,11 @@ class DataValidator:
         """
         try:
             manifest = {
-                'algorithm': 'sha256',
-                'checksums': checksums,
+                "algorithm": "sha256",
+                "checksums": checksums,
             }
 
-            with open(self.manifest_file, 'w') as f:
+            with open(self.manifest_file, "w") as f:
                 json.dump(manifest, f, indent=2)
 
             logger.info(f"  Saved manifest: {self.manifest_file}")
@@ -90,7 +90,7 @@ class DataValidator:
             logger.error(f"Failed to save manifest: {e}")
             return False
 
-    def verify_checksums(self) -> Tuple[bool, str]:
+    def verify_checksums(self) -> tuple[bool, str]:
         """
         Verify checksums against saved manifest.
 
@@ -101,10 +101,10 @@ class DataValidator:
             return (False, "Checksum verification: ❌ No manifest file found")
 
         try:
-            with open(self.manifest_file, 'r') as f:
+            with open(self.manifest_file) as f:
                 manifest = json.load(f)
 
-            saved_checksums = manifest.get('checksums', {})
+            saved_checksums = manifest.get("checksums", {})
             current_checksums = self.compute_checksums()
 
             if saved_checksums == current_checksums:
@@ -115,7 +115,7 @@ class DataValidator:
         except Exception as e:
             return (False, f"Checksum verification: ❌ {e}")
 
-    def validate_row_counts(self, expected: Dict[str, int]) -> Tuple[bool, str]:
+    def validate_row_counts(self, expected: dict[str, int]) -> tuple[bool, str]:
         """
         Validate row counts in generated TSV files.
 
@@ -126,9 +126,9 @@ class DataValidator:
             (is_valid: bool, message: str)
         """
         file_mapping = {
-            'posts': 'blog_posts.tsv',
-            'users': 'blog_users.tsv',
-            'comments': 'blog_comments.tsv',
+            "posts": "blog_posts.tsv",
+            "users": "blog_users.tsv",
+            "comments": "blog_comments.tsv",
         }
 
         msg = "Row count validation:"
@@ -146,7 +146,7 @@ class DataValidator:
                 continue
 
             try:
-                with open(filepath, 'r') as f:
+                with open(filepath) as f:
                     row_count = sum(1 for _ in f)
                 expected_count = expected[key]
 
@@ -165,7 +165,7 @@ class DataValidator:
         else:
             return (False, msg)
 
-    def validate_file_sizes(self) -> Tuple[bool, str]:
+    def validate_file_sizes(self) -> tuple[bool, str]:
         """
         Validate that generated files have reasonable sizes.
 
@@ -175,8 +175,8 @@ class DataValidator:
         msg = "File size validation:"
         all_ok = True
 
-        for tsv_file in sorted(self.output_dir.glob('blog_*.tsv')):
-            size_mb = tsv_file.stat().st_size / (1024 ** 2)
+        for tsv_file in sorted(self.output_dir.glob("blog_*.tsv")):
+            size_mb = tsv_file.stat().st_size / (1024**2)
 
             if size_mb > 0:
                 msg += f"\n  ✅ {tsv_file.name}: {size_mb:.1f} MB"

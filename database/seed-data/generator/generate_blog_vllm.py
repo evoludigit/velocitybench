@@ -75,8 +75,8 @@ def generate_comparison(pattern: dict, depth: str) -> str:
 Write complete, publishable blog posts in markdown format. Do NOT wrap the entire post in markdown code fences."""
 
     # For comparison patterns (REST vs GraphQL vs gRPC)
-    paradigms = pattern.get('paradigms', [])
-    frameworks = pattern.get('frameworks', [])
+    paradigms = pattern.get("paradigms", [])
+    frameworks = pattern.get("frameworks", [])
 
     if paradigms:
         items = paradigms
@@ -88,28 +88,28 @@ Write complete, publishable blog posts in markdown format. Do NOT wrap the entir
         items = []
         item_type = "option"
 
-    prompt = f"""Write a comparison blog post about "{pattern['name']}".
+    prompt = f"""Write a comparison blog post about "{pattern["name"]}".
 
 ## Target Audience
 {depth.title()} backend developers.
 
 ## Summary
-{pattern['summary']['long']}
+{pattern["summary"]["long"]}
 
 ## Items to Compare
 """
     for item in items:
         prompt += f"\n### {item['name']}\n"
         prompt += f"{item.get('description', '')}\n"
-        if 'strengths' in item:
+        if "strengths" in item:
             prompt += f"Strengths: {', '.join(item['strengths'][:3])}\n"
-        if 'weaknesses' in item:
+        if "weaknesses" in item:
             prompt += f"Weaknesses: {', '.join(item['weaknesses'][:3])}\n"
-        if 'best_for' in item:
+        if "best_for" in item:
             prompt += f"Best for: {', '.join(item['best_for'][:3])}\n"
 
     # Add comparison matrix if available
-    comparison = pattern.get('comparison_matrix', {})
+    comparison = pattern.get("comparison_matrix", {})
     if comparison:
         prompt += "\n## Comparison Matrix\n"
         for metric, values in list(comparison.items())[:5]:
@@ -121,13 +121,17 @@ Write complete, publishable blog posts in markdown format. Do NOT wrap the entir
             prompt += "\n"
 
     # Add recommendations if available
-    recommendations = pattern.get('use_case_recommendations', pattern.get('recommendation_matrix', []))
+    recommendations = pattern.get(
+        "use_case_recommendations", pattern.get("recommendation_matrix", [])
+    )
     if recommendations:
         prompt += "\n## Use Case Recommendations\n"
         for rec in recommendations[:4]:
-            prompt += f"- **{rec['scenario']}**: {rec['recommendation']} - {rec['reason']}\n"
+            prompt += (
+                f"- **{rec['scenario']}**: {rec['recommendation']} - {rec['reason']}\n"
+            )
 
-    if 'analogy' in blog_hooks:
+    if "analogy" in blog_hooks:
         prompt += f"\n## Analogy for {depth} audience\n{blog_hooks['analogy']}\n"
 
     prompt += f"""
@@ -186,12 +190,12 @@ def generate_tutorial(pattern: dict, depth: str) -> str:
 Write complete, publishable blog posts in markdown format."""
 
     # Handle both 'solution' (singular) and 'solutions' (plural) structures
-    solution = pattern.get('solution', {})
-    solutions = pattern.get('solutions', [])
+    solution = pattern.get("solution", {})
+    solutions = pattern.get("solutions", [])
 
     if solution:
-        solution_text = solution.get('principle', '')
-        components = solution.get('components', [])
+        solution_text = solution.get("principle", "")
+        components = solution.get("components", [])
     elif solutions:
         # For patterns with multiple solutions, summarize all
         solution_text = "Multiple solutions exist for this problem:\n"
@@ -204,19 +208,19 @@ Write complete, publishable blog posts in markdown format."""
 
     # Build prompt based on available fields
     problem_section = ""
-    if 'problem' in pattern:
+    if "problem" in pattern:
         problem_section = f"\n## The Problem\n{pattern['problem']['description']}"
-    elif 'timeline' in pattern:
+    elif "timeline" in pattern:
         # For history patterns
         problem_section = f"\n## Context\nSee timeline below for the evolution and challenges that arose."
 
-    prompt = f"""Write a tutorial blog post about the "{pattern['name']}" pattern.
+    prompt = f"""Write a tutorial blog post about the "{pattern["name"]}" pattern.
 
 ## Target Audience
 {depth.title()} backend developers.
 
 ## Summary
-{pattern['summary']['long']}{problem_section}
+{pattern["summary"]["long"]}{problem_section}
 
 ## The Solution
 {solution_text}
@@ -230,21 +234,21 @@ Write complete, publishable blog posts in markdown format."""
         prompt += f"- **{sol['name']}**: {sol['description']}\n"
 
     # Handle schema - may not exist for all patterns
-    schema = pattern.get('schema', {})
-    if schema and 'sql' in schema:
+    schema = pattern.get("schema", {})
+    if schema and "sql" in schema:
         prompt += f"""
 ## Schema Example
 ```sql
-{schema['sql']}
+{schema["sql"]}
 ```
 """
     else:
         prompt += "\n## Code Examples\nInclude practical code examples demonstrating the pattern.\n"
 
-    if 'analogy' in blog_hooks:
+    if "analogy" in blog_hooks:
         prompt += f"""
 ## Analogy for {depth} audience
-{blog_hooks['analogy']}
+{blog_hooks["analogy"]}
 """
 
     prompt += """
@@ -271,7 +275,7 @@ def generate_troubleshooting(pattern: dict) -> str:
     system_prompt = """You are a senior backend engineer writing debugging guides. Be practical and focused on quick problem resolution."""
 
     # Check for symptoms in problem section
-    symptoms = pattern.get('problem', {}).get('symptoms', [])
+    symptoms = pattern.get("problem", {}).get("symptoms", [])
     symptoms_section = ""
     if symptoms:
         symptoms_section = "## Common Symptoms\n"
@@ -282,17 +286,19 @@ def generate_troubleshooting(pattern: dict) -> str:
                 # Handle string symptoms
                 symptoms_section += f"- {symptom}\n"
     else:
-        symptoms_section = "## Common Challenges\nThis pattern addresses several common challenges:\n"
+        symptoms_section = (
+            "## Common Challenges\nThis pattern addresses several common challenges:\n"
+        )
         # Extract challenges from pattern description if available
-        if 'problem' in pattern and isinstance(pattern['problem'], dict):
-            desc = pattern['problem'].get('description', '')
+        if "problem" in pattern and isinstance(pattern["problem"], dict):
+            desc = pattern["problem"].get("description", "")
             if desc:
                 symptoms_section += f"{desc}\n"
 
-    prompt = f"""Write a troubleshooting guide for the "{pattern['name']}" pattern.
+    prompt = f"""Write a troubleshooting guide for the "{pattern["name"]}" pattern.
 
 ## Pattern Summary
-{pattern['summary']['short']}
+{pattern["summary"]["short"]}
 
 {symptoms_section}
 
@@ -315,21 +321,21 @@ def generate_reference(pattern: dict) -> str:
     system_prompt = """You are a technical writer creating reference documentation. Be precise and scannable."""
 
     # Handle schema - may not exist
-    schema = pattern.get('schema', {})
+    schema = pattern.get("schema", {})
     schema_section = ""
-    if schema and 'sql' in schema:
+    if schema and "sql" in schema:
         schema_section = f"""## Schema
 ```sql
-{schema['sql']}
+{schema["sql"]}
 ```
 """
     else:
         schema_section = "## Implementation Details\nKey concepts and implementation details for this pattern.\n"
 
     # Handle solution/solutions
-    solution = pattern.get('solution', {})
-    solutions = pattern.get('solutions', [])
-    components = solution.get('components', []) if solution else []
+    solution = pattern.get("solution", {})
+    solutions = pattern.get("solutions", [])
+    components = solution.get("components", []) if solution else []
 
     # Build components/solutions section
     components_section = ""
@@ -339,14 +345,16 @@ def generate_reference(pattern: dict) -> str:
             components_section += f"- **{comp['name']}** ({comp.get('type', 'approach')}): {comp['purpose']}\n"
         for sol in solutions:
             components_section += f"- **{sol['name']}**: {sol['description']}\n"
-    elif 'timeline' in pattern:
+    elif "timeline" in pattern:
         # For history patterns, use timeline as reference
-        components_section = "## Timeline\nKey events and milestones in the evolution of this topic.\n"
+        components_section = (
+            "## Timeline\nKey events and milestones in the evolution of this topic.\n"
+        )
 
-    prompt = f"""Write reference documentation for the "{pattern['name']}" pattern.
+    prompt = f"""Write reference documentation for the "{pattern["name"]}" pattern.
 
 ## Summary
-{pattern['summary']['long']}
+{pattern["summary"]["long"]}
 
 {schema_section}
 
@@ -369,7 +377,7 @@ Length: 800-1200 words
 def save_blog(content: str, output_path: Path) -> bool:
     """Save blog post to file."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(output_path, 'w') as f:
+    with open(output_path, "w") as f:
         f.write(content)
     return True
 
@@ -378,12 +386,16 @@ def get_existing_posts() -> set[str]:
     """Get set of patterns that already have blog posts."""
     existing = set()
     import re
+
     for post_type in ["tutorials", "reference", "troubleshooting", "comparisons"]:
         dir_path = OUTPUT_DIR / post_type
         if dir_path.exists():
             for md_file in dir_path.glob("*.md"):
                 # Extract pattern name from filename
-                match = re.match(r"^(.+?)(?:-tutorial|-reference|-troubleshooting|-(?:beginner|intermediate|advanced))", md_file.name)
+                match = re.match(
+                    r"^(.+?)(?:-tutorial|-reference|-troubleshooting|-(?:beginner|intermediate|advanced))",
+                    md_file.name,
+                )
                 if match:
                     existing.add(match.group(1))
     return existing
@@ -391,7 +403,12 @@ def get_existing_posts() -> set[str]:
 
 def is_comparison_pattern(pattern: dict) -> bool:
     """Check if pattern is a comparison pattern."""
-    return bool(pattern.get('paradigms') or pattern.get('frameworks') or 'paradigms' in pattern or 'comparison_matrix' in pattern)
+    return bool(
+        pattern.get("paradigms")
+        or pattern.get("frameworks")
+        or "paradigms" in pattern
+        or "comparison_matrix" in pattern
+    )
 
 
 def generate_all():
@@ -400,13 +417,13 @@ def generate_all():
     existing_posts = get_existing_posts()
     depths = ["beginner", "intermediate", "advanced"]
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"BLOG POST GENERATION STATUS")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(f"Total patterns discovered: {len(all_patterns)}")
     print(f"Patterns with existing posts: {len(existing_posts)}")
     print(f"Patterns to generate: {len(all_patterns) - len(existing_posts)}")
-    print(f"{'='*70}\n")
+    print(f"{'=' * 70}\n")
 
     # Generate for all patterns
     for pattern_id, category in sorted(all_patterns.items()):
@@ -441,7 +458,9 @@ def generate_all():
 
             # Tutorials
             for depth in depths:
-                output_path = OUTPUT_DIR / "tutorials" / f"{pattern_id}-tutorial-{depth}.md"
+                output_path = (
+                    OUTPUT_DIR / "tutorials" / f"{pattern_id}-tutorial-{depth}.md"
+                )
                 print(f"  Generating tutorial ({depth})...")
                 content = generate_tutorial(pattern, depth)
                 if content:
@@ -451,7 +470,9 @@ def generate_all():
                     print(f"    ✗ FAILED")
 
             # Troubleshooting
-            output_path = OUTPUT_DIR / "troubleshooting" / f"{pattern_id}-troubleshooting.md"
+            output_path = (
+                OUTPUT_DIR / "troubleshooting" / f"{pattern_id}-troubleshooting.md"
+            )
             print(f"  Generating troubleshooting guide...")
             content = generate_troubleshooting(pattern)
             if content:
@@ -470,18 +491,26 @@ def generate_all():
             else:
                 print(f"    ✗ FAILED")
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"Blog generation complete!")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Generate blog posts using local vLLM")
     parser.add_argument("--pattern", help="Pattern ID to generate for")
-    parser.add_argument("--type", choices=["tutorial", "troubleshooting", "reference", "comparison"], default="tutorial")
-    parser.add_argument("--depth", choices=["beginner", "intermediate", "advanced"], default="beginner")
+    parser.add_argument(
+        "--type",
+        choices=["tutorial", "troubleshooting", "reference", "comparison"],
+        default="tutorial",
+    )
+    parser.add_argument(
+        "--depth", choices=["beginner", "intermediate", "advanced"], default="beginner"
+    )
     parser.add_argument("--all", action="store_true", help="Generate all blog posts")
-    parser.add_argument("--stdout", action="store_true", help="Output to stdout instead of file")
+    parser.add_argument(
+        "--stdout", action="store_true", help="Output to stdout instead of file"
+    )
 
     args = parser.parse_args()
 
@@ -510,10 +539,14 @@ def main():
     # Generate based on type
     if args.type == "tutorial":
         content = generate_tutorial(pattern, args.depth)
-        output_path = OUTPUT_DIR / "tutorials" / f"{args.pattern}-tutorial-{args.depth}.md"
+        output_path = (
+            OUTPUT_DIR / "tutorials" / f"{args.pattern}-tutorial-{args.depth}.md"
+        )
     elif args.type == "troubleshooting":
         content = generate_troubleshooting(pattern)
-        output_path = OUTPUT_DIR / "troubleshooting" / f"{args.pattern}-troubleshooting.md"
+        output_path = (
+            OUTPUT_DIR / "troubleshooting" / f"{args.pattern}-troubleshooting.md"
+        )
     elif args.type == "comparison":
         content = generate_comparison(pattern, args.depth)
         output_path = OUTPUT_DIR / "comparisons" / f"{args.pattern}-{args.depth}.md"

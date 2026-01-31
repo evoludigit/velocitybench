@@ -55,16 +55,63 @@ def import_xs(sqlite_path: str, pg_conn_str: str):
             pg_conn.commit()
         except Exception:
             pass
+
     atexit.register(re_enable_fks)
 
     # Map SQLite tables to PostgreSQL tables
     # Skip pk_* columns as they're GENERATED ALWAYS in PostgreSQL
     table_mappings = [
-        ('users', 'tb_user', ['id', 'identifier', 'email', 'username', 'full_name', 'bio', 'created_at', 'updated_at']),
-        ('posts', 'tb_post', ['id', 'identifier', 'title', 'content', 'fk_author', 'published', 'created_at', 'updated_at']),
-        ('comments', 'tb_comment', ['id', 'identifier', 'content', 'fk_post', 'fk_author', 'created_at', 'updated_at']),
-        ('user_follows', 'tb_user_follows', ['fk_follower', 'fk_following', 'created_at']),
-        ('post_likes', 'tb_post_like', ['fk_user', 'fk_post', 'reaction_type', 'created_at']),
+        (
+            "users",
+            "tb_user",
+            [
+                "id",
+                "identifier",
+                "email",
+                "username",
+                "full_name",
+                "bio",
+                "created_at",
+                "updated_at",
+            ],
+        ),
+        (
+            "posts",
+            "tb_post",
+            [
+                "id",
+                "identifier",
+                "title",
+                "content",
+                "fk_author",
+                "published",
+                "created_at",
+                "updated_at",
+            ],
+        ),
+        (
+            "comments",
+            "tb_comment",
+            [
+                "id",
+                "identifier",
+                "content",
+                "fk_post",
+                "fk_author",
+                "created_at",
+                "updated_at",
+            ],
+        ),
+        (
+            "user_follows",
+            "tb_user_follows",
+            ["fk_follower", "fk_following", "created_at"],
+        ),
+        (
+            "post_likes",
+            "tb_post_like",
+            ["fk_user", "fk_post", "reaction_type", "created_at"],
+        ),
     ]
 
     start = time.time()
@@ -96,7 +143,7 @@ def import_xs(sqlite_path: str, pg_conn_str: str):
             rows = [[row[i] for i in col_indices] for row in all_rows]
 
             # For posts table, cast published int to boolean
-            if pg_table == 'tb_post':
+            if pg_table == "tb_post":
                 rows = [[*row[:5], bool(row[5]), row[6], row[7]] for row in rows]
 
             # Insert into PostgreSQL in batches

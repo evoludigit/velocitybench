@@ -47,7 +47,13 @@ def load_dataset_config(size: str) -> dict[str, Any]:
 def load_pattern(pattern_id: str) -> dict[str, Any]:
     """Load pattern definition from corpus."""
     # Search in pattern directories
-    for category in ["identifiers", "queries", "architecture", "relationships", "performance"]:
+    for category in [
+        "identifiers",
+        "queries",
+        "architecture",
+        "relationships",
+        "performance",
+    ]:
         pattern_path = CORPUS_PATH / "patterns" / category / f"{pattern_id}.yaml"
         if pattern_path.exists():
             return load_yaml(pattern_path)
@@ -102,19 +108,21 @@ def generate_users_sql(config: dict) -> str:
     lines.append(",\n".join(fixture_values) + ";")
 
     # Generated users
-    lines.extend([
-        "",
-        f"-- Generated users ({generated_count} users)",
-        "INSERT INTO tb_user (email, username, first_name, last_name, bio, is_active)",
-        "SELECT",
-        "    'user' || i || '@example.com',",
-        "    'user' || i,",
-        "    'First' || i,",
-        "    'Last' || i,",
-        f"    'Generated user ' || i || ' for {config['id']} dataset benchmarking',",
-        "    true",
-        f"FROM generate_series({len(fixtures) + 1}, {total_users}) AS i;",
-    ])
+    lines.extend(
+        [
+            "",
+            f"-- Generated users ({generated_count} users)",
+            "INSERT INTO tb_user (email, username, first_name, last_name, bio, is_active)",
+            "SELECT",
+            "    'user' || i || '@example.com',",
+            "    'user' || i,",
+            "    'First' || i,",
+            "    'Last' || i,",
+            f"    'Generated user ' || i || ' for {config['id']} dataset benchmarking',",
+            "    true",
+            f"FROM generate_series({len(fixtures) + 1}, {total_users}) AS i;",
+        ]
+    )
 
     return "\n".join(lines)
 
@@ -141,31 +149,35 @@ def generate_posts_sql(config: dict) -> str:
     for user in fixtures:
         post_count = user.get("post_count", 5)
         for j in range(post_count):
-            slug = f"{user['username']}-post-{j+1}"
-            title = f"{user['first_name']}'s Post #{j+1}"
+            slug = f"{user['username']}-post-{j + 1}"
+            title = f"{user['first_name']}'s Post #{j + 1}"
             content = f"This is a post by {user['username']} about backend development."
             fixture_posts.append(
                 f"    (gen_random_uuid(), '{slug}', {user['pk']}, '{title}', '{content}', NOW() - interval '{post_pk} days')"
             )
             post_pk += 1
 
-    lines.append("INSERT INTO tb_post (id, slug, fk_author, title, content, published_at) VALUES")
+    lines.append(
+        "INSERT INTO tb_post (id, slug, fk_author, title, content, published_at) VALUES"
+    )
     lines.append(",\n".join(fixture_posts[:50]) + ";")  # First 50 fixture posts
 
     # Generated posts distributed across users
     remaining_posts = total_posts - len(fixture_posts[:50])
-    lines.extend([
-        "",
-        f"-- Generated posts ({remaining_posts} posts) distributed across users",
-        "INSERT INTO tb_post (slug, fk_author, title, content, published_at)",
-        "SELECT",
-        "    'post-' || i,",
-        f"    1 + (i % {total_users}),  -- Distribute across users",
-        "    'Generated Post #' || i,",
-        "    'Content for generated post ' || i || '. This post demonstrates the Trinity Pattern in action.',",
-        "    NOW() - (i || ' hours')::interval",
-        f"FROM generate_series({len(fixture_posts[:50]) + 1}, {total_posts}) AS i;",
-    ])
+    lines.extend(
+        [
+            "",
+            f"-- Generated posts ({remaining_posts} posts) distributed across users",
+            "INSERT INTO tb_post (slug, fk_author, title, content, published_at)",
+            "SELECT",
+            "    'post-' || i,",
+            f"    1 + (i % {total_users}),  -- Distribute across users",
+            "    'Generated Post #' || i,",
+            "    'Content for generated post ' || i || '. This post demonstrates the Trinity Pattern in action.',",
+            "    NOW() - (i || ' hours')::interval",
+            f"FROM generate_series({len(fixture_posts[:50]) + 1}, {total_posts}) AS i;",
+        ]
+    )
 
     return "\n".join(lines)
 
@@ -216,16 +228,56 @@ def generate_categories_sql(config: dict) -> str:
     total_posts = config["counts"]["posts"]
 
     category_names = [
-        "Technology", "Programming", "Database", "GraphQL", "REST",
-        "Performance", "Security", "DevOps", "Cloud", "Architecture",
-        "Testing", "Frontend", "Backend", "Mobile", "AI/ML",
-        "Career", "Tutorial", "Opinion", "News", "Review",
-        "JavaScript", "Python", "Go", "Rust", "Java",
-        "PostgreSQL", "MongoDB", "Redis", "Kubernetes", "Docker",
-        "AWS", "GCP", "Azure", "Linux", "Git",
-        "Agile", "Best Practices", "Code Review", "Documentation", "Open Source",
-        "Startups", "Enterprise", "Scale", "Microservices", "Monolith",
-        "API Design", "Data Modeling", "Caching", "Queues", "Monitoring"
+        "Technology",
+        "Programming",
+        "Database",
+        "GraphQL",
+        "REST",
+        "Performance",
+        "Security",
+        "DevOps",
+        "Cloud",
+        "Architecture",
+        "Testing",
+        "Frontend",
+        "Backend",
+        "Mobile",
+        "AI/ML",
+        "Career",
+        "Tutorial",
+        "Opinion",
+        "News",
+        "Review",
+        "JavaScript",
+        "Python",
+        "Go",
+        "Rust",
+        "Java",
+        "PostgreSQL",
+        "MongoDB",
+        "Redis",
+        "Kubernetes",
+        "Docker",
+        "AWS",
+        "GCP",
+        "Azure",
+        "Linux",
+        "Git",
+        "Agile",
+        "Best Practices",
+        "Code Review",
+        "Documentation",
+        "Open Source",
+        "Startups",
+        "Enterprise",
+        "Scale",
+        "Microservices",
+        "Monolith",
+        "API Design",
+        "Data Modeling",
+        "Caching",
+        "Queues",
+        "Monitoring",
     ]
 
     lines = [
@@ -247,16 +299,18 @@ def generate_categories_sql(config: dict) -> str:
     lines.append(",\n".join(category_values) + ";")
 
     # Post categories (many-to-many)
-    lines.extend([
-        "",
-        f"-- Post-Category relationships ({total_post_categories} relationships)",
-        "INSERT INTO post_categories (fk_post, fk_category)",
-        "SELECT DISTINCT",
-        f"    1 + (i % {total_posts}),",
-        f"    1 + ((i * 7) % {total_categories})  -- Semi-random distribution",
-        f"FROM generate_series(1, {total_post_categories}) AS i",
-        "ON CONFLICT DO NOTHING;",  # Ignore duplicates
-    ])
+    lines.extend(
+        [
+            "",
+            f"-- Post-Category relationships ({total_post_categories} relationships)",
+            "INSERT INTO post_categories (fk_post, fk_category)",
+            "SELECT DISTINCT",
+            f"    1 + (i % {total_posts}),",
+            f"    1 + ((i * 7) % {total_categories})  -- Semi-random distribution",
+            f"FROM generate_series(1, {total_post_categories}) AS i",
+            "ON CONFLICT DO NOTHING;",  # Ignore duplicates
+        ]
+    )
 
     return "\n".join(lines)
 
@@ -280,7 +334,7 @@ def generate_relationships_sql(config: dict) -> str:
         f"    1 + (i % {total_users}),",
         f"    1 + ((i * 17) % {total_users})  -- Different user",
         f"FROM generate_series(1, {total_follows}) AS i",
-        "WHERE (i % {}) != ((i * 17) % {})  -- Can't follow yourself".format(total_users, total_users),
+        f"WHERE (i % {total_users}) != ((i * 17) % {total_users})  -- Can't follow yourself",
         "ON CONFLICT DO NOTHING;",
         "",
         "-- ============================================================",
@@ -380,18 +434,16 @@ def main():
         "--size",
         choices=["xs", "medium", "large"],
         default="xs",
-        help="Dataset size to generate"
+        help="Dataset size to generate",
     )
     parser.add_argument(
         "--output",
         type=Path,
         default=None,
-        help="Output file path (default: ../output/sql/03-data-{size}.sql)"
+        help="Output file path (default: ../output/sql/03-data-{size}.sql)",
     )
     parser.add_argument(
-        "--stdout",
-        action="store_true",
-        help="Output to stdout instead of file"
+        "--stdout", action="store_true", help="Output to stdout instead of file"
     )
 
     args = parser.parse_args()

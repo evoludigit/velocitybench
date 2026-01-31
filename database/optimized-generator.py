@@ -59,7 +59,10 @@ class OptimizedGenerator:
 
             # Fetch available models and use the first one (keep full path)
             import requests
-            models_response = requests.get(f"{vllm_endpoint.replace('/v1', '')}/v1/models")
+
+            models_response = requests.get(
+                f"{vllm_endpoint.replace('/v1', '')}/v1/models"
+            )
             if models_response.status_code == 200:
                 models = models_response.json().get("data", [])
                 if models:
@@ -75,7 +78,7 @@ class OptimizedGenerator:
                 model=self.model_name,
                 messages=[{"role": "user", "content": "test"}],
                 max_tokens=10,
-                temperature=0.1
+                temperature=0.1,
             )
             self.vllm_available = True
             print("✓ vLLM available at", vllm_endpoint)
@@ -112,35 +115,37 @@ class OptimizedGenerator:
             user_id = str(uuid.uuid4())
             self.user_ids.append(i + 1)  # Store pk_user (1-indexed)
 
-            users.append((
-                i + 1,  # pk_user
-                user_id,  # id
-                f"user_{i+1:06d}",  # identifier
-                self.fake.unique.email(),  # email
-                f"user_{i+1}",  # username
-                self.fake.name(),  # full_name
-                self.fake.text(max_nb_chars=200) if random.random() > 0.3 else None,  # bio
-                datetime.now().isoformat(),  # created_at
-                datetime.now().isoformat(),  # updated_at
-            ))
+            users.append(
+                (
+                    i + 1,  # pk_user
+                    user_id,  # id
+                    f"user_{i + 1:06d}",  # identifier
+                    self.fake.unique.email(),  # email
+                    f"user_{i + 1}",  # username
+                    self.fake.name(),  # full_name
+                    self.fake.text(max_nb_chars=200)
+                    if random.random() > 0.3
+                    else None,  # bio
+                    datetime.now().isoformat(),  # created_at
+                    datetime.now().isoformat(),  # updated_at
+                )
+            )
 
             # Batch insert every 10K users
             if (i + 1) % 10000 == 0:
                 cursor = self.conn.cursor()
                 cursor.executemany(
-                    """INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    users
+                    """INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""", users
                 )
                 self.conn.commit()
-                print(f"  ✓ {i+1:,} users created", flush=True)
+                print(f"  ✓ {i + 1:,} users created", flush=True)
                 users = []
 
         # Insert remaining
         if users:
             cursor = self.conn.cursor()
             cursor.executemany(
-                """INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                users
+                """INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""", users
             )
             self.conn.commit()
             print(f"✓ {count:,} users created")
@@ -164,35 +169,39 @@ class OptimizedGenerator:
             post_id = str(uuid.uuid4())
             self.post_ids.append(i + 1)
 
-            posts.append((
-                i + 1,  # pk_post
-                post_id,  # id
-                f"post_{i+1:07d}",  # identifier
-                titles[i] if i < len(titles) else f"Post {i+1}",  # title
-                contents[i] if i < len(contents) else f"Content for post {i+1}",  # content
-                random.choice(self.user_ids),  # fk_author
-                1 if random.random() > 0.2 else 0,  # published
-                (datetime.now() - timedelta(days=random.randint(0, 365))).isoformat(),  # created_at
-                datetime.now().isoformat(),  # updated_at
-            ))
+            posts.append(
+                (
+                    i + 1,  # pk_post
+                    post_id,  # id
+                    f"post_{i + 1:07d}",  # identifier
+                    titles[i] if i < len(titles) else f"Post {i + 1}",  # title
+                    contents[i]
+                    if i < len(contents)
+                    else f"Content for post {i + 1}",  # content
+                    random.choice(self.user_ids),  # fk_author
+                    1 if random.random() > 0.2 else 0,  # published
+                    (
+                        datetime.now() - timedelta(days=random.randint(0, 365))
+                    ).isoformat(),  # created_at
+                    datetime.now().isoformat(),  # updated_at
+                )
+            )
 
             # Batch insert every 50K posts
             if (i + 1) % 50000 == 0:
                 cursor = self.conn.cursor()
                 cursor.executemany(
-                    """INSERT INTO posts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    posts
+                    """INSERT INTO posts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""", posts
                 )
                 self.conn.commit()
-                print(f"  ✓ {i+1:,} posts created", flush=True)
+                print(f"  ✓ {i + 1:,} posts created", flush=True)
                 posts = []
 
         # Insert remaining
         if posts:
             cursor = self.conn.cursor()
             cursor.executemany(
-                """INSERT INTO posts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                posts
+                """INSERT INTO posts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""", posts
             )
             self.conn.commit()
             print(f"✓ {count:,} posts created")
@@ -211,34 +220,36 @@ class OptimizedGenerator:
         for i in range(count):
             comment_id = str(uuid.uuid4())
 
-            comments.append((
-                i + 1,  # pk_comment
-                comment_id,  # id
-                None,  # identifier
-                contents[i] if i < len(contents) else f"Comment {i+1}",  # content
-                random.choice(self.post_ids),  # fk_post
-                random.choice(self.user_ids),  # fk_author
-                (datetime.now() - timedelta(days=random.randint(0, 180))).isoformat(),  # created_at
-                datetime.now().isoformat(),  # updated_at
-            ))
+            comments.append(
+                (
+                    i + 1,  # pk_comment
+                    comment_id,  # id
+                    None,  # identifier
+                    contents[i] if i < len(contents) else f"Comment {i + 1}",  # content
+                    random.choice(self.post_ids),  # fk_post
+                    random.choice(self.user_ids),  # fk_author
+                    (
+                        datetime.now() - timedelta(days=random.randint(0, 180))
+                    ).isoformat(),  # created_at
+                    datetime.now().isoformat(),  # updated_at
+                )
+            )
 
             # Batch insert every 100K comments
             if (i + 1) % 100000 == 0:
                 cursor = self.conn.cursor()
                 cursor.executemany(
-                    """INSERT INTO comments VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                    comments
+                    """INSERT INTO comments VALUES (?, ?, ?, ?, ?, ?, ?, ?)""", comments
                 )
                 self.conn.commit()
-                print(f"  ✓ {i+1:,} comments created", flush=True)
+                print(f"  ✓ {i + 1:,} comments created", flush=True)
                 comments = []
 
         # Insert remaining
         if comments:
             cursor = self.conn.cursor()
             cursor.executemany(
-                """INSERT INTO comments VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                comments
+                """INSERT INTO comments VALUES (?, ?, ?, ?, ?, ?, ?, ?)""", comments
             )
             self.conn.commit()
             print(f"✓ {count:,} comments created")
@@ -254,31 +265,27 @@ class OptimizedGenerator:
             following = random.choice(self.user_ids)
 
             if follower != following:
-                follows.append((
-                    follower,
-                    following,
-                    datetime.now().isoformat()
-                ))
+                follows.append((follower, following, datetime.now().isoformat()))
 
         cursor = self.conn.cursor()
         cursor.executemany(
-            """INSERT OR IGNORE INTO user_follows VALUES (?, ?, ?)""",
-            follows
+            """INSERT OR IGNORE INTO user_follows VALUES (?, ?, ?)""", follows
         )
 
         # Likes: 100K (0.2 per post average)
         likes = []
         for _ in range(100000):
-            likes.append((
-                random.choice(self.user_ids),
-                random.choice(self.post_ids),
-                random.choice(['like', 'love', 'laugh', 'angry', 'sad']),
-                datetime.now().isoformat()
-            ))
+            likes.append(
+                (
+                    random.choice(self.user_ids),
+                    random.choice(self.post_ids),
+                    random.choice(["like", "love", "laugh", "angry", "sad"]),
+                    datetime.now().isoformat(),
+                )
+            )
 
         cursor.executemany(
-            """INSERT OR IGNORE INTO post_likes VALUES (?, ?, ?, ?)""",
-            likes
+            """INSERT OR IGNORE INTO post_likes VALUES (?, ?, ?, ?)""", likes
         )
 
         self.conn.commit()
@@ -289,7 +296,7 @@ class OptimizedGenerator:
         results = []
 
         if not self.vllm_available:
-            return [f"Blog Post {i+1}" for i in range(count)]
+            return [f"Blog Post {i + 1}" for i in range(count)]
 
         for batch_start in range(0, count, batch_size):
             batch_count = min(batch_size, count - batch_start)
@@ -297,9 +304,10 @@ class OptimizedGenerator:
             try:
                 response = self.client.chat.completions.create(
                     model=self.model_name,
-                    messages=[{
-                        "role": "user",
-                        "content": f"""Generate {batch_count} unique, realistic blog post titles.
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": f"""Generate {batch_count} unique, realistic blog post titles.
 
 Requirements:
 - 5-12 words each
@@ -307,14 +315,15 @@ Requirements:
 - Varied topics (technology, culture, lifestyle, productivity)
 - Professional tone
 
-Format: One title per line, no numbering"""
-                    }],
+Format: One title per line, no numbering""",
+                        }
+                    ],
                     max_tokens=batch_count * 20,
                     temperature=0.7,
-                    top_p=0.95
+                    top_p=0.95,
                 )
 
-                titles = response.choices[0].message.content.strip().split('\n')
+                titles = response.choices[0].message.content.strip().split("\n")
                 results.extend([t.strip() for t in titles if t.strip()][:batch_count])
 
                 progress = min(batch_start + batch_count, count)
@@ -339,9 +348,10 @@ Format: One title per line, no numbering"""
             try:
                 response = self.client.chat.completions.create(
                     model=self.model_name,
-                    messages=[{
-                        "role": "user",
-                        "content": f"""Generate {batch_count} short blog post bodies.
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": f"""Generate {batch_count} short blog post bodies.
 
 Requirements:
 - 300-800 words each
@@ -349,14 +359,15 @@ Requirements:
 - Professional, informative tone
 - Diverse topics
 
-Separate each post with "---" on its own line."""
-                    }],
+Separate each post with "---" on its own line.""",
+                        }
+                    ],
                     max_tokens=batch_count * 300,
                     temperature=0.7,
-                    top_p=0.95
+                    top_p=0.95,
                 )
 
-                posts = response.choices[0].message.content.split('---')
+                posts = response.choices[0].message.content.split("---")
                 results.extend([p.strip() for p in posts if p.strip()][:batch_count])
 
                 progress = min(batch_start + batch_count, count)
@@ -364,7 +375,9 @@ Separate each post with "---" on its own line."""
                     print(f"    Content: {progress:,}/{count:,}", flush=True)
             except Exception as e:
                 print(f"  ⚠ vLLM error: {e}. Using fallback content.")
-                results.extend([f"Content for post {i}. " * 50 for i in range(batch_count)])
+                results.extend(
+                    [f"Content for post {i}. " * 50 for i in range(batch_count)]
+                )
 
         return results[:count]
 
@@ -381,9 +394,10 @@ Separate each post with "---" on its own line."""
             try:
                 response = self.client.chat.completions.create(
                     model=self.model_name,
-                    messages=[{
-                        "role": "user",
-                        "content": f"""Generate {batch_count} realistic blog comments.
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": f"""Generate {batch_count} realistic blog comments.
 
 Requirements:
 - 20-100 words each
@@ -392,14 +406,15 @@ Requirements:
 - Conversational tone
 - Varied perspectives
 
-Format: One comment per line"""
-                    }],
+Format: One comment per line""",
+                        }
+                    ],
                     max_tokens=batch_count * 100,
                     temperature=0.7,
-                    top_p=0.95
+                    top_p=0.95,
                 )
 
-                comments = response.choices[0].message.content.strip().split('\n')
+                comments = response.choices[0].message.content.strip().split("\n")
                 results.extend([c.strip() for c in comments if c.strip()][:batch_count])
 
                 progress = min(batch_start + batch_count, count)
@@ -447,6 +462,7 @@ Format: One comment per line"""
         except Exception as e:
             print(f"\n❌ Generation failed: {e}")
             import traceback
+
             traceback.print_exc()
             return False
 

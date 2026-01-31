@@ -28,6 +28,7 @@ except ImportError:
     print("Error: psycopg not installed")
     print("Install with: pip install psycopg")
     import sys
+
     sys.exit(1)
 
 # ============================================================================
@@ -56,7 +57,9 @@ class PersonaToUserMapper:
     def __init__(self, num_users: int = DEFAULT_NUM_USERS):
         self.num_users = num_users
 
-    def get_user_pk_for_persona(self, author_id: int | None, author_name: str | None) -> int:
+    def get_user_pk_for_persona(
+        self, author_id: int | None, author_name: str | None
+    ) -> int:
         """
         Get valid user PK for a comment author.
 
@@ -114,7 +117,12 @@ class BlogCommentLoader:
         # This will be implemented with actual DB query
         return None
 
-    def generate_comment_author(self, comment_index: int, author_id: int | None = None, author_name: str | None = None) -> int:
+    def generate_comment_author(
+        self,
+        comment_index: int,
+        author_id: int | None = None,
+        author_name: str | None = None,
+    ) -> int:
         """
         Assign author to comment.
 
@@ -183,7 +191,7 @@ class BlogCommentLoader:
                         fk_author = self.generate_comment_author(
                             file_idx * 100 + comment_idx,
                             author_id=author_id,
-                            author_name=author_name
+                            author_name=author_name,
                         )
 
                         # For now, created_at is current time
@@ -194,12 +202,12 @@ class BlogCommentLoader:
                         # Format for TSV
                         # Columns: id, fk_post, fk_author, fk_parent, content, is_approved, created_at, updated_at
                         row = [
-                            comment_id,           # id (UUID)
-                            "\\N",                # fk_post (NULL, will be filled with UPDATE)
-                            str(fk_author),       # fk_author (1-5000)
-                            "\\N",                # fk_parent (NULL for primary comments)
+                            comment_id,  # id (UUID)
+                            "\\N",  # fk_post (NULL, will be filled with UPDATE)
+                            str(fk_author),  # fk_author (1-5000)
+                            "\\N",  # fk_parent (NULL for primary comments)
                             self._escape_tsv(comment_text),  # content
-                            "true",               # is_approved (hardcoded true)
+                            "true",  # is_approved (hardcoded true)
                             created_at.isoformat(),  # created_at
                             updated_at.isoformat(),  # updated_at
                         ]
@@ -236,7 +244,7 @@ class BlogCommentLoader:
                 with conn.cursor() as cur:
                     # Load comments initially with NULL fk_post, then update in batch
                     print(f"  Loading comments (without post associations)...")
-                    with open(comments_tsv, "r", encoding="utf-8") as f:
+                    with open(comments_tsv, encoding="utf-8") as f:
                         with cur.copy(
                             "COPY benchmark.tb_comment (id, fk_post, fk_author, fk_parent, content, is_approved, created_at, updated_at) FROM STDIN"
                         ) as copy:
@@ -347,16 +355,16 @@ class BlogCommentLoader:
         if not output_tsv:
             output_tsv = comments_dir.parent / "comments.tsv"
 
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print(f"BLOG COMMENTS DATABASE LOADER")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
         print(f"Comments directory:  {comments_dir}")
         print(f"Output TSV:          {output_tsv}")
         print(f"Num users:           {self.num_users:,}")
         if connection_string:
             print(f"Database:            {connection_string.split('@')[-1]}")
         print(f"Dry run:             {dry_run}")
-        print(f"{'='*70}\n")
+        print(f"{'=' * 70}\n")
 
         # Prepare TSV
         num_comments, tsv_path = self.prepare_comments_tsv(comments_dir, output_tsv)
@@ -379,9 +387,9 @@ class BlogCommentLoader:
         self.stats["duration"] = time.time() - start_time
 
         # Print summary
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print("SUMMARY")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
         print(f"Files processed:         {self.stats['files_processed']:,}")
         print(f"Comments prepared:       {num_comments:,}")
         if connection_string and not dry_run:
@@ -390,7 +398,7 @@ class BlogCommentLoader:
         print(f"Duration:                {self.stats['duration']:.1f}s")
         print(f"\nOutput files:")
         print(f"  TSV: {tsv_path}")
-        print(f"{'='*70}\n")
+        print(f"{'=' * 70}\n")
 
         return self.stats
 
@@ -464,7 +472,9 @@ Examples:
     # Run loader
     loader = BlogCommentLoader(num_users=args.num_users)
 
-    connection_string = None if (args.dry_run or args.generate_only) else args.connection
+    connection_string = (
+        None if (args.dry_run or args.generate_only) else args.connection
+    )
 
     if not args.dry_run and not args.generate_only and not args.connection:
         parser.error("Either --connection, --dry-run, or --generate-only is required")

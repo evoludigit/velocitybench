@@ -33,13 +33,11 @@ import argparse
 import sys
 import yaml
 from pathlib import Path
+from typing import Any
 import logging
 
 # Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
 # Import our modules
@@ -62,12 +60,12 @@ class ScaleDatasetConfig:
             config_file: Path to config.yaml (default: same directory as scale_dataset.py)
         """
         if config_file is None:
-            config_file = Path(__file__).parent / 'config.yaml'
+            config_file = Path(__file__).parent / "config.yaml"
 
         self.config_file = config_file
         self.config = self._load_config()
-        self.profiles = self.config.get('profiles', {})
-        self.safety = self.config.get('safety', {})
+        self.profiles = self.config.get("profiles", {})
+        self.safety = self.config.get("safety", {})
 
     def _load_config(self) -> dict:
         """Load YAML configuration file."""
@@ -76,7 +74,7 @@ class ScaleDatasetConfig:
             return {}
 
         try:
-            with open(self.config_file, 'r') as f:
+            with open(self.config_file) as f:
                 return yaml.safe_load(f) or {}
         except Exception as e:
             logger.error(f"Failed to load config: {e}")
@@ -85,18 +83,20 @@ class ScaleDatasetConfig:
     def get_profile(self, profile_name: str) -> dict:
         """Get configuration for a profile."""
         if profile_name not in self.profiles:
-            raise ValueError(f"Unknown profile: {profile_name}. Available: {list(self.profiles.keys())}")
+            raise ValueError(
+                f"Unknown profile: {profile_name}. Available: {list(self.profiles.keys())}"
+            )
         return self.profiles[profile_name]
 
     def get_safety_settings(self) -> dict:
         """Get safety check settings."""
         return {
-            'safety_margin_gb': self.safety.get('safety_margin_gb', 1.0),
-            'warn_threshold_pct': self.safety.get('warn_threshold_pct', 80),
-            'critical_threshold_pct': self.safety.get('critical_threshold_pct', 95),
-            'max_memory_pct': self.safety.get('max_memory_pct', 85),
-            'max_process_memory_mb': self.safety.get('max_process_memory_mb', 2048),
-            'batch_size': self.safety.get('batch_size', 1000),
+            "safety_margin_gb": self.safety.get("safety_margin_gb", 1.0),
+            "warn_threshold_pct": self.safety.get("warn_threshold_pct", 80),
+            "critical_threshold_pct": self.safety.get("critical_threshold_pct", 95),
+            "max_memory_pct": self.safety.get("max_memory_pct", 85),
+            "max_process_memory_mb": self.safety.get("max_process_memory_mb", 2048),
+            "batch_size": self.safety.get("batch_size", 1000),
         }
 
 
@@ -142,18 +142,20 @@ class ScaleDatasetSystem:
         """
         # Default: use dev profile
         if not any([scale_multiplier, posts, profile]):
-            profile = 'dev'
+            profile = "dev"
 
         # Load profile if specified
         if profile:
             profile_config = self.config.get_profile(profile)
-            posts = profile_config.get('posts')
-            users = profile_config.get('users')
-            comments = profile_config.get('comments')
+            posts = profile_config.get("posts")
+            users = profile_config.get("users")
+            comments = profile_config.get("comments")
         elif scale_multiplier:
             # Calculate from multiplier (5K seed × multiplier)
             posts = 5000 * scale_multiplier
-            users = users or (int(100000 * (scale_multiplier / 200)))  # Scale users proportionally
+            users = users or (
+                int(100000 * (scale_multiplier / 200))
+            )  # Scale users proportionally
             comments = comments or (int(5000000 * (scale_multiplier / 200)))
         elif posts:
             # Auto-scale users and comments proportionally
@@ -162,17 +164,17 @@ class ScaleDatasetSystem:
             comments = comments or int(5000000 * multiplier)
 
         return {
-            'posts': posts or 5000,  # Default to dev
-            'users': users or 500,
-            'comments': comments or 25000,
-            'seed_posts': 5000,
-            'profile': profile,
+            "posts": posts or 5000,  # Default to dev
+            "users": users or 500,
+            "comments": comments or 25000,
+            "seed_posts": 5000,
+            "profile": profile,
         }
 
     def check_safety(
         self,
-        scale_params: dict[str, any],
-        format: str = 'both',
+        scale_params: dict[str, Any],
+        format: str = "both",
         dry_run: bool = False,
         force: bool = False,
     ) -> tuple[bool, list[str]]:
@@ -191,7 +193,7 @@ class ScaleDatasetSystem:
         messages = []
 
         disk_checker = DiskSpaceChecker(self.output_dir)
-        disk_ok, disk_msg = disk_checker.check_all(scale_params['posts'], format)
+        disk_ok, disk_msg = disk_checker.check_all(scale_params["posts"], format)
         messages.append(disk_msg)
         if not disk_ok:
             return (False, messages) if not force else (True, messages)
@@ -211,7 +213,7 @@ class ScaleDatasetSystem:
         users: int | None = None,
         comments: int | None = None,
         profile: str | None = None,
-        format: str = 'both',
+        format: str = "both",
         load: bool = False,
         connection_string: str | None = None,
         dry_run: bool = False,
@@ -259,17 +261,27 @@ class ScaleDatasetSystem:
 
         # Step 2: Check safety
         logger.info("\n[2/6] Checking safety...")
-        is_safe, safety_messages = self.check_safety(scale_params, format, dry_run, force)
+        is_safe, safety_messages = self.check_safety(
+            scale_params, format, dry_run, force
+        )
         for msg in safety_messages:
             logger.info(f"  {msg}")
 
         if not is_safe:
             logger.error("\n❌ Safety checks failed. Use --force to override.")
-            return {'success': False, 'error': 'Safety checks failed', 'duration': time.time() - start_time}
+            return {
+                "success": False,
+                "error": "Safety checks failed",
+                "duration": time.time() - start_time,
+            }
 
         if dry_run:
             logger.info("\n⚠️  DRY RUN - No generation")
-            return {'success': True, 'dry_run': True, 'duration': time.time() - start_time}
+            return {
+                "success": True,
+                "dry_run": True,
+                "duration": time.time() - start_time,
+            }
 
         # Step 3: Create output directory
         logger.info("\n[3/6] Preparing output directory...")
@@ -283,26 +295,36 @@ class ScaleDatasetSystem:
 
         if not gen_success:
             logger.error("❌ Variant generation failed")
-            return {'success': False, 'error': 'Generation failed', 'duration': time.time() - start_time}
+            return {
+                "success": False,
+                "error": "Generation failed",
+                "duration": time.time() - start_time,
+            }
 
         logger.info(f"  ✓ Generated {gen_stats['posts_generated']:,} posts")
-        if gen_stats['users_generated'] > 0:
+        if gen_stats["users_generated"] > 0:
             logger.info(f"  ✓ Generated {gen_stats['users_generated']:,} users")
-        if gen_stats['comments_generated'] > 0:
+        if gen_stats["comments_generated"] > 0:
             logger.info(f"  ✓ Generated {gen_stats['comments_generated']:,} comments")
 
         # Step 5: Validate generated data
         logger.info("\n[5/6] Validating generated data...")
         validator = DataValidator(self.output_dir)
-        valid_ok, valid_msg = validator.validate_row_counts({
-            'posts': gen_stats['posts_generated'],
-            'users': gen_stats['users_generated'],
-        })
+        valid_ok, valid_msg = validator.validate_row_counts(
+            {
+                "posts": gen_stats["posts_generated"],
+                "users": gen_stats["users_generated"],
+            }
+        )
         logger.info(f"  {valid_msg}")
 
         if not valid_ok:
             logger.warning("❌ Validation failed")
-            return {'success': False, 'error': 'Validation failed', 'duration': time.time() - start_time}
+            return {
+                "success": False,
+                "error": "Validation failed",
+                "duration": time.time() - start_time,
+            }
 
         # Step 6: Load to database (optional)
         if load and connection_string:
@@ -315,7 +337,11 @@ class ScaleDatasetSystem:
                 logger.info(f"  ✓ Loaded {load_stats['users_loaded']:,} users")
             else:
                 logger.error("❌ Database loading failed")
-                return {'success': False, 'error': 'Loading failed', 'duration': time.time() - start_time}
+                return {
+                    "success": False,
+                    "error": "Loading failed",
+                    "duration": time.time() - start_time,
+                }
         else:
             logger.info("\n[6/6] Database loading skipped (no --load)")
 
@@ -331,11 +357,11 @@ class ScaleDatasetSystem:
         logger.info(f"Output: {self.output_dir}")
 
         return {
-            'success': True,
-            'posts_generated': gen_stats['posts_generated'],
-            'users_generated': gen_stats['users_generated'],
-            'comments_generated': gen_stats['comments_generated'],
-            'duration': elapsed,
+            "success": True,
+            "posts_generated": gen_stats["posts_generated"],
+            "users_generated": gen_stats["users_generated"],
+            "comments_generated": gen_stats["comments_generated"],
+            "duration": elapsed,
         }
 
 
@@ -372,80 +398,72 @@ Examples:
 
   # Force generation despite safety warnings
   python scale_dataset.py --scale-multiplier 200 --force
-        """
+        """,
     )
 
     # Scale parameters (mutually exclusive but not enforced)
-    scale_group = parser.add_argument_group('scale_parameters', 'Choose one method to specify scale')
-    scale_group.add_argument(
-        '--scale-multiplier',
-        type=int,
-        help='Multiplier for 5K seed posts (e.g., 200 = 1M posts)'
+    scale_group = parser.add_argument_group(
+        "scale_parameters", "Choose one method to specify scale"
     )
     scale_group.add_argument(
-        '--posts',
+        "--scale-multiplier",
         type=int,
-        help='Explicit number of posts to generate'
+        help="Multiplier for 5K seed posts (e.g., 200 = 1M posts)",
     )
     scale_group.add_argument(
-        '--users',
-        type=int,
-        help='Explicit number of users (auto-scales with --posts if not specified)'
+        "--posts", type=int, help="Explicit number of posts to generate"
     )
     scale_group.add_argument(
-        '--comments',
+        "--users",
         type=int,
-        help='Explicit number of comments (auto-scales with --posts if not specified)'
+        help="Explicit number of users (auto-scales with --posts if not specified)",
     )
     scale_group.add_argument(
-        '--profile',
-        choices=['tiny', 'dev', 'staging', 'production'],
-        help='Use preset profile configuration'
+        "--comments",
+        type=int,
+        help="Explicit number of comments (auto-scales with --posts if not specified)",
+    )
+    scale_group.add_argument(
+        "--profile",
+        choices=["tiny", "dev", "staging", "production"],
+        help="Use preset profile configuration",
     )
 
     # Options
     parser.add_argument(
-        '--output-dir',
+        "--output-dir",
         type=Path,
-        default=Path('/tmp/velocitybench'),
-        help='Output directory for generated files (default: /tmp/velocitybench)'
+        default=Path("/tmp/velocitybench"),
+        help="Output directory for generated files (default: /tmp/velocitybench)",
     )
     parser.add_argument(
-        '--format',
-        choices=['tsv', 'sql', 'both'],
-        default='both',
-        help='Output format (default: both TSV and SQL)'
+        "--format",
+        choices=["tsv", "sql", "both"],
+        default="both",
+        help="Output format (default: both TSV and SQL)",
     )
 
     # Database loading
     parser.add_argument(
-        '--load',
-        action='store_true',
-        help='Load generated data to database'
+        "--load", action="store_true", help="Load generated data to database"
     )
     parser.add_argument(
-        '--connection',
+        "--connection",
         type=str,
-        help='PostgreSQL connection string (required if --load)'
+        help="PostgreSQL connection string (required if --load)",
     )
 
     # Safety/control
     parser.add_argument(
-        '--dry-run',
-        action='store_true',
-        help='Validate without generating'
+        "--dry-run", action="store_true", help="Validate without generating"
     )
-    parser.add_argument(
-        '--force',
-        action='store_true',
-        help='Ignore safety warnings'
-    )
+    parser.add_argument("--force", action="store_true", help="Ignore safety warnings")
 
     # Advanced
     parser.add_argument(
-        '--config',
+        "--config",
         type=Path,
-        help='Path to config.yaml (default: same directory as script)'
+        help="Path to config.yaml (default: same directory as script)",
     )
 
     args = parser.parse_args()
@@ -462,7 +480,7 @@ Examples:
         sys.exit(1)
 
     # Determine seed directory
-    seed_dir = Path(__file__).parent.parent / 'gold-corpus'
+    seed_dir = Path(__file__).parent.parent / "gold-corpus"
     if not seed_dir.exists():
         logger.warning(f"Gold corpus not found at {seed_dir}")
         logger.info("Will generate synthetic seed posts instead")
@@ -484,7 +502,7 @@ Examples:
             force=args.force,
         )
 
-        if stats.get('success'):
+        if stats.get("success"):
             logger.info("\n✅ Dataset scaling complete!")
             sys.exit(0)
         else:
@@ -497,9 +515,10 @@ Examples:
     except Exception as e:
         logger.error(f"\n❌ Error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -78,14 +78,12 @@ PROFESSIONAL_TITLES = [
     "Database Administrator",
     "Systems Engineer",
     "Core Platform Engineer",
-
     # Frontend & Full Stack
     "Frontend Engineer",
     "Senior Frontend Engineer",
     "Full Stack Developer",
     "React Specialist",
     "TypeScript Specialist",
-
     # DevOps & Infrastructure
     "DevOps Engineer",
     "Senior DevOps Engineer",
@@ -94,7 +92,6 @@ PROFESSIONAL_TITLES = [
     "Cloud Architect",
     "Site Reliability Engineer",
     "Infrastructure Architect",
-
     # Data & Analytics
     "Data Engineer",
     "Senior Data Engineer",
@@ -103,14 +100,12 @@ PROFESSIONAL_TITLES = [
     "Machine Learning Engineer",
     "ML/AI Specialist",
     "Big Data Engineer",
-
     # Security
     "Security Engineer",
     "Application Security Engineer",
     "Infrastructure Security Engineer",
     "Security Architect",
     "Incident Response Engineer",
-
     # Leadership & Architecture
     "Software Architect",
     "Solutions Architect",
@@ -120,14 +115,12 @@ PROFESSIONAL_TITLES = [
     "Principal Engineer",
     "VP Engineering",
     "Engineering Director",
-
     # Quality & Reliability
     "Quality Assurance Engineer",
     "QA Automation Engineer",
     "Test Automation Engineer",
     "Performance Engineer",
     "Reliability Engineer",
-
     # Other Specializations
     "Mobile Engineer",
     "iOS Engineer",
@@ -159,31 +152,122 @@ REPLY_STYLES = [
 
 # Gender-neutral names for diversity
 FIRST_NAMES = [
-    "Alex", "Jordan", "Casey", "Morgan", "Riley", "Taylor", "Madison", "Quinn",
-    "Adrian", "Cameron", "Blake", "Drew", "Evan", "Jamie", "Logan", "Reese",
-    "Skylar", "Charlie", "Avery", "Sydney", "Casey", "Dakota", "River", "Phoenix",
-    "Sam", "Bailey", "Emerson", "Finley", "Harper", "Parker", "Scout", "Tatum",
+    "Alex",
+    "Jordan",
+    "Casey",
+    "Morgan",
+    "Riley",
+    "Taylor",
+    "Madison",
+    "Quinn",
+    "Adrian",
+    "Cameron",
+    "Blake",
+    "Drew",
+    "Evan",
+    "Jamie",
+    "Logan",
+    "Reese",
+    "Skylar",
+    "Charlie",
+    "Avery",
+    "Sydney",
+    "Casey",
+    "Dakota",
+    "River",
+    "Phoenix",
+    "Sam",
+    "Bailey",
+    "Emerson",
+    "Finley",
+    "Harper",
+    "Parker",
+    "Scout",
+    "Tatum",
 ]
 
 LAST_NAMES = [
-    "Anderson", "Bennett", "Brooks", "Campbell", "Chen", "Cohen", "Davis", "Drake",
-    "Edwards", "Foster", "Garcia", "Greene", "Hansen", "Harris", "Jackson", "James",
-    "Johnson", "Jones", "Khan", "Kim", "Klein", "Kumar", "Lee", "Lewis",
-    "Martinez", "Miller", "Moore", "Murphy", "Nelson", "O'Brien", "Parker", "Patel",
-    "Peterson", "Phillips", "Quinn", "Ramirez", "Roberts", "Robinson", "Rogers", "Ross",
-    "Santos", "Scott", "Shah", "Shaw", "Smith", "Stevens", "Stewart", "Sullivan",
-    "Taylor", "Thompson", "Torres", "Turner", "Vargas", "Wagner", "Walker", "Walsh",
-    "Wang", "Warren", "Washington", "Watson", "Webb", "Weber", "Webster", "Wheeler",
-    "White", "Williams", "Wilson", "Wright", "Wu", "Yang", "Young", "Zhang",
+    "Anderson",
+    "Bennett",
+    "Brooks",
+    "Campbell",
+    "Chen",
+    "Cohen",
+    "Davis",
+    "Drake",
+    "Edwards",
+    "Foster",
+    "Garcia",
+    "Greene",
+    "Hansen",
+    "Harris",
+    "Jackson",
+    "James",
+    "Johnson",
+    "Jones",
+    "Khan",
+    "Kim",
+    "Klein",
+    "Kumar",
+    "Lee",
+    "Lewis",
+    "Martinez",
+    "Miller",
+    "Moore",
+    "Murphy",
+    "Nelson",
+    "O'Brien",
+    "Parker",
+    "Patel",
+    "Peterson",
+    "Phillips",
+    "Quinn",
+    "Ramirez",
+    "Roberts",
+    "Robinson",
+    "Rogers",
+    "Ross",
+    "Santos",
+    "Scott",
+    "Shah",
+    "Shaw",
+    "Smith",
+    "Stevens",
+    "Stewart",
+    "Sullivan",
+    "Taylor",
+    "Thompson",
+    "Torres",
+    "Turner",
+    "Vargas",
+    "Wagner",
+    "Walker",
+    "Walsh",
+    "Wang",
+    "Warren",
+    "Washington",
+    "Watson",
+    "Webb",
+    "Weber",
+    "Webster",
+    "Wheeler",
+    "White",
+    "Williams",
+    "Wilson",
+    "Wright",
+    "Wu",
+    "Yang",
+    "Young",
+    "Zhang",
 ]
 
 # Experience levels with year ranges
 EXPERIENCE_LEVELS = [
-    ("Junior", 0, 3),      # Junior: 0-3 years
-    ("Mid-level", 3, 7),   # Mid-level: 3-7 years
-    ("Senior", 7, 12),     # Senior: 7-12 years
-    ("Staff", 12, 20),     # Staff: 12-20 years
-    ("Principal", 20, 30), # Principal: 20+ years
+    ("Junior", 0, 3),  # Junior: 0-3 years
+    ("Mid-level", 3, 7),  # Mid-level: 3-7 years
+    ("Senior", 7, 12),  # Senior: 7-12 years
+    ("Staff", 12, 20),  # Staff: 12-20 years
+    ("Principal", 20, 30),  # Principal: 20+ years
 ]
 
 # Company types/sizes
@@ -205,79 +289,66 @@ BUSINESS_DOMAINS = [
     "cryptocurrency and blockchain",
     "fintech and payment processing",
     "insurance technology",
-
     # Healthcare & Life Sciences
     "healthcare and medical technology",
     "pharmaceutical research and development",
     "telemedicine and health monitoring",
     "medical device manufacturing",
-
     # Retail & Commerce
     "e-commerce and retail",
     "supply chain and logistics",
     "inventory management systems",
     "point of sale systems",
-
     # Communications & Media
     "social media and communications",
     "video streaming and content delivery",
     "advertising and marketing technology",
     "messaging and collaboration tools",
-
     # Infrastructure & Cloud
     "cloud infrastructure and platforms",
     "containerization and orchestration",
     "serverless computing",
     "content delivery networks",
-
     # Security & Compliance
     "cybersecurity and compliance",
     "identity and access management",
     "threat detection and response",
     "data privacy and GDPR",
-
     # Data & Analytics
     "data science and analytics",
     "business intelligence and reporting",
     "machine learning and AI",
     "real-time data processing",
-
     # Enterprise & B2B
     "enterprise resource planning (ERP)",
     "customer relationship management (CRM)",
     "human resources technology",
     "accounting and finance software",
-
     # Developer Tools
     "version control and collaboration",
     "CI/CD and automation",
     "monitoring and observability",
     "API management and integration",
-
     # Consumer & Mobile
     "consumer mobile applications",
     "mobile game development",
     "fitness and wellness apps",
     "travel and hospitality apps",
-
     # Hardware & Embedded
     "IoT and embedded systems",
     "robotics and automation",
     "autonomous vehicles",
     "smart home technology",
-
     # Media & Entertainment
     "gaming and entertainment",
     "music streaming and distribution",
     "podcast and audio production",
     "augmented and virtual reality",
-
     # Education & Training
     "education technology (EdTech)",
     "online learning platforms",
     "corporate training systems",
     "skill assessment platforms",
-
     # Other Domains
     "legal technology and compliance",
     "real estate and property management",
@@ -459,7 +530,9 @@ class PersonaGenerator:
 
         return ""
 
-    def generate_single_persona(self, persona_id: int, dry_run: bool = False) -> Dict | None:
+    def generate_single_persona(
+        self, persona_id: int, dry_run: bool = False
+    ) -> dict | None:
         """Generate a single persona by requesting individual fields and assembling them.
 
         Args:
@@ -484,35 +557,62 @@ class PersonaGenerator:
         business_domain = random.choice(BUSINESS_DOMAINS)
         geographic_region = random.choice(GEOGRAPHIC_REGIONS)
         # Select language background appropriate for the region
-        lang_bg, is_native = random.choice(LANGUAGE_BACKGROUNDS_BY_REGION[geographic_region])
+        lang_bg, is_native = random.choice(
+            LANGUAGE_BACKGROUNDS_BY_REGION[geographic_region]
+        )
 
         try:
             # Generate each field individually with explicit constraints
             # Name generation includes geographic/cultural context
-            name = self._generate_field("name", f"Generate a realistic full name for a {geographic_region} person. Respond with ONLY the name, nothing else. Example: Alice Johnson")
+            name = self._generate_field(
+                "name",
+                f"Generate a realistic full name for a {geographic_region} person. Respond with ONLY the name, nothing else. Example: Alice Johnson",
+            )
 
             # Title selection from available list
-            selected_titles = random.sample(PROFESSIONAL_TITLES, min(15, len(PROFESSIONAL_TITLES)))
+            selected_titles = random.sample(
+                PROFESSIONAL_TITLES, min(15, len(PROFESSIONAL_TITLES))
+            )
             titles_str = ", ".join(selected_titles)
-            title = self._generate_field("title", f"Respond with ONLY one title from this list: {titles_str}")
+            title = self._generate_field(
+                "title", f"Respond with ONLY one title from this list: {titles_str}"
+            )
 
             # Years of experience with appropriate range for their level
-            years_exp = self._generate_field("years_experience", f"Respond with ONLY a single number between {exp_min} and {exp_max}. Example: {years_exp_range}")
+            years_exp = self._generate_field(
+                "years_experience",
+                f"Respond with ONLY a single number between {exp_min} and {exp_max}. Example: {years_exp_range}",
+            )
 
             # Background includes company context and domain
-            background = self._generate_field("background", f"Respond with 1-2 sentences about technical career working in {business_domain} at a {company_type}. No extra text.")
+            background = self._generate_field(
+                "background",
+                f"Respond with 1-2 sentences about technical career working in {business_domain} at a {company_type}. No extra text.",
+            )
 
             # Expertise in selected topics
-            expertise = self._generate_field("expertise_areas", f"Respond with ONLY 2-3 items from this list, separated by commas: {topics_str}. No other text.")
+            expertise = self._generate_field(
+                "expertise_areas",
+                f"Respond with ONLY 2-3 items from this list, separated by commas: {topics_str}. No other text.",
+            )
 
             # Communication style that matches reply style
-            comm_style = self._generate_field("communication_style", f"Respond with 1-2 sentences describing a {reply_style} communication style. No extra text.")
+            comm_style = self._generate_field(
+                "communication_style",
+                f"Respond with 1-2 sentences describing a {reply_style} communication style. No extra text.",
+            )
 
             # Personality traits
-            traits = self._generate_field("personality_traits", "Respond with ONLY 2-3 traits separated by commas. Example: pragmatic, detail-oriented, collaborative")
+            traits = self._generate_field(
+                "personality_traits",
+                "Respond with ONLY 2-3 traits separated by commas. Example: pragmatic, detail-oriented, collaborative",
+            )
 
             # Preferred comment types
-            comment_types = self._generate_field("preferred_comment_types", "Respond with ONLY 1-2 values separated by commas. Choose from: technical_issue, missing_edge_case, question, tradeoff, validation, critical_analysis, experience_sharing")
+            comment_types = self._generate_field(
+                "preferred_comment_types",
+                "Respond with ONLY 1-2 values separated by commas. Choose from: technical_issue, missing_edge_case, question, tradeoff, validation, critical_analysis, experience_sharing",
+            )
 
             # Example phrases - adjust for language background
             if is_native:
@@ -522,7 +622,10 @@ class PersonaGenerator:
             phrases = self._generate_field("example_phrases", phrases_prompt)
 
             # Interests in selected topics
-            interests = self._generate_field("interests", f"Respond with ONLY 2-3 items from this list separated by commas: {topics_str}. No other text.")
+            interests = self._generate_field(
+                "interests",
+                f"Respond with ONLY 2-3 items from this list separated by commas: {topics_str}. No other text.",
+            )
 
             # Validate essential fields
             if not all([name, title, background]):
@@ -562,7 +665,6 @@ class PersonaGenerator:
                 "preferred_comment_types": parse_list(comment_types, 2),
                 "example_phrases": parse_list(phrases, 3),
                 "interests": parse_list(interests, 3),
-
                 # Persona dimensions (for diversity and realism)
                 "reply_style": reply_style,
                 "experience_level": exp_level,
@@ -590,7 +692,7 @@ class PersonaGenerator:
             print(f"\n  Unexpected error: {e}")
             return None
 
-    def _create_dummy_persona(self, persona_id: int) -> Dict:
+    def _create_dummy_persona(self, persona_id: int) -> dict:
         """Create a dummy persona for dry-run mode."""
         roles = [
             "Senior Backend Engineer",
@@ -631,7 +733,7 @@ class PersonaGenerator:
         count: int = 2000,
         dry_run: bool = False,
         resume: bool = False,
-    ) -> Dict:
+    ) -> dict:
         """Generate multiple personas.
 
         Args:
@@ -648,14 +750,18 @@ class PersonaGenerator:
             latest_id = self.find_latest_persona_id()
             if latest_id > 0:
                 start_id = latest_id + 1
-                end_id = latest_id + count  # count is now the number of ADDITIONAL personas
-                print(f"\n{'='*70}")
+                end_id = (
+                    latest_id + count
+                )  # count is now the number of ADDITIONAL personas
+                print(f"\n{'=' * 70}")
                 print(f"RESUMING PERSONA GENERATION")
-                print(f"{'='*70}")
+                print(f"{'=' * 70}")
                 print(f"Found {latest_id} existing personas")
                 print(f"Resuming from persona ID: {start_id}")
-                print(f"Generating {count} additional personas (ID range: {start_id}-{end_id})")
-                print(f"{'='*70}\n")
+                print(
+                    f"Generating {count} additional personas (ID range: {start_id}-{end_id})"
+                )
+                print(f"{'=' * 70}\n")
 
         results = {
             "generated": 0,
@@ -664,13 +770,13 @@ class PersonaGenerator:
             "resumed_from": start_id - 1,
         }
 
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print(f"PERSONA GENERATION")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
         print(f"Target personas: {end_id}")
         print(f"Starting from: {start_id}")
         print(f"Dry run: {dry_run}")
-        print(f"{'='*70}\n")
+        print(f"{'=' * 70}\n")
 
         personas = []
 
@@ -693,7 +799,9 @@ class PersonaGenerator:
                 rate = i / elapsed
                 remaining = (end_id - i) / rate if rate > 0 else 0
                 self._save_personas(personas)
-                print(f"  ✓ Saved {len(personas)} personas ({rate:.1f} personas/sec, ~{remaining/60:.0f}min remaining)\n")
+                print(
+                    f"  ✓ Saved {len(personas)} personas ({rate:.1f} personas/sec, ~{remaining / 60:.0f}min remaining)\n"
+                )
 
         # Save final batch
         self._save_personas(personas)
@@ -701,20 +809,22 @@ class PersonaGenerator:
         results["duration"] = time.time() - self.start_time
 
         # Print summary
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print("SUMMARY")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
         print(f"Generated:       {results['generated']:,}")
         print(f"Failed:          {results['failed']:,}")
-        print(f"Duration:        {results['duration']/60:.1f} min")
+        print(f"Duration:        {results['duration'] / 60:.1f} min")
         if results["generated"] > 0:
-            print(f"Throughput:      {results['generated']/results['duration']:.1f} personas/sec")
+            print(
+                f"Throughput:      {results['generated'] / results['duration']:.1f} personas/sec"
+            )
         print(f"Output file:     {self.output_dir / 'personas.json'}")
-        print(f"{'='*70}\n")
+        print(f"{'=' * 70}\n")
 
         return results
 
-    def _validate_persona(self, persona: Dict, persona_id: int) -> None:
+    def _validate_persona(self, persona: dict, persona_id: int) -> None:
         """Validate persona against schema. Raises ValidationError if invalid."""
         try:
             self.validator.validate(persona)
@@ -761,7 +871,7 @@ class PersonaGenerator:
                 indent=2,
             )
 
-    def _extract_structured_from_response(self, response: str) -> Dict | None:
+    def _extract_structured_from_response(self, response: str) -> dict | None:
         """Extract structured data (JSON or YAML) from response and return as dict."""
         if not response:
             return None
@@ -847,7 +957,9 @@ class PersonaGenerator:
         except requests.exceptions.Timeout:
             raise VLLMTimeoutError("Request timed out after 60s") from None
         except requests.exceptions.ConnectionError:
-            raise VLLMConnectionError("Cannot connect to vLLM server at localhost:8000") from None
+            raise VLLMConnectionError(
+                "Cannot connect to vLLM server at localhost:8000"
+            ) from None
         except Exception as e:
             raise VLLMError(f"vLLM error: {e}") from e
 
@@ -860,9 +972,9 @@ class PersonaGenerator:
 
         personas = data.get("personas", [])
 
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print("PERSONA ANALYSIS")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
         print(f"Total personas: {len(personas)}")
 
         if not personas:
@@ -878,7 +990,9 @@ class PersonaGenerator:
             area_counts[area] = area_counts.get(area, 0) + 1
 
         print(f"\nTop expertise areas:")
-        for area, count in sorted(area_counts.items(), key=lambda x: x[1], reverse=True)[:10]:
+        for area, count in sorted(
+            area_counts.items(), key=lambda x: x[1], reverse=True
+        )[:10]:
             pct = 100 * count / len(personas)
             print(f"  {area:30s}: {count:4d} personas ({pct:5.1f}%)")
 
@@ -889,7 +1003,9 @@ class PersonaGenerator:
             styles[style] = styles.get(style, 0) + 1
 
         print(f"\nCommunication styles:")
-        for style, count in sorted(styles.items(), key=lambda x: x[1], reverse=True)[:5]:
+        for style, count in sorted(styles.items(), key=lambda x: x[1], reverse=True)[
+            :5
+        ]:
             pct = 100 * count / len(personas)
             print(f"  {style:30s}: {count:4d} personas ({pct:5.1f}%)")
 
@@ -910,7 +1026,7 @@ class PersonaGenerator:
             print(f"    Expertise: {', '.join(persona.get('expertise_areas', [])[:2])}")
             print(f"    Style: {persona.get('communication_style', 'unknown')}")
 
-        print(f"\n{'='*70}\n")
+        print(f"\n{'=' * 70}\n")
 
 
 # ============================================================================
@@ -996,7 +1112,9 @@ Examples:
 
     # Generate personas
     generator = PersonaGenerator(output_dir=args.output)
-    results = generator.generate_batch(count=args.count, dry_run=args.dry_run, resume=args.resume)
+    results = generator.generate_batch(
+        count=args.count, dry_run=args.dry_run, resume=args.resume
+    )
 
     sys.exit(0 if results["failed"] == 0 else 1)
 

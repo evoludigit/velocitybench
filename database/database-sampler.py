@@ -42,7 +42,9 @@ class DatabaseSampler:
         """Execute full sampling pipeline"""
         start = time.time()
         print("=" * 70)
-        print(f"DATABASE SAMPLING: {self.sample_percent}% from {Path(self.source_db).name}")
+        print(
+            f"DATABASE SAMPLING: {self.sample_percent}% from {Path(self.source_db).name}"
+        )
         print("=" * 70)
 
         try:
@@ -51,9 +53,9 @@ class DatabaseSampler:
             source_conn.row_factory = sqlite3.Row
 
             # Get total user count
-            total_users = source_conn.execute(
-                "SELECT COUNT(*) FROM users"
-            ).fetchone()[0]
+            total_users = source_conn.execute("SELECT COUNT(*) FROM users").fetchone()[
+                0
+            ]
 
             sample_size = max(1, int(total_users * self.sample_percent / 100))
             print(f"\nSampling {sample_size:,} users from {total_users:,} total")
@@ -63,7 +65,9 @@ class DatabaseSampler:
             all_user_pks = source_conn.execute(
                 "SELECT pk_user FROM users ORDER BY pk_user"
             ).fetchall()
-            sampled_user_pks = set(random.sample([row[0] for row in all_user_pks], sample_size))
+            sampled_user_pks = set(
+                random.sample([row[0] for row in all_user_pks], sample_size)
+            )
             print(f"  ✓ Selected {len(sampled_user_pks):,} users")
 
             # Step 2: Get their posts
@@ -71,9 +75,9 @@ class DatabaseSampler:
             posts = source_conn.execute(
                 """SELECT pk_post FROM posts
                    WHERE fk_author IN ({})""".format(
-                    ','.join('?' * len(sampled_user_pks))
+                    ",".join("?" * len(sampled_user_pks))
                 ),
-                list(sampled_user_pks)
+                list(sampled_user_pks),
             ).fetchall()
             sampled_post_pks = set(row[0] for row in posts)
             print(f"  ✓ Found {len(sampled_post_pks):,} posts")
@@ -92,14 +96,13 @@ class DatabaseSampler:
             users = source_conn.execute(
                 """SELECT * FROM users
                    WHERE pk_user IN ({})""".format(
-                    ','.join('?' * len(sampled_user_pks))
+                    ",".join("?" * len(sampled_user_pks))
                 ),
-                list(sampled_user_pks)
+                list(sampled_user_pks),
             ).fetchall()
 
             output_conn.executemany(
-                """INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                users
+                """INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""", users
             )
             output_conn.commit()
             print(f"  ✓ Copied {len(users):,} users")
@@ -108,14 +111,13 @@ class DatabaseSampler:
             posts = source_conn.execute(
                 """SELECT * FROM posts
                    WHERE pk_post IN ({})""".format(
-                    ','.join('?' * len(sampled_post_pks))
+                    ",".join("?" * len(sampled_post_pks))
                 ),
-                list(sampled_post_pks)
+                list(sampled_post_pks),
             ).fetchall()
 
             output_conn.executemany(
-                """INSERT INTO posts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                posts
+                """INSERT INTO posts VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""", posts
             )
             output_conn.commit()
             print(f"  ✓ Copied {len(posts):,} posts")
@@ -124,14 +126,13 @@ class DatabaseSampler:
             comments = source_conn.execute(
                 """SELECT * FROM comments
                    WHERE fk_post IN ({})""".format(
-                    ','.join('?' * len(sampled_post_pks))
+                    ",".join("?" * len(sampled_post_pks))
                 ),
-                list(sampled_post_pks)
+                list(sampled_post_pks),
             ).fetchall()
 
             output_conn.executemany(
-                """INSERT INTO comments VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                comments
+                """INSERT INTO comments VALUES (?, ?, ?, ?, ?, ?, ?, ?)""", comments
             )
             output_conn.commit()
             print(f"  ✓ Copied {len(comments):,} comments")
@@ -140,16 +141,15 @@ class DatabaseSampler:
             follows = source_conn.execute(
                 """SELECT * FROM user_follows
                    WHERE fk_follower IN ({}) AND fk_following IN ({})""".format(
-                    ','.join('?' * len(sampled_user_pks)),
-                    ','.join('?' * len(sampled_user_pks))
+                    ",".join("?" * len(sampled_user_pks)),
+                    ",".join("?" * len(sampled_user_pks)),
                 ),
-                list(sampled_user_pks) + list(sampled_user_pks)
+                list(sampled_user_pks) + list(sampled_user_pks),
             ).fetchall()
 
             if follows:
                 output_conn.executemany(
-                    """INSERT INTO user_follows VALUES (?, ?, ?)""",
-                    follows
+                    """INSERT INTO user_follows VALUES (?, ?, ?)""", follows
                 )
                 output_conn.commit()
             print(f"  ✓ Copied {len(follows):,} follows")
@@ -158,15 +158,14 @@ class DatabaseSampler:
             likes = source_conn.execute(
                 """SELECT * FROM post_likes
                    WHERE fk_post IN ({})""".format(
-                    ','.join('?' * len(sampled_post_pks))
+                    ",".join("?" * len(sampled_post_pks))
                 ),
-                list(sampled_post_pks)
+                list(sampled_post_pks),
             ).fetchall()
 
             if likes:
                 output_conn.executemany(
-                    """INSERT INTO post_likes VALUES (?, ?, ?, ?)""",
-                    likes
+                    """INSERT INTO post_likes VALUES (?, ?, ?, ?)""", likes
                 )
                 output_conn.commit()
             print(f"  ✓ Copied {len(likes):,} likes")
@@ -191,6 +190,7 @@ class DatabaseSampler:
         except Exception as e:
             print(f"\n❌ Sampling failed: {e}")
             import traceback
+
             traceback.print_exc()
             return False
 

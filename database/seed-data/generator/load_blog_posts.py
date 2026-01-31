@@ -47,7 +47,7 @@ class BlogPostLoader:
             output_dir: Directory for TSV output files (default: /tmp)
         """
         self.num_users = num_users
-        self.output_dir = output_dir or Path('/tmp')
+        self.output_dir = output_dir or Path("/tmp")
 
         # Initialize Faker with reproducible seed
         self.fake = Faker()
@@ -55,19 +55,19 @@ class BlogPostLoader:
         random.seed(42)
 
         # Blog posts directory
-        self.blog_dir = Path(__file__).parent.parent / 'output' / 'blog'
+        self.blog_dir = Path(__file__).parent.parent / "output" / "blog"
 
         # Statistics
         self.stats = {
-            'users_generated': 0,
-            'total_files': 0,
-            'parsed': 0,
-            'failed': 0,
-            'loaded': 0,
-            'duration': 0,
+            "users_generated": 0,
+            "total_files": 0,
+            "parsed": 0,
+            "failed": 0,
+            "loaded": 0,
+            "duration": 0,
         }
 
-    def generate_users(self) -> List[dict]:
+    def generate_users(self) -> list[dict]:
         """
         Generate realistic users with Faker.
 
@@ -84,7 +84,7 @@ class BlogPostLoader:
         for i in range(self.num_users):
             # Generate user data
             email = self.fake.unique.email()
-            username = email.split('@')[0]  # Use email prefix as username
+            username = email.split("@")[0]  # Use email prefix as username
 
             # Ensure username is unique (append number if needed)
             if username in used_usernames:
@@ -105,26 +105,26 @@ class BlogPostLoader:
             bio = self.fake.text(max_nb_chars=200) if random.random() > 0.3 else None
 
             user = {
-                'pk_user': i + 1,  # 1-indexed
-                'id': str(uuid.uuid4()),
-                'email': email,
-                'username': username,
-                'first_name': first_name,
-                'last_name': last_name,
-                'bio': bio,
-                'is_active': True,
-                'created_at': datetime.now(),
-                'updated_at': datetime.now(),
+                "pk_user": i + 1,  # 1-indexed
+                "id": str(uuid.uuid4()),
+                "email": email,
+                "username": username,
+                "first_name": first_name,
+                "last_name": last_name,
+                "bio": bio,
+                "is_active": True,
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
             }
             users.append(user)
 
         elapsed = time.time() - start
-        self.stats['users_generated'] = len(users)
+        self.stats["users_generated"] = len(users)
         print(f"✓ Generated {len(users)} users in {elapsed:.2f}s")
 
         return users
 
-    def discover_posts(self) -> List[Path]:
+    def discover_posts(self) -> list[Path]:
         """
         Find all markdown files in blog output directory.
 
@@ -138,8 +138,8 @@ class BlogPostLoader:
             return []
 
         # Find all .md files recursively
-        md_files = list(self.blog_dir.rglob('*.md'))
-        self.stats['total_files'] = len(md_files)
+        md_files = list(self.blog_dir.rglob("*.md"))
+        self.stats["total_files"] = len(md_files)
 
         print(f"✓ Found {len(md_files)} markdown files")
         return md_files
@@ -175,21 +175,21 @@ class BlogPostLoader:
 
         # Prepare post data
         post = {
-            'pk_post': post_index + 1,  # 1-indexed
-            'id': str(uuid.uuid4()),
-            'title': metadata['title'],
-            'content': metadata['content'],
-            'excerpt': metadata['excerpt'],
-            'fk_author': self.assign_author(post_index),
-            'status': 'published',
-            'published_at': metadata['published_at'],
-            'created_at': datetime.now(),
-            'updated_at': datetime.now(),
+            "pk_post": post_index + 1,  # 1-indexed
+            "id": str(uuid.uuid4()),
+            "title": metadata["title"],
+            "content": metadata["content"],
+            "excerpt": metadata["excerpt"],
+            "fk_author": self.assign_author(post_index),
+            "status": "published",
+            "published_at": metadata["published_at"],
+            "created_at": datetime.now(),
+            "updated_at": datetime.now(),
         }
 
         return post
 
-    def generate_users_tsv(self, users: List[dict]) -> Path:
+    def generate_users_tsv(self, users: list[dict]) -> Path:
         """
         Generate TSV file for tb_user table.
 
@@ -201,33 +201,33 @@ class BlogPostLoader:
         """
         print(f"Generating users TSV file...", flush=True)
 
-        tsv_path = self.output_dir / 'blog_users.tsv'
+        tsv_path = self.output_dir / "blog_users.tsv"
 
-        with open(tsv_path, 'w', encoding='utf-8') as f:
+        with open(tsv_path, "w", encoding="utf-8") as f:
             for user in users:
                 # Format: pk_user\tid\temail\tusername\tfirst_name\tlast_name\tbio\tis_active\tcreated_at\tupdated_at
                 row = [
-                    str(user['pk_user']),
-                    user['id'],
-                    user['email'],
-                    user['username'],
-                    user['first_name'],
-                    user['last_name'],
-                    user['bio'] if user['bio'] else '\\N',  # NULL for None
-                    'true' if user['is_active'] else 'false',
-                    user['created_at'].isoformat(),
-                    user['updated_at'].isoformat(),
+                    str(user["pk_user"]),
+                    user["id"],
+                    user["email"],
+                    user["username"],
+                    user["first_name"],
+                    user["last_name"],
+                    user["bio"] if user["bio"] else "\\N",  # NULL for None
+                    "true" if user["is_active"] else "false",
+                    user["created_at"].isoformat(),
+                    user["updated_at"].isoformat(),
                 ]
 
                 # Escape special characters for TSV
                 row = [self._escape_tsv(str(v)) for v in row]
 
-                f.write('\t'.join(row) + '\n')
+                f.write("\t".join(row) + "\n")
 
         print(f"✓ Generated {tsv_path}")
         return tsv_path
 
-    def generate_posts_tsv(self, posts: List[dict]) -> Path:
+    def generate_posts_tsv(self, posts: list[dict]) -> Path:
         """
         Generate TSV file for tb_post table.
 
@@ -239,28 +239,28 @@ class BlogPostLoader:
         """
         print(f"Generating posts TSV file...", flush=True)
 
-        tsv_path = self.output_dir / 'blog_posts.tsv'
+        tsv_path = self.output_dir / "blog_posts.tsv"
 
-        with open(tsv_path, 'w', encoding='utf-8') as f:
+        with open(tsv_path, "w", encoding="utf-8") as f:
             for post in posts:
                 # Format: pk_post\tid\ttitle\tcontent\texcerpt\tfk_author\tstatus\tpublished_at\tcreated_at\tupdated_at
                 row = [
-                    str(post['pk_post']),
-                    post['id'],
-                    post['title'],
-                    post['content'],
-                    post['excerpt'] if post['excerpt'] else '\\N',
-                    str(post['fk_author']),
-                    post['status'],
-                    post['published_at'].isoformat(),
-                    post['created_at'].isoformat(),
-                    post['updated_at'].isoformat(),
+                    str(post["pk_post"]),
+                    post["id"],
+                    post["title"],
+                    post["content"],
+                    post["excerpt"] if post["excerpt"] else "\\N",
+                    str(post["fk_author"]),
+                    post["status"],
+                    post["published_at"].isoformat(),
+                    post["created_at"].isoformat(),
+                    post["updated_at"].isoformat(),
                 ]
 
                 # Escape special characters for TSV
                 row = [self._escape_tsv(str(v)) for v in row]
 
-                f.write('\t'.join(row) + '\n')
+                f.write("\t".join(row) + "\n")
 
         print(f"✓ Generated {tsv_path}")
         return tsv_path
@@ -277,16 +277,18 @@ class BlogPostLoader:
             Escaped string
         """
         # Replace backslashes first
-        value = value.replace('\\', '\\\\')
+        value = value.replace("\\", "\\\\")
 
         # Escape tabs and newlines
-        value = value.replace('\t', '\\t')
-        value = value.replace('\n', '\\n')
-        value = value.replace('\r', '\\r')
+        value = value.replace("\t", "\\t")
+        value = value.replace("\n", "\\n")
+        value = value.replace("\r", "\\r")
 
         return value
 
-    def load_to_postgres(self, users_tsv: Path, posts_tsv: Path, connection_string: str) -> bool:
+    def load_to_postgres(
+        self, users_tsv: Path, posts_tsv: Path, connection_string: str
+    ) -> bool:
         """
         Load TSV files to PostgreSQL using COPY command.
 
@@ -304,18 +306,25 @@ class BlogPostLoader:
             with psycopg.connect(connection_string) as conn:
                 with conn.cursor() as cur:
                     # Load users first (no FK dependencies)
-                    print(f"  Loading {self.stats['users_generated']} users...", flush=True)
-                    with open(users_tsv, 'r', encoding='utf-8') as f:
-                        with cur.copy("COPY benchmark.tb_user (pk_user, id, email, username, first_name, last_name, bio, is_active, created_at, updated_at) FROM STDIN") as copy:
+                    print(
+                        f"  Loading {self.stats['users_generated']} users...",
+                        flush=True,
+                    )
+                    with open(users_tsv, encoding="utf-8") as f:
+                        with cur.copy(
+                            "COPY benchmark.tb_user (pk_user, id, email, username, first_name, last_name, bio, is_active, created_at, updated_at) FROM STDIN"
+                        ) as copy:
                             for line in f:
-                                copy.write(line.encode('utf-8'))
+                                copy.write(line.encode("utf-8"))
 
                     # Load posts (FK to users already loaded, so no FK violations)
                     print(f"  Loading {self.stats['parsed']} posts...", flush=True)
-                    with open(posts_tsv, 'r', encoding='utf-8') as f:
-                        with cur.copy("COPY benchmark.tb_post (pk_post, id, title, content, excerpt, fk_author, status, published_at, created_at, updated_at) FROM STDIN") as copy:
+                    with open(posts_tsv, encoding="utf-8") as f:
+                        with cur.copy(
+                            "COPY benchmark.tb_post (pk_post, id, title, content, excerpt, fk_author, status, published_at, created_at, updated_at) FROM STDIN"
+                        ) as copy:
                             for line in f:
-                                copy.write(line.encode('utf-8'))
+                                copy.write(line.encode("utf-8"))
 
                     # Validate row counts
                     cur.execute("SELECT COUNT(*) FROM benchmark.tb_user;")
@@ -327,9 +336,12 @@ class BlogPostLoader:
                     conn.commit()
 
                     print(f"✓ Loaded {user_count} users, {post_count} posts")
-                    self.stats['loaded'] = post_count
+                    self.stats["loaded"] = post_count
 
-                    return user_count == self.stats['users_generated'] and post_count == self.stats['parsed']
+                    return (
+                        user_count == self.stats["users_generated"]
+                        and post_count == self.stats["parsed"]
+                    )
 
         except Exception as e:
             print(f"❌ Error loading to PostgreSQL: {e}")
@@ -367,9 +379,9 @@ class BlogPostLoader:
 
             if post:
                 posts.append(post)
-                self.stats['parsed'] += 1
+                self.stats["parsed"] += 1
             else:
-                self.stats['failed'] += 1
+                self.stats["failed"] += 1
                 print(f"  Warning: Failed to parse {md_file.name}")
 
             # Progress indicator every 100 files
@@ -393,12 +405,12 @@ class BlogPostLoader:
             print("\n⚠️  TSV-only mode (no database connection)")
 
         # Calculate duration
-        self.stats['duration'] = time.time() - start_time
+        self.stats["duration"] = time.time() - start_time
 
         # Print summary
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print("SUMMARY")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
         print(f"Users generated: {self.stats['users_generated']:,}")
         print(f"Files discovered: {self.stats['total_files']:,}")
         print(f"Posts parsed: {self.stats['parsed']:,}")
@@ -430,39 +442,39 @@ Examples:
 
   # Generate TSV only (no database load)
   python load_blog_posts.py --generate-only --output output/sql
-        """
+        """,
     )
 
     parser.add_argument(
-        '--users',
+        "--users",
         type=int,
         default=5000,
-        help='Number of users to generate (default: 5000)'
+        help="Number of users to generate (default: 5000)",
     )
 
     parser.add_argument(
-        '--connection',
+        "--connection",
         type=str,
-        help='PostgreSQL connection string (e.g., postgresql://user:pass@localhost/db)'
+        help="PostgreSQL connection string (e.g., postgresql://user:pass@localhost/db)",
     )
 
     parser.add_argument(
-        '--dry-run',
-        action='store_true',
-        help='Validate files without loading to database'
+        "--dry-run",
+        action="store_true",
+        help="Validate files without loading to database",
     )
 
     parser.add_argument(
-        '--generate-only',
-        action='store_true',
-        help='Generate TSV files only (no database load)'
+        "--generate-only",
+        action="store_true",
+        help="Generate TSV files only (no database load)",
     )
 
     parser.add_argument(
-        '--output',
+        "--output",
         type=Path,
-        default=Path('/tmp'),
-        help='Output directory for TSV files (default: /tmp)'
+        default=Path("/tmp"),
+        help="Output directory for TSV files (default: /tmp)",
     )
 
     args = parser.parse_args()
@@ -472,16 +484,13 @@ Examples:
         parser.error("Either --connection, --dry-run, or --generate-only is required")
 
     # Run loader
-    loader = BlogPostLoader(
-        num_users=args.users,
-        output_dir=args.output
-    )
+    loader = BlogPostLoader(num_users=args.users, output_dir=args.output)
 
     connection_string = args.connection if not args.generate_only else None
     stats = loader.run(connection_string=connection_string, dry_run=args.dry_run)
 
     # Exit with status code
-    if stats['failed'] > 0:
+    if stats["failed"] > 0:
         print(f"\n⚠️  Warning: {stats['failed']} files failed to parse")
         sys.exit(1)
 
@@ -489,5 +498,5 @@ Examples:
     sys.exit(0)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

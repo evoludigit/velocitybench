@@ -83,7 +83,7 @@ class PersonaCorrector:
             print(f"  vLLM error: {e}")
         return None
 
-    def _analyze_persona(self, persona: Dict) -> Tuple[bool, int, List[str]]:
+    def _analyze_persona(self, persona: dict) -> tuple[bool, int, list[str]]:
         """
         Analyze persona for coherence issues.
         Returns (is_coherent, score, issues_list)
@@ -98,18 +98,18 @@ Analyze this persona profile for semantic coherence and realism. Check:
 6. Do the personality traits support the communication/reply style?
 
 Persona:
-- Name: {persona.get('name')}
-- Title: {persona.get('title')}
-- Years: {persona.get('years_experience')} ({persona.get('experience_level')})
-- Region: {persona.get('geographic_region')}
-- Language: {persona.get('language_background')}
-- Company: {persona.get('company_type')}
-- Domain: {persona.get('business_domain')}
-- Communication style: {persona.get('communication_style')}
-- Reply style: {persona.get('reply_style')}
-- Expertise: {', '.join(persona.get('expertise_areas', []))}
-- Traits: {', '.join(persona.get('personality_traits', []))}
-- Background: {persona.get('background')[:100]}...
+- Name: {persona.get("name")}
+- Title: {persona.get("title")}
+- Years: {persona.get("years_experience")} ({persona.get("experience_level")})
+- Region: {persona.get("geographic_region")}
+- Language: {persona.get("language_background")}
+- Company: {persona.get("company_type")}
+- Domain: {persona.get("business_domain")}
+- Communication style: {persona.get("communication_style")}
+- Reply style: {persona.get("reply_style")}
+- Expertise: {", ".join(persona.get("expertise_areas", []))}
+- Traits: {", ".join(persona.get("personality_traits", []))}
+- Background: {persona.get("background")[:100]}...
 
 Respond ONLY with structured lines (one per line):
 COHERENT: yes/no
@@ -131,12 +131,14 @@ Use EXACTLY this format - no explanations, no extra text."""
         # Extract COHERENT
         is_coherent = None
         if "coherent:" in text:
-            coherent_section = text[text.find("coherent:") : text.find("coherent:") + 50]
+            coherent_section = text[
+                text.find("coherent:") : text.find("coherent:") + 50
+            ]
             is_coherent = "yes" in coherent_section
 
         # Extract SCORE
         score = None
-        score_match = re.search(r'score[:\*]* *\*?(\d+)', text)
+        score_match = re.search(r"score[:\*]* *\*?(\d+)", text)
         if score_match:
             try:
                 score = int(score_match.group(1))
@@ -147,7 +149,7 @@ Use EXACTLY this format - no explanations, no extra text."""
         if "issues:" in text:
             issues_section = text[text.find("issues:") : text.find("issues:") + 500]
             # Split by | or newline
-            issue_parts = re.split(r'\||\n', issues_section)
+            issue_parts = re.split(r"\||\n", issues_section)
             for part in issue_parts:
                 part = part.strip()
                 if part and part != "issues:" and len(part) > 5:
@@ -156,7 +158,7 @@ Use EXACTLY this format - no explanations, no extra text."""
         return is_coherent, score, issues[:5]  # Max 5 issues
 
     def _correct_field(
-        self, persona: Dict, field_name: str, issue_description: str
+        self, persona: dict, field_name: str, issue_description: str
     ) -> Optional:
         """
         Generate a correction for a specific field.
@@ -176,15 +178,15 @@ Issue: {issue_description}
 Format: {array_format}
 
 Context:
-- Title: {persona.get('title')}
-- Experience: {persona.get('years_experience')} years ({persona.get('experience_level')})
-- Domain: {persona.get('business_domain')}
-- Company: {persona.get('company_type')}
-- Region: {persona.get('geographic_region')}
-- Language: {persona.get('language_background')}
+- Title: {persona.get("title")}
+- Experience: {persona.get("years_experience")} years ({persona.get("experience_level")})
+- Domain: {persona.get("business_domain")}
+- Company: {persona.get("company_type")}
+- Region: {persona.get("geographic_region")}
+- Language: {persona.get("language_background")}
 
 Generate a corrected value for '{field_name}' that fixes the issue.
-Respond with ONLY the corrected value, no explanation.{' For arrays, use comma-separated format.' if is_array else ''}"""
+Respond with ONLY the corrected value, no explanation.{" For arrays, use comma-separated format." if is_array else ""}"""
 
         system_prompt = (
             f"You are fixing a '{field_name}' field in a professional persona.\n"
@@ -210,7 +212,7 @@ Respond with ONLY the corrected value, no explanation.{' For arrays, use comma-s
 
         return None
 
-    def _map_issue_to_field(self, persona: Dict, issue: str) -> tuple[str, str] | None:
+    def _map_issue_to_field(self, persona: dict, issue: str) -> tuple[str, str] | None:
         """
         Map an issue description to a specific field and correction strategy.
         Returns (field_name, correction_type)
@@ -219,8 +221,7 @@ Respond with ONLY the corrected value, no explanation.{' For arrays, use comma-s
 
         # Title/Experience mismatch
         if any(
-            x in issue_lower
-            for x in ["title", "experience level", "years don't match"]
+            x in issue_lower for x in ["title", "experience level", "years don't match"]
         ):
             return ("title", "title_experience_alignment")
 
@@ -247,8 +248,8 @@ Respond with ONLY the corrected value, no explanation.{' For arrays, use comma-s
         return None
 
     def correct_persona(
-        self, persona: Dict, persona_id: int, dry_run: bool = False
-    ) -> Tuple[Dict, List[str]]:
+        self, persona: dict, persona_id: int, dry_run: bool = False
+    ) -> tuple[dict, list[str]]:
         """
         Analyze and correct a single persona.
         Returns (corrected_persona, list_of_corrections_made)
@@ -297,11 +298,11 @@ Respond with ONLY the corrected value, no explanation.{' For arrays, use comma-s
         output_dir: Path | None = None,
         count: int | None = None,
         dry_run: bool = False,
-    ) -> Dict:
+    ) -> dict:
         """Process all personas for correction."""
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print("PERSONA CORRECTION (LAYER 3)")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
         print(f"Input directory: {input_dir}")
         print(f"Dry run: {dry_run}")
         if output_dir and not dry_run:
@@ -309,7 +310,7 @@ Respond with ONLY the corrected value, no explanation.{' For arrays, use comma-s
             output_dir.mkdir(parents=True, exist_ok=True)
         if count:
             print(f"Limit: {count}")
-        print(f"{'='*70}\n")
+        print(f"{'=' * 70}\n")
 
         results = {
             "analyzed": 0,
@@ -344,13 +345,13 @@ Respond with ONLY the corrected value, no explanation.{' For arrays, use comma-s
                     status = "↻" if dry_run else "✓"
                     corrections_summary = "; ".join(corrections[:2])
                     if len(corrections) > 2:
-                        corrections_summary += f"; +{len(corrections)-2} more"
+                        corrections_summary += f"; +{len(corrections) - 2} more"
 
                     print(f"[{i:4d}] {persona_file.name} {status}")
                     for corr in corrections[:2]:
                         print(f"       - {corr}")
                     if len(corrections) > 2:
-                        print(f"       ... and {len(corrections)-2} more corrections")
+                        print(f"       ... and {len(corrections) - 2} more corrections")
 
                     results["summary"].append(
                         {
@@ -374,9 +375,9 @@ Respond with ONLY the corrected value, no explanation.{' For arrays, use comma-s
                 results["failed"] += 1
 
         # Print summary
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print("CORRECTION SUMMARY")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
         print(f"Analyzed:              {results['analyzed']}")
         print(f"Corrected:             {results['corrected']}")
         print(f"Unchanged (coherent):  {results['unchanged']}")
@@ -385,7 +386,7 @@ Respond with ONLY the corrected value, no explanation.{' For arrays, use comma-s
         if results["corrected"] > 0:
             avg_corrections = results["total_corrections"] / results["corrected"]
             print(f"Avg corrections/persona: {avg_corrections:.1f}")
-        print(f"{'='*70}\n")
+        print(f"{'=' * 70}\n")
 
         if results["summary"] and results["corrected"] <= 20:
             print("Correction details (first 20 personas):")
@@ -394,7 +395,9 @@ Respond with ONLY the corrected value, no explanation.{' For arrays, use comma-s
                 for detail in item["details"]:
                     print(f"    - {detail}")
             if len(results["summary"]) > 20:
-                print(f"\n  ... and {len(results['summary']) - 20} more personas corrected")
+                print(
+                    f"\n  ... and {len(results['summary']) - 20} more personas corrected"
+                )
 
         return results
 

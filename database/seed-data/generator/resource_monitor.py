@@ -24,7 +24,7 @@ class ResourceMonitor:
         """Initialize resource monitor."""
         self.process = psutil.Process(os.getpid())
 
-    def check_memory(self) -> Tuple[bool, str]:
+    def check_memory(self) -> tuple[bool, str]:
         """
         Check system memory usage.
 
@@ -34,7 +34,7 @@ class ResourceMonitor:
         try:
             mem = psutil.virtual_memory()
             mem_used_pct = mem.percent
-            mem_available_gb = mem.available / (1024 ** 3)
+            mem_available_gb = mem.available / (1024**3)
 
             msg = f"System Memory: {mem_used_pct:.1f}% used ({mem_available_gb:.1f} GB available)"
 
@@ -52,7 +52,7 @@ class ResourceMonitor:
         except Exception as e:
             return (False, f"Memory check: ❌ {e}")
 
-    def check_process_memory(self, limit_mb: int = 2048) -> Tuple[bool, str]:
+    def check_process_memory(self, limit_mb: int = 2048) -> tuple[bool, str]:
         """
         Check current process memory usage.
 
@@ -63,7 +63,7 @@ class ResourceMonitor:
             (is_ok: bool, message: str)
         """
         try:
-            process_mem_mb = self.process.memory_info().rss / (1024 ** 2)
+            process_mem_mb = self.process.memory_info().rss / (1024**2)
 
             msg = f"Process Memory: {process_mem_mb:.1f} MB (limit: {limit_mb} MB)"
 
@@ -81,7 +81,7 @@ class ResourceMonitor:
         except Exception as e:
             return (False, f"Process memory check: ❌ {e}")
 
-    def check_cpu(self) -> Tuple[bool, str]:
+    def check_cpu(self) -> tuple[bool, str]:
         """
         Check CPU usage.
 
@@ -103,7 +103,7 @@ class ResourceMonitor:
         except Exception as e:
             return (False, f"CPU check: ❌ {e}")
 
-    def check_all(self, process_limit_mb: int = 2048) -> Tuple[bool, str]:
+    def check_all(self, process_limit_mb: int = 2048) -> tuple[bool, str]:
         """
         Run all resource checks.
 
@@ -120,6 +120,6 @@ class ResourceMonitor:
         ]
 
         all_ok = all(check[0] for check in checks)
-        message = '\n'.join(check[1] for check in checks)
+        message = "\n".join(check[1] for check in checks)
 
         return (all_ok, message)

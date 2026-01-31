@@ -48,6 +48,7 @@ BackendType = Literal["vllm", "opencode_free", "grok"]
 @dataclass
 class GenerationTask:
     """A single blog post generation task."""
+
     pattern_id: str
     post_type: str  # tutorial, troubleshooting, reference, comparison
     depth: str  # beginner, intermediate, advanced
@@ -59,6 +60,7 @@ class GenerationTask:
 @dataclass
 class GenerationResult:
     """Result of a generation task."""
+
     task: GenerationTask
     backend: BackendType
     content: str
@@ -75,7 +77,14 @@ def load_yaml(path: Path) -> dict:
 
 def find_pattern(pattern_id: str) -> dict | None:
     """Find pattern in corpus."""
-    for category in ["identifiers", "queries", "architecture", "relationships", "performance", "frameworks"]:
+    for category in [
+        "identifiers",
+        "queries",
+        "architecture",
+        "relationships",
+        "performance",
+        "frameworks",
+    ]:
         path = CORPUS_DIR / "patterns" / category / f"{pattern_id}.yaml"
         if path.exists():
             return load_yaml(path)
@@ -94,12 +103,12 @@ def build_tutorial_prompt(pattern: dict, depth: str) -> tuple[str, str]:
 
 Write complete, publishable blog posts in markdown format. Do NOT wrap the output in markdown code fences."""
 
-    solution = pattern.get('solution', {})
-    solutions = pattern.get('solutions', [])
+    solution = pattern.get("solution", {})
+    solutions = pattern.get("solutions", [])
 
     if solution:
-        solution_text = solution.get('principle', '')
-        components = solution.get('components', [])
+        solution_text = solution.get("principle", "")
+        components = solution.get("components", [])
     elif solutions:
         solution_text = "Multiple solutions exist for this problem:\n"
         for sol in solutions:
@@ -109,16 +118,16 @@ Write complete, publishable blog posts in markdown format. Do NOT wrap the outpu
         solution_text = "See the detailed solutions below."
         components = []
 
-    prompt = f"""Write a tutorial blog post about the "{pattern['name']}" pattern.
+    prompt = f"""Write a tutorial blog post about the "{pattern["name"]}" pattern.
 
 ## Target Audience
 {depth.title()} backend developers.
 
 ## Summary
-{pattern['summary']['long']}
+{pattern["summary"]["long"]}
 
 ## The Problem
-{pattern['problem']['description']}
+{pattern["problem"]["description"]}
 
 ## The Solution
 {solution_text}
@@ -130,13 +139,13 @@ Write complete, publishable blog posts in markdown format. Do NOT wrap the outpu
     for sol in solutions:
         prompt += f"- **{sol['name']}**: {sol['description']}\n"
 
-    schema = pattern.get('schema', {})
-    if schema and 'sql' in schema:
+    schema = pattern.get("schema", {})
+    if schema and "sql" in schema:
         prompt += f"\n## Schema Example\n```sql\n{schema['sql']}\n```\n"
     else:
         prompt += "\n## Code Examples\nInclude practical code examples demonstrating the pattern.\n"
 
-    if 'analogy' in blog_hooks:
+    if "analogy" in blog_hooks:
         prompt += f"\n## Analogy for {depth} audience\n{blog_hooks['analogy']}\n"
 
     prompt += """
@@ -170,8 +179,8 @@ def build_comparison_prompt(pattern: dict, depth: str) -> tuple[str, str]:
 
 Write complete, publishable blog posts in markdown format. Do NOT wrap the output in markdown code fences."""
 
-    paradigms = pattern.get('paradigms', [])
-    frameworks = pattern.get('frameworks', [])
+    paradigms = pattern.get("paradigms", [])
+    frameworks = pattern.get("frameworks", [])
 
     if paradigms:
         items = paradigms
@@ -183,27 +192,27 @@ Write complete, publishable blog posts in markdown format. Do NOT wrap the outpu
         items = []
         item_type = "option"
 
-    prompt = f"""Write a comparison blog post about "{pattern['name']}".
+    prompt = f"""Write a comparison blog post about "{pattern["name"]}".
 
 ## Target Audience
 {depth.title()} backend developers.
 
 ## Summary
-{pattern['summary']['long']}
+{pattern["summary"]["long"]}
 
 ## Items to Compare
 """
     for item in items:
         prompt += f"\n### {item['name']}\n"
         prompt += f"{item.get('description', '')}\n"
-        if 'strengths' in item:
+        if "strengths" in item:
             prompt += f"Strengths: {', '.join(item['strengths'][:3])}\n"
-        if 'weaknesses' in item:
+        if "weaknesses" in item:
             prompt += f"Weaknesses: {', '.join(item['weaknesses'][:3])}\n"
-        if 'best_for' in item:
+        if "best_for" in item:
             prompt += f"Best for: {', '.join(item['best_for'][:3])}\n"
 
-    comparison = pattern.get('comparison_matrix', {})
+    comparison = pattern.get("comparison_matrix", {})
     if comparison:
         prompt += "\n## Comparison Matrix\n"
         for metric, values in list(comparison.items())[:5]:
@@ -214,13 +223,17 @@ Write complete, publishable blog posts in markdown format. Do NOT wrap the outpu
                 prompt += str(values)
             prompt += "\n"
 
-    recommendations = pattern.get('use_case_recommendations', pattern.get('recommendation_matrix', []))
+    recommendations = pattern.get(
+        "use_case_recommendations", pattern.get("recommendation_matrix", [])
+    )
     if recommendations:
         prompt += "\n## Use Case Recommendations\n"
         for rec in recommendations[:4]:
-            prompt += f"- **{rec['scenario']}**: {rec['recommendation']} - {rec['reason']}\n"
+            prompt += (
+                f"- **{rec['scenario']}**: {rec['recommendation']} - {rec['reason']}\n"
+            )
 
-    if 'analogy' in blog_hooks:
+    if "analogy" in blog_hooks:
         prompt += f"\n## Analogy for {depth} audience\n{blog_hooks['analogy']}\n"
 
     prompt += f"""
@@ -245,14 +258,14 @@ def build_troubleshooting_prompt(pattern: dict) -> tuple[str, str]:
     """Build prompt for troubleshooting guide."""
     system_prompt = """You are a senior backend engineer writing debugging guides. Be practical and focused on quick problem resolution. Do NOT wrap output in markdown code fences."""
 
-    prompt = f"""Write a troubleshooting guide for the "{pattern['name']}" pattern.
+    prompt = f"""Write a troubleshooting guide for the "{pattern["name"]}" pattern.
 
 ## Pattern Summary
-{pattern['summary']['short']}
+{pattern["summary"]["short"]}
 
 ## Common Symptoms
 """
-    for symptom in pattern.get('problem', {}).get('symptoms', []):
+    for symptom in pattern.get("problem", {}).get("symptoms", []):
         prompt += f"- **{symptom['name']}**: {symptom['description']}\n"
 
     prompt += """
@@ -273,21 +286,23 @@ def build_reference_prompt(pattern: dict) -> tuple[str, str]:
     """Build prompt for reference documentation."""
     system_prompt = """You are a technical writer creating reference documentation. Be precise and scannable. Do NOT wrap output in markdown code fences."""
 
-    schema = pattern.get('schema', {})
+    schema = pattern.get("schema", {})
     schema_section = ""
-    if schema and 'sql' in schema:
+    if schema and "sql" in schema:
         schema_section = f"## Schema\n```sql\n{schema['sql']}\n```\n"
     else:
-        schema_section = "## Code Examples\nProvide relevant code examples for this pattern.\n"
+        schema_section = (
+            "## Code Examples\nProvide relevant code examples for this pattern.\n"
+        )
 
-    solution = pattern.get('solution', {})
-    solutions = pattern.get('solutions', [])
-    components = solution.get('components', []) if solution else []
+    solution = pattern.get("solution", {})
+    solutions = pattern.get("solutions", [])
+    components = solution.get("components", []) if solution else []
 
-    prompt = f"""Write reference documentation for the "{pattern['name']}" pattern.
+    prompt = f"""Write reference documentation for the "{pattern["name"]}" pattern.
 
 ## Summary
-{pattern['summary']['long']}
+{pattern["summary"]["long"]}
 
 {schema_section}
 
@@ -329,36 +344,46 @@ def build_all_tasks() -> list[GenerationTask]:
         # Tutorials
         for depth in depths:
             prompt, sys_prompt = build_tutorial_prompt(pattern, depth)
-            tasks.append(GenerationTask(
-                pattern_id=pattern_id,
-                post_type="tutorial",
-                depth=depth,
-                output_path=OUTPUT_DIR / "tutorials" / f"{pattern_id}-tutorial-{depth}.md",
-                prompt=prompt,
-                system_prompt=sys_prompt,
-            ))
+            tasks.append(
+                GenerationTask(
+                    pattern_id=pattern_id,
+                    post_type="tutorial",
+                    depth=depth,
+                    output_path=OUTPUT_DIR
+                    / "tutorials"
+                    / f"{pattern_id}-tutorial-{depth}.md",
+                    prompt=prompt,
+                    system_prompt=sys_prompt,
+                )
+            )
 
         # Troubleshooting
         prompt, sys_prompt = build_troubleshooting_prompt(pattern)
-        tasks.append(GenerationTask(
-            pattern_id=pattern_id,
-            post_type="troubleshooting",
-            depth="all",
-            output_path=OUTPUT_DIR / "troubleshooting" / f"{pattern_id}-troubleshooting.md",
-            prompt=prompt,
-            system_prompt=sys_prompt,
-        ))
+        tasks.append(
+            GenerationTask(
+                pattern_id=pattern_id,
+                post_type="troubleshooting",
+                depth="all",
+                output_path=OUTPUT_DIR
+                / "troubleshooting"
+                / f"{pattern_id}-troubleshooting.md",
+                prompt=prompt,
+                system_prompt=sys_prompt,
+            )
+        )
 
         # Reference
         prompt, sys_prompt = build_reference_prompt(pattern)
-        tasks.append(GenerationTask(
-            pattern_id=pattern_id,
-            post_type="reference",
-            depth="all",
-            output_path=OUTPUT_DIR / "reference" / f"{pattern_id}-reference.md",
-            prompt=prompt,
-            system_prompt=sys_prompt,
-        ))
+        tasks.append(
+            GenerationTask(
+                pattern_id=pattern_id,
+                post_type="reference",
+                depth="all",
+                output_path=OUTPUT_DIR / "reference" / f"{pattern_id}-reference.md",
+                prompt=prompt,
+                system_prompt=sys_prompt,
+            )
+        )
 
     # Comparison patterns
     for pattern_id in comparison_patterns:
@@ -368,19 +393,23 @@ def build_all_tasks() -> list[GenerationTask]:
 
         for depth in depths:
             prompt, sys_prompt = build_comparison_prompt(pattern, depth)
-            tasks.append(GenerationTask(
-                pattern_id=pattern_id,
-                post_type="comparison",
-                depth=depth,
-                output_path=OUTPUT_DIR / "comparisons" / f"{pattern_id}-{depth}.md",
-                prompt=prompt,
-                system_prompt=sys_prompt,
-            ))
+            tasks.append(
+                GenerationTask(
+                    pattern_id=pattern_id,
+                    post_type="comparison",
+                    depth=depth,
+                    output_path=OUTPUT_DIR / "comparisons" / f"{pattern_id}-{depth}.md",
+                    prompt=prompt,
+                    system_prompt=sys_prompt,
+                )
+            )
 
     return tasks
 
 
-async def generate_vllm(session: aiohttp.ClientSession, task: GenerationTask) -> GenerationResult:
+async def generate_vllm(
+    session: aiohttp.ClientSession, task: GenerationTask
+) -> GenerationResult:
     """Generate using local vLLM."""
     start = time.time()
 
@@ -397,40 +426,62 @@ async def generate_vllm(session: aiohttp.ClientSession, task: GenerationTask) ->
     }
 
     try:
-        async with session.post(VLLM_URL, json=payload, timeout=aiohttp.ClientTimeout(total=300)) as resp:
+        async with session.post(
+            VLLM_URL, json=payload, timeout=aiohttp.ClientTimeout(total=300)
+        ) as resp:
             if resp.status != 200:
                 return GenerationResult(
-                    task=task, backend="vllm", content="", duration=time.time()-start,
-                    success=False, error=f"HTTP {resp.status}"
+                    task=task,
+                    backend="vllm",
+                    content="",
+                    duration=time.time() - start,
+                    success=False,
+                    error=f"HTTP {resp.status}",
                 )
             result = await resp.json()
             content = result["choices"][0]["message"]["content"]
             return GenerationResult(
-                task=task, backend="vllm", content=content, duration=time.time()-start,
-                success=True
+                task=task,
+                backend="vllm",
+                content=content,
+                duration=time.time() - start,
+                success=True,
             )
     except Exception as e:
         return GenerationResult(
-            task=task, backend="vllm", content="", duration=time.time()-start,
-            success=False, error=str(e)
+            task=task,
+            backend="vllm",
+            content="",
+            duration=time.time() - start,
+            success=False,
+            error=str(e),
         )
 
 
-async def generate_opencode(task: GenerationTask, model: str, backend_name: BackendType) -> GenerationResult:
+async def generate_opencode(
+    task: GenerationTask, model: str, backend_name: BackendType
+) -> GenerationResult:
     """Generate using opencode CLI (runs in subprocess)."""
     start = time.time()
 
     # Create a temporary prompt file
-    prompt_file = Path(f"/tmp/blog_prompt_{task.pattern_id}_{task.depth}_{backend_name}.txt")
-    full_prompt = f"{task.system_prompt}\n\n{task.prompt}" if task.system_prompt else task.prompt
+    prompt_file = Path(
+        f"/tmp/blog_prompt_{task.pattern_id}_{task.depth}_{backend_name}.txt"
+    )
+    full_prompt = (
+        f"{task.system_prompt}\n\n{task.prompt}" if task.system_prompt else task.prompt
+    )
     prompt_file.write_text(full_prompt)
 
     try:
         # Run opencode with the specified model
         cmd = [
-            "opencode", "run",
-            "--model", model,
-            "--prompt", str(prompt_file),
+            "opencode",
+            "run",
+            "--model",
+            model,
+            "--prompt",
+            str(prompt_file),
             "--no-interactive",
         ]
 
@@ -443,39 +494,62 @@ async def generate_opencode(task: GenerationTask, model: str, backend_name: Back
 
         if proc.returncode != 0:
             return GenerationResult(
-                task=task, backend=backend_name, content="", duration=time.time()-start,
-                success=False, error=stderr.decode()
+                task=task,
+                backend=backend_name,
+                content="",
+                duration=time.time() - start,
+                success=False,
+                error=stderr.decode(),
             )
 
         content = stdout.decode()
         return GenerationResult(
-            task=task, backend=backend_name, content=content, duration=time.time()-start,
-            success=True
+            task=task,
+            backend=backend_name,
+            content=content,
+            duration=time.time() - start,
+            success=True,
         )
     except asyncio.TimeoutError:
         return GenerationResult(
-            task=task, backend=backend_name, content="", duration=time.time()-start,
-            success=False, error="Timeout"
+            task=task,
+            backend=backend_name,
+            content="",
+            duration=time.time() - start,
+            success=False,
+            error="Timeout",
         )
     except Exception as e:
         return GenerationResult(
-            task=task, backend=backend_name, content="", duration=time.time()-start,
-            success=False, error=str(e)
+            task=task,
+            backend=backend_name,
+            content="",
+            duration=time.time() - start,
+            success=False,
+            error=str(e),
         )
     finally:
         prompt_file.unlink(missing_ok=True)
 
 
-async def generate_with_openrouter(session: aiohttp.ClientSession, task: GenerationTask,
-                                    model: str, backend_name: BackendType) -> GenerationResult:
+async def generate_with_openrouter(
+    session: aiohttp.ClientSession,
+    task: GenerationTask,
+    model: str,
+    backend_name: BackendType,
+) -> GenerationResult:
     """Generate using OpenRouter API directly (works for both free and paid models)."""
     start = time.time()
 
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
         return GenerationResult(
-            task=task, backend=backend_name, content="", duration=time.time()-start,
-            success=False, error="OPENROUTER_API_KEY not set"
+            task=task,
+            backend=backend_name,
+            content="",
+            duration=time.time() - start,
+            success=False,
+            error="OPENROUTER_API_KEY not set",
         )
 
     messages = []
@@ -501,24 +575,35 @@ async def generate_with_openrouter(session: aiohttp.ClientSession, task: Generat
             "https://openrouter.ai/api/v1/chat/completions",
             json=payload,
             headers=headers,
-            timeout=aiohttp.ClientTimeout(total=300)
+            timeout=aiohttp.ClientTimeout(total=300),
         ) as resp:
             if resp.status != 200:
                 error_text = await resp.text()
                 return GenerationResult(
-                    task=task, backend=backend_name, content="", duration=time.time()-start,
-                    success=False, error=f"HTTP {resp.status}: {error_text[:200]}"
+                    task=task,
+                    backend=backend_name,
+                    content="",
+                    duration=time.time() - start,
+                    success=False,
+                    error=f"HTTP {resp.status}: {error_text[:200]}",
                 )
             result = await resp.json()
             content = result["choices"][0]["message"]["content"]
             return GenerationResult(
-                task=task, backend=backend_name, content=content, duration=time.time()-start,
-                success=True
+                task=task,
+                backend=backend_name,
+                content=content,
+                duration=time.time() - start,
+                success=True,
             )
     except Exception as e:
         return GenerationResult(
-            task=task, backend=backend_name, content="", duration=time.time()-start,
-            success=False, error=str(e)
+            task=task,
+            backend=backend_name,
+            content="",
+            duration=time.time() - start,
+            success=False,
+            error=str(e),
         )
 
 
@@ -532,16 +617,18 @@ def save_result(result: GenerationResult) -> bool:
     # Clean up markdown code fence wrapper if present
     content = result.content
     if content.startswith("```markdown\n"):
-        content = content[len("```markdown\n"):]
+        content = content[len("```markdown\n") :]
     if content.endswith("\n```"):
         content = content[:-4]
 
-    with open(result.task.output_path, 'w') as f:
+    with open(result.task.output_path, "w") as f:
         f.write(content)
     return True
 
 
-async def run_parallel_generation(tasks: list[GenerationTask], backends: list[BackendType]):
+async def run_parallel_generation(
+    tasks: list[GenerationTask], backends: list[BackendType]
+):
     """Run generation across multiple backends in parallel."""
 
     # Distribute tasks across backends (round-robin)
@@ -550,13 +637,13 @@ async def run_parallel_generation(tasks: list[GenerationTask], backends: list[Ba
         backend = backends[i % len(backends)]
         backend_tasks[backend].append(task)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Parallel Blog Generation")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"Total tasks: {len(tasks)}")
     for backend, btasks in backend_tasks.items():
         print(f"  {backend}: {len(btasks)} tasks")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     results: list[GenerationResult] = []
 
@@ -569,9 +656,17 @@ async def run_parallel_generation(tasks: list[GenerationTask], backends: list[Ba
                 if backend == "vllm":
                     coros.append(generate_vllm(session, task))
                 elif backend == "opencode_free":
-                    coros.append(generate_with_openrouter(session, task, OPENCODE_FREE_MODEL, backend))
+                    coros.append(
+                        generate_with_openrouter(
+                            session, task, OPENCODE_FREE_MODEL, backend
+                        )
+                    )
                 elif backend == "grok":
-                    coros.append(generate_with_openrouter(session, task, OPENCODE_GROK_MODEL, backend))
+                    coros.append(
+                        generate_with_openrouter(
+                            session, task, OPENCODE_GROK_MODEL, backend
+                        )
+                    )
 
         # Run with progress tracking
         for coro in asyncio.as_completed(coros):
@@ -579,15 +674,17 @@ async def run_parallel_generation(tasks: list[GenerationTask], backends: list[Ba
             results.append(result)
 
             status = "✓" if result.success else "✗"
-            print(f"  [{status}] {result.backend}: {result.task.pattern_id}/{result.task.post_type}-{result.task.depth} ({result.duration:.1f}s)")
+            print(
+                f"  [{status}] {result.backend}: {result.task.pattern_id}/{result.task.post_type}-{result.task.depth} ({result.duration:.1f}s)"
+            )
 
             if result.success:
                 save_result(result)
 
     # Summary
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("Summary")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     success = [r for r in results if r.success]
     failed = [r for r in results if not r.success]
@@ -598,23 +695,36 @@ async def run_parallel_generation(tasks: list[GenerationTask], backends: list[Ba
     if failed:
         print("\nFailed tasks:")
         for r in failed:
-            print(f"  - {r.task.pattern_id}/{r.task.post_type}-{r.task.depth} ({r.backend}): {r.error}")
+            print(
+                f"  - {r.task.pattern_id}/{r.task.post_type}-{r.task.depth} ({r.backend}): {r.error}"
+            )
 
     total_time = sum(r.duration for r in results)
     wall_time = max(r.duration for r in results) if results else 0
     print(f"\nTotal generation time: {total_time:.1f}s")
     print(f"Wall clock time: {wall_time:.1f}s")
-    print(f"Speedup from parallelism: {total_time/wall_time:.1f}x" if wall_time > 0 else "")
+    print(
+        f"Speedup from parallelism: {total_time / wall_time:.1f}x"
+        if wall_time > 0
+        else ""
+    )
 
     return results
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Parallel blog generator using multiple AI backends")
+    parser = argparse.ArgumentParser(
+        description="Parallel blog generator using multiple AI backends"
+    )
     parser.add_argument("--all", action="store_true", help="Generate all blog posts")
-    parser.add_argument("--backends", default="vllm,opencode_free,grok",
-                       help="Comma-separated backends: vllm,opencode_free,grok")
-    parser.add_argument("--dry-run", action="store_true", help="Show tasks without generating")
+    parser.add_argument(
+        "--backends",
+        default="vllm,opencode_free,grok",
+        help="Comma-separated backends: vllm,opencode_free,grok",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Show tasks without generating"
+    )
 
     args = parser.parse_args()
 
@@ -632,6 +742,7 @@ def main():
 
     if "vllm" in backends:
         import requests
+
         try:
             resp = requests.get("http://localhost:8000/v1/models", timeout=5)
             resp.raise_for_status()

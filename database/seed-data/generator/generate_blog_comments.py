@@ -97,7 +97,7 @@ class BlogPost:
 
     def _read_content(self) -> str:
         """Read markdown file."""
-        with open(self.file_path, "r", encoding="utf-8") as f:
+        with open(self.file_path, encoding="utf-8") as f:
             return f.read()
 
     def _extract_title(self) -> str:
@@ -109,9 +109,9 @@ class BlogPost:
         # Override with first heading if exists
         content = ""
         try:
-            with open(self.file_path, "r", encoding="utf-8") as f:
+            with open(self.file_path, encoding="utf-8") as f:
                 content = f.read(500)
-        except (IOError, OSError):
+        except OSError:
             pass
 
         match = re.search(r"^#+\s+(.+)$", content, re.MULTILINE)
@@ -120,7 +120,7 @@ class BlogPost:
 
         return title
 
-    def _extract_sections(self) -> List[Dict]:
+    def _extract_sections(self) -> list[dict]:
         """
         Extract major sections from post that are suitable for commenting.
 
@@ -172,7 +172,9 @@ class BlogPost:
 class CommentGenerator:
     """Generates comments for blog posts using vLLM."""
 
-    def __init__(self, output_dir: Path = OUTPUT_DIR, personas_file: Path = PERSONAS_FILE):
+    def __init__(
+        self, output_dir: Path = OUTPUT_DIR, personas_file: Path = PERSONAS_FILE
+    ):
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.personas = self._load_personas(personas_file)
@@ -181,7 +183,7 @@ class CommentGenerator:
         self.failed_count = 0
         self.start_time = time.time()
 
-    def _load_personas(self, personas_file: Path) -> List[Dict]:
+    def _load_personas(self, personas_file: Path) -> list[dict]:
         """Load personas from JSON file or index."""
         # Try new format first: individual files with index
         personas_dir = personas_file.parent / "personas"
@@ -222,7 +224,7 @@ class CommentGenerator:
             print(f"Warning: Failed to load personas: {e}")
             return []
 
-    def _load_state(self) -> Dict:
+    def _load_state(self) -> dict:
         """Load generation state from file (for resuming)."""
         if STATE_FILE.exists():
             with open(STATE_FILE) as f:
@@ -238,15 +240,47 @@ class CommentGenerator:
         """Extract meaningful keywords from text (lowercase)."""
         # Remove common words and split on non-alphanumeric
         text = text.lower()
-        words = re.split(r'[^a-z0-9]+', text)
+        words = re.split(r"[^a-z0-9]+", text)
         # Filter short words and common stopwords
-        stopwords = {'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been',
-                     'to', 'of', 'and', 'in', 'for', 'on', 'with', 'as', 'at',
-                     'by', 'from', 'or', 'that', 'this', 'it', 'its', 'md', 'reference',
-                     'tutorial', 'guide', 'advanced', 'beginner', 'intermediate'}
+        stopwords = {
+            "the",
+            "a",
+            "an",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "to",
+            "of",
+            "and",
+            "in",
+            "for",
+            "on",
+            "with",
+            "as",
+            "at",
+            "by",
+            "from",
+            "or",
+            "that",
+            "this",
+            "it",
+            "its",
+            "md",
+            "reference",
+            "tutorial",
+            "guide",
+            "advanced",
+            "beginner",
+            "intermediate",
+        }
         return {w for w in words if len(w) > 2 and w not in stopwords}
 
-    def _score_persona_for_post(self, persona: Dict, post_keywords: set, blog_type: str) -> float:
+    def _score_persona_for_post(
+        self, persona: dict, post_keywords: set, blog_type: str
+    ) -> float:
         """
         Score a persona's relevance to a blog post.
         Higher score = better match for commenting on this post.
@@ -254,10 +288,14 @@ class CommentGenerator:
         score = 0.0
 
         # Extract persona keywords
-        expertise_keywords = self._extract_keywords(' '.join(persona.get('expertise_areas', [])))
-        title_keywords = self._extract_keywords(persona.get('title', ''))
-        interest_keywords = self._extract_keywords(' '.join(persona.get('interests', [])))
-        background_keywords = self._extract_keywords(persona.get('background', ''))
+        expertise_keywords = self._extract_keywords(
+            " ".join(persona.get("expertise_areas", []))
+        )
+        title_keywords = self._extract_keywords(persona.get("title", ""))
+        interest_keywords = self._extract_keywords(
+            " ".join(persona.get("interests", []))
+        )
+        background_keywords = self._extract_keywords(persona.get("background", ""))
 
         # Score expertise match (highest weight)
         expertise_overlap = len(expertise_keywords & post_keywords)
@@ -274,26 +312,31 @@ class CommentGenerator:
         score += background_overlap * 0.5
 
         # Experience level matching
-        exp_level = persona.get('experience_level', '').lower()
-        if blog_type == 'tutorial':
+        exp_level = persona.get("experience_level", "").lower()
+        if blog_type == "tutorial":
             # Tutorials benefit from diverse perspectives
-            if 'beginner' in blog_type.lower() and exp_level in ['junior', 'mid']:
+            if "beginner" in blog_type.lower() and exp_level in ["junior", "mid"]:
                 score += 1.5
-            elif 'advanced' in blog_type.lower() and exp_level in ['senior', 'principal']:
+            elif "advanced" in blog_type.lower() and exp_level in [
+                "senior",
+                "principal",
+            ]:
                 score += 1.5
-        elif blog_type == 'reference':
+        elif blog_type == "reference":
             # Reference docs benefit from senior reviewers
-            if exp_level in ['senior', 'principal']:
+            if exp_level in ["senior", "principal"]:
                 score += 1.0
-        elif blog_type == 'troubleshooting':
+        elif blog_type == "troubleshooting":
             # Troubleshooting benefits from experienced devs
-            if exp_level in ['senior', 'principal']:
+            if exp_level in ["senior", "principal"]:
                 score += 1.5
 
         # Ensure some minimum score for diversity
         return max(score, 0.1)
 
-    def _select_personas_for_post(self, post: 'BlogPost', num_personas: int) -> List[Dict]:
+    def _select_personas_for_post(
+        self, post: BlogPost, num_personas: int
+    ) -> list[dict]:
         """
         Select personas relevant to the blog post topic.
         Uses weighted random selection based on relevance scores.
@@ -306,16 +349,16 @@ class CommentGenerator:
         post_keywords.update(self._extract_keywords(post.file_path.stem))
 
         # Determine blog type from path
-        blog_type = 'general'
+        blog_type = "general"
         path_str = str(post.file_path).lower()
-        if 'tutorial' in path_str:
-            blog_type = 'tutorial'
-        elif 'reference' in path_str:
-            blog_type = 'reference'
-        elif 'troubleshooting' in path_str:
-            blog_type = 'troubleshooting'
-        elif 'comparison' in path_str:
-            blog_type = 'comparison'
+        if "tutorial" in path_str:
+            blog_type = "tutorial"
+        elif "reference" in path_str:
+            blog_type = "reference"
+        elif "troubleshooting" in path_str:
+            blog_type = "troubleshooting"
+        elif "comparison" in path_str:
+            blog_type = "comparison"
 
         # Score all personas
         scored_personas = []
@@ -366,7 +409,7 @@ class CommentGenerator:
 
     def generate_comments_for_post(
         self, post: BlogPost, num_comments: int, dry_run: bool = False
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Generate specified number of comments for a post.
 
@@ -379,7 +422,9 @@ class CommentGenerator:
         weighted_types = self._prepare_comment_types(num_comments)
 
         # Pre-select topic-relevant personas for this post
-        selected_personas = self._select_personas_for_post(post, num_comments) if self.personas else []
+        selected_personas = (
+            self._select_personas_for_post(post, num_comments) if self.personas else []
+        )
 
         for i, comment_type in enumerate(weighted_types):
             # Select a section to comment on
@@ -419,7 +464,7 @@ class CommentGenerator:
 
         return comments
 
-    def _prepare_comment_types(self, num_comments: int) -> List[str]:
+    def _prepare_comment_types(self, num_comments: int) -> list[str]:
         """Prepare comment types distribution."""
         types = []
         remaining = num_comments
@@ -440,7 +485,12 @@ class CommentGenerator:
         return types[:num_comments]
 
     def _generate_single_comment(
-        self, post: BlogPost, section: Dict, comment_type: str, persona: Dict | None = None, dry_run: bool = False
+        self,
+        post: BlogPost,
+        section: dict,
+        comment_type: str,
+        persona: dict | None = None,
+        dry_run: bool = False,
     ) -> str | None:
         """Generate a single comment, optionally from a persona."""
         config = COMMENT_TYPES.get(comment_type, {})
@@ -449,13 +499,15 @@ class CommentGenerator:
         # Build system prompt with persona if available
         if persona:
             expertise_str = ", ".join(persona.get("expertise_areas", [])[:3])
-            communication_style = persona.get("communication_style", "critical but constructive")
+            communication_style = persona.get(
+                "communication_style", "critical but constructive"
+            )
 
-            system_prompt = f"""You are {persona.get('name', 'Anonymous')}, a {persona.get('title', 'Software Engineer')} with {persona.get('years_experience', 5)} years of experience.
+            system_prompt = f"""You are {persona.get("name", "Anonymous")}, a {persona.get("title", "Software Engineer")} with {persona.get("years_experience", 5)} years of experience.
 
 Your expertise: {expertise_str}
 Your communication style: {communication_style}
-Your interests: {', '.join(persona.get('interests', [])[:3])}
+Your interests: {", ".join(persona.get("interests", [])[:3])}
 
 Your job is to write critical but constructive comments on blog posts about software architecture and database design.
 
@@ -467,7 +519,7 @@ Guidelines:
 - If genuinely nothing to critique, explain what's done well (briefly)
 - Avoid generic comments like "Great post!" or "Thanks for sharing!"
 - Comments should be 100-250 words
-- Write in your characteristic style: {persona.get('personality_traits', ['thoughtful'])[0] if persona.get('personality_traits') else 'thoughtful'}"""
+- Write in your characteristic style: {persona.get("personality_traits", ["thoughtful"])[0] if persona.get("personality_traits") else "thoughtful"}"""
         else:
             system_prompt = """You are an experienced backend engineer reviewing blog posts about software architecture and database design.
 Your job is to write critical but constructive comments pointing out issues, missing edge cases, or asking clarifying questions.
@@ -483,10 +535,10 @@ Guidelines:
 
         prompt = f"""Comment on this section from "{post.title}":
 
-**Section**: {section['heading']}
+**Section**: {section["heading"]}
 
 **Content**:
-{section['excerpt']}
+{section["excerpt"]}
 """
         if section["code_excerpt"]:
             prompt += f"\n**Code Example**:\n```\n{section['code_excerpt']}\n```\n"
@@ -533,7 +585,9 @@ Guidelines:
         except requests.exceptions.Timeout:
             raise VLLMTimeoutError("Request timed out after 60s") from None
         except requests.exceptions.ConnectionError:
-            raise VLLMConnectionError("Cannot connect to vLLM server at localhost:8000") from None
+            raise VLLMConnectionError(
+                "Cannot connect to vLLM server at localhost:8000"
+            ) from None
         except Exception as e:
             raise VLLMError(f"vLLM error: {e}") from e
 
@@ -541,10 +595,10 @@ Guidelines:
 
     def process_posts(
         self,
-        post_paths: List[Path],
+        post_paths: list[Path],
         dry_run: bool = False,
         resume: bool = False,
-    ) -> Dict:
+    ) -> dict:
         """Process multiple posts and generate comments."""
         results = {
             "posts_processed": 0,
@@ -553,13 +607,15 @@ Guidelines:
             "duration": 0,
         }
 
-        print(f"\n{'='*70}")
+        print(f"\n{'=' * 70}")
         print(f"BLOG COMMENT GENERATION (PERSONA-BASED)")
-        print(f"{'='*70}")
+        print(f"{'=' * 70}")
         print(f"Posts to process: {len(post_paths)}")
-        print(f"Comments per post: {COMMENTS_MIN}-{COMMENTS_MAX} (μ={COMMENTS_MEAN}, σ={COMMENTS_STDDEV})")
+        print(
+            f"Comments per post: {COMMENTS_MIN}-{COMMENTS_MAX} (μ={COMMENTS_MEAN}, σ={COMMENTS_STDDEV})"
+        )
         print(f"Personas loaded: {len(self.personas)}")
-        print(f"{'='*70}\n")
+        print(f"{'=' * 70}\n")
 
         already_processed = set(self.state.get("processed_posts", []))
         if resume:
@@ -609,7 +665,7 @@ Guidelines:
                     rate = i / elapsed
                     remaining = (len(post_paths) - i) / rate if rate > 0 else 0
                     print(
-                        f"  ✓ Processed {i}/{len(post_paths)} posts ({rate:.1f} posts/sec, ~{remaining/60:.1f}min remaining)\n"
+                        f"  ✓ Processed {i}/{len(post_paths)} posts ({rate:.1f} posts/sec, ~{remaining / 60:.1f}min remaining)\n"
                     )
 
             except Exception as e:
@@ -652,7 +708,10 @@ Guidelines:
 def analyze_distribution(num_samples: int = 1000) -> None:
     """Analyze the comment count distribution."""
     samples = [
-        max(COMMENTS_MIN, min(COMMENTS_MAX, int(random.gauss(COMMENTS_MEAN, COMMENTS_STDDEV))))
+        max(
+            COMMENTS_MIN,
+            min(COMMENTS_MAX, int(random.gauss(COMMENTS_MEAN, COMMENTS_STDDEV))),
+        )
         for _ in range(num_samples)
     ]
 
@@ -660,13 +719,17 @@ def analyze_distribution(num_samples: int = 1000) -> None:
     print("COMMENT DISTRIBUTION ANALYSIS")
     print("=" * 70)
     print(f"Samples: {num_samples}")
-    print(f"Target: Gaussian (μ={COMMENTS_MEAN}, σ={COMMENTS_STDDEV}), clipped [{COMMENTS_MIN}, {COMMENTS_MAX}]")
+    print(
+        f"Target: Gaussian (μ={COMMENTS_MEAN}, σ={COMMENTS_STDDEV}), clipped [{COMMENTS_MIN}, {COMMENTS_MAX}]"
+    )
     print(f"\nStatistics:")
     print(f"  Mean:     {sum(samples) / len(samples):.2f}")
     print(f"  Median:   {sorted(samples)[len(samples) // 2]:.2f}")
     print(f"  Min:      {min(samples)}")
     print(f"  Max:      {max(samples)}")
-    print(f"  Std Dev:  {(sum((x - sum(samples)/len(samples))**2 for x in samples) / len(samples))**0.5:.2f}")
+    print(
+        f"  Std Dev:  {(sum((x - sum(samples) / len(samples)) ** 2 for x in samples) / len(samples)) ** 0.5:.2f}"
+    )
 
     # Histogram
     print(f"\nDistribution:")
@@ -678,7 +741,9 @@ def analyze_distribution(num_samples: int = 1000) -> None:
     for bucket in sorted(buckets.keys()):
         pct = 100 * buckets[bucket] / len(samples)
         bar = "█" * int(pct / 2)
-        print(f"  {bucket:2d}-{bucket + 4:2d}: {bar} {pct:5.1f}% ({buckets[bucket]:4d})")
+        print(
+            f"  {bucket:2d}-{bucket + 4:2d}: {bar} {pct:5.1f}% ({buckets[bucket]:4d})"
+        )
 
     print("=" * 70 + "\n")
 
@@ -688,7 +753,7 @@ def analyze_distribution(num_samples: int = 1000) -> None:
 # ============================================================================
 
 
-def discover_blog_posts() -> List[Path]:
+def discover_blog_posts() -> list[Path]:
     """Find all markdown blog post files."""
     if not BLOG_DIR.exists():
         print(f"Error: Blog directory not found: {BLOG_DIR}")
@@ -812,13 +877,13 @@ Examples:
     )
 
     # Print summary
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("SUMMARY")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(f"Posts processed:    {results['posts_processed']:,}")
     print(f"Total comments:     {results['total_comments']:,}")
     print(f"Failed posts:       {results['failed_posts']:,}")
-    print(f"Duration:           {results['duration']/60:.1f} min")
+    print(f"Duration:           {results['duration'] / 60:.1f} min")
     if results["posts_processed"] > 0:
         print(
             f"Avg comments/post:  {results['total_comments'] / results['posts_processed']:.1f}"
@@ -827,7 +892,7 @@ Examples:
             f"Throughput:         {results['posts_processed'] / results['duration']:.1f} posts/sec"
         )
     print(f"Output directory:   {args.output}")
-    print(f"{'='*70}\n")
+    print(f"{'=' * 70}\n")
 
     sys.exit(0 if results["failed_posts"] == 0 else 1)
 
