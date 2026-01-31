@@ -21,10 +21,16 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.orm import declarative_base
 
 # Database configuration
+_db_password = os.getenv("DB_PASSWORD")
+if not _db_password:
+    raise ValueError(
+        "Database password is required. Set DB_PASSWORD environment variable."
+    )
+
 DATABASE_URL = (
     f"postgresql+asyncpg://"
     f"{os.getenv('DB_USER', 'benchmark')}:"
-    f"{os.getenv('DB_PASSWORD', 'benchmark123')}@"
+    f"{_db_password}@"
     f"{os.getenv('DB_HOST', 'postgres')}:"
     f"{os.getenv('DB_PORT', '5432')}/"
     f"{os.getenv('DB_NAME', 'fraiseql_benchmark')}"

@@ -41,6 +41,15 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
+# Configure environment variables
+# Copy the example and customize for your system
+cp .env.example .env
+
+# Edit .env and set DB_PASSWORD (REQUIRED)
+# The DB_PASSWORD must be explicitly set - there is no default
+# For development, you can use: openssl rand -base64 32
+# Or simply edit .env to set: DB_PASSWORD=your_secure_password
+
 # Start Docker containers
 docker-compose up -d postgres
 

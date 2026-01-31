@@ -71,12 +71,19 @@ def validate_update_user_data(data):
 
 def init_pool():
     """Initialize psycopg3 connection pool in app context."""
+    # Password is REQUIRED - fail fast if not provided
+    password = os.getenv("DATABASE_PASSWORD")
+    if not password:
+        raise ValueError(
+            "Database password is required. Set DATABASE_PASSWORD environment variable."
+        )
+
     conninfo = psycopg.conninfo.make_conninfo(
         host=os.getenv("DATABASE_HOST", "postgres"),
         port=int(os.getenv("DATABASE_PORT", "5432")),
         dbname=os.getenv("DATABASE_NAME", "fraiseql_benchmark"),
         user=os.getenv("DATABASE_USER", "benchmark"),
-        password=os.getenv("DATABASE_PASSWORD", "benchmark123"),
+        password=password,
     )
 
     pool = ConnectionPool(

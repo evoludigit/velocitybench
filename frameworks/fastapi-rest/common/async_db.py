@@ -122,7 +122,14 @@ class AsyncDatabase:
         port = port or int(os.getenv("DB_PORT", "5432"))
         database = database or os.getenv("DB_NAME", "fraiseql_benchmark")
         user = user or os.getenv("DB_USER", "benchmark")
-        password = password or os.getenv("DB_PASSWORD", "benchmark123")
+
+        # Password is REQUIRED - fail fast if not provided
+        if not password:
+            password = os.getenv("DB_PASSWORD")
+            if not password:
+                raise ValueError(
+                    "Database password is required. Set DB_PASSWORD environment variable."
+                )
 
         logger.info(
             f"Creating asyncpg pool: {user}@{host}:{port}/{database} "

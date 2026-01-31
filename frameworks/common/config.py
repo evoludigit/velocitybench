@@ -22,7 +22,8 @@ class DatabaseConfig:
         self.port = self._get_int("DB_PORT", 5432)
         self.name = self._get_required("DB_NAME", "velocitybench_benchmark")
         self.user = self._get_required("DB_USER", "benchmark")
-        self.password = self._get_required("DB_PASSWORD", "benchmark123")
+        # Password is REQUIRED - no default (must be explicitly set)
+        self.password = self._get_required("DB_PASSWORD")
 
     def _get_required(self, key: str, default: str | None = None) -> str:
         """Get required environment variable with optional default.
