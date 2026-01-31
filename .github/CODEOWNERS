@@ -1,0 +1,87 @@
+# VelocityBench Code Owners
+# Automatically request reviews from appropriate teams/users
+# See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for all code
+* @lionel
+
+# Python Framework Implementations
+frameworks/fastapi-rest/ @lionel
+frameworks/flask-rest/ @lionel
+frameworks/strawberry/ @lionel
+frameworks/graphene/ @lionel
+frameworks/ariadne/ @lionel
+frameworks/asgi-graphql/ @lionel
+
+# TypeScript/Node.js Frameworks
+frameworks/apollo-server/ @lionel
+frameworks/express-rest/ @lionel
+frameworks/express-orm/ @lionel
+frameworks/apollo-orm/ @lionel
+frameworks/express-graphql/ @lionel
+frameworks/fastify-graphql/ @lionel
+frameworks/graphql-yoga/ @lionel
+frameworks/mercurius/ @lionel
+frameworks/postgraphile/ @lionel
+
+# Go Frameworks
+frameworks/go-gqlgen/ @lionel
+frameworks/gin-rest/ @lionel
+frameworks/go-graphql-go/ @lionel
+frameworks/graphql-go/ @lionel
+
+# Java/JVM Frameworks
+frameworks/java-spring-boot/ @lionel
+frameworks/spring-boot-orm/ @lionel
+frameworks/spring-boot-orm-naive/ @lionel
+frameworks/micronaut-graphql/ @lionel
+frameworks/quarkus-graphql/ @lionel
+frameworks/play-graphql/ @lionel
+
+# Rust Frameworks
+frameworks/async-graphql/ @lionel
+frameworks/actix-web-rest/ @lionel
+frameworks/juniper/ @lionel
+
+# PHP Frameworks
+frameworks/php-laravel/ @lionel
+frameworks/webonyx-graphql-php/ @lionel
+
+# Ruby Frameworks
+frameworks/ruby-rails/ @lionel
+frameworks/ruby-rails-fixed/ @lionel
+frameworks/hanami/ @lionel
+
+# Managed Services
+frameworks/hasura/ @lionel
+frameworks/csharp-dotnet/ @lionel
+
+# Shared Code - Critical for all frameworks
+frameworks/common/ @lionel
+database/ @lionel
+tests/common/ @lionel
+
+# Configuration and Documentation
+docs/ @lionel
+.github/workflows/ @lionel
+.github/dependabot.yml @lionel
+Makefile @lionel
+pyproject.toml @lionel
+.env.example @lionel
+
+# Database Schema and Migrations
+database/*.sql @lionel
+database/migrations/ @lionel
+database/schema/ @lionel
+
+# Test Infrastructure
+tests/qa/ @lionel
+tests/integration/ @lionel
+tests/perf/ @lionel
+tests/health/ @lionel
+
+# Quality and Security
+.github/workflows/code-quality.yml @lionel
+.github/workflows/dependency-check.yml @lionel
+.github/workflows/unit-tests.yml @lionel
+pre-commit-config.yaml @lionel

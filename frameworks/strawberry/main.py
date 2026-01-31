@@ -605,10 +605,16 @@ app = FastAPI()
 async def startup_event():
     """Initialize database pool on startup."""
     db = AsyncDatabase()
+
+    # Get pool configuration from environment or use defaults
+    pool_min_size = int(os.getenv("DB_POOL_MIN_SIZE", "10"))
+    pool_max_size = int(os.getenv("DB_POOL_MAX_SIZE", "50"))
+    pool_statement_cache = int(os.getenv("DB_POOL_STATEMENT_CACHE_SIZE", "100"))
+
     await db.connect(
-        min_size=10,
-        max_size=50,
-        statement_cache_size=100
+        min_size=pool_min_size,
+        max_size=pool_max_size,
+        statement_cache_size=pool_statement_cache
     )
     app.state.db = db
 

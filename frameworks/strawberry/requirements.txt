@@ -2,16 +2,16 @@
 # Updated for latest stable versions with pytest-asyncio 1.0+
 
 # Web Framework
-fastapi>=0.104.1
-uvicorn[standard]>=0.24.0
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
 
 # GraphQL Framework (with Pydantic v2 support)
-strawberry-graphql[fastapi]>=0.250.0
-pydantic>=2.10.0
+strawberry-graphql[fastapi]==0.250.0
+pydantic==2.10.0
 
 # Database
 psycopg>=3.2.2
-asyncpg>=0.31.0  # Required by common.async_db, >=0.31 for Python 3.14 support
+asyncpg==0.29.0  # Pinned to match other frameworks for consistent benchmarking
 
 # System monitoring
 psutil==5.9.6  # Required for health checks
