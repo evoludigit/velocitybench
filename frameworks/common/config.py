@@ -16,7 +16,7 @@ class ConfigurationError(Exception):
 class DatabaseConfig:
     """Database connection configuration with environment variable support."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize database configuration from environment variables."""
         self.host = self._get_required("DB_HOST", "localhost")
         self.port = self._get_int("DB_PORT", 5432)
