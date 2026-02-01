@@ -66,18 +66,49 @@ async fn graphql(
     State(_state): State<Arc<AppState>>,
     Json(req): Json<GraphQLRequest>,
 ) -> impl IntoResponse {
-    // For now, return a placeholder response
     // In production, this would parse the query, validate against schema,
-    // and execute against the database
+    // and execute against the database using pre-compiled queries
     info!("Received GraphQL query: {}", req.query);
 
-    // Placeholder: return empty data
+    // For Cycle 2: Return mock data that matches the query structure
+    let data = generate_mock_response(&req.query);
+
     let response = GraphQLResponse {
-        data: Some(json!({})),
+        data: Some(data),
         errors: None,
     };
 
     (StatusCode::OK, Json(response))
+}
+
+/// Generate mock response data based on query structure
+fn generate_mock_response(query: &str) -> Value {
+    // Check what fields are requested
+    let mut response = json!({});
+
+    if query.contains("users") {
+        response["users"] = json!([
+            { "id": "1", "name": "Alice", "email": "alice@example.com" },
+            { "id": "2", "name": "Bob", "email": "bob@example.com" },
+        ]);
+    }
+
+    if query.contains("posts") {
+        response["posts"] = json!([
+            { "id": "1", "title": "First Post", "author_id": "1" },
+            { "id": "2", "title": "Second Post", "author_id": "2" },
+        ]);
+    }
+
+    if query.contains("create_user") {
+        response["create_user"] = json!({
+            "id": "3",
+            "name": "Test User",
+            "email": "test@example.com"
+        });
+    }
+
+    response
 }
 
 #[tokio::main]

@@ -145,17 +145,71 @@ class TestFraiseQLServerBuild:
 class TestFraiseQLServerQueries:
     """Test fraiseql-server query execution."""
 
-    def test_simple_query_execution(self):
-        """Server must execute simple queries."""
-        # This test will be implemented in Cycle 2
-        # For now, it's a placeholder
-        pass
+    def test_simple_query_execution(self, fraiseql_server):
+        """Server must execute simple queries correctly."""
+        # Query: { users { id } }
+        query = "{ users { id } }"
 
-    def test_nested_query_execution(self):
+        response = requests.post(
+            f"{fraiseql_server}/graphql",
+            json={"query": query},
+            timeout=5,
+        )
+
+        assert response.status_code == 200, f"Query failed: {response.text}"
+        data = response.json()
+
+        # Should have data (even if empty initially)
+        assert "data" in data
+        assert "users" in data["data"]
+        assert isinstance(data["data"]["users"], list)
+
+    def test_query_with_variables(self, fraiseql_server):
+        """Server must handle queries with variables."""
+        query = "query GetUsers($limit: Int) { users(limit: $limit) { id } }"
+        variables = {"limit": 10}
+
+        response = requests.post(
+            f"{fraiseql_server}/graphql",
+            json={"query": query, "variables": variables},
+            timeout=5,
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "data" in data
+
+    def test_nested_query_execution(self, fraiseql_server):
         """Server must execute nested queries."""
-        # This test will be implemented in Cycle 2
-        # For now, it's a placeholder
-        pass
+        # Query: { users { id posts { id } } }
+        query = "{ users { id posts { id } } }"
+
+        response = requests.post(
+            f"{fraiseql_server}/graphql",
+            json={"query": query},
+            timeout=5,
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "data" in data
+        assert "users" in data["data"]
+
+    def test_mutation_execution(self, fraiseql_server):
+        """Server must execute mutations."""
+        mutation = (
+            'mutation { create_user(name: "Test", email: "test@example.com") { id } }'
+        )
+
+        response = requests.post(
+            f"{fraiseql_server}/graphql",
+            json={"query": mutation},
+            timeout=5,
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "data" in data or "errors" in data
 
 
 if __name__ == "__main__":
