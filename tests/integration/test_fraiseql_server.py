@@ -1,7 +1,7 @@
 """
-Phase 2, Cycle 1: FraiseQL Server Build & Validation Tests
+FraiseQL Server Build & Validation Tests
 
-RED: Tests verify fraiseql-server builds, accepts schema, and executes queries
+Verifies fraiseql-server builds, accepts schema, and executes queries.
 """
 
 import subprocess

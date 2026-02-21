@@ -1,7 +1,7 @@
 """
-Phase 2, Cycle 4: FraiseQL Resource Profiling
+FraiseQL Resource Profiling
 
-RED: Tests measure memory and CPU usage under load
+Measures memory and CPU usage under load.
 """
 
 import time

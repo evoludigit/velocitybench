@@ -1,7 +1,7 @@
 """
-Phase 2, Cycle 3: FraiseQL Performance Baseline Measurement
+FraiseQL Performance Baseline Measurement
 
-RED: Tests measure baseline performance metrics for compiled query execution
+Measures baseline performance metrics for compiled query execution.
 """
 
 import time

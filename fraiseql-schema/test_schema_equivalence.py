@@ -1,7 +1,7 @@
 """
-Phase 1, Cycle 2+: Schema Equivalence Tests
+Schema Equivalence Tests
 
-RED: Tests verify that schema definitions in all languages produce identical schema.json
+Verifies that schema definitions in all languages produce identical schema.json.
 """
 
 import json
