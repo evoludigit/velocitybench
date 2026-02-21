@@ -1,12 +1,8 @@
 use async_graphql::*;
-use chrono::{DateTime, Utc};
 use uuid::Uuid;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 use crate::db::Database;
 use crate::models::{User, Post, Comment};
-use async_graphql::*;
 
 pub struct QueryRoot {
     db: Database,
@@ -119,7 +115,7 @@ impl QueryRoot {
         let client = db.pool().get().await?;
         let rows = client
             .query(
-                "SELECT id, pk_post, title, content, fk_author, created_at FROM benchmark.tb_post LIMIT $1 OFFSET $2",
+                "SELECT id, pk_user, username, full_name, bio, created_at FROM benchmark.tb_user ORDER BY pk_user LIMIT $1 OFFSET $2",
                 &[&limit, &offset],
             )
             .await?;
@@ -128,11 +124,11 @@ impl QueryRoot {
             .iter()
             .map(|row| User {
                 id: row.get(0),
-                pk_user: row.get(5),
-                username: row.get(1),
-                full_name: row.get(2),
-                bio: row.get(3),
-                created_at: row.get(4),
+                pk_user: row.get(1),
+                username: row.get(2),
+                full_name: row.get(3),
+                bio: row.get(4),
+                created_at: row.get(5),
             })
             .collect();
 
@@ -225,7 +221,7 @@ impl QueryRoot {
         let client = db.pool().get().await?;
         let rows = client
             .query(
-                "SELECT c.id, c.content, c.fk_post, c.fk_author, c.created_at FROM benchmark.tb_comment c JOIN benchmark.tb_post p ON c.fk_post = p.pk_post WHERE p.id = $1 LIMIT $2",
+                "SELECT c.id, c.pk_comment, c.content, c.fk_post, c.fk_author, c.created_at FROM benchmark.tb_comment c JOIN benchmark.tb_post p ON c.fk_post = p.pk_post WHERE p.id = $1 LIMIT $2",
                 &[&post_uuid, &limit],
             )
             .await?;
@@ -234,10 +230,11 @@ impl QueryRoot {
             .iter()
             .map(|row| Comment {
                 id: row.get(0),
-                content: row.get(1),
-                fk_post: row.get(2),
-                fk_author: row.get(3),
-                created_at: row.get(4),
+                pk_comment: row.get(1),
+                content: row.get(2),
+                fk_post: row.get(3),
+                fk_author: row.get(4),
+                created_at: row.get(5),
             })
             .collect();
 

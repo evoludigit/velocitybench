@@ -1,11 +1,11 @@
 [package]
 name = "async-graphql"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
 actix-web = "4.4"
-async-graphql = "7.0"
+async-graphql = { version = "7.0", features = ["dataloader"] }
 async-graphql-actix-web = "7.0"
 tokio = { version = "1.35", features = ["full"] }
 tokio-postgres = { version = "0.7", features = ["with-uuid-1", "with-chrono-0_4"] }

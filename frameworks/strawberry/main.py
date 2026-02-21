@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """
 Async GraphQL Benchmarking Server for Strawberry with DataLoader
 Uses connection pooling and DataLoader to prevent N+1 queries.
@@ -166,7 +167,7 @@ class Comment:
     )
 
     @strawberry.field(description="Author who wrote this comment")
-    async def author(self, info) -> "User" | None:
+    async def author(self, info) -> User | None:
         if not self.author_id:
             return None
         try:
@@ -183,7 +184,7 @@ class Comment:
         return None
 
     @strawberry.field(description="Post this comment belongs to")
-    async def post(self, info) -> "Post" | None:
+    async def post(self, info) -> Post | None:
         if not self.post_id:
             return None
         try:
@@ -216,7 +217,7 @@ class Post:
     )
 
     @strawberry.field(description="Author who wrote this post")
-    async def author(self, info) -> "User" | None:
+    async def author(self, info) -> User | None:
         if not self.author_id:
             return None
         try:
@@ -593,9 +594,6 @@ class Mutation:
 schema = strawberry.Schema(
     query=Query,
     mutation=Mutation,
-    config=strawberry.SchemaConfig(
-        name_converter=strawberry.utils.str_converters.to_camel_case
-    ),
 )
 
 

@@ -1,15 +1,18 @@
-"""Pytest configuration and fixtures for FraiseQL benchmarking tests."""
+"""Pytest configuration and fixtures for FraiseQL v2 benchmarking tests."""
 
 import os
-import json
+import shutil
 import subprocess
 import time
+from collections.abc import Generator
 from pathlib import Path
-from typing import Generator
 
+import psycopg
 import pytest
 import requests
-import psycopg
+
+DEFAULT_PORT = 8815
+REQUIRED_VERSION = "2.0.0-beta.3"
 
 
 # ============================================================================
@@ -38,32 +41,76 @@ def db_connection(db_connection_string):
 
 
 # ============================================================================
-# FraiseQL Server Fixtures
+# FraiseQL v2 Binary Fixtures
 # ============================================================================
+
+
+def _find_fraiseql_binary(name: str) -> Path | None:
+    """Find a FraiseQL binary in common locations."""
+    fraiseql_root = os.getenv("FRAISEQL_ROOT", "/home/lionel/code/fraiseql")
+
+    local_path = Path(fraiseql_root) / "target" / "release" / name
+    if local_path.exists():
+        return local_path
+
+    cargo_bin = Path.home() / ".cargo" / "bin" / name
+    if cargo_bin.exists():
+        return cargo_bin
+
+    system_path = shutil.which(name)
+    if system_path:
+        return Path(system_path)
+
+    return None
+
+
+def _assert_binary_version(binary: Path, required: str) -> None:
+    """Assert that the binary reports the required version string."""
+    result = subprocess.run(
+        [str(binary), "--version"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    version_output = result.stdout.strip() + result.stderr.strip()
+    if required not in version_output:
+        pytest.skip(
+            f"{binary.name} is not {required} (got: {version_output!r}). "
+            "Build beta.3 with: cargo build --release --manifest-path "
+            "/home/lionel/code/fraiseql/Cargo.toml"
+        )
 
 
 @pytest.fixture(scope="session")
 def fraiseql_root() -> Path:
-    """Get path to FraiseQL repository."""
-    return Path("/home/lionel/code/fraiseql")
+    """Get path to FraiseQL repository or installation."""
+    root = os.getenv("FRAISEQL_ROOT", "/home/lionel/code/fraiseql")
+    return Path(root)
 
 
 @pytest.fixture(scope="session")
-def fraiseql_cli(fraiseql_root: Path) -> Path:
-    """Get path to fraiseql-cli binary."""
-    cli_path = fraiseql_root / "target" / "release" / "fraiseql-cli"
-    if not cli_path.exists():
+def fraiseql_cli() -> Path:
+    """Get path to fraiseql-cli binary, asserting beta.3 version."""
+    cli_path = _find_fraiseql_binary("fraiseql-cli")
+    if cli_path is None:
         pytest.skip("fraiseql-cli binary not found")
+    _assert_binary_version(cli_path, REQUIRED_VERSION)
     return cli_path
 
 
 @pytest.fixture(scope="session")
-def fraiseql_server_bin(fraiseql_root: Path) -> Path:
-    """Get path to fraiseql-server binary."""
-    server_path = fraiseql_root / "target" / "release" / "fraiseql-server"
-    if not server_path.exists():
+def fraiseql_server_bin() -> Path:
+    """Get path to fraiseql-server binary, asserting beta.3 version."""
+    server_path = _find_fraiseql_binary("fraiseql-server")
+    if server_path is None:
         pytest.skip("fraiseql-server binary not found")
+    _assert_binary_version(server_path, REQUIRED_VERSION)
     return server_path
+
+
+# ============================================================================
+# Schema Fixtures
+# ============================================================================
 
 
 @pytest.fixture(scope="session")
@@ -71,21 +118,39 @@ def schema_file() -> Path:
     """Get path to schema.json."""
     schema_path = Path(__file__).parent.parent / "schema.json"
     if not schema_path.exists():
-        pytest.skip("schema.json not found")
+        pytest.skip("schema.json not found - run 'python schema.py' first")
     return schema_path
 
 
 @pytest.fixture(scope="session")
-def compiled_schema(fraiseql_cli: Path, schema_file: Path) -> Path:
-    """Compile schema.json to schema.compiled.json."""
+def config_file() -> Path:
+    """Get path to fraiseql.toml configuration."""
+    config_path = Path(__file__).parent.parent / "fraiseql.toml"
+    if not config_path.exists():
+        pytest.skip("fraiseql.toml not found")
+    return config_path
+
+
+@pytest.fixture(scope="session")
+def compiled_schema(fraiseql_cli: Path, schema_file: Path, config_file: Path) -> Path:
+    """Compile schema.json to schema.compiled.json via fraiseql.toml."""
     compiled_path = schema_file.parent / "schema.compiled.json"
 
-    # Compile schema if needed
-    if not compiled_path.exists() or schema_file.stat().st_mtime > compiled_path.stat().st_mtime:
+    if (
+        not compiled_path.exists()
+        or schema_file.stat().st_mtime > compiled_path.stat().st_mtime
+    ):
         result = subprocess.run(
-            [str(fraiseql_cli), "compile", str(schema_file), "-o", str(compiled_path)],
+            [
+                str(fraiseql_cli),
+                "compile",
+                str(config_file),
+                "--types",
+                str(schema_file),
+            ],
             capture_output=True,
             timeout=30,
+            cwd=str(config_file.parent),
         )
 
         if result.returncode != 0:
@@ -94,37 +159,38 @@ def compiled_schema(fraiseql_cli: Path, schema_file: Path) -> Path:
     return compiled_path
 
 
+# ============================================================================
+# FraiseQL v2 Server Fixtures
+# ============================================================================
+
+
 @pytest.fixture
 def fraiseql_server(
     fraiseql_server_bin: Path,
-    compiled_schema: Path,
+    compiled_schema: Path,  # noqa: ARG001 — injected for schema compile side-effect
+    config_file: Path,
     db_connection_string: str,
-    tmp_path,
 ) -> Generator[str, None, None]:
-    """Start FraiseQL server for testing.
+    """Start FraiseQL v2 server for testing.
 
     Yields:
-        Base URL of the FraiseQL server (e.g., 'http://localhost:3000')
+        Base URL of the FraiseQL server (e.g., 'http://localhost:8815')
     """
-    port = 3000
+    port = DEFAULT_PORT
     url = f"http://localhost:{port}"
 
-    # Start server
+    env = os.environ.copy()
+    env["RUST_LOG"] = "info"
+    env["FRAISEQL_CONFIG"] = str(config_file)
+    env["DATABASE_URL"] = db_connection_string
+
     process = subprocess.Popen(
-        [
-            str(fraiseql_server_bin),
-            "--schema",
-            str(compiled_schema),
-            "--database",
-            db_connection_string,
-            "--port",
-            str(port),
-        ],
+        [str(fraiseql_server_bin)],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        env=env,
     )
 
-    # Wait for server to start
     max_retries = 30
     retry_count = 0
     while retry_count < max_retries:
@@ -140,11 +206,11 @@ def fraiseql_server(
 
     if retry_count >= max_retries:
         process.terminate()
-        pytest.skip("FraiseQL server failed to start")
+        stdout, stderr = process.communicate(timeout=5)
+        pytest.skip(f"FraiseQL v2 server failed to start. Stderr: {stderr.decode()}")
 
     yield url
 
-    # Cleanup
     process.terminate()
     try:
         process.wait(timeout=5)
@@ -160,7 +226,8 @@ def fraiseql_server(
 @pytest.fixture
 def graphql_query():
     """Helper function to send GraphQL queries."""
-    def _query(url: str, query: str, variables: dict = None) -> dict:
+
+    def _query(url: str, query: str, variables: dict | None = None) -> dict:
         payload = {"query": query}
         if variables:
             payload["variables"] = variables

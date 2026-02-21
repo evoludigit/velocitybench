@@ -1,31 +1,26 @@
-"""FraiseQL v2 Schema Definition for VelocityBench
+"""FraiseQL v2 Schema Definition for VelocityBench (TV Tables — pre-computed JSONB)
 
 This schema defines the GraphQL types and queries for the VelocityBench
-FraiseQL v2 framework. It maps to the JSONB views in the database
-(v_user, v_post, v_comment).
+FraiseQL v2 framework using pre-computed JSONB tables (tv_*).
 
-FraiseQL v2 Architecture:
-- Types defined with @fraiseql.type decorator
-- Trinity pattern: every type exposes pk (int), id (ID), identifier (str)
-- Queries use @fraiseql.query with sql_source parameter
-- fraiseql-cli compiles schema.py -> schema.json -> schema.compiled.json
-- fraiseql-server executes queries against compiled schema
+Benchmark Variant B (this file):
+- Pre-computed JSONB tables (tv_*): JSONB baked in at INSERT time, not query time
+- camelCase field names align with GraphQL convention and the stored JSONB keys
+- Avoids join overhead at query time (data is denormalized at write time)
 
-Benchmark Variant A (this file):
-- Views (v_*) compute JSONB on-the-fly at query time
-- camelCase field names match GraphQL convention
+Trinity pattern: every type exposes id (ID), identifier (str)
 
 Usage:
-    python schema.py                        # Export schema.json
-    fraiseql-cli compile fraiseql.toml      # Compile to schema.compiled.json
-    fraiseql-server                         # Start (reads FRAISEQL_CONFIG)
+    python schema_tv.py                          # Export schema_tv.json
+    fraiseql-cli compile schema_tv.json          # Compile to schema_tv.compiled.json
+    fraiseql-server                              # Start with appropriate config
 """
 
 import fraiseql
 from fraiseql.scalars import ID, DateTime
 
 # ============================================================================
-# Type Definitions — Trinity Pattern (pk / id / identifier)
+# Type Definitions — Trinity Pattern, camelCase keys (match tv_* JSONB)
 # ============================================================================
 
 
@@ -74,12 +69,13 @@ class Comment:
 
 
 # ============================================================================
-# Query Definitions — sql_source maps to benchmark schema views
+# Query Definitions — sql_source maps to benchmark.tv_* pre-computed tables
 # ============================================================================
 
 
 @fraiseql.query(
-    sql_source="benchmark.v_user",
+    sql_source="benchmark.tv_user",
+    jsonb_column="data",
     auto_params={"limit": True, "offset": True, "where": True, "order_by": True},
 )
 def users(
@@ -90,47 +86,49 @@ def users(
     pass
 
 
-@fraiseql.query(sql_source="benchmark.v_user")
+@fraiseql.query(sql_source="benchmark.tv_user", jsonb_column="data")
 def user(id: ID) -> User | None:
     """Get a single user by UUID."""
     pass
 
 
 @fraiseql.query(
-    sql_source="benchmark.v_post",
+    sql_source="benchmark.tv_post",
+    jsonb_column="data",
     auto_params={"limit": True, "offset": True, "where": True, "order_by": True},
 )
 def posts(
     limit: int = 10,
     offset: int = 0,
     published: bool | None = None,
-    authorId: ID | None = None,
+    author_id: ID | None = None,
 ) -> list[Post]:
     """Get list of posts with filtering and pagination."""
     pass
 
 
-@fraiseql.query(sql_source="benchmark.v_post")
+@fraiseql.query(sql_source="benchmark.tv_post", jsonb_column="data")
 def post(id: ID) -> Post | None:
     """Get a single post by UUID."""
     pass
 
 
 @fraiseql.query(
-    sql_source="benchmark.v_comment",
+    sql_source="benchmark.tv_comment",
+    jsonb_column="data",
     auto_params={"limit": True, "offset": True, "where": True, "order_by": True},
 )
 def comments(
     limit: int = 10,
     offset: int = 0,
-    postId: ID | None = None,
-    authorId: ID | None = None,
+    post_id: ID | None = None,
+    author_id: ID | None = None,
 ) -> list[Comment]:
     """Get list of comments with filtering and pagination."""
     pass
 
 
-@fraiseql.query(sql_source="benchmark.v_comment")
+@fraiseql.query(sql_source="benchmark.tv_comment", jsonb_column="data")
 def comment(id: ID) -> Comment | None:
     """Get a single comment by UUID."""
     pass
@@ -141,11 +139,12 @@ def comment(id: ID) -> Comment | None:
 # ============================================================================
 
 if __name__ == "__main__":
-    fraiseql.export_schema("schema.json")
+    fraiseql.export_schema("schema_tv.json")
 
-    print("\n✅ FraiseQL v2 schema exported successfully!")
-    print("   Location: schema.json")
+    print("\n✅ FraiseQL v2 schema (TV tables) exported!")
+    print("   Location: schema_tv.json")
     print("\n   Next steps:")
-    print("   1. Compile schema:  fraiseql-cli compile fraiseql.toml")
-    print("   2. Start server:    fraiseql-server  (reads FRAISEQL_CONFIG env var)")
-    print("   3. Query GraphQL:   curl -X POST http://localhost:8815/graphql")
+    print("   1. Compile: fraiseql-cli compile schema_tv.json")
+    print(
+        "   2. Start:   fraiseql-server  (point FRAISEQL_CONFIG at tv variant config)"
+    )

@@ -5,7 +5,8 @@ FROM python:3.11-slim AS builder
 # Install system dependencies for building
 RUN apt-get update && apt-get install -y \
     gcc \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean \
+    && rm -rf /var/cache/apt/archives/* /var/lib/apt/lists/*
 
 # Create virtual environment
 RUN python -m venv /opt/venv

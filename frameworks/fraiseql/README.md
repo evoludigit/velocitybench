@@ -1,6 +1,6 @@
-# FraiseQL Framework - VelocityBench
+# FraiseQL v2 Framework - VelocityBench
 
-FraiseQL v2 is a compiled GraphQL execution engine written in pure Rust. Unlike traditional GraphQL servers that resolve relationships at query time, FraiseQL uses the JSONB pattern where relationships are pre-shaped at the database level.
+FraiseQL v2 (2.0.0-alpha.1) is a compiled GraphQL execution engine written in pure Rust. Unlike traditional GraphQL servers that resolve relationships at query time, FraiseQL uses the JSONB pattern where relationships are pre-shaped at the database level.
 
 ## Architecture
 
@@ -9,34 +9,116 @@ Database Tables (tb_user, tb_post, tb_comment)
         ↓
 JSONB Views (v_user, v_post, v_comment)
         ↓
-schema.json (Type definitions)
+schema.py (Python SDK for schema definition)
+        ↓
+schema.json (Exported schema)
         ↓
 fraiseql-cli compile → schema.compiled.json
         ↓
 fraiseql-server (Pure Rust binary)
         ↓
-HTTP GraphQL Endpoint
+HTTP GraphQL Endpoint (port 8815)
 ```
 
 ## Key Characteristics
 
 - **Compiled Execution**: Schema compiled to optimized format before runtime
 - **JSONB Pattern**: Relationships pre-computed in database views (no N+1 queries)
-- **Write-Time Optimization**: Relationship computation happens at write time in views
+- **Write-Time Optimization**: Relationship computation happens in views
 - **Pure Rust Runtime**: No Python involved in query execution
-- **Performance**: Baseline (xs dataset):
-  - Simple query: 0.37ms p50, 0.94ms p99
-  - Nested query: 0.42ms p50, 0.47ms p99
-  - Throughput: 2400-2500 req/s
+- **v2 Features**: Introspection, rate limiting, audit logging, configurable security
+
+## Quick Start
+
+### 1. Install FraiseQL v2 Binaries
+
+From crates.io:
+```bash
+cargo install fraiseql-cli --version 2.0.0-alpha.1
+cargo install fraiseql-server --version 2.0.0-alpha.1
+```
+
+Or build locally:
+```bash
+cd /home/lionel/code/fraiseql
+cargo build --release
+```
+
+### 2. Install Python SDK
+
+```bash
+cd /home/lionel/code/velocitybench/frameworks/fraiseql
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 3. Generate Schema
+
+```bash
+python schema.py
+# Creates schema.json
+```
+
+### 4. Compile Schema
+
+```bash
+fraiseql-cli compile schema.json -o schema.compiled.json
+```
+
+### 5. Start Server
+
+```bash
+python main.py
+# Or directly:
+fraiseql-server --schema schema.compiled.json --config fraiseql.toml --port 8815
+```
+
+### 6. Query GraphQL
+
+```bash
+# Health check
+curl http://localhost:8815/health
+
+# GraphQL query
+curl -X POST http://localhost:8815/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query": "{ users(limit: 5) { id username email } }"}'
+```
+
+## Configuration (fraiseql.toml)
+
+```toml
+[server]
+bind_addr = "0.0.0.0:8815"
+shutdown_timeout_secs = 30
+
+[database]
+url = "postgresql://velocitybench:password@localhost:5432/fraiseql_test"
+pool_min_size = 5
+pool_max_size = 20
+
+[graphql]
+graphql_path = "/graphql"
+health_path = "/health"
+introspection_enabled = true
+max_query_depth = 10
+
+[security]
+rate_limiting_enabled = false
+requests_per_second = 100
+
+[audit]
+query_logging_enabled = false
+slow_query_threshold_ms = 100
+```
 
 ## Database Schema
 
 ### JSONB Views
 
-The FraiseQL framework uses three main views that implement the JSONB pattern:
+FraiseQL v2 uses JSONB views that pre-shape data for GraphQL queries:
 
 #### v_user
-Maps `tb_user` table to GraphQL User type with all fields in JSONB:
 ```sql
 SELECT
     id,
@@ -45,169 +127,164 @@ SELECT
         'email', email,
         'username', username,
         'firstName', first_name,
-        'lastName', last_name,
         ...
     ) AS data
 FROM tb_user;
 ```
 
-#### v_post
-Maps `tb_post` table with nested author data pre-computed:
+#### v_post (with nested author)
 ```sql
 SELECT
-    id,
+    p.id,
     jsonb_build_object(
-        'id', id::text,
-        'title', title,
-        'author', (
-            SELECT jsonb_build_object(...)
-            FROM tb_user WHERE pk_user = fk_author
+        'id', p.id::text,
+        'title', p.title,
+        'author', jsonb_build_object(
+            'id', u.id::text,
+            'username', u.username,
+            ...
         ),
         ...
     ) AS data
-FROM tb_post;
+FROM tb_post p
+LEFT JOIN tb_user u ON u.pk_user = p.fk_author;
 ```
 
-#### v_comment
-Maps `tb_comment` table with nested author and post data pre-computed.
+## Schema Definition (Python SDK)
 
-### View Columns
-
-Each view has three columns:
-1. **id** (UUID): The object identifier for API queries
-2. **data** (JSONB): All object fields plus nested relationships
-3. **Denormalized filters** (integer or UUID): For efficient WHERE clauses (e.g., `author_pk`, `post_pk`)
-
-### Indexes
-
-Each view has GIN indexes on the `data` JSONB column for efficient filtering:
-```sql
-CREATE INDEX idx_v_post_data_gin ON v_post USING GIN(data);
-```
-
-## FraiseQL Schema Definition
-
-The schema is defined in `schema.py` using Python decorators:
+FraiseQL v2 uses a Python SDK for schema definition:
 
 ```python
-@fraiseql.type
+from fraiseql import object_type, query, field, argument, ID, String
+
+@object_type(description="User type")
 class User:
-    id: str
-    email: str
-    username: str
-    # ... other fields
+    id: ID = field(description="User UUID")
+    username: String = field(description="Username")
 
-@fraiseql.query(sql_source="v_user")
-def users(limit: int = 10) -> list[User]:
-    """Get all users"""
+@query(view_source="v_user")
+def users(
+    limit: Int = argument(default=10),
+) -> list[User]:
     pass
+
+schema = FraiseQLSchema(types=[User], queries=[users])
+schema.export("schema.json")
 ```
 
-## Running FraiseQL
+## Docker
 
-### 1. Setup Database
+Build and run with Docker:
 
-The database setup creates the JSONB views:
 ```bash
-python database/setup.py fraiseql
+# Build image
+docker build -t fraiseql-v2 .
+
+# Run container
+docker run -p 8815:8815 \
+  -e DATABASE_URL=postgresql://... \
+  fraiseql-v2
 ```
 
-This:
-- Creates `fraiseql_test` database
-- Applies Trinity Pattern schema (`schema-template.sql`)
-- Creates JSONB views (`frameworks/fraiseql/database/extensions.sql`)
-- Loads seed data
+Or with docker-compose:
 
-### 2. Export Schema (Optional)
-
-If modifying the schema definition:
 ```bash
+docker-compose up fraiseql
+```
+
+## Testing
+
+Run integration tests:
+
+```bash
+cd /home/lionel/code/velocitybench/frameworks/fraiseql
+source venv/bin/activate
+pytest tests/ -v
+```
+
+Run performance benchmarks:
+
+```bash
+pytest tests/ -v -m benchmark
+```
+
+## Performance
+
+FraiseQL v2 achieves high performance through:
+
+- **Compile-time optimization**: Schema analyzed before runtime
+- **Pre-computed relationships**: JSONB views include nested data
+- **Efficient traversal**: GraphQL is data extraction from pre-shaped JSON
+- **Minimal overhead**: Rust handles only query parsing and JSON serialization
+
+Baseline metrics (xs dataset):
+- Simple query: ~0.4ms p50
+- Nested query: ~0.5ms p50
+- Throughput: 2400+ req/s
+
+## Troubleshooting
+
+### Binary not found
+
+```bash
+# Check if installed via cargo
+which fraiseql-cli fraiseql-server
+
+# Or set FRAISEQL_ROOT environment variable
+export FRAISEQL_ROOT=/path/to/fraiseql
+```
+
+### Schema compilation fails
+
+```bash
+# Verify schema.json is valid
 python schema.py
-# Creates schema.json
+
+# Check CLI version
+fraiseql-cli --version  # Should be 2.0.0-alpha.1
 ```
 
-### 3. Compile Schema
+### Server won't start
 
 ```bash
-fraiseql-cli compile schema.json
-# Creates schema.compiled.json
+# Check database connection
+psql "postgresql://velocitybench:password@localhost:5432/fraiseql_test"
+
+# Verify config
+cat fraiseql.toml
+
+# Run with debug logging
+RUST_LOG=debug fraiseql-server --schema schema.compiled.json
 ```
 
-### 4. Start FraiseQL Server
+### Port already in use
 
 ```bash
-fraiseql-server \
-    --schema schema.compiled.json \
-    --database postgresql://velocitybench:password@localhost:5432/fraiseql_test \
-    --port 3000
-```
+# FraiseQL v2 uses port 8815 by default
+lsof -i :8815
 
-### 5. Query GraphQL
-
-```bash
-curl -X POST http://localhost:3000/graphql \
-  -H "Content-Type: application/json" \
-  -d '{"query": "{ users(limit: 10) { id username email } }"}'
-```
-
-## Benchmarking
-
-The FraiseQL implementation is suitable for benchmarking because:
-
-1. **Pure Rust runtime**: No Python overhead
-2. **Compiled schema**: No schema parsing at runtime
-3. **JSONB efficiency**: No N+1 queries, all data pre-shaped
-4. **Baseline comparison**: Used as reference for other frameworks in Phase 3
-
-Baseline metrics are stored in `benchmarks/reports/fraiseql_baseline.json`.
-
-## Performance Characteristics
-
-FraiseQL achieves high performance through:
-
-- **Compile-time optimization**: Schema analyzed and optimized before execution
-- **Database-level relationship pre-computation**: JSONB views include nested data
-- **Efficient traversal**: GraphQL execution is pure data extraction from pre-shaped JSON
-- **Minimal overhead**: Rust runtime handles only query parsing and JSON serialization
-
-Example query execution flow:
-```
-GraphQL Query: { posts(limit: 10) { id title author { name } } }
-  ↓
-fraiseql-server parses query
-  ↓
-Maps to SQL: SELECT data FROM v_post LIMIT 10
-  ↓
-PostgreSQL returns pre-shaped JSONB with author data embedded
-  ↓
-Server extracts requested fields and returns JSON
-  ↓
-~0.5ms total latency
+# Use different port
+python main.py --port 8816
 ```
 
 ## Files
 
-- `schema.py`: FraiseQL schema definition (Python decorators)
-- `database/extensions.sql`: JSONB views
-- `database/schema.sql`: Detailed view definitions (included by extensions.sql)
-- `requirements.txt`: Python dependencies
-- `README.md`: This file
+| File | Description |
+|------|-------------|
+| `schema.py` | FraiseQL v2 schema definition (Python SDK) |
+| `schema.json` | Exported schema (generated) |
+| `schema.compiled.json` | Compiled schema (generated) |
+| `fraiseql.toml` | Server configuration |
+| `main.py` | Server management script |
+| `Dockerfile` | Multi-stage Docker build |
+| `database/extensions.sql` | JSONB view definitions |
+| `tests/` | Integration and benchmark tests |
 
-## Testing
+## Version History
 
-Integration tests verify:
-- JSONB views return correct data structure
-- Nested relationships are properly embedded
-- Performance benchmarks are within expected ranges
-- Resource usage is efficient
-
-Tests can be run with:
-```bash
-pytest tests/integration/test_fraiseql.py -v
-```
-
-## Further Reading
-
-- [FraiseQL Documentation](https://github.com/lionel/fraiseql)
-- [JSONB Pattern Overview](../README.md)
-- [VelocityBench Phase 2 Documentation](../../.phases/phase-02-server-setup.md)
+- **v2.0.0-alpha.1**: Current version
+  - New Python SDK for schema authoring
+  - Introspection support
+  - Rate limiting and audit logging
+  - Configuration via TOML
+  - Default port changed to 8815

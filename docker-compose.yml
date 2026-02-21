@@ -5,27 +5,24 @@ services:
       POSTGRES_DB: velocitybench_benchmark
       POSTGRES_USER: benchmark
       POSTGRES_PASSWORD: benchmark123
-      # Data volume selector: small, medium, large, xlarge
-      DATA_VOLUME: ${DATA_VOLUME:-small}
-      TMPDIR: /data/tmp
+      # Data volume selector: xs (default), medium, large
+      # Pass as: DATA_VOLUME=medium docker compose up postgres
+      DATA_VOLUME: ${DATA_VOLUME:-xs}
     ports:
       - "${POSTGRES_PORT:-5434}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/01-extensions.sql:/docker-entrypoint-initdb.d/01-extensions.sql
-      - ./database/velocitybench_cqrs_schema.sql:/docker-entrypoint-initdb.d/02-velocitybench-cqrs.sql
+      - ./database/fraiseql_cqrs_schema.sql:/docker-entrypoint-initdb.d/02-fraiseql-cqrs.sql
       - ./database/04-cqrs-extensions.sql:/docker-entrypoint-initdb.d/03-cqrs-extensions.sql
-      # Large dataset loaded conditionally via startup script
-      - ./database/05-large-dataset.sql:/scripts/05-large-dataset.sql:ro
-      # Mount /data/tmp to avoid filling /tmp
-      - /data/tmp:/data/tmp
-    # Temporarily disable health check - PostgreSQL is working
-    # healthcheck:
-    #   test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/5432 && echo 'PostgreSQL is listening'"]
-    #   interval: 30s
-    #   timeout: 10s
-    #   retries: 3
-    #   start_period: 10s
+      - ./database/05-medium-seed.sql:/docker-entrypoint-initdb.d/04-medium-seed.sql
+      - ./frameworks/fraiseql/database/extensions.sql:/docker-entrypoint-initdb.d/05-fraiseql-views.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U benchmark -d velocitybench_benchmark"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     networks:
       - velocitybench-benchmark
     command: >
@@ -44,29 +41,63 @@ services:
       -c max_wal_size=${DB_MAX_WAL_SIZE:-4GB}
       -c wal_buffers=${DB_WAL_BUFFERS:-16MB}
       -c random_page_cost=${DB_RANDOM_PAGE_COST:-1.1}
+      -c benchmark.data_volume=${DATA_VOLUME:-xs}
 
-  # Framework containers
+  # ============================================================================
+  # Benchmark frameworks — start all 8 with: docker compose --profile benchmark up
+  # ============================================================================
+
   fraiseql:
-    build: ./frameworks/fraiseql
+    # FraiseQL v2.0.0-beta.3 — Variant A: v_* on-the-fly JSONB views
+    build:
+      context: ./frameworks/fraiseql
+      args:
+        SCHEMA_FILE: schema.py
     ports:
-      - "4000:4000"
+      - "8815:8815"
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_NAME=velocitybench_benchmark
-      - DB_USER=benchmark
-      - DB_PASSWORD=benchmark123
-      - DB_POOL_MIN=20
-      - DB_POOL_MAX=100
-      - DB_STATEMENT_CACHE_SIZE=100
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
+      - RUST_LOG=info
+      - FRAISEQL_CONFIG=fraiseql.toml
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8007/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8815/health"]
       interval: 30s
-      timeout: 15s
+      timeout: 10s
       retries: 3
+      start_period: 15s
+    profiles:
+      - benchmark
+      - fraiseql
+    networks:
+      - velocitybench-benchmark
+
+  fraiseql-tv:
+    # FraiseQL v2.0.0-beta.3 — Variant B: tv_* pre-computed JSONB tables
+    build:
+      context: ./frameworks/fraiseql
+      args:
+        SCHEMA_FILE: schema_tv.py
+    ports:
+      - "8816:8815"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
+      - RUST_LOG=info
+      - FRAISEQL_CONFIG=fraiseql-tv.toml
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8815/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    profiles:
+      - benchmark
+      - fraiseql
     networks:
       - velocitybench-benchmark
 
@@ -76,7 +107,7 @@ services:
       - "8011:8000"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -88,9 +119,12 @@ services:
       - DB_STATEMENT_CACHE_SIZE=100
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 60s
-      timeout: 15s
+      interval: 30s
+      timeout: 10s
       retries: 3
+      start_period: 30s
+    profiles:
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -100,7 +134,7 @@ services:
       - "8002:8000"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -112,9 +146,12 @@ services:
       - DB_STATEMENT_CACHE_SIZE=100
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 60s
-      timeout: 15s
+      interval: 30s
+      timeout: 10s
       retries: 3
+      start_period: 30s
+    profiles:
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -553,7 +590,7 @@ services:
       - "8003:8003"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -561,10 +598,13 @@ services:
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8003/health')"]
+      test: ["CMD", "curl", "-f", "-s", "http://localhost:8003/health"]
       interval: 30s
-      timeout: 15s
+      timeout: 10s
       retries: 3
+      start_period: 30s
+    profiles:
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -574,7 +614,7 @@ services:
       - "8015:8002"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -582,10 +622,13 @@ services:
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8001/health"]
+      test: ["CMD", "curl", "-f", "-s", "http://localhost:8002/health"]
       interval: 30s
-      timeout: 15s
+      timeout: 10s
       retries: 3
+      start_period: 15s
+    profiles:
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -595,14 +638,21 @@ services:
       - "8016:8000"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_USER=benchmark
+      - DATABASE_PASSWORD=benchmark123
+      - DATABASE_NAME=velocitybench_benchmark
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/health"]
       interval: 30s
-      timeout: 15s
+      timeout: 10s
       retries: 3
+      start_period: 15s
+    profiles:
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -890,7 +940,7 @@ services:
       - "4010:4009"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -899,10 +949,13 @@ services:
       - DB_PASSWORD=benchmark123
       - PORT=4009
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4009/health"]
+      test: ["CMD", "curl", "-f", "-s", "http://localhost:4009/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 30s
+    profiles:
+      - benchmark
     networks:
       - velocitybench-benchmark
 

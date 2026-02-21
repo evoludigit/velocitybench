@@ -1,150 +1,146 @@
--- FraiseQL Framework Database Extensions
+-- FraiseQL v2.0.0-beta.3 Database Extensions
 --
--- Applies FraiseQL-specific JSONB views for compiled query execution
--- These views implement the FraiseQL pattern: id + data (JSONB) + denormalized filters
+-- Two families of views, both built on the CQRS trinity-pattern tables:
+--
+--   v_*  (Variant A) — on-the-fly JSONB views (schema.py)
+--       JSONB is constructed at query time via jsonb_build_object().
+--       Consistent with fraiseql init canonical blog template.
+--
+--   tv_* (Variant B) — pre-computed JSONB tables (schema_tv.py)
+--       JSONB is baked in at INSERT time; queries just SELECT the column.
+--       snake_case keys align directly with database columns.
+--
+-- Trinity pattern fields exposed at the top level of every JSONB object:
+--   pk         INT    — internal integer primary key (fast join)
+--   id         UUID   — public GraphQL ID (secure, UUID v4)
+--   identifier TEXT   — human-readable identifier (username / slug)
 
 SET search_path TO benchmark, public;
 
 -- ============================================================================
--- View: v_user
--- Maps tb_user table to FraiseQL JSONB structure
+-- VARIANT A: On-the-fly JSONB Views (v_*)
 -- ============================================================================
 
-CREATE OR REPLACE VIEW v_user AS
+-- v_user: User entity as JSONB
+DROP VIEW IF EXISTS v_user CASCADE;
+
+CREATE VIEW v_user AS
 SELECT
-    u.id,
+    id,
     jsonb_build_object(
-        'id', u.id::text,
-        'email', u.email,
-        'username', u.username,
-        'firstName', u.first_name,
-        'lastName', u.last_name,
-        'bio', u.bio,
-        'avatarUrl', u.avatar_url,
-        'isActive', u.is_active,
-        'createdAt', u.created_at,
-        'updatedAt', u.updated_at
+        'id',         id::text,
+        'identifier', identifier,
+        'email',      email,
+        'username',   username,
+        'fullName',   full_name,
+        'bio',        bio,
+        'createdAt',  to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+        'updatedAt',  to_char(updated_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
     ) AS data,
-    u.pk_user AS user_pk
-FROM tb_user u;
+    pk_user AS _pk
+FROM benchmark.tb_user;
 
--- Index for JSONB queries
-CREATE INDEX IF NOT EXISTS idx_v_user_data_gin ON v_user USING GIN(data);
+-- v_post: Post entity with nested author as JSONB
+-- Author pre-computed to eliminate N+1 queries
+DROP VIEW IF EXISTS v_post CASCADE;
 
--- ============================================================================
--- View: v_post
--- Maps tb_post with nested author data
--- FraiseQL pattern: pre-compute nested relationships in JSONB at read time
--- ============================================================================
-
-CREATE OR REPLACE VIEW v_post AS
+CREATE VIEW v_post AS
 SELECT
     p.id,
     jsonb_build_object(
-        'id', p.id::text,
-        'title', p.title,
-        'content', p.content,
-        'excerpt', p.excerpt,
-        'status', p.status,
-        'publishedAt', p.published_at,
-        'createdAt', p.created_at,
-        'updatedAt', p.updated_at,
-        'author', (
-            SELECT jsonb_build_object(
-                'id', u.id::text,
-                'username', u.username,
-                'firstName', u.first_name,
-                'lastName', u.last_name,
-                'avatarUrl', u.avatar_url,
-                'isActive', u.is_active
-            )
-            FROM tb_user u
-            WHERE u.pk_user = p.fk_author
+        'id',         p.id::text,
+        'identifier', p.identifier,
+        'title',      p.title,
+        'content',    p.content,
+        'published',  p.published,
+        'createdAt',  to_char(p.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+        'updatedAt',  to_char(p.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+        'author',     jsonb_build_object(
+            'id',         u.id::text,
+            'identifier', u.identifier,
+            'email',      u.email,
+            'username',   u.username,
+            'fullName',   u.full_name,
+            'bio',        u.bio,
+            'createdAt',  to_char(u.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+            'updatedAt',  to_char(u.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
         )
     ) AS data,
-    p.pk_post AS post_pk,
-    p.fk_author AS author_pk
-FROM tb_post p;
+    p.pk_post      AS _pk,
+    p.fk_author    AS _author_pk,
+    p.published    AS _published
+FROM benchmark.tb_post p
+LEFT JOIN benchmark.tb_user u ON u.pk_user = p.fk_author;
 
--- Denormalized filter columns for efficient WHERE clauses
-CREATE INDEX IF NOT EXISTS idx_v_post_data_gin ON v_post USING GIN(data);
-CREATE INDEX IF NOT EXISTS idx_v_post_author_pk ON v_post(author_pk);
+-- v_comment: Comment entity with nested author and post as JSONB
+-- Both relationships pre-computed to eliminate N+1 queries
+DROP VIEW IF EXISTS v_comment CASCADE;
 
--- ============================================================================
--- View: v_comment
--- Maps tb_comment with nested author and post data
--- FraiseQL pattern: nested relationships pre-computed in JSONB
--- ============================================================================
-
-CREATE OR REPLACE VIEW v_comment AS
+CREATE VIEW v_comment AS
 SELECT
     c.id,
     jsonb_build_object(
-        'id', c.id::text,
-        'content', c.content,
-        'isApproved', c.is_approved,
-        'createdAt', c.created_at,
-        'updatedAt', c.updated_at,
-        'author', (
-            SELECT jsonb_build_object(
-                'id', u.id::text,
-                'username', u.username,
-                'firstName', u.first_name,
-                'lastName', u.last_name,
-                'avatarUrl', u.avatar_url
-            )
-            FROM tb_user u
-            WHERE u.pk_user = c.fk_author
+        'id',         c.id::text,
+        'identifier', c.identifier,
+        'content',    c.content,
+        'createdAt',  to_char(c.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+        'updatedAt',  to_char(c.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+        'author',     jsonb_build_object(
+            'id',         u.id::text,
+            'identifier', u.identifier,
+            'email',      u.email,
+            'username',   u.username,
+            'fullName',   u.full_name,
+            'bio',        u.bio,
+            'createdAt',  to_char(u.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+            'updatedAt',  to_char(u.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
         ),
-        'post', (
-            SELECT jsonb_build_object(
-                'id', p.id::text,
-                'title', p.title,
-                'status', p.status
+        'post',       jsonb_build_object(
+            'id',         p.id::text,
+            'identifier', p.identifier,
+            'title',      p.title,
+            'content',    p.content,
+            'published',  p.published,
+            'createdAt',  to_char(p.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+            'updatedAt',  to_char(p.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+            'author',     jsonb_build_object(
+                'id',         pu.id::text,
+                'identifier', pu.identifier,
+                'email',      pu.email,
+                'username',   pu.username,
+                'fullName',   pu.full_name,
+                'bio',        pu.bio
             )
-            FROM tb_post p
-            WHERE p.pk_post = c.fk_post
         )
     ) AS data,
-    c.pk_comment AS comment_pk,
-    c.fk_post AS post_pk,
-    c.fk_author AS author_pk
-FROM tb_comment c;
-
--- Denormalized filter columns for efficient WHERE clauses
-CREATE INDEX IF NOT EXISTS idx_v_comment_data_gin ON v_comment USING GIN(data);
-CREATE INDEX IF NOT EXISTS idx_v_comment_post_pk ON v_comment(post_pk);
-CREATE INDEX IF NOT EXISTS idx_v_comment_author_pk ON v_comment(author_pk);
+    c.pk_comment   AS _pk,
+    c.fk_author    AS _author_pk,
+    c.fk_post      AS _post_pk
+FROM benchmark.tb_comment c
+LEFT JOIN benchmark.tb_user u  ON u.pk_user   = c.fk_author
+LEFT JOIN benchmark.tb_post p  ON p.pk_post   = c.fk_post
+LEFT JOIN benchmark.tb_user pu ON pu.pk_user  = p.fk_author;
 
 -- ============================================================================
--- Optional: Fact Tables for Analytics (tf_* pattern)
+-- Indexes on underlying tables (views are not directly indexed)
 -- ============================================================================
 
--- Fact table for API query metrics
--- Measures: latency, response size, etc.
--- Dimensions: endpoint, status code, etc. (in JSONB for flexibility)
-CREATE TABLE IF NOT EXISTS tf_api_calls (
-    id BIGSERIAL PRIMARY KEY,
+CREATE INDEX IF NOT EXISTS idx_tb_user_id         ON benchmark.tb_user(id);
+CREATE INDEX IF NOT EXISTS idx_tb_user_identifier  ON benchmark.tb_user(identifier);
 
-    -- Measures (numeric columns for aggregation)
-    latency_ms INT NOT NULL,
-    request_size INT DEFAULT 0,
-    response_size INT DEFAULT 0,
+CREATE INDEX IF NOT EXISTS idx_tb_post_id          ON benchmark.tb_post(id);
+CREATE INDEX IF NOT EXISTS idx_tb_post_identifier  ON benchmark.tb_post(identifier);
+CREATE INDEX IF NOT EXISTS idx_tb_post_published   ON benchmark.tb_post(published);
+CREATE INDEX IF NOT EXISTS idx_tb_post_fk_author   ON benchmark.tb_post(fk_author);
 
-    -- Dimensions (JSONB for flexible grouping)
-    data JSONB NOT NULL,
+CREATE INDEX IF NOT EXISTS idx_tb_comment_id       ON benchmark.tb_comment(id);
+CREATE INDEX IF NOT EXISTS idx_tb_comment_fk_post  ON benchmark.tb_comment(fk_post);
+CREATE INDEX IF NOT EXISTS idx_tb_comment_fk_author ON benchmark.tb_comment(fk_author);
 
-    -- Denormalized filters (indexed for fast WHERE)
-    user_id UUID,
-    endpoint VARCHAR(500) NOT NULL,
-    status_code INT NOT NULL,
-    occurred_at TIMESTAMPTZ NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- ============================================================================
+-- Permissions
+-- ============================================================================
 
--- Create indexes for denormalized filters
-CREATE INDEX IF NOT EXISTS idx_api_calls_user ON tf_api_calls(user_id);
-CREATE INDEX IF NOT EXISTS idx_api_calls_endpoint ON tf_api_calls(endpoint);
-CREATE INDEX IF NOT EXISTS idx_api_calls_status ON tf_api_calls(status_code);
-CREATE INDEX IF NOT EXISTS idx_api_calls_occurred ON tf_api_calls(occurred_at);
-CREATE INDEX IF NOT EXISTS idx_api_calls_data_gin ON tf_api_calls USING GIN(data);
+GRANT SELECT ON v_user    TO PUBLIC;
+GRANT SELECT ON v_post    TO PUBLIC;
+GRANT SELECT ON v_comment TO PUBLIC;

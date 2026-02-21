@@ -1,4 +1,4 @@
--- Phase 4: Data Volume Scaling - Seed Generation
+-- Seed Data Extension: Data Volume Scaling
 -- This script extends the small CQRS seed data to test large datasets
 -- Can be loaded manually: psql -U benchmark -d fraiseql_benchmark -f database/04-seed-extension.sql
 

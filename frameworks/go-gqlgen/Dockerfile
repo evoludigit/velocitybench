@@ -1,4 +1,4 @@
-FROM golang:1.22-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 # Set TMPDIR to use /data/tmp for builds to avoid /tmp filling up
 ENV TMPDIR=/data/tmp

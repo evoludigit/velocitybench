@@ -1,11 +1,10 @@
 # FraiseQL Framework Requirements
 # FraiseQL v2: Compiled GraphQL execution engine
 
+# FraiseQL Python SDK for schema authoring
+fraiseql>=2.0.0b3
+
 # Core dependencies
 requests>=2.31.0          # HTTP client for GraphQL queries
-psycopg[binary]>=3.1.0   # PostgreSQL adapter
-python-dotenv>=1.0.0     # Environment variable management
-
-# FraiseQL schema authoring (if using Python schema definition)
-# fraiseql>=2.0.0         # (Optional) For schema authoring
-# Note: fraiseql-cli and fraiseql-server are standalone Rust binaries
+psycopg[binary]>=3.1.0    # PostgreSQL adapter
+python-dotenv>=1.0.0      # Environment variable management

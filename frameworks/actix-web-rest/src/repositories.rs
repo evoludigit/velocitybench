@@ -48,7 +48,7 @@ impl UserRepository {
 
         let rows = client
             .query(
-                "SELECT id, username, full_name, bio
+                "SELECT id::text, username, full_name, bio
                  FROM benchmark.tb_user
                  ORDER BY id
                  LIMIT $1 OFFSET $2",

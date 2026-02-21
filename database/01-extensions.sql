@@ -15,8 +15,8 @@ CREATE EXTENSION IF NOT EXISTS "pg_buffercache";
 
 -- Create benchmark schema
 CREATE SCHEMA IF NOT EXISTS benchmark;
-GRANT USAGE ON SCHEMA benchmark TO velocitybench;
-GRANT ALL PRIVILEGES ON SCHEMA benchmark TO velocitybench;
+GRANT USAGE ON SCHEMA benchmark TO benchmark;
+GRANT ALL PRIVILEGES ON SCHEMA benchmark TO benchmark;
 
 -- Set search path for benchmark operations
 SET search_path TO benchmark, public;
