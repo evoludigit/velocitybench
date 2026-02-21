@@ -1,7 +1,19 @@
 # Framework Management Targets
 # Start, stop, list, and test benchmark frameworks
 
-.PHONY: framework-list framework-start framework-stop framework-smoke
+# Convenience targets: start/stop the full benchmark stack
+up:
+	docker compose --profile benchmark up -d
+
+up-medium:
+	DATA_VOLUME=medium docker compose --profile benchmark up -d
+
+down:
+	docker compose --profile benchmark down
+
+
+
+.PHONY: framework-list framework-start framework-stop framework-smoke test-seed smoke-test parity-test bench bench-one bench-all n1-guard up up-medium down
 
 # List all available frameworks
 framework-list:
@@ -81,3 +93,73 @@ framework-stop:
 framework-smoke:
 	@echo "Running smoke tests..."
 	@bash $(PROJECT_ROOT)tests/integration/smoke-test.sh
+
+
+# Verify seed data row counts
+# Usage:
+#   make test-seed                  # xs (default) — fixture checks only
+#   make test-seed DATA_VOLUME=medium
+test-seed:
+	@echo "Running seed data verification (DATA_VOLUME=$(DATA_VOLUME:-xs))..."
+	DATA_VOLUME=$(DATA_VOLUME) \
+	  $(PROJECT_ROOT)tests/qa/.venv/bin/python -m pytest \
+	    $(PROJECT_ROOT)tests/qa/test_seed_data.py \
+	    -v --tb=short --no-header
+
+# Full smoke test: start all 8 benchmark frameworks and verify health + basic queries
+# Usage: make smoke-test [DATA_VOLUME=xs]
+smoke-test:
+	@echo "Starting benchmark stack (DATA_VOLUME=$(DATA_VOLUME))..."
+	DATA_VOLUME=$(DATA_VOLUME) docker compose --profile benchmark up -d
+	@echo "Waiting 60s for containers to initialize..."
+	@sleep 60
+	@echo "Running health + query smoke tests..."
+	$(PROJECT_ROOT)tests/qa/.venv/bin/python -m pytest \
+	  $(PROJECT_ROOT)tests/qa/test_all_frameworks_health.py \
+	  -v --tb=short --no-header
+	@echo "Tearing down benchmark stack..."
+	docker compose --profile benchmark down
+
+# Cross-framework parity test: verify all frameworks return identical data
+# Requires all 8 benchmark services to be running.
+# Usage: make parity-test
+parity-test:
+	@echo "Running cross-framework parity tests..."
+	$(PROJECT_ROOT)tests/qa/.venv/bin/python -m pytest \
+	  $(PROJECT_ROOT)tests/qa/test_parity.py \
+	  -v --tb=short --no-header
+	@echo "✓ Parity tests passed"
+
+# Run k6 against a single framework.
+# Usage: make bench-one FRAMEWORK=go-gqlgen
+bench-one:
+	@if [ -z "$(FRAMEWORK)" ]; then \
+		echo "Error: FRAMEWORK is required"; \
+		echo "Usage: make bench-one FRAMEWORK=<name>"; \
+		exit 1; \
+	fi
+	k6 run --env FRAMEWORK=$(FRAMEWORK) $(PROJECT_ROOT)benchmarks/k6/full_suite.js
+
+# Run k6 against all 8 frameworks (parity gate first).
+# Usage: make bench-all
+bench-all: parity-test
+	@echo "Running full k6 benchmark suite..."
+	$(PROJECT_ROOT)venv/bin/python $(PROJECT_ROOT)benchmarks/run_all.py
+
+# N+1 query guard: detect DataLoader regressions using pg_stat_statements.
+# Run serially against the benchmark stack (no concurrent traffic).
+# Usage: make n1-guard
+n1-guard:
+	@echo "Running N+1 query guard tests..."
+	$(PROJECT_ROOT)tests/qa/.venv/bin/python -m pytest \
+	  $(PROJECT_ROOT)tests/qa/test_n1_detection.py \
+	  -v --tb=short --no-header -p no:randomly
+	@echo "✓ N+1 guard passed"
+
+# FraiseQL-specific comparison benchmark (Python threaded, no k6 required).
+# Usage: make bench [DURATION=30] [CONCURRENCY=50]
+bench: parity-test
+	@echo "Parity confirmed. Starting FraiseQL comparison benchmark..."
+	$(PROJECT_ROOT)venv/bin/python $(PROJECT_ROOT)benchmarks/fraiseql_comparison.py \
+	  --duration $(or $(DURATION),30) \
+	  --concurrency $(or $(CONCURRENCY),50)

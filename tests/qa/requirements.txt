@@ -1,7 +1,11 @@
 # QA Framework Validator Dependencies
 
+# Test runner
+pytest>=8.0.0
+
 # Database
 asyncpg>=0.29.0
+psycopg2-binary>=2.9.0
 
 # HTTP client
 httpx>=0.27.0
