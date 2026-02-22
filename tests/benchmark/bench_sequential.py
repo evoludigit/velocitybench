@@ -57,6 +57,19 @@ FRAMEWORKS: dict[str, dict] = {
             "Q2b": ("http://localhost:8816/graphql", _GQL_Q2b),
         },
         "health_url": "http://localhost:8816/health",
+        # LRU cache needs 30s warmup to fill before measuring cache-hit throughput.
+        "warmup_secs": 30,
+    },
+    "fraiseql-tv-nocache": {
+        "compose_service": "fraiseql-tv-nocache",
+        "type": "graphql",
+        "queries": {
+            "Q1":  ("http://localhost:8817/graphql", _GQL_Q1),
+            "Q2":  ("http://localhost:8817/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:8817/graphql", _GQL_Q2b),
+        },
+        "health_url": "http://localhost:8817/health",
+        # Cold reads: standard warmup is sufficient (no cache to fill).
     },
     "fraiseql-v": {
         "compose_service": "fraiseql",
@@ -67,6 +80,7 @@ FRAMEWORKS: dict[str, dict] = {
             "Q2b": ("http://localhost:8815/graphql", _GQL_Q2b),
         },
         "health_url": "http://localhost:8815/health",
+        "warmup_secs": 30,
     },
     "go-gqlgen": {
         "compose_service": "go-gqlgen",
@@ -102,6 +116,7 @@ FRAMEWORKS: dict[str, dict] = {
 
 DEFAULT_FRAMEWORK_ORDER = [
     "fraiseql-tv",
+    "fraiseql-tv-nocache",
     "fraiseql-v",
     "go-gqlgen",
     "actix-web-rest",
@@ -233,6 +248,8 @@ def run_scenario(
     duration_secs: int,
     warmup_secs: int,
 ) -> BenchResult:
+    # Per-framework warmup override (e.g. cache-enabled fraiseql needs 30s to fill LRU).
+    warmup_secs = fw_config.get("warmup_secs", warmup_secs)
     """Run warmup then measurement for one (framework, query) pair."""
     entry = fw_config["queries"][query_name]
     result = BenchResult(
@@ -402,8 +419,8 @@ def format_report(
         "",
         "## Summary — Q1 Cross-Framework (sorted by RPS)",
         "",
-        "| Framework | RPS | p50 ms | p99 ms |",
-        "|-----------|----:|-------:|-------:|",
+        "| Framework | Cache | RPS | p50 ms | p99 ms |",
+        "|-----------|-------|----:|-------:|-------:|",
     ]
     q1_results = sorted(
         [r for r in results if r.query_name == "Q1" and not r.skipped],
@@ -411,7 +428,11 @@ def format_report(
         reverse=True,
     )
     for r in q1_results:
-        lines.append(f"| {r.framework} | {r.rps:.0f} | {r.p50_ms:.1f} | {r.p99_ms:.1f} |")
+        cache_label = "off" if "nocache" in r.framework else "on"
+        lines.append(
+            f"| {r.framework} | {cache_label} "
+            f"| {r.rps:.0f} | {r.p50_ms:.1f} | {r.p99_ms:.1f} |"
+        )
 
     return "\n".join(lines)
 

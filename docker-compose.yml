@@ -105,6 +105,35 @@ services:
     networks:
       - velocitybench-benchmark
 
+  fraiseql-tv-nocache:
+    # FraiseQL v2 — Variant B (tv_*), cache disabled — Phase 1 cold-read baseline
+    build:
+      context: ./frameworks/fraiseql
+      args:
+        SCHEMA_FILE: schema_tv.py
+    ports:
+      - "8817:8815"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./frameworks/fraiseql/fraiseql-tv-nocache.toml:/app/fraiseql-tv-nocache.toml
+    environment:
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
+      - RUST_LOG=info
+      - FRAISEQL_CONFIG=fraiseql-tv-nocache.toml
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8815/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    profiles:
+      - benchmark
+      - fraiseql
+    networks:
+      - velocitybench-benchmark
+
   strawberry:
     build: ./frameworks/strawberry
     ports:
