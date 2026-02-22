@@ -183,7 +183,7 @@ extern "C-unwind" fn _PG_init() {
     // For shared_preload_libraries extensions, _PG_init is called during postmaster startup
     // This is the CORRECT time to install hooks (they apply to all backends)
     unsafe {
-        hooks::install_hook();
+        hooks::ensure_hook_installed();
     }
 
     // Note: We cannot call functions that require SPI/database connection here

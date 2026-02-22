@@ -143,9 +143,12 @@ fn create_trigger_handler() -> TViewResult<()> {
 }
 
 fn get_table_name(oid: pg_sys::Oid) -> TViewResult<String> {
-    Spi::get_one::<String>(&format!(
-        "SELECT relname::text FROM pg_class WHERE oid = {oid:?}"
-    ))
+    let query = format!("SELECT relname::text FROM pg_class WHERE oid = {oid:?}");
+    Spi::connect(|client| -> spi::Result<Option<String>> {
+        let rows = client.select(&query, Some(1), &[])?;
+        let val: Option<&str> = rows.first().get_one()?;
+        Ok(val.map(|s| s.to_string()))
+    })
     .map_err(|e| TViewError::CatalogError {
         operation: format!("Get table name for OID {oid:?}"),
         pg_error: format!("{e:?}"),
