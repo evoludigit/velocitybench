@@ -9,6 +9,10 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pg_stat_statements";
 CREATE EXTENSION IF NOT EXISTS "pg_buffercache";
 
+-- pg_tviews: automatic JSONB TVIEW materialization with trigger-based cascade sync
+-- Provides pg_tviews_create(), pg_tviews_refresh(), and DDL event triggers for tv_* tables
+CREATE EXTENSION IF NOT EXISTS pg_tviews;
+
 -- Note: jsonb_ivm and pg_tview would be installed separately
 -- as they are external extensions that need to be compiled
 -- For now, we'll simulate their functionality with standard PostgreSQL features

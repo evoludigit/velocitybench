@@ -1,0 +1,7 @@
+pg_tviews/target
+pg_tviews/.git
+__pycache__
+*.pyc
+*.pyo
+seed-data/
+*.sqlite

@@ -36,6 +36,12 @@ BEGIN
     RAISE NOTICE '[05-medium-seed] Seeding % dataset: % users, % posts, % comments',
         v_scale, v_user_count, v_post_count, v_comment_count;
 
+    -- Disable pg_tviews triggers during bulk insert to avoid per-row overhead.
+    -- pg_tviews_refresh() is called after all inserts complete for a single-pass sync.
+    ALTER TABLE benchmark.tb_user    DISABLE TRIGGER ALL;
+    ALTER TABLE benchmark.tb_post    DISABLE TRIGGER ALL;
+    ALTER TABLE benchmark.tb_comment DISABLE TRIGGER ALL;
+
     -- -----------------------------------------------------------------------
     -- Users (6 → v_user_count, fixtures 1-5 already inserted)
     -- -----------------------------------------------------------------------
@@ -104,106 +110,24 @@ BEGIN
 
     RAISE NOTICE '[05-medium-seed] Comments inserted.';
 
+    -- Re-enable triggers now that bulk data is loaded
+    ALTER TABLE benchmark.tb_user    ENABLE TRIGGER ALL;
+    ALTER TABLE benchmark.tb_post    ENABLE TRIGGER ALL;
+    ALTER TABLE benchmark.tb_comment ENABLE TRIGGER ALL;
+
     -- -----------------------------------------------------------------------
-    -- Bulk sync to query side (tv_* tables)
-    -- Set-based sync avoids the slow row-by-row fn_sync_tv_* functions.
+    -- Refresh TVIEWs via pg_tviews_refresh (single-pass batch sync)
+    -- pg_tviews_refresh truncates and repopulates from the backing view,
+    -- which is equivalent to a full re-sync but done in one set-based query.
     -- -----------------------------------------------------------------------
+    PERFORM pg_tviews_refresh('tv_user');
+    RAISE NOTICE '[05-medium-seed] tv_user refreshed.';
 
-    -- tv_user: embed post count per user
-    INSERT INTO benchmark.tv_user (id, identifier, data, updated_at)
-    SELECT
-        u.id,
-        u.identifier,
-        jsonb_build_object(
-            'id',         u.id::text,
-            'identifier', u.identifier,
-            'email',      u.email,
-            'username',   u.username,
-            'fullName',   u.full_name,
-            'bio',        u.bio,
-            'createdAt',  u.created_at,
-            'updatedAt',  u.updated_at,
-            'postCount',  COALESCE(pc.post_count, 0)
-        ),
-        NOW()
-    FROM benchmark.tb_user u
-    LEFT JOIN (
-        SELECT fk_author, COUNT(*) AS post_count
-        FROM benchmark.tb_post
-        GROUP BY fk_author
-    ) pc ON pc.fk_author = u.pk_user
-    ON CONFLICT (id) DO UPDATE
-        SET identifier  = EXCLUDED.identifier,
-            data        = EXCLUDED.data,
-            updated_at  = EXCLUDED.updated_at;
+    PERFORM pg_tviews_refresh('tv_post');
+    RAISE NOTICE '[05-medium-seed] tv_post refreshed.';
 
-    RAISE NOTICE '[05-medium-seed] tv_user synced.';
+    PERFORM pg_tviews_refresh('tv_comment');
+    RAISE NOTICE '[05-medium-seed] tv_comment refreshed.';
 
-    -- tv_post: embed author info and comment count
-    INSERT INTO benchmark.tv_post (id, identifier, data, updated_at)
-    SELECT
-        p.id,
-        p.identifier,
-        jsonb_build_object(
-            'id',           p.id::text,
-            'identifier',   p.identifier,
-            'title',        p.title,
-            'content',      p.content,
-            'published',    p.published,
-            'createdAt',    p.created_at,
-            'updatedAt',    p.updated_at,
-            'author', jsonb_build_object(
-                'id',       u.id::text,
-                'username', u.username,
-                'fullName', u.full_name
-            ),
-            'commentCount', COALESCE(cc.comment_count, 0)
-        ),
-        NOW()
-    FROM benchmark.tb_post p
-    JOIN benchmark.tb_user u ON u.pk_user = p.fk_author
-    LEFT JOIN (
-        SELECT fk_post, COUNT(*) AS comment_count
-        FROM benchmark.tb_comment
-        GROUP BY fk_post
-    ) cc ON cc.fk_post = p.pk_post
-    ON CONFLICT (id) DO UPDATE
-        SET identifier  = EXCLUDED.identifier,
-            data        = EXCLUDED.data,
-            updated_at  = EXCLUDED.updated_at;
-
-    RAISE NOTICE '[05-medium-seed] tv_post synced.';
-
-    -- tv_comment: embed author and post info
-    INSERT INTO benchmark.tv_comment (id, identifier, data, updated_at)
-    SELECT
-        c.id,
-        c.identifier,
-        jsonb_build_object(
-            'id',         c.id::text,
-            'identifier', c.identifier,
-            'content',    c.content,
-            'createdAt',  c.created_at,
-            'updatedAt',  c.updated_at,
-            'author', jsonb_build_object(
-                'id',       u.id::text,
-                'username', u.username,
-                'fullName', u.full_name
-            ),
-            'post', jsonb_build_object(
-                'id',    p.id::text,
-                'title', p.title
-            )
-        ),
-        NOW()
-    FROM benchmark.tb_comment c
-    JOIN benchmark.tb_user u ON u.pk_user = c.fk_author
-    JOIN benchmark.tb_post  p ON p.pk_post = c.fk_post
-    ON CONFLICT (id) DO UPDATE
-        SET identifier  = EXCLUDED.identifier,
-            data        = EXCLUDED.data,
-            updated_at  = EXCLUDED.updated_at;
-
-    RAISE NOTICE '[05-medium-seed] tv_comment synced.';
     RAISE NOTICE '[05-medium-seed] Seeding complete for % dataset.', v_scale;
 END $$;

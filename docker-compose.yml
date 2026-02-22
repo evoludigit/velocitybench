@@ -1,6 +1,8 @@
 services:
   postgres:
-    image: postgres:15-alpine
+    build:
+      context: ./database
+      dockerfile: Dockerfile
     environment:
       POSTGRES_DB: velocitybench_benchmark
       POSTGRES_USER: benchmark
@@ -27,7 +29,7 @@ services:
       - velocitybench-benchmark
     command: >
       postgres
-      -c shared_preload_libraries=pg_stat_statements,pg_buffercache
+      -c shared_preload_libraries=pg_stat_statements,pg_buffercache,pg_tviews
       -c pg_stat_statements.max=10000
       -c pg_stat_statements.track=all
       -c shared_buffers=${DB_SHARED_BUFFERS:-8GB}

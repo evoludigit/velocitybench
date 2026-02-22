@@ -2,7 +2,7 @@
 
 This schema defines the GraphQL types and queries for the VelocityBench
 FraiseQL v2 framework. It maps to the JSONB views in the database
-(v_user, v_post, v_comment).
+(fv_user, fv_post, fv_comment).
 
 FraiseQL v2 Architecture:
 - Types defined with @fraiseql.type decorator
@@ -12,7 +12,7 @@ FraiseQL v2 Architecture:
 - fraiseql-server executes queries against compiled schema
 
 Benchmark Variant A (this file):
-- Views (v_*) compute JSONB on-the-fly at query time
+- Views (fv_*) compute JSONB on-the-fly at query time
 - camelCase field names match GraphQL convention
 
 Usage:
@@ -79,7 +79,7 @@ class Comment:
 
 
 @fraiseql.query(
-    sql_source="benchmark.v_user",
+    sql_source="benchmark.fv_user",
     auto_params={"limit": True, "offset": True, "where": True, "order_by": True},
 )
 def users(
@@ -90,14 +90,14 @@ def users(
     pass
 
 
-@fraiseql.query(sql_source="benchmark.v_user")
+@fraiseql.query(sql_source="benchmark.fv_user")
 def user(id: ID) -> User | None:
     """Get a single user by UUID."""
     pass
 
 
 @fraiseql.query(
-    sql_source="benchmark.v_post",
+    sql_source="benchmark.fv_post",
     auto_params={"limit": True, "offset": True, "where": True, "order_by": True},
 )
 def posts(
@@ -110,14 +110,14 @@ def posts(
     pass
 
 
-@fraiseql.query(sql_source="benchmark.v_post")
+@fraiseql.query(sql_source="benchmark.fv_post")
 def post(id: ID) -> Post | None:
     """Get a single post by UUID."""
     pass
 
 
 @fraiseql.query(
-    sql_source="benchmark.v_comment",
+    sql_source="benchmark.fv_comment",
     auto_params={"limit": True, "offset": True, "where": True, "order_by": True},
 )
 def comments(
@@ -130,7 +130,7 @@ def comments(
     pass
 
 
-@fraiseql.query(sql_source="benchmark.v_comment")
+@fraiseql.query(sql_source="benchmark.fv_comment")
 def comment(id: ID) -> Comment | None:
     """Get a single comment by UUID."""
     pass
