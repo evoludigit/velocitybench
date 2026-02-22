@@ -116,15 +116,15 @@ INSERT INTO benchmark.tb_comment (id, content, fk_post, fk_author) VALUES
 -- ============================================================================
 -- QUERY SIDE SETUP: Create TVIEWs via pg_tviews_create()
 -- pg_tviews creates backing views (public.v_*) and materialized tables
--- (benchmark.tv_*), populates them from current data, and installs triggers
+-- (public.tv_*), populates them from current data, and installs triggers
 -- on tb_* tables so future writes auto-cascade.
 -- ============================================================================
 
--- Set search_path: pg_tviews creates materialized tables in the first schema
--- in the path (benchmark), while backing views go to public.v_*
+-- Set search_path: pg_tviews creates materialized tables in public schema (hardcoded),
+-- as does the backing view. trigger resolution uses search_path at runtime.
 SET search_path TO benchmark, public;
 
--- tv_user: backed by public.v_user, materialized in benchmark.tv_user
+-- tv_user: backed by public.v_user, materialized in public.tv_user
 -- Triggers installed on tb_user. CASCADE: user update → tv_user + tv_post + tv_comment
 SELECT pg_tviews_create('tv_user', $TVIEW_SQL$
     SELECT
@@ -150,7 +150,7 @@ SELECT pg_tviews_create('tv_user', $TVIEW_SQL$
     ) pc ON pc.fk_author = u.pk_user
 $TVIEW_SQL$);
 
--- tv_post: backed by public.v_post, materialized in benchmark.tv_post
+-- tv_post: backed by public.v_post, materialized in public.tv_post
 -- Triggers on tb_post AND tb_user (cascade: author change → tv_post update)
 SELECT pg_tviews_create('tv_post', $TVIEW_SQL$
     SELECT
@@ -182,7 +182,7 @@ SELECT pg_tviews_create('tv_post', $TVIEW_SQL$
     ) cc ON cc.fk_post = p.pk_post
 $TVIEW_SQL$);
 
--- tv_comment: backed by public.v_comment, materialized in benchmark.tv_comment
+-- tv_comment: backed by public.v_comment, materialized in public.tv_comment
 -- Triggers on tb_comment, tb_post, tb_user
 SELECT pg_tviews_create('tv_comment', $TVIEW_SQL$
     SELECT
@@ -220,9 +220,9 @@ COMMENT ON TABLE benchmark.tb_user IS 'Command side: Normalized users with Trini
 COMMENT ON TABLE benchmark.tb_post IS 'Command side: Normalized posts with INT foreign keys for fast joins';
 COMMENT ON TABLE benchmark.tb_comment IS 'Command side: Normalized comments with INT foreign keys for fast joins';
 
-COMMENT ON TABLE benchmark.tv_user IS 'Query side: TVIEW managed by pg_tviews — denormalized users with JSONB and pre-computed post count';
-COMMENT ON TABLE benchmark.tv_post IS 'Query side: TVIEW managed by pg_tviews — denormalized posts with embedded author and comment count';
-COMMENT ON TABLE benchmark.tv_comment IS 'Query side: TVIEW managed by pg_tviews — denormalized comments with embedded author and post info';
+COMMENT ON TABLE public.tv_user IS 'Query side: TVIEW managed by pg_tviews — denormalized users with JSONB and pre-computed post count';
+COMMENT ON TABLE public.tv_post IS 'Query side: TVIEW managed by pg_tviews — denormalized posts with embedded author and comment count';
+COMMENT ON TABLE public.tv_comment IS 'Query side: TVIEW managed by pg_tviews — denormalized comments with embedded author and post info';
 
 -- ============================================================================
 -- PERFORMANCE ANALYSIS QUERIES
@@ -233,8 +233,8 @@ COMMENT ON TABLE benchmark.tv_comment IS 'Query side: TVIEW managed by pg_tviews
 -- FROM pg_tables WHERE schemaname = 'benchmark' ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
 
 -- Query to analyze JSONB data size
--- SELECT 'tv_user' as table_name, count(*) as rows, pg_size_pretty(sum(pg_column_size(data))) as jsonb_size FROM benchmark.tv_user
+-- SELECT 'tv_user' as table_name, count(*) as rows, pg_size_pretty(sum(pg_column_size(data))) as jsonb_size FROM public.tv_user
 -- UNION ALL
--- SELECT 'tv_post' as table_name, count(*) as rows, pg_size_pretty(sum(pg_column_size(data))) as jsonb_size FROM benchmark.tv_post
+-- SELECT 'tv_post' as table_name, count(*) as rows, pg_size_pretty(sum(pg_column_size(data))) as jsonb_size FROM public.tv_post
 -- UNION ALL
--- SELECT 'tv_comment' as table_name, count(*) as rows, pg_size_pretty(sum(pg_column_size(data))) as jsonb_size FROM benchmark.tv_comment;
+-- SELECT 'tv_comment' as table_name, count(*) as rows, pg_size_pretty(sum(pg_column_size(data))) as jsonb_size FROM public.tv_comment;

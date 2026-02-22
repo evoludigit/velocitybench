@@ -137,19 +137,19 @@ def test_v_post_count_medium(pg_conn):
 def test_tv_user_has_rows(pg_conn):
     """tv_user must be populated at init time."""
     cur = pg_conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM benchmark.tv_user")
+    cur.execute("SELECT COUNT(*) FROM public.tv_user")
     assert cur.fetchone()[0] >= 5
 
 
 def test_tv_post_has_rows(pg_conn):
     cur = pg_conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM benchmark.tv_post")
+    cur.execute("SELECT COUNT(*) FROM public.tv_post")
     assert cur.fetchone()[0] >= 5
 
 
 def test_tv_comment_has_rows(pg_conn):
     cur = pg_conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM benchmark.tv_comment")
+    cur.execute("SELECT COUNT(*) FROM public.tv_comment")
     assert cur.fetchone()[0] >= 5
 
 
@@ -161,7 +161,7 @@ def test_tv_user_jsonb_uses_camelcase(pg_conn):
             data ? 'fullName'  AS has_full_name,
             data ? 'createdAt' AS has_created_at,
             data ? 'updatedAt' AS has_updated_at
-        FROM benchmark.tv_user
+        FROM public.tv_user
         LIMIT 1
     """)
     row = cur.fetchone()
@@ -177,7 +177,7 @@ def test_tv_post_nested_author_username(pg_conn):
     cur = pg_conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute("""
         SELECT data->'author'->>'username' AS author_username
-        FROM benchmark.tv_post
+        FROM public.tv_post
         LIMIT 1
     """)
     row = cur.fetchone()
@@ -192,7 +192,7 @@ def test_tv_comment_nested_author_and_post(pg_conn):
         SELECT
             data->'author'->>'username' AS author_username,
             data->'post'->>'title'      AS post_title
-        FROM benchmark.tv_comment
+        FROM public.tv_comment
         LIMIT 1
     """)
     row = cur.fetchone()
@@ -205,7 +205,7 @@ def test_tv_user_alice_fixture_synced(pg_conn):
     """alice's fixture row must exist in tv_user after init sync."""
     cur = pg_conn.cursor()
     cur.execute("""
-        SELECT data->>'username' FROM benchmark.tv_user
+        SELECT data->>'username' FROM public.tv_user
         WHERE data->>'username' = 'alice'
     """)
     row = cur.fetchone()
@@ -216,7 +216,7 @@ def test_tv_post_fixture_synced(pg_conn):
     """At least one fixture post must be in tv_post."""
     cur = pg_conn.cursor()
     cur.execute("""
-        SELECT COUNT(*) FROM benchmark.tv_post
+        SELECT COUNT(*) FROM public.tv_post
         WHERE data->>'identifier' = 'getting-started-graphql'
     """)
     assert cur.fetchone()[0] == 1, "fixture post not found in tv_post"
@@ -226,7 +226,7 @@ def test_tv_user_count_medium(pg_conn):
     if os.environ.get("DATA_VOLUME") != "medium":
         pytest.skip("Requires DATA_VOLUME=medium")
     cur = pg_conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM benchmark.tv_user")
+    cur.execute("SELECT COUNT(*) FROM public.tv_user")
     assert cur.fetchone()[0] == 10_000
 
 
@@ -234,7 +234,7 @@ def test_tv_post_count_medium(pg_conn):
     if os.environ.get("DATA_VOLUME") != "medium":
         pytest.skip("Requires DATA_VOLUME=medium")
     cur = pg_conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM benchmark.tv_post")
+    cur.execute("SELECT COUNT(*) FROM public.tv_post")
     assert cur.fetchone()[0] == 50_000
 
 
@@ -242,5 +242,5 @@ def test_tv_comment_count_medium(pg_conn):
     if os.environ.get("DATA_VOLUME") != "medium":
         pytest.skip("Requires DATA_VOLUME=medium")
     cur = pg_conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM benchmark.tv_comment")
+    cur.execute("SELECT COUNT(*) FROM public.tv_comment")
     assert cur.fetchone()[0] == 200_000

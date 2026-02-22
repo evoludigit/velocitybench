@@ -11,9 +11,9 @@ frameworks:
     health_check: /health
     metrics_endpoint: /metrics
     expected_tables:
-      - benchmark.tv_user
-      - benchmark.tv_post
-      - benchmark.tv_comment
+      - public.tv_user
+      - public.tv_post
+      - public.tv_comment
     pool_config:
       min: 20
       max: 30

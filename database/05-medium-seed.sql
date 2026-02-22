@@ -116,17 +116,24 @@ BEGIN
     ALTER TABLE benchmark.tb_comment ENABLE TRIGGER ALL;
 
     -- -----------------------------------------------------------------------
-    -- Refresh TVIEWs via pg_tviews_refresh (single-pass batch sync)
-    -- pg_tviews_refresh truncates and repopulates from the backing view,
-    -- which is equivalent to a full re-sync but done in one set-based query.
+    -- Rebuild TVIEWs from backing views (single-pass batch sync).
+    -- pg_tviews creates tables in public schema with extra created_at/updated_at
+    -- columns not present in the backing views, so we INSERT with explicit
+    -- column lists rather than using pg_tviews_refresh() SELECT *.
     -- -----------------------------------------------------------------------
-    PERFORM pg_tviews_refresh('tv_user');
+    TRUNCATE public.tv_user;
+    INSERT INTO public.tv_user (pk_user, id, identifier, data)
+    SELECT pk_user, id::uuid, identifier, data FROM public.v_user;
     RAISE NOTICE '[05-medium-seed] tv_user refreshed.';
 
-    PERFORM pg_tviews_refresh('tv_post');
+    TRUNCATE public.tv_post;
+    INSERT INTO public.tv_post (pk_post, id, identifier, fk_author, data)
+    SELECT pk_post, id::uuid, identifier, fk_author, data FROM public.v_post;
     RAISE NOTICE '[05-medium-seed] tv_post refreshed.';
 
-    PERFORM pg_tviews_refresh('tv_comment');
+    TRUNCATE public.tv_comment;
+    INSERT INTO public.tv_comment (pk_comment, id, identifier, fk_author, fk_post, data)
+    SELECT pk_comment, id::uuid, identifier, fk_author, fk_post, data FROM public.v_comment;
     RAISE NOTICE '[05-medium-seed] tv_comment refreshed.';
 
     RAISE NOTICE '[05-medium-seed] Seeding complete for % dataset.', v_scale;

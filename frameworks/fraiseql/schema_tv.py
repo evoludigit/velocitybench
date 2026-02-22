@@ -69,12 +69,12 @@ class Comment:
 
 
 # ============================================================================
-# Query Definitions — sql_source maps to benchmark.tv_* pre-computed tables
+# Query Definitions — sql_source maps to public.tv_* pre-computed tables pre-computed tables
 # ============================================================================
 
 
 @fraiseql.query(
-    sql_source="benchmark.tv_user",
+    sql_source="public.tv_user",
     jsonb_column="data",
     auto_params={"limit": True, "offset": True, "where": True, "order_by": True},
 )
@@ -86,14 +86,14 @@ def users(
     pass
 
 
-@fraiseql.query(sql_source="benchmark.tv_user", jsonb_column="data")
+@fraiseql.query(sql_source="public.tv_user", jsonb_column="data")
 def user(id: ID) -> User | None:
     """Get a single user by UUID."""
     pass
 
 
 @fraiseql.query(
-    sql_source="benchmark.tv_post",
+    sql_source="public.tv_post",
     jsonb_column="data",
     auto_params={"limit": True, "offset": True, "where": True, "order_by": True},
 )
@@ -107,14 +107,14 @@ def posts(
     pass
 
 
-@fraiseql.query(sql_source="benchmark.tv_post", jsonb_column="data")
+@fraiseql.query(sql_source="public.tv_post", jsonb_column="data")
 def post(id: ID) -> Post | None:
     """Get a single post by UUID."""
     pass
 
 
 @fraiseql.query(
-    sql_source="benchmark.tv_comment",
+    sql_source="public.tv_comment",
     jsonb_column="data",
     auto_params={"limit": True, "offset": True, "where": True, "order_by": True},
 )
@@ -128,7 +128,7 @@ def comments(
     pass
 
 
-@fraiseql.query(sql_source="benchmark.tv_comment", jsonb_column="data")
+@fraiseql.query(sql_source="public.tv_comment", jsonb_column="data")
 def comment(id: ID) -> Comment | None:
     """Get a single comment by UUID."""
     pass
