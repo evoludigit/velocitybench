@@ -991,6 +991,7 @@ services:
 
   jmeter-master:
     image: jmeter:5.6-jdk11-alpine
+    profiles: [jmeter]
     ports:
       - "1099:1099"
       - "50500:50500"

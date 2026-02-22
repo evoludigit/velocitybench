@@ -2,7 +2,7 @@
 # FraiseQL v2: Compiled GraphQL execution engine
 
 # FraiseQL Python SDK for schema authoring
-fraiseql>=2.0.0b3
+fraiseql>=2.0.0rc1
 
 # Core dependencies
 requests>=2.31.0          # HTTP client for GraphQL queries
