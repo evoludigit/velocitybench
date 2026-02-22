@@ -1,4 +1,5 @@
-# FraiseQL v2.0.0-beta.4 Configuration — TV Tables Variant
+# FraiseQL v2.0.0-beta.4 Configuration — TV Tables Variant (NO CACHE)
+# Use for cold-read baseline comparison (C1 phase)
 # VelocityBench Benchmark Environment
 #
 # Variant B: Pre-computed JSONB tables (tv_*)
@@ -33,7 +34,7 @@ metrics_enabled = false
 
 # Query result cache enabled — LRU with SHA-256 keying, 24h TTL, 10 000 entries
 # For cold-read baseline comparison, use fraiseql-tv-nocache.toml (cache_enabled = false).
-cache_enabled = true
+cache_enabled = false
 
 # ============================================================================
 # JSONB Optimization Strategy

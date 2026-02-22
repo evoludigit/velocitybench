@@ -43,6 +43,11 @@ playground_enabled = false
 # Metrics disabled — reduces overhead for fairer benchmark comparison
 metrics_enabled = false
 
+# Query result cache enabled — LRU with SHA-256 keying, 24h TTL, 10 000 entries
+# This is the default (cache_enabled = true), stated explicitly for documentation.
+# For cold-read baseline comparison, use fraiseql-nocache.toml (cache_enabled = false).
+cache_enabled = true
+
 # ============================================================================
 # JSONB Optimization Strategy
 # "project": generates SQL like data->>'field' for scalars, data->'field'
