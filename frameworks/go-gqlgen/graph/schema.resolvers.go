@@ -72,9 +72,10 @@ func (r *queryResolver) Posts(ctx context.Context, limit *int32) ([]*model.Post,
 	}
 
 	rows, err := db.Pool.Query(ctx, `
-		SELECT id, fk_author, title, content, created_at::text
-		FROM benchmark.tb_post
-		ORDER BY created_at DESC
+		SELECT p.id, u.id AS author_uuid, p.title, p.content, p.created_at::text
+		FROM benchmark.tb_post p
+		JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+		ORDER BY p.created_at DESC
 		LIMIT $1
 	`, l)
 	if err != nil {
@@ -85,15 +86,15 @@ func (r *queryResolver) Posts(ctx context.Context, limit *int32) ([]*model.Post,
 	var posts []*model.Post
 	for rows.Next() {
 		var p model.Post
-		var authorID string
+		var authorUUID string
 		var content *string
 		var createdAt string
-		if err := rows.Scan(&p.ID, &authorID, &p.Title, &content, &createdAt); err != nil {
+		if err := rows.Scan(&p.ID, &authorUUID, &p.Title, &content, &createdAt); err != nil {
 			continue
 		}
 		p.Content = content
 		p.CreatedAt = createdAt
-		// Load author via dataloader later
+		p.Author = &model.User{ID: authorUUID}
 		posts = append(posts, &p)
 	}
 
