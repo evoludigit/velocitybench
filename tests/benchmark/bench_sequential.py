@@ -48,6 +48,327 @@ _GQL_Q2  = "{ posts(limit: 10) { id title } }"
 _GQL_Q2b = "{ posts(limit: 10) { id title author { username fullName } } }"
 
 FRAMEWORKS: dict[str, dict] = {
+    # ------------------------------------------------------------------
+    # Rust frameworks
+    # ------------------------------------------------------------------
+    "actix-web-rest": {
+        "compose_service": "actix-web-rest",
+        "type": "rest",
+        "queries": {
+            "Q1":  "http://localhost:8015/users?limit=20",
+            "Q2":  "http://localhost:8015/posts?limit=10",
+            "Q2b": "http://localhost:8015/posts?limit=10",  # always includes author JOIN
+        },
+        "health_url": "http://localhost:8015/health",
+    },
+    "async-graphql": {
+        "compose_service": "async-graphql",
+        "type": "graphql",
+        "queries": {
+            "Q1":  ("http://localhost:8016/graphql", _GQL_Q1),
+            "Q2":  ("http://localhost:8016/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:8016/graphql", _GQL_Q2b),
+        },
+        "health_url": "http://localhost:8016/health",
+    },
+    "juniper": {
+        "compose_service": "juniper",
+        "type": "graphql",
+        "queries": {
+            "Q1":  ("http://localhost:4000/graphql", _GQL_Q1),
+            "Q2":  ("http://localhost:4000/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
+        },
+        "health_url": "http://localhost:4000/health",
+    },
+    # ------------------------------------------------------------------
+    # Go frameworks
+    # ------------------------------------------------------------------
+    "go-gqlgen": {
+        "compose_service": "go-gqlgen",
+        "type": "graphql",
+        "queries": {
+            "Q1":  ("http://localhost:4010/query", _GQL_Q1),
+            "Q2":  ("http://localhost:4010/query", _GQL_Q2),
+            "Q2b": None,  # SKIP: author resolver architectural bug (fk_author→UUID mismatch)
+        },
+        "health_url": "http://localhost:4010/health",
+    },
+    "gin-rest": {
+        "compose_service": "gin-rest",
+        "type": "rest",
+        "queries": {
+            "Q1":  "http://localhost:8006/users?limit=20",
+            "Q2":  "http://localhost:8006/posts?limit=10",
+            "Q2b": "http://localhost:8006/posts?limit=10&include=author",
+        },
+        "health_url": "http://localhost:8006/health",
+    },
+    "go-graphql-go": {
+        "compose_service": "go-graphql-go",
+        "type": "graphql",
+        "queries": {
+            "Q1":  ("http://localhost:8008/graphql", _GQL_Q1),
+            "Q2":  ("http://localhost:8008/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:8008/graphql", _GQL_Q2b),
+        },
+        "health_url": "http://localhost:8008/health",
+    },
+    # ------------------------------------------------------------------
+    # Node.js frameworks
+    # ------------------------------------------------------------------
+    "apollo-server": {
+        "compose_service": "apollo",
+        "type": "graphql",
+        "queries": {
+            "Q1":  ("http://localhost:4002/graphql", _GQL_Q1),
+            "Q2":  ("http://localhost:4002/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:4002/graphql", _GQL_Q2b),
+        },
+        "health_url": "http://localhost:4002/health",
+    },
+    "apollo-orm": {
+        "compose_service": "apollo-orm",
+        "type": "graphql",
+        "queries": {
+            "Q1":  ("http://localhost:4004/graphql", _GQL_Q1),
+            "Q2":  ("http://localhost:4004/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:4004/graphql", _GQL_Q2b),
+        },
+        "health_url": "http://localhost:4005/health",  # health on separate port
+    },
+    "express-rest": {
+        "compose_service": "express-rest",
+        "type": "rest",
+        "queries": {
+            "Q1":  "http://localhost:8005/users?limit=20",
+            "Q2":  "http://localhost:8005/posts?limit=10",
+            "Q2b": "http://localhost:8005/posts?limit=10&include=author",
+        },
+        "health_url": "http://localhost:8005/health",
+    },
+    "express-orm": {
+        "compose_service": "express-orm",
+        "type": "rest",
+        "queries": {
+            "Q1":  "http://localhost:8007/users?limit=20",
+            "Q2":  "http://localhost:8007/posts?limit=10",
+            "Q2b": "http://localhost:8007/posts?limit=10&include=author",
+        },
+        "health_url": "http://localhost:8007/health",
+    },
+    "express-graphql": {
+        "compose_service": "express-graphql",
+        "type": "graphql",
+        "queries": {
+            "Q1":  ("http://localhost:4000/graphql", _GQL_Q1),
+            "Q2":  ("http://localhost:4000/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
+        },
+        "health_url": "http://localhost:4000/health",
+    },
+    "graphql-yoga": {
+        "compose_service": "graphql-yoga",
+        "type": "graphql",
+        "queries": {
+            "Q1":  ("http://localhost:4000/graphql", _GQL_Q1),
+            "Q2":  ("http://localhost:4000/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
+        },
+        "health_url": "http://localhost:4000/health",
+    },
+    "mercurius": {
+        "compose_service": "mercurius",
+        "type": "graphql",
+        "queries": {
+            "Q1":  ("http://localhost:4000/graphql", _GQL_Q1),
+            "Q2":  ("http://localhost:4000/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
+        },
+        "health_url": "http://localhost:4000/health",
+    },
+    # ------------------------------------------------------------------
+    # Python frameworks
+    # ------------------------------------------------------------------
+    "strawberry": {
+        "compose_service": "strawberry",
+        "type": "graphql",
+        "queries": {
+            "Q1":  ("http://localhost:8011/graphql", _GQL_Q1),
+            "Q2":  ("http://localhost:8011/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:8011/graphql", _GQL_Q2b),
+        },
+        "health_url": "http://localhost:8011/health",
+    },
+    "graphene": {
+        "compose_service": "graphene",
+        "type": "graphql",
+        "queries": {
+            "Q1":  ("http://localhost:8002/graphql", _GQL_Q1),
+            "Q2":  ("http://localhost:8002/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:8002/graphql", _GQL_Q2b),
+        },
+        "health_url": "http://localhost:8002/health",
+    },
+    "fastapi-rest": {
+        "compose_service": "fastapi-rest",
+        "type": "rest",
+        "queries": {
+            "Q1":  "http://localhost:8003/users?limit=20",
+            "Q2":  "http://localhost:8003/posts?limit=10",
+            "Q2b": "http://localhost:8003/posts?limit=10&include=author",
+        },
+        "health_url": "http://localhost:8003/health",
+    },
+    "flask-rest": {
+        "compose_service": "flask-rest",
+        "type": "rest",
+        "queries": {
+            "Q1":  "http://localhost:8004/users?limit=20",
+            "Q2":  "http://localhost:8004/posts?limit=10",
+            "Q2b": "http://localhost:8004/posts?limit=10&include=author",
+        },
+        "health_url": "http://localhost:8004/health",
+    },
+    "ariadne": {
+        "compose_service": "ariadne",
+        "type": "graphql",
+        "queries": {
+            "Q1":  ("http://localhost:4000/graphql", _GQL_Q1),
+            "Q2":  ("http://localhost:4000/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
+        },
+        "health_url": "http://localhost:4000/health",
+    },
+    "asgi-graphql": {
+        "compose_service": "asgi-graphql",
+        "type": "graphql",
+        "queries": {
+            "Q1":  ("http://localhost:4000/graphql", _GQL_Q1),
+            "Q2":  ("http://localhost:4000/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
+        },
+        "health_url": "http://localhost:4000/health",
+    },
+    # ------------------------------------------------------------------
+    # Java / JVM frameworks
+    # ------------------------------------------------------------------
+    "spring-boot": {
+        "compose_service": "spring-boot",
+        "type": "rest",
+        "queries": {
+            # Spring Boot uses page/size pagination, not limit
+            "Q1":  "http://localhost:8010/api/users?page=0&size=20",
+            "Q2":  "http://localhost:8010/api/posts?page=0&size=10",
+            "Q2b": None,  # PostDTO has authorId only — no nested author object
+        },
+        "health_url": "http://localhost:8010/actuator/health",
+    },
+    "spring-boot-orm": {
+        "compose_service": "spring-boot-orm",
+        "type": "rest",
+        "queries": {
+            "Q1":  "http://localhost:8013/api/users?page=0&size=20",
+            "Q2":  "http://localhost:8013/api/posts?size=10",
+            "Q2b": None,  # PostDTO has authorId only — no nested author object
+        },
+        "health_url": "http://localhost:8013/actuator/health",
+    },
+    "micronaut-graphql": {
+        "compose_service": "micronaut-graphql",
+        "type": "graphql",
+        "queries": {
+            "Q1":  ("http://localhost:4000/graphql", _GQL_Q1),
+            "Q2":  ("http://localhost:4000/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
+        },
+        "health_url": "http://localhost:4000/health",
+    },
+    "quarkus-graphql": {
+        "compose_service": "quarkus-graphql",
+        "type": "graphql",
+        "queries": {
+            "Q1":  ("http://localhost:4000/graphql", _GQL_Q1),
+            "Q2":  ("http://localhost:4000/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
+        },
+        "health_url": "http://localhost:4000/health",
+    },
+    # ------------------------------------------------------------------
+    # Scala frameworks
+    # ------------------------------------------------------------------
+    "play-graphql": {
+        "compose_service": "play-graphql",
+        "type": "graphql",
+        "queries": {
+            "Q1":  ("http://localhost:4000/graphql", _GQL_Q1),
+            "Q2":  ("http://localhost:4000/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
+        },
+        "health_url": "http://localhost:4000/health",
+    },
+    # ------------------------------------------------------------------
+    # Ruby frameworks
+    # ------------------------------------------------------------------
+    "ruby-rails": {
+        "compose_service": "ruby-rails",
+        "type": "rest",
+        "queries": {
+            "Q1":  "http://localhost:8012/api/users?limit=20",
+            "Q2":  "http://localhost:8012/api/posts?limit=10",
+            "Q2b": None,  # no nested author embedding
+        },
+        "health_url": "http://localhost:8012/api/health",
+    },
+    "hanami": {
+        "compose_service": "hanami",
+        "type": "graphql",
+        "queries": {
+            "Q1":  ("http://localhost:4000/graphql", _GQL_Q1),
+            "Q2":  ("http://localhost:4000/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
+        },
+        "health_url": "http://localhost:4000/health",
+    },
+    # ------------------------------------------------------------------
+    # PHP frameworks
+    # ------------------------------------------------------------------
+    "php-laravel": {
+        "compose_service": "php-laravel",
+        "type": "rest",
+        "queries": {
+            "Q1":  "http://localhost:8009/api/users?limit=20",
+            "Q2":  "http://localhost:8009/api/posts?limit=10",
+            "Q2b": None,  # no nested author embedding
+        },
+        "health_url": "http://localhost:8009/api/health",
+    },
+    "webonyx-graphql-php": {
+        "compose_service": "webonyx-graphql-php",
+        "type": "graphql",
+        "queries": {
+            "Q1":  ("http://localhost:4000/graphql", _GQL_Q1),
+            "Q2":  ("http://localhost:4000/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
+        },
+        "health_url": "http://localhost:4000/health",
+    },
+    # ------------------------------------------------------------------
+    # C# / .NET frameworks
+    # ------------------------------------------------------------------
+    "csharp-dotnet": {
+        "compose_service": "csharp-dotnet",
+        "type": "graphql",
+        "queries": {
+            "Q1":  ("http://localhost:8025/graphql", _GQL_Q1),
+            "Q2":  ("http://localhost:8025/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:8025/graphql", _GQL_Q2b),
+        },
+        "health_url": "http://localhost:8025/health",
+    },
+    # ------------------------------------------------------------------
+    # FraiseQL variants (last — pending upstream fixes)
+    # ------------------------------------------------------------------
     "fraiseql-tv": {
         "compose_service": "fraiseql-tv",
         "type": "graphql",
@@ -69,7 +390,6 @@ FRAMEWORKS: dict[str, dict] = {
             "Q2b": ("http://localhost:8817/graphql", _GQL_Q2b),
         },
         "health_url": "http://localhost:8817/health",
-        # Cold reads: standard warmup is sufficient (no cache to fill).
     },
     "fraiseql-v": {
         "compose_service": "fraiseql",
@@ -82,45 +402,53 @@ FRAMEWORKS: dict[str, dict] = {
         "health_url": "http://localhost:8815/health",
         "warmup_secs": 30,
     },
-    "go-gqlgen": {
-        "compose_service": "go-gqlgen",
-        "type": "graphql",
-        "queries": {
-            "Q1":  ("http://localhost:4010/query", _GQL_Q1),
-            "Q2":  ("http://localhost:4010/query", _GQL_Q2),
-            "Q2b": None,  # SKIP: author resolver architectural bug (fk_author→UUID mismatch)
-        },
-        "health_url": "http://localhost:4010/health",
-    },
-    "actix-web-rest": {
-        "compose_service": "actix-web-rest",
-        "type": "rest",
-        "queries": {
-            "Q1":  "http://localhost:8015/users?limit=20",
-            "Q2":  "http://localhost:8015/posts?limit=10",
-            "Q2b": "http://localhost:8015/posts?limit=10",  # always includes author JOIN
-        },
-        "health_url": "http://localhost:8015/health",
-    },
-    "async-graphql": {
-        "compose_service": "async-graphql",
-        "type": "graphql",
-        "queries": {
-            "Q1":  ("http://localhost:8016/graphql", _GQL_Q1),
-            "Q2":  ("http://localhost:8016/graphql", _GQL_Q2),
-            "Q2b": ("http://localhost:8016/graphql", _GQL_Q2b),
-        },
-        "health_url": "http://localhost:8016/health",
-    },
 }
 
+# Ordered for a single full-suite run: fastest first (Rust/Go), then compiled
+# (JVM/.NET), then interpreted (Node/Python/Ruby/PHP), then FraiseQL last.
 DEFAULT_FRAMEWORK_ORDER = [
+    # Rust
+    "actix-web-rest",
+    "async-graphql",
+    "juniper",
+    # Go
+    "go-gqlgen",
+    "gin-rest",
+    "go-graphql-go",
+    # Node.js
+    "apollo-server",
+    "apollo-orm",
+    "express-rest",
+    "express-orm",
+    "express-graphql",
+    "graphql-yoga",
+    "mercurius",
+    # Python
+    "strawberry",
+    "graphene",
+    "fastapi-rest",
+    "flask-rest",
+    "ariadne",
+    "asgi-graphql",
+    # Java / JVM
+    "spring-boot",
+    "spring-boot-orm",
+    "micronaut-graphql",
+    "quarkus-graphql",
+    # Scala
+    "play-graphql",
+    # Ruby
+    "ruby-rails",
+    "hanami",
+    # PHP
+    "php-laravel",
+    "webonyx-graphql-php",
+    # C# / .NET
+    "csharp-dotnet",
+    # FraiseQL (last — regression pending upstream fix)
     "fraiseql-tv",
     "fraiseql-tv-nocache",
     "fraiseql-v",
-    "go-gqlgen",
-    "actix-web-rest",
-    "async-graphql",
 ]
 
 REPORTS_DIR = Path(__file__).parent.parent.parent / "reports"
