@@ -47,17 +47,17 @@ class FrameworkValidator:
         conn = await asyncpg.connect(self.config['database']['url'])
         try:
             # Get first user
-            user = await conn.fetchrow('SELECT id FROM public.tv_user LIMIT 1')
+            user = await conn.fetchrow('SELECT id FROM benchmark.tv_user LIMIT 1')
             if user:
                 self.test_ids['TEST_USER_ID'] = str(user['id'])
 
             # Get first post
-            post = await conn.fetchrow('SELECT id FROM public.tv_post LIMIT 1')
+            post = await conn.fetchrow('SELECT id FROM benchmark.tv_post LIMIT 1')
             if post:
                 self.test_ids['TEST_POST_ID'] = str(post['id'])
 
             # Get first comment
-            comment = await conn.fetchrow('SELECT id FROM public.tv_comment LIMIT 1')
+            comment = await conn.fetchrow('SELECT id FROM benchmark.tv_comment LIMIT 1')
             if comment:
                 self.test_ids['TEST_COMMENT_ID'] = str(comment['id'])
 

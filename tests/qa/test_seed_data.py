@@ -99,7 +99,7 @@ def test_tv_user_count_medium(pg_conn):
     if os.environ.get("DATA_VOLUME") != "medium":
         pytest.skip("Requires DATA_VOLUME=medium")
     cur = pg_conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM public.tv_user")
+    cur.execute("SELECT COUNT(*) FROM benchmark.tv_user")
     assert cur.fetchone()[0] == 10_000
 
 
@@ -108,7 +108,7 @@ def test_tv_post_count_medium(pg_conn):
     if os.environ.get("DATA_VOLUME") != "medium":
         pytest.skip("Requires DATA_VOLUME=medium")
     cur = pg_conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM public.tv_post")
+    cur.execute("SELECT COUNT(*) FROM benchmark.tv_post")
     assert cur.fetchone()[0] == 50_000
 
 
@@ -117,7 +117,7 @@ def test_tv_comment_count_medium(pg_conn):
     if os.environ.get("DATA_VOLUME") != "medium":
         pytest.skip("Requires DATA_VOLUME=medium")
     cur = pg_conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM public.tv_comment")
+    cur.execute("SELECT COUNT(*) FROM benchmark.tv_comment")
     assert cur.fetchone()[0] == 200_000
 
 

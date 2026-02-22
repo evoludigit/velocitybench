@@ -368,9 +368,9 @@ class DataGenerator:
             cur.execute("ANALYZE benchmark.tb_user")
             cur.execute("ANALYZE benchmark.tb_post")
             cur.execute("ANALYZE benchmark.tb_comment")
-            cur.execute("ANALYZE public.tv_user")
-            cur.execute("ANALYZE public.tv_post")
-            cur.execute("ANALYZE public.tv_comment")
+            cur.execute("ANALYZE benchmark.tv_user")
+            cur.execute("ANALYZE benchmark.tv_post")
+            cur.execute("ANALYZE benchmark.tv_comment")
             self.conn.commit()
 
         print("  Analysis complete")

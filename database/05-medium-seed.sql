@@ -116,24 +116,18 @@ BEGIN
     ALTER TABLE benchmark.tb_comment ENABLE TRIGGER ALL;
 
     -- -----------------------------------------------------------------------
-    -- Rebuild TVIEWs from backing views (single-pass batch sync).
-    -- pg_tviews creates tables in public schema with extra created_at/updated_at
-    -- columns not present in the backing views, so we INSERT with explicit
-    -- column lists rather than using pg_tviews_refresh() SELECT *.
+    -- Refresh TVIEWs via pg_tviews_refresh() (beta.3+ API).
+    -- Takes the entity name (e.g. 'user'), not the tview name ('tv_user').
+    -- Internally does TRUNCATE + column-explicit INSERT from the backing view,
+    -- so created_at/updated_at column mismatch is handled correctly.
     -- -----------------------------------------------------------------------
-    TRUNCATE public.tv_user;
-    INSERT INTO public.tv_user (pk_user, id, identifier, data)
-    SELECT pk_user, id::uuid, identifier, data FROM public.v_user;
+    PERFORM pg_tviews_refresh('user');
     RAISE NOTICE '[05-medium-seed] tv_user refreshed.';
 
-    TRUNCATE public.tv_post;
-    INSERT INTO public.tv_post (pk_post, id, identifier, fk_author, data)
-    SELECT pk_post, id::uuid, identifier, fk_author, data FROM public.v_post;
+    PERFORM pg_tviews_refresh('post');
     RAISE NOTICE '[05-medium-seed] tv_post refreshed.';
 
-    TRUNCATE public.tv_comment;
-    INSERT INTO public.tv_comment (pk_comment, id, identifier, fk_author, fk_post, data)
-    SELECT pk_comment, id::uuid, identifier, fk_author, fk_post, data FROM public.v_comment;
+    PERFORM pg_tviews_refresh('comment');
     RAISE NOTICE '[05-medium-seed] tv_comment refreshed.';
 
     RAISE NOTICE '[05-medium-seed] Seeding complete for % dataset.', v_scale;
