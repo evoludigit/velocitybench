@@ -1,6 +1,6 @@
 # FraiseQL v2 Framework - VelocityBench
 
-FraiseQL v2 (2.0.0-rc.2) is a compiled GraphQL execution engine written in pure Rust. Unlike traditional GraphQL servers that resolve relationships at query time, FraiseQL uses the JSONB pattern where relationships are pre-shaped at the database level.
+FraiseQL v2 (2.0.0-rc.3) is a compiled GraphQL execution engine written in pure Rust. Unlike traditional GraphQL servers that resolve relationships at query time, FraiseQL uses the JSONB pattern where relationships are pre-shaped at the database level.
 
 ## Architecture
 
@@ -34,8 +34,8 @@ HTTP GraphQL Endpoint (port 8815)
 
 From crates.io:
 ```bash
-cargo install fraiseql-cli --version 2.0.0-rc.2
-cargo install fraiseql-server --version 2.0.0-rc.2
+cargo install fraiseql-cli --version 2.0.0-rc.3
+cargo install fraiseql-server --version 2.0.0-rc.3
 ```
 
 Or build locally:
@@ -241,7 +241,7 @@ export FRAISEQL_ROOT=/path/to/fraiseql
 python schema.py
 
 # Check CLI version
-fraiseql-cli --version  # Should be 2.0.0-rc.2
+fraiseql-cli --version  # Should be 2.0.0-rc.3
 ```
 
 ### Server won't start
@@ -282,7 +282,7 @@ python main.py --port 8816
 
 ## Version History
 
-- **v2.0.0-rc.2**: Current version
+- **v2.0.0-rc.3**: Current version
   - New Python SDK for schema authoring
   - Introspection support
   - Rate limiting and audit logging
