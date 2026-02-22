@@ -1,4 +1,4 @@
-# FraiseQL v2.0.0-beta.3 Configuration
+# FraiseQL v2.0.0-beta.4 Configuration
 # VelocityBench Benchmark Environment
 #
 # This file is read by BOTH the compiler and the server:
@@ -45,16 +45,14 @@ metrics_enabled = false
 
 # ============================================================================
 # JSONB Optimization Strategy
-# "project" (default): generates SQL like data->>'field' for each requested
-#   field — BROKEN for nested Object types (returns them as JSON strings).
-# "stream": returns the full data JSONB column and does field selection in
-#   Rust — correctly handles nested Object types (author, post, etc.).
-# Set to "stream" as a workaround for the beta.3 nested-object projection bug.
+# "project": generates SQL like data->>'field' for scalars, data->'field'
+#   for Object types — fixed in beta.4 (issue #27).
+# "stream": returns the full data JSONB column and filters in Rust.
 # ============================================================================
 
 [jsonb_optimization]
-default_strategy = "stream"
-auto_threshold_percent = 0
+default_strategy = "project"
+auto_threshold_percent = 80
 
 # ============================================================================
 # Compiler Configuration (fraiseql-cli compile fraiseql.toml)

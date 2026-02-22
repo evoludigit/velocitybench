@@ -1,17 +1,13 @@
-# FraiseQL v2.0.0-beta.3 Dockerfile for VelocityBench
+# FraiseQL v2.0.0-beta.4 Dockerfile for VelocityBench
 # Multi-stage build: Rust builder -> Python schema gen -> Debian runtime
 #
-# NOTE: fraiseql-server v2.0.0-beta.3 is not yet published to crates.io
-# (fraiseql-cli is at beta.3; the server crate lags behind). The server
-# binary is copied from the local build at ~/code/fraiseql/target/release/.
+# NOTE: fraiseql-server v2.0.0-beta.4 is not yet published to crates.io.
+# The server binary is copied from the local build at ~/code/fraiseql/target/release/.
 # When the server is published, replace the COPY with:
-#   RUN cargo install fraiseql-server --version 2.0.0-beta.3 --locked
+#   RUN cargo install fraiseql-server --version 2.0.0-beta.4 --locked
 #
-# PATCH: The local binary includes a fix for the nested Object field bug
-# (issue #27: https://github.com/fraiseql/fraiseql/issues/27). The fix
-# re-parses JSON-string values from data->>'field' back into proper objects
-# inside project_nested_value() in fraiseql-core/src/runtime/projection.rs.
-# Remove this note once the fix is merged and a patched release is published.
+# beta.4 includes fix for issue #27 (nested Object projection using -> instead
+# of ->>) — the "stream" strategy workaround in fraiseql.toml is no longer needed.
 
 # Build argument: which schema variant to compile.
 #   schema.py    → Variant A (v_* on-the-fly JSONB views) — default
@@ -49,7 +45,9 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install fraiseql-cli from crates.io (beta.3 published)
-RUN cargo install fraiseql-cli --version 2.0.0-beta.3 --locked --jobs "$(nproc)"
+# fraiseql-cli beta.4 not yet on crates.io — use local build copied alongside fraiseql-server
+COPY fraiseql-cli /usr/local/bin/fraiseql-cli
+RUN chmod +x /usr/local/bin/fraiseql-cli
 
 WORKDIR /app
 
@@ -68,7 +66,7 @@ RUN chmod +x /usr/local/bin/fraiseql-server
 # Stage 3: Runtime image (bookworm-slim)
 # NOTE: fraiseql-server is a local build linked against bookworm glibc
 # ============================================================================
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 RUN apt-get update && apt-get install -y \
     ca-certificates \

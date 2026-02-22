@@ -165,7 +165,7 @@ impl QueryRoot {
         let client = db.pool().get().await?;
         let rows = client
             .query(
-                "SELECT id, title, content, fk_author, created_at FROM benchmark.tb_post LIMIT $1 OFFSET $2",
+                "SELECT id, pk_post, title, content, fk_author, created_at FROM benchmark.tb_post LIMIT $1 OFFSET $2",
                 &[&limit, &offset],
              )
             .await?;

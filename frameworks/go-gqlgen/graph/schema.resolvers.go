@@ -72,7 +72,7 @@ func (r *queryResolver) Posts(ctx context.Context, limit *int32) ([]*model.Post,
 	}
 
 	rows, err := db.Pool.Query(ctx, `
-		SELECT id, fk_author, title, content, created_at
+		SELECT id, fk_author, title, content, created_at::text
 		FROM benchmark.tb_post
 		ORDER BY created_at DESC
 		LIMIT $1

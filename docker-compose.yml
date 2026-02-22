@@ -85,6 +85,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - ./frameworks/fraiseql/fraiseql-tv.toml:/app/fraiseql-tv.toml
     environment:
       - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
       - RUST_LOG=info
@@ -646,7 +648,7 @@ services:
       - DATABASE_PASSWORD=benchmark123
       - DATABASE_NAME=velocitybench_benchmark
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3

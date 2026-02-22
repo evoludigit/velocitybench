@@ -1,4 +1,4 @@
-# FraiseQL v2.0.0-beta.3 Configuration — TV Tables Variant
+# FraiseQL v2.0.0-beta.4 Configuration — TV Tables Variant
 # VelocityBench Benchmark Environment
 #
 # Variant B: Pre-computed JSONB tables (tv_*)
@@ -36,8 +36,8 @@ metrics_enabled = false
 # ============================================================================
 
 [jsonb_optimization]
-default_strategy = "stream"
-auto_threshold_percent = 0
+default_strategy = "project"
+auto_threshold_percent = 80
 
 # ============================================================================
 # Compiler Configuration (fraiseql-cli compile fraiseql-tv.toml)
