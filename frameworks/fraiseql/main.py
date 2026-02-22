@@ -124,13 +124,13 @@ class FraiseQLServer:
         """Validate that required binaries exist."""
         if not self.fraiseql_cli.exists():
             logger.error(f"fraiseql-cli not found at {self.fraiseql_cli}")
-            logger.info("Install with: cargo install fraiseql-cli --version 2.0.0-rc.3")
+            logger.info("Install with: cargo install fraiseql-cli --version 2.0.0-rc.5")
             logger.info("Or build locally: cd /home/lionel/code/fraiseql && cargo build --release")
             return False
 
         if not self.fraiseql_server.exists():
             logger.error(f"fraiseql-server not found at {self.fraiseql_server}")
-            logger.info("Install with: cargo install fraiseql-server --version 2.0.0-rc.3")
+            logger.info("Install with: cargo install fraiseql-server --version 2.0.0-rc.5")
             return False
 
         return True
