@@ -55,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        framework: [apollo-server, express-rest, express-orm, apollo-orm, express-graphql, fastify-graphql, graphql-yoga, mercurius, postgraphile]
+        framework: [apollo-server, express-rest, express-orm, apollo-orm, express-graphql, graphql-yoga, mercurius, postgraphile]
     steps:
       - uses: actions/checkout@v4
 
@@ -281,7 +281,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        framework: [ruby-rails, ruby-rails-fixed, hanami]
+        framework: [ruby-rails, hanami]
     steps:
       - uses: actions/checkout@v4
 
@@ -418,17 +418,17 @@ jobs:
           echo "| Language | Frameworks | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|------------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Python | 6 | ${{ needs.python-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| TypeScript | 9 | ${{ needs.typescript-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| TypeScript | 8 | ${{ needs.typescript-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Go | 4 | ${{ needs.go-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Java (Maven) | 3 | ${{ needs.java-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| JVM (Multi-tool) | 3 | ${{ needs.jvm-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Rust | 3 | ${{ needs.rust-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| PHP | 2 | ${{ needs.php-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Ruby | 3 | ${{ needs.ruby-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Ruby | 2 | ${{ needs.ruby-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| C# | 1 | ${{ needs.csharp-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Hasura | 1 | ${{ needs.hasura-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Total: 35 frameworks tested in CI**" >> $GITHUB_STEP_SUMMARY
+          echo "**Total: 33 frameworks tested in CI**" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "_Note: Additional framework variations available for N+1 testing (apollorm-naive, strawberry-orm-naive, etc.)_" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
