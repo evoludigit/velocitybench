@@ -361,20 +361,6 @@ frameworks:
     features:
       dataloader: graphql-dataloader
 
-  - name: fastify-graphql
-    language: typescript
-    type: graphql
-    port: 8028
-    endpoint: /graphql
-    health_check: /health
-    expected_tables:
-      - benchmark.tb_user
-      - benchmark.tb_post
-      - benchmark.tb_comment
-    features:
-      dataloader: native
-      subscription: mercurius
-
   - name: graphql-yoga
     language: typescript
     type: graphql
@@ -519,19 +505,6 @@ frameworks:
     features:
       dataloader: sangria-dataloader
       note: Play Framework with Sangria GraphQL
-
-  - name: spring-graphql
-    language: java
-    type: graphql
-    port: 8042
-    endpoint: /graphql
-    health_check: /health
-    expected_tables:
-      - benchmark.tb_user
-      - benchmark.tb_post
-      - benchmark.tb_comment
-    features:
-      note: Test-only stub (no build configuration)
 
   # Hasura (Database-first GraphQL)
   - name: hasura

@@ -250,14 +250,6 @@
       "language": "typescript",
       "category": "graphql-library"
     },
-    "fastify-graphql": {
-      "port": 8028,
-      "type": "graphql",
-      "health": "/health",
-      "endpoint": "/graphql",
-      "language": "typescript",
-      "category": "graphql-library"
-    },
     "graphql-yoga": {
       "port": 8029,
       "type": "graphql",
@@ -315,15 +307,6 @@
       "language": "ruby",
       "category": "rest-framework"
     },
-    "ruby-rails-fixed": {
-      "port": 8036,
-      "type": "rest",
-      "health": "/api/health",
-      "endpoint": "/api/users",
-      "language": "ruby",
-      "category": "rest-framework",
-      "note": "Fixed version with optimized queries"
-    },
     "hanami": {
       "port": 8037,
       "type": "rest",
@@ -363,15 +346,6 @@
       "endpoint": "/graphql",
       "language": "scala",
       "category": "graphql-framework"
-    },
-    "spring-graphql": {
-      "port": 8042,
-      "type": "graphql",
-      "health": "/health",
-      "endpoint": "/graphql",
-      "language": "java",
-      "category": "graphql-framework",
-      "note": "Test-only stub (no build configuration)"
     }
   },
   "test_queries": {

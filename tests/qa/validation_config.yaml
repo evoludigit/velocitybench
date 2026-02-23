@@ -49,7 +49,7 @@ reporting:
   output_formats:
     - markdown
     - json
-  output_directory: .phases/qa-framework-verification
+  output_directory: reports
 
   include_sections:
     - summary

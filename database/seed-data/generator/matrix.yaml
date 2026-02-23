@@ -66,7 +66,7 @@ blog_generation:
     - frameworks: [strawberry, graphene]
       patterns: [trinity-pattern, n-plus-one]
 
-    - frameworks: [spring-graphql, quarkus-graphql]
+    - frameworks: [quarkus-graphql]
       patterns: [trinity-pattern]
 
     - frameworks: [hot-chocolate, graphql-net]
@@ -245,16 +245,13 @@ frameworks:
     - fraiseql
     - apollo-server
     - graphql-yoga
-    - fastify-graphql
     - express-graphql
     - mercurius
     - strawberry
     - graphene
     - ariadne
     - asgi-graphql
-    - rails
     - hanami
-    - spring-graphql
     - micronaut-graphql
     - quarkus-graphql
     - play-graphql
@@ -274,7 +271,6 @@ frameworks:
       - postgraphile
       - apollo-server
       - graphql-yoga
-      - fastify-graphql
       - express-graphql
       - mercurius
 
@@ -285,11 +281,9 @@ frameworks:
       - asgi-graphql
 
     ruby:
-      - rails
       - hanami
 
     java:
-      - spring-graphql
       - micronaut-graphql
       - quarkus-graphql
       - play-graphql

@@ -5,18 +5,19 @@ Runs all validators in order and generates comprehensive report.
 """
 
 import asyncio
-from pathlib import Path
-import yaml
 import json
 from datetime import datetime
-import asyncpg
+from pathlib import Path
 
-from .schema_validator import SchemaValidator
-from .query_validator import QueryValidator
-from .n1_detector import N1Detector
-from .data_consistency_validator import DataConsistencyValidator
+import asyncpg
+import yaml
+
 from .config_validator import ConfigValidator
+from .data_consistency_validator import DataConsistencyValidator
+from .n1_detector import N1Detector
 from .performance_validator import PerformanceValidator
+from .query_validator import QueryValidator
+from .schema_validator import SchemaValidator
 
 
 class FrameworkValidator:
@@ -118,13 +119,13 @@ class FrameworkValidator:
         }
 
         # 1. Schema validation
-        print(f"  [1/6] Validating schema references...")
+        print("  [1/6] Validating schema references...")
         results['checks']['schema'] = await self.schema_validator.verify_framework_schema(framework)
         status_icon = "✅" if results['checks']['schema']['status'] == 'pass' else "❌"
         print(f"        {status_icon} {results['checks']['schema']['status'].upper()}")
 
         # 2. Config validation
-        print(f"  [2/6] Validating configuration...")
+        print("  [2/6] Validating configuration...")
         results['checks']['config'] = {
             'health': await self.config_validator.check_health_endpoint(framework),
             'metrics': await self.config_validator.check_metrics_endpoint(framework),
@@ -137,12 +138,12 @@ class FrameworkValidator:
 
         # Skip remaining checks if framework is not running
         if health_status != 'pass':
-            print(f"        ⏭️  Skipping remaining checks (framework not running)")
+            print("        ⏭️  Skipping remaining checks (framework not running)")
             results['overall_status'] = 'broken'
             return results
 
         # 3. Query validation
-        print(f"  [3/6] Validating query support...")
+        print("  [3/6] Validating query support...")
         results['checks']['queries'] = await self.query_validator.verify_query_support(framework, self.test_ids)
         supported = results['checks']['queries']['supported_queries']
         passing = sum(1 for v in supported.values() if v == 'pass')
@@ -150,7 +151,7 @@ class FrameworkValidator:
         print(f"        ℹ️  {passing}/{total} queries passing")
 
         # 4. N+1 detection (only for GraphQL)
-        print(f"  [4/6] Detecting N+1 query patterns...")
+        print("  [4/6] Detecting N+1 query patterns...")
         if framework['type'] == 'graphql':
             results['checks']['n1_queries'] = {}
             for test_case in ['users_with_posts', 'posts_with_authors']:
@@ -162,10 +163,10 @@ class FrameworkValidator:
                     print(f"        ⚠️  {test_case}: {result.get('reason', 'N/A')}")
         else:
             results['checks']['n1_queries'] = {'status': 'skipped', 'reason': 'REST framework'}
-            print(f"        ⏭️  Skipped (REST framework)")
+            print("        ⏭️  Skipped (REST framework)")
 
         # 5. Performance sanity checks
-        print(f"  [5/6] Running performance sanity checks...")
+        print("  [5/6] Running performance sanity checks...")
         if framework['type'] == 'graphql':
             ping_result = await self.performance_validator.measure_query_latency(framework, 'query { ping }', iterations=5)
             results['checks']['performance'] = {
@@ -176,11 +177,11 @@ class FrameworkValidator:
                 print(f"        ✅ Avg latency: {ping_result['avg_latency_ms']:.2f}ms")
         else:
             results['checks']['performance'] = {'status': 'skipped'}
-            print(f"        ⏭️  Skipped")
+            print("        ⏭️  Skipped")
 
         # 6. Data consistency (will be run separately across all frameworks)
-        print(f"  [6/6] Data consistency check...")
-        print(f"        ⏭️  Will be compared against baseline later")
+        print("  [6/6] Data consistency check...")
+        print("        ⏭️  Will be compared against baseline later")
 
         # Calculate overall status
         results['overall_status'] = self._calculate_status(results['checks'])
@@ -334,13 +335,15 @@ async def main():
     results = await validator.validate_all_frameworks()
 
     # Generate reports
+    from datetime import datetime
+    date_str = datetime.now().strftime("%Y-%m-%d")
     await validator.generate_report(
         results,
-        '.phases/qa-framework-verification/VERIFICATION_RESULTS.md'
+        f'reports/qa-verification-{date_str}.md'
     )
     await validator.generate_json_report(
         results,
-        '.phases/qa-framework-verification/verification_results.json'
+        f'reports/qa-verification-{date_str}.json'
     )
 
     # Exit code based on results

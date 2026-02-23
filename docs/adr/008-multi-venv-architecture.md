@@ -30,7 +30,7 @@ VelocityBench uses **8 distinct virtual environments**:
 | **Flask** | `frameworks/flask-rest/.venv` | 3.13.7 | Flask framework | ~900 MB |
 | **Strawberry** | `frameworks/strawberry/.venv` | 3.13.7 | Strawberry GraphQL | ~1.1 GB |
 | **Graphene** | `frameworks/graphene/.venv` | 3.13.7 | Graphene GraphQL | ~1.0 GB |
-| **FraiseQL** | `frameworks/fraiseql/venv` | 3.13.7 | FraiseQL framework | ~1.0 GB |
+| **FraiseQL** | `frameworks/fraiseql/.venv` | 3.13.7 | FraiseQL framework | ~1.0 GB |
 | **QA** | `tests/qa/.venv` | 3.13.7 | Integration testing | ~1.5 GB |
 
 **Total Disk Space**: ~8-10 GB of Python dependencies (19 GB with caches)
@@ -189,8 +189,8 @@ source /home/lionel/code/velocitybench/database/.venv/bin/activate
 # FastAPI development
 source /home/lionel/code/velocitybench/frameworks/fastapi-rest/.venv/bin/activate
 
-# FraiseQL development (note: venv not .venv)
-source /home/lionel/code/velocitybench/frameworks/fraiseql/venv/bin/activate
+# FraiseQL development
+source /home/lionel/code/velocitybench/frameworks/fraiseql/.venv/bin/activate
 
 # QA testing
 source /home/lionel/code/velocitybench/tests/qa/.venv/bin/activate

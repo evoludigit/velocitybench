@@ -156,7 +156,7 @@ source /home/lionel/code/velocitybench/frameworks/graphene/.venv/bin/activate
 
 ### 7. FraiseQL Framework
 
-**Location**: `/home/lionel/code/velocitybench/frameworks/fraiseql/venv`
+**Location**: `/home/lionel/code/velocitybench/frameworks/fraiseql/.venv`
 
 **Python Version**: 3.13.7
 
@@ -168,12 +168,10 @@ source /home/lionel/code/velocitybench/frameworks/graphene/.venv/bin/activate
 
 **Activation**:
 ```bash
-source /home/lionel/code/velocitybench/frameworks/fraiseql/venv/bin/activate
+source /home/lionel/code/velocitybench/frameworks/fraiseql/.venv/bin/activate
 # or:
-/home/lionel/code/velocitybench/frameworks/fraiseql/venv/bin/python
+/home/lionel/code/velocitybench/frameworks/fraiseql/.venv/bin/python
 ```
-
-**Note**: Uses `venv` (not `.venv`) naming convention.
 
 **When to use**:
 - Developing/testing FraiseQL framework
@@ -213,23 +211,14 @@ source /home/lionel/code/velocitybench/tests/qa/.venv/bin/activate
 | **Flask** | `frameworks/flask-rest/.venv` | 3.13.7 | Flask REST framework |
 | **Strawberry** | `frameworks/strawberry/.venv` | 3.13.7 | Strawberry GraphQL |
 | **Graphene** | `frameworks/graphene/.venv` | 3.13.7 | Graphene GraphQL |
-| **FraiseQL** | `frameworks/fraiseql/venv` | 3.13.7 | FraiseQL framework |
+| **FraiseQL** | `frameworks/fraiseql/.venv` | 3.13.7 | FraiseQL framework |
 | **QA** | `tests/qa/.venv` | 3.13.7 | Integration testing |
 
 ---
 
-## Important Notes on Virtual Environment Naming
+## Virtual Environment Naming Convention
 
-⚠️ **Inconsistent Naming Convention**: The project uses both `.venv` and `venv` naming:
-- **Most frameworks**: Use `.venv` (hidden directory)
-- **FraiseQL**: Uses `venv` (non-hidden directory)
-
-**Why this matters**:
-- When activating venvs, use the correct path
-- When configuring IDEs, be aware of the exact location
-- When adding to `.gitignore`, both patterns should be covered
-
-**Recommendation**: Consider standardizing to `.venv` across all frameworks for consistency.
+All framework virtual environments use `.venv` (hidden directory). This is consistent across all frameworks including FraiseQL.
 
 ---
 
@@ -244,7 +233,7 @@ which python
 # Expected output patterns:
 # - Blog generation: /home/lionel/code/velocitybench/venv/bin/python
 # - FastAPI: /home/lionel/code/velocitybench/frameworks/fastapi-rest/.venv/bin/python
-# - FraiseQL: /home/lionel/code/velocitybench/frameworks/fraiseql/venv/bin/python
+# - FraiseQL: /home/lionel/code/velocitybench/frameworks/fraiseql/.venv/bin/python
 ```
 
 ### Verifying Dependencies
@@ -486,7 +475,7 @@ pip install -r requirements-dev.txt
 | Flask | REST | `frameworks/flask-rest/` | `.venv` | 3.13.7 | Active |
 | Strawberry | GraphQL | `frameworks/strawberry/` | `.venv` | 3.13.7 | Active |
 | Graphene | GraphQL | `frameworks/graphene/` | `.venv` | 3.13.7 | Active |
-| FraiseQL | GraphQL | `frameworks/fraiseql/` | `venv` | 3.13.7 | Active |
+| FraiseQL | GraphQL | `frameworks/fraiseql/` | `.venv` | 3.13.7 | Active |
 | Database | Utilities | `database/` | `.venv` | 3.11.14 | Active |
 
 ---

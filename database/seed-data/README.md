@@ -192,8 +192,8 @@ Backend pattern definitions organized by category:
 Framework-specific implementations for all 26 frameworks:
 - Node.js: postgraphile, apollo-server, graphql-yoga, etc.
 - Python: strawberry, graphene, ariadne, etc.
-- Ruby: rails, hanami
-- Java: spring-graphql, micronaut-graphql, etc.
+- Ruby: hanami
+- Java: micronaut-graphql, quarkus-graphql, play-graphql, etc.
 - And more...
 
 ### /corpus/languages/
