@@ -90,7 +90,7 @@ FRAMEWORKS: dict[str, dict] = {
         "queries": {
             "Q1":  ("http://localhost:4010/query", _GQL_Q1),
             "Q2":  ("http://localhost:4010/query", _GQL_Q2),
-            "Q2b": None,  # SKIP: author resolver architectural bug (fk_author→UUID mismatch)
+            "Q2b": ("http://localhost:4010/query", _GQL_Q2b),
         },
         "health_url": "http://localhost:4010/health",
     },
@@ -270,7 +270,7 @@ FRAMEWORKS: dict[str, dict] = {
         "queries": {
             "Q1":  "http://localhost:8013/api/users?page=0&size=20",
             "Q2":  "http://localhost:8013/api/posts?size=10",
-            "Q2b": None,  # PostDTO has authorId only — no nested author object
+            "Q2b": "http://localhost:8013/api/posts?size=10&include=author",
         },
         "health_url": "http://localhost:8013/actuator/health",
     },
@@ -339,7 +339,7 @@ FRAMEWORKS: dict[str, dict] = {
         "queries": {
             "Q1":  "http://localhost:8009/api/users?limit=20",
             "Q2":  "http://localhost:8009/api/posts?limit=10",
-            "Q2b": None,  # no nested author embedding
+            "Q2b": "http://localhost:8009/api/posts?limit=10&include=author",
         },
         "health_url": "http://localhost:8009/api/health",
     },
@@ -666,6 +666,17 @@ def start_service(service: str, health_url: str, timeout_secs: int = 60) -> None
     raise RuntimeError(f"{service} did not become healthy within {timeout_secs}s")
 
 
+def start_service_or_skip(service: str, health_url: str, timeout_secs: int = 60) -> bool:
+    """Like start_service but returns False instead of raising on timeout."""
+    try:
+        start_service(service, health_url, timeout_secs)
+        return True
+    except RuntimeError as exc:
+        print(f"  WARN: {exc} — skipping", flush=True)
+        _compose("stop", service, check=False)
+        return False
+
+
 def stop_service(service: str) -> None:
     print(f"  stopping {service}...", end=" ", flush=True)
     _compose("stop", service)
@@ -700,8 +711,8 @@ def format_report(
         "# VelocityBench — Sequential Isolation Benchmark Results",
         "",
         f"**Date**: {date_str}  ",
-        f"**Dataset**: MEDIUM — 10 000 users · 50 000 posts · 200 000 comments  ",
-        f"**Method**: Sequential isolation — each framework runs alone, PostgreSQL stays up  ",
+        "**Dataset**: MEDIUM — 10 000 users · 50 000 posts · 200 000 comments  ",
+        "**Method**: Sequential isolation — each framework runs alone, PostgreSQL stays up  ",
         f"**Concurrency**: {args.concurrency} workers  ",
         f"**Measurement**: {args.duration}s per scenario  ",
         f"**Warmup**: {args.warmup}s per scenario  ",
@@ -802,6 +813,10 @@ def main() -> None:
         help="Skip docker start/stop — assume all services already running",
     )
     parser.add_argument(
+        "--skip-unhealthy", action="store_true",
+        help="Skip frameworks that fail to become healthy instead of aborting",
+    )
+    parser.add_argument(
         "--output", type=str, default=None,
         help="Report output path (default: reports/bench-sequential-YYYY-MM-DD.md)",
     )
@@ -833,7 +848,19 @@ def main() -> None:
         print(f"[{i + 1}/{len(args.frameworks)}] {fw_name}")
 
         if not args.no_isolation:
-            start_service(fw_config["compose_service"], fw_config["health_url"])
+            healthy = start_service_or_skip(fw_config["compose_service"], fw_config["health_url"]) \
+                if args.skip_unhealthy else (start_service(fw_config["compose_service"], fw_config["health_url"]) or True)
+            if not healthy:
+                for query_name in ("Q1", "Q2", "Q2b"):
+                    r = BenchResult(
+                        framework=fw_name, query_name=query_name,
+                        duration_secs=args.duration, concurrency=args.concurrency,
+                        skipped=True, skip_reason="service did not become healthy",
+                    )
+                    all_results.append(r)
+                continue
+        else:
+            healthy = True
 
         for query_name in ("Q1", "Q2", "Q2b"):
             print(f"  {query_name}:")
