@@ -39,10 +39,7 @@ import traceback
 FRAMEWORKS = [
     'postgraphile',
     'fraiseql',
-    # 'rails',
-    # 'django',
-    # 'spring-graphql',
-    # ... (26 total frameworks)
+    # ... (see tests/benchmark/bench_sequential.py for the full registry)
 ]
 
 

@@ -89,13 +89,6 @@ FRAMEWORKS = {
         "factory_class": "TestFactory",
         "status": "ready",
     },
-    "fastify-graphql": {
-        "language": "TypeScript",
-        "template": "SECURITY_TEST_TEMPLATE_TYPESCRIPT.ts",
-        "test_dir": "frameworks/fastify-graphql/tests",
-        "factory_class": "TestFactory",
-        "status": "ready",
-    },
     "graphql-yoga": {
         "language": "TypeScript",
         "template": "SECURITY_TEST_TEMPLATE_TYPESCRIPT.ts",
@@ -194,13 +187,6 @@ FRAMEWORKS = {
         "language": "Java",
         "template": "SECURITY_TEST_TEMPLATE_JAVA.java",
         "test_dir": "frameworks/spring-boot-orm/src/test/java",
-        "factory_class": "TestFactory",
-        "status": "ready",
-    },
-    "spring-graphql": {
-        "language": "Java",
-        "template": "SECURITY_TEST_TEMPLATE_JAVA.java",
-        "test_dir": "frameworks/spring-graphql/src/test/java",
         "factory_class": "TestFactory",
         "status": "ready",
     },

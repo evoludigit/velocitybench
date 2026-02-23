@@ -13,7 +13,7 @@ down:
 
 
 
-.PHONY: framework-list framework-start framework-stop framework-smoke test-seed smoke-test parity-test bench bench-one bench-all n1-guard up up-medium down
+.PHONY: framework-list framework-start framework-stop framework-smoke test-seed smoke-test parity-test bench bench-one bench-all bench-sequential n1-guard validate up up-medium down
 
 # List all available frameworks
 framework-list:
@@ -38,7 +38,6 @@ framework-list:
 	@echo "    juniper         - Juniper (Rust)"
 	@echo "    hanami          - Hanami (Ruby)"
 	@echo "    webonyx-graphql-php - webonyx/graphql-php (PHP)"
-	@echo "    spring-graphql  - Spring GraphQL (Java)"
 	@echo "    micronaut-graphql - Micronaut GraphQL (Java)"
 	@echo "    quarkus-graphql - Quarkus GraphQL (Java)"
 	@echo "    play-graphql    - Play/Sangria (Scala)"
@@ -138,13 +137,22 @@ bench-one:
 		echo "Usage: make bench-one FRAMEWORK=<name>"; \
 		exit 1; \
 	fi
-	k6 run --env FRAMEWORK=$(FRAMEWORK) $(PROJECT_ROOT)benchmarks/k6/full_suite.js
+	k6 run --env FRAMEWORK=$(FRAMEWORK) $(PROJECT_ROOT)tests/benchmark/k6/full_suite.js
 
 # Run k6 against all 8 frameworks (parity gate first).
 # Usage: make bench-all
 bench-all: parity-test
 	@echo "Running full k6 benchmark suite..."
-	$(PROJECT_ROOT)venv/bin/python $(PROJECT_ROOT)benchmarks/run_all.py
+	$(PROJECT_ROOT)venv/bin/python $(PROJECT_ROOT)tests/benchmark/run_all.py
+
+# Sequential isolation benchmark (canonical, no k6 required).
+# Usage: make bench-sequential [DURATION=20] [CONCURRENCY=40] [FRAMEWORKS="fraiseql-tv gin-rest"]
+bench-sequential:
+	@echo "Running sequential isolation benchmark..."
+	$(PROJECT_ROOT)venv/bin/python $(PROJECT_ROOT)tests/benchmark/bench_sequential.py \
+	  $(if $(DURATION),--duration $(DURATION),) \
+	  $(if $(CONCURRENCY),--concurrency $(CONCURRENCY),) \
+	  $(if $(FRAMEWORKS),--frameworks $(FRAMEWORKS),)
 
 # N+1 query guard: detect DataLoader regressions using pg_stat_statements.
 # Run serially against the benchmark stack (no concurrent traffic).
@@ -160,6 +168,11 @@ n1-guard:
 # Usage: make bench [DURATION=30] [CONCURRENCY=50]
 bench: parity-test
 	@echo "Parity confirmed. Starting FraiseQL comparison benchmark..."
-	$(PROJECT_ROOT)venv/bin/python $(PROJECT_ROOT)benchmarks/fraiseql_comparison.py \
+	$(PROJECT_ROOT)venv/bin/python $(PROJECT_ROOT)tests/benchmark/fraiseql_comparison.py \
 	  --duration $(or $(DURATION),30) \
 	  --concurrency $(or $(CONCURRENCY),50)
+
+# Full pre-benchmark health check: smoke, parity, N+1 guard.
+# Usage: make validate
+validate: smoke-test parity-test n1-guard
+	@echo "✓ All pre-benchmark validation checks passed"
