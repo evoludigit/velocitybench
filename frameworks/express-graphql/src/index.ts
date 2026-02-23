@@ -53,7 +53,8 @@ UserType = new GraphQLObjectType({
 // Post Type
 PostType = new GraphQLObjectType({
   name: 'Post',
-  fields: () => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  fields: (): any => ({
     id: { type: new GraphQLNonNull(GraphQLID) },
     title: { type: new GraphQLNonNull(GraphQLString) },
     content: { type: GraphQLString },
@@ -90,7 +91,8 @@ PostType = new GraphQLObjectType({
 // Comment Type
 CommentType = new GraphQLObjectType({
   name: 'Comment',
-  fields: () => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  fields: (): any => ({
     id: { type: new GraphQLNonNull(GraphQLID) },
     content: { type: new GraphQLNonNull(GraphQLString) },
     author: {

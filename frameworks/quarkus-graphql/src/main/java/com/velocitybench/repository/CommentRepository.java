@@ -54,7 +54,7 @@ public class CommentRepository {
     private Comment mapRow(ResultSet rs) throws SQLException {
         return new Comment(
             rs.getInt("pk_comment"),
-            rs.getString("id"),
+            rs.getObject("id", UUID.class),
             rs.getInt("fk_post"),
             rs.getInt("fk_author"),
             rs.getString("content"),

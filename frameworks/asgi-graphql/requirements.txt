@@ -11,6 +11,8 @@ graphql-core==3.2.3
 # Database
 asyncpg==0.29.0
 
+psutil==5.9.6
+
 # Testing
 pytest==9.0.2
 pytest-asyncio==1.3.0

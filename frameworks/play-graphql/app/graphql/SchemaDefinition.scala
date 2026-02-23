@@ -4,6 +4,7 @@ import models._
 import repositories._
 import sangria.schema._
 import sangria.macros.derive._
+import sangria.execution.deferred._
 import scala.concurrent.{ExecutionContext, Future}
 
 class SchemaDefinition(
@@ -27,22 +28,10 @@ class SchemaDefinition(
     }
   )(HasId(_.pkPost))
 
-  val postsByAuthorFetcher = Fetcher.rel[GraphQLContext, Post, Int, Int](
-    (ctx, ids, _) => Future {
-      ctx.postRepository.findByAuthorPks(ids.toSet, 50).values.flatten.toSeq
-    }
-  )(HasId(_.pkPost))
-
-  val commentsByPostFetcher = Fetcher.rel[GraphQLContext, Comment, Int, Int](
-    (ctx, ids, _) => Future {
-      ctx.commentRepository.findByPostPks(ids.toSet, 50).values.flatten.toSeq
-    }
-  )(HasId(_.pkComment))
-
   lazy val CommentType: ObjectType[GraphQLContext, Comment] = ObjectType(
     "Comment",
     () => fields[GraphQLContext, Comment](
-      Field("id", IDType, resolve = _.value.id),
+      Field("id", IDType, resolve = _.value.id.toString),
       Field("content", StringType, resolve = _.value.content),
       Field("createdAt", StringType, resolve = _.value.createdAt.toString),
       Field("author", OptionType(UserType),
@@ -55,7 +44,7 @@ class SchemaDefinition(
   lazy val PostType: ObjectType[GraphQLContext, Post] = ObjectType(
     "Post",
     () => fields[GraphQLContext, Post](
-      Field("id", IDType, resolve = _.value.id),
+      Field("id", IDType, resolve = _.value.id.toString),
       Field("title", StringType, resolve = _.value.title),
       Field("content", OptionType(StringType), resolve = _.value.content),
       Field("createdAt", StringType, resolve = _.value.createdAt.toString),
@@ -76,7 +65,7 @@ class SchemaDefinition(
   lazy val UserType: ObjectType[GraphQLContext, User] = ObjectType(
     "User",
     () => fields[GraphQLContext, User](
-      Field("id", IDType, resolve = _.value.id),
+      Field("id", IDType, resolve = _.value.id.toString),
       Field("username", StringType, resolve = _.value.username),
       Field("fullName", OptionType(StringType), resolve = _.value.fullName),
       Field("bio", OptionType(StringType), resolve = _.value.bio),
@@ -96,22 +85,6 @@ class SchemaDefinition(
       Field("following", ListType(UserType),
         arguments = Argument("limit", OptionInputType(IntType), 50) :: Nil,
         resolve = _ => Seq.empty[User])
-    )
-  )
-
-  val UpdateUserInputType = InputObjectType[UpdateUserInput](
-    "UpdateUserInput",
-    List(
-      InputField("fullName", OptionInputType(StringType)),
-      InputField("bio", OptionInputType(StringType))
-    )
-  )
-
-  val UpdatePostInputType = InputObjectType[UpdatePostInput](
-    "UpdatePostInput",
-    List(
-      InputField("title", OptionInputType(StringType)),
-      InputField("content", OptionInputType(StringType))
     )
   )
 
@@ -138,17 +111,11 @@ class SchemaDefinition(
     "Mutation",
     fields[GraphQLContext, Unit](
       Field("updateUser", OptionType(UserType),
-        arguments = Argument("id", IDType) :: Argument("input", UpdateUserInputType) :: Nil,
-        resolve = ctx => {
-          val input = ctx.arg[UpdateUserInput]("input")
-          ctx.ctx.userRepository.update(ctx.arg[String]("id"), input.fullName, input.bio)
-        }),
+        arguments = Argument("id", IDType) :: Argument("fullName", OptionInputType(StringType)) :: Argument("bio", OptionInputType(StringType)) :: Nil,
+        resolve = ctx => ctx.ctx.userRepository.update(ctx.arg[String]("id"), ctx.argOpt[String]("fullName"), ctx.argOpt[String]("bio"))),
       Field("updatePost", OptionType(PostType),
-        arguments = Argument("id", IDType) :: Argument("input", UpdatePostInputType) :: Nil,
-        resolve = ctx => {
-          val input = ctx.arg[UpdatePostInput]("input")
-          ctx.ctx.postRepository.update(ctx.arg[String]("id"), input.title, input.content)
-        })
+        arguments = Argument("id", IDType) :: Argument("title", OptionInputType(StringType)) :: Argument("content", OptionInputType(StringType)) :: Nil,
+        resolve = ctx => ctx.ctx.postRepository.update(ctx.arg[String]("id"), ctx.argOpt[String]("title"), ctx.argOpt[String]("content")))
     )
   )
 

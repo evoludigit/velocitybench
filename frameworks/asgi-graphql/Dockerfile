@@ -8,14 +8,12 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
-COPY requirements.txt .
+COPY asgi-graphql/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY . .
-
-# Copy common module
-COPY ../common /app/common
+# Copy application code and common module
+COPY asgi-graphql/ .
+COPY common/ /app/common
 
 # Health check
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 \

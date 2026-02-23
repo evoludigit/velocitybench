@@ -25,6 +25,9 @@ WORKDIR /app
 # Copy staged application
 COPY --from=builder /app/target/universal/stage /app
 
+# Install bash (required by sbt stage startup scripts) and wget for healthcheck
+RUN apk add --no-cache bash wget
+
 # Create non-root user
 RUN adduser -D -s /bin/sh appuser && chown -R appuser:appuser /app
 USER appuser

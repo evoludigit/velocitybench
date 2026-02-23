@@ -142,7 +142,7 @@ public class PostRepository {
     private Post mapRow(ResultSet rs) throws SQLException {
         return new Post(
             rs.getInt("pk_post"),
-            rs.getString("id"),
+            rs.getObject("id", java.util.UUID.class),
             rs.getInt("fk_author"),
             rs.getString("title"),
             rs.getString("content"),

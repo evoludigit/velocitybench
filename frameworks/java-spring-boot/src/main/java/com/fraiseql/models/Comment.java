@@ -2,36 +2,30 @@ package com.fraiseql.models;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
-import java.util.UUID;
 
 @Entity
 @Table(name = "tb_comment", schema = "benchmark")
 public class Comment {
 
     @Id
-    @Column(columnDefinition = "uuid")
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "pk_comment")
+    private Integer pkComment;
 
-    @Column(name = "post_id", nullable = false, columnDefinition = "uuid")
-    private UUID postId;
+    @Column(name = "id", columnDefinition = "uuid")
+    private String id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "post_id", insertable = false, updatable = false)
-    private Post post;
+    @Column(name = "identifier")
+    private String identifier;
 
-    @Column(name = "author_id", nullable = false, columnDefinition = "uuid")
-    private UUID authorId;
+    @Column(name = "fk_post", nullable = false)
+    private Integer fkPost;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "author_id", insertable = false, updatable = false)
-    private User author;
+    @Column(name = "fk_author", nullable = false)
+    private Integer fkAuthor;
 
-    @Column(name = "parent_id", columnDefinition = "uuid")
-    private UUID parentId;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "parent_id", insertable = false, updatable = false)
-    private Comment parent;
+    @Column(name = "fk_parent")
+    private Integer fkParent;
 
     @NotBlank
     @Column(columnDefinition = "TEXT", nullable = false)
@@ -47,26 +41,23 @@ public class Comment {
     private java.time.LocalDateTime updatedAt;
 
     // Getters and setters
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
+    public Integer getPkComment() { return pkComment; }
+    public void setPkComment(Integer pkComment) { this.pkComment = pkComment; }
 
-    public UUID getPostId() { return postId; }
-    public void setPostId(UUID postId) { this.postId = postId; }
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
 
-    public Post getPost() { return post; }
-    public void setPost(Post post) { this.post = post; }
+    public String getIdentifier() { return identifier; }
+    public void setIdentifier(String identifier) { this.identifier = identifier; }
 
-    public UUID getAuthorId() { return authorId; }
-    public void setAuthorId(UUID authorId) { this.authorId = authorId; }
+    public Integer getFkPost() { return fkPost; }
+    public void setFkPost(Integer fkPost) { this.fkPost = fkPost; }
 
-    public User getAuthor() { return author; }
-    public void setAuthor(User author) { this.author = author; }
+    public Integer getFkAuthor() { return fkAuthor; }
+    public void setFkAuthor(Integer fkAuthor) { this.fkAuthor = fkAuthor; }
 
-    public UUID getParentId() { return parentId; }
-    public void setParentId(UUID parentId) { this.parentId = parentId; }
-
-    public Comment getParent() { return parent; }
-    public void setParent(Comment parent) { this.parent = parent; }
+    public Integer getFkParent() { return fkParent; }
+    public void setFkParent(Integer fkParent) { this.fkParent = fkParent; }
 
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }

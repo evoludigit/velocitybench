@@ -8,7 +8,6 @@ import lombok.Builder;
 import javax.persistence.*;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
 
 @Entity
 @Table(name = "tb_user", schema = "benchmark")
@@ -23,7 +22,7 @@ public class User {
     private Integer pkUser;
 
     @Column(name = "id", columnDefinition = "uuid")
-    private UUID id;
+    private String id;
 
     @Column(name = "username")
     private String username;

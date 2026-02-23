@@ -1,6 +1,5 @@
 plugins {
     id("io.micronaut.application") version "4.2.1"
-    id("io.micronaut.aot") version "4.2.1"
 }
 
 version = "0.1"
@@ -21,7 +20,7 @@ dependencies {
     // GraphQL
     implementation("io.micronaut.graphql:micronaut-graphql")
     implementation("com.graphql-java:graphql-java:21.3")
-    implementation("org.dataloader:java-dataloader:3.2.2")
+    implementation("com.graphql-java:java-dataloader:3.2.2")
 
     // Database
     implementation("io.micronaut.sql:micronaut-jdbc-hikari")
@@ -45,19 +44,11 @@ java {
 }
 
 micronaut {
+    version("4.2.1")
     runtime("netty")
     testRuntime("junit5")
     processing {
         incremental(true)
         annotations("com.velocitybench.*")
-    }
-    aot {
-        optimizeServiceLoading = false
-        convertYamlToJava = false
-        precomputeOperations = true
-        cacheEnvironment = true
-        optimizeClassLoading = true
-        deduceEnvironment = true
-        optimizeNetty = true
     }
 }

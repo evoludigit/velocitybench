@@ -21,7 +21,7 @@ RUN mvn clean package -DskipTests -Dmaven.test.skip=true
 FROM eclipse-temurin:17-jre-alpine
 
 # Install additional tools
-RUN apk add --no-cache curl
+RUN apk add --no-cache bash curl
 
 # Create non-root user
 RUN addgroup -g 1001 -S appuser && \

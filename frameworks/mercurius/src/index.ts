@@ -260,9 +260,10 @@ const app = Fastify({
 });
 
 // Register Mercurius
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 app.register(mercurius, {
   schema,
-  resolvers,
+  resolvers: resolvers as any,
   context: () => ({
     loaders: createDataLoaders(),
   }),

@@ -2,23 +2,24 @@ package com.fraiseql.models;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
-import java.util.List;
-import java.util.UUID;
 
 @Entity
 @Table(name = "tb_post", schema = "benchmark")
 public class Post {
 
     @Id
-    @Column(columnDefinition = "uuid")
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "pk_post")
+    private Integer pkPost;
 
-    @Column(name = "author_id", nullable = false, columnDefinition = "uuid")
-    private UUID authorId;
+    @Column(name = "id", columnDefinition = "uuid")
+    private String id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "author_id", insertable = false, updatable = false)
-    private User author;
+    @Column(name = "identifier")
+    private String identifier;
+
+    @Column(name = "fk_author", nullable = false)
+    private Integer fkAuthor;
 
     @NotBlank
     @Size(max = 500)
@@ -28,14 +29,8 @@ public class Post {
     @Column(columnDefinition = "TEXT")
     private String content;
 
-    @Column
-    private String excerpt;
-
-    @Column(nullable = false)
-    private String status = "published";
-
-    @Column(name = "published_at")
-    private java.time.LocalDateTime publishedAt;
+    @Column(name = "published")
+    private Boolean published;
 
     @Column(name = "created_at", nullable = false)
     private java.time.LocalDateTime createdAt;
@@ -43,18 +38,18 @@ public class Post {
     @Column(name = "updated_at", nullable = false)
     private java.time.LocalDateTime updatedAt;
 
-    @OneToMany(mappedBy = "post", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-    private List<Comment> comments;
-
     // Getters and setters
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
+    public Integer getPkPost() { return pkPost; }
+    public void setPkPost(Integer pkPost) { this.pkPost = pkPost; }
 
-    public UUID getAuthorId() { return authorId; }
-    public void setAuthorId(UUID authorId) { this.authorId = authorId; }
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
 
-    public User getAuthor() { return author; }
-    public void setAuthor(User author) { this.author = author; }
+    public String getIdentifier() { return identifier; }
+    public void setIdentifier(String identifier) { this.identifier = identifier; }
+
+    public Integer getFkAuthor() { return fkAuthor; }
+    public void setFkAuthor(Integer fkAuthor) { this.fkAuthor = fkAuthor; }
 
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
@@ -62,21 +57,12 @@ public class Post {
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
 
-    public String getExcerpt() { return excerpt; }
-    public void setExcerpt(String excerpt) { this.excerpt = excerpt; }
-
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
-
-    public java.time.LocalDateTime getPublishedAt() { return publishedAt; }
-    public void setPublishedAt(java.time.LocalDateTime publishedAt) { this.publishedAt = publishedAt; }
+    public Boolean getPublished() { return published; }
+    public void setPublished(Boolean published) { this.published = published; }
 
     public java.time.LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(java.time.LocalDateTime createdAt) { this.createdAt = createdAt; }
 
     public java.time.LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(java.time.LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
-
-    public List<Comment> getComments() { return comments; }
-    public void setComments(List<Comment> comments) { this.comments = comments; }
 }

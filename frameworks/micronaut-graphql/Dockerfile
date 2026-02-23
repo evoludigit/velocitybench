@@ -9,8 +9,9 @@ COPY build.gradle settings.gradle ./
 # Copy source
 COPY src ./src
 
-# Build
-RUN gradle build -x test --no-daemon
+# Build and normalise the fat JAR name to app.jar
+RUN gradle build -x test --no-daemon && \
+    find build/libs -name "*.jar" ! -name "*-plain.jar" | head -1 | xargs -I{} cp {} build/libs/app.jar
 
 # Runtime stage
 FROM eclipse-temurin:21-jre-alpine
@@ -18,7 +19,7 @@ FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
 # Copy JAR from builder
-COPY --from=builder /app/build/libs/*-all.jar app.jar
+COPY --from=builder /app/build/libs/app.jar app.jar
 
 # Create non-root user
 RUN adduser -D -s /bin/sh appuser && chown -R appuser:appuser /app

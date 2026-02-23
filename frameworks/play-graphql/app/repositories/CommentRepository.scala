@@ -43,7 +43,7 @@ class CommentRepository @Inject()(database: Database) {
   private def mapRow(rs: java.sql.ResultSet): Comment = {
     Comment(
       pkComment = rs.getInt("pk_comment"),
-      id = rs.getString("id"),
+      id = java.util.UUID.fromString(rs.getString("id")),
       fkPost = rs.getInt("fk_post"),
       fkAuthor = rs.getInt("fk_author"),
       content = rs.getString("content"),

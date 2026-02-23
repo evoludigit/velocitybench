@@ -1,7 +1,5 @@
 package com.fraiseql;
 
-import com.fraiseql.models.User;
-import com.fraiseql.models.Post;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
@@ -28,7 +26,7 @@ class SecurityAuthTest {
     @Test
     void testMissingAuthToken() {
         // Simulate request without auth token
-        User user = factory.createTestUser("user", "user@example.com", "User", "");
+        TestFactory.TestUser user = factory.createUser("user", "user@example.com", "User", "");
 
         // Attempt to access protected resource without token
         assertThrows(SecurityException.class, () -> {
@@ -91,7 +89,7 @@ class SecurityAuthTest {
         });
 
         // But getting user data should fail
-        User user = factory.getUser("nonexistent-user");
+        TestFactory.TestUser user = factory.getUser("nonexistent-user");
         assertNull(user);
     }
 
@@ -101,47 +99,47 @@ class SecurityAuthTest {
 
     @Test
     void testUnauthorizedResourceAccess() {
-        User user1 = factory.createTestUser("user1", "user1@example.com", "User 1", "");
-        User user2 = factory.createTestUser("user2", "user2@example.com", "User 2", "");
+        TestFactory.TestUser user1 = factory.createUser("user1", "user1@example.com", "User 1", "");
+        TestFactory.TestUser user2 = factory.createUser("user2", "user2@example.com", "User 2", "");
 
-        Post user2Post = factory.createTestPost(user2.getId(), "Private Post", "Secret content");
+        TestFactory.TestPost user2Post = factory.createPost(user2.id, "Private Post", "Secret content");
 
         // User1 should not be able to delete User2's post
         assertThrows(SecurityException.class, () -> {
-            authorizeResourceAccess(user1.getId(), user2Post.getId(), "delete");
+            authorizeResourceAccess(user1.id, user2Post.id, "delete");
         });
     }
 
     @Test
     void testAuthorizedResourceAccess() {
-        User user = factory.createTestUser("user", "user@example.com", "User", "");
-        Post userPost = factory.createTestPost(user.getId(), "My Post", "My content");
+        TestFactory.TestUser user = factory.createUser("user", "user@example.com", "User", "");
+        TestFactory.TestPost userPost = factory.createPost(user.id, "My Post", "My content");
 
         // User should be able to access their own post
         assertDoesNotThrow(() -> {
-            authorizeResourceAccess(user.getId(), userPost.getId(), "delete");
+            authorizeResourceAccess(user.id, userPost.id, "delete");
         });
     }
 
     @Test
     void testPrivilegeEscalation() {
-        User regularUser = factory.createTestUser("regular", "regular@example.com", "Regular User", "");
-        User adminUser = factory.createTestUser("admin", "admin@example.com", "Admin", "");
+        TestFactory.TestUser regularUser = factory.createUser("regular", "regular@example.com", "Regular User", "");
+        TestFactory.TestUser adminUser = factory.createUser("admin", "admin@example.com", "Admin", "");
 
         // Regular user should not be able to perform admin actions
         assertThrows(SecurityException.class, () -> {
-            checkAdminPrivileges(regularUser.getId());
+            checkAdminPrivileges(regularUser.id);
         });
     }
 
     @Test
     void testCrossUserDataAccess() {
-        User user1 = factory.createTestUser("user1", "user1@example.com", "User 1", "");
-        User user2 = factory.createTestUser("user2", "user2@example.com", "User 2", "");
+        TestFactory.TestUser user1 = factory.createUser("user1", "user1@example.com", "User 1", "");
+        TestFactory.TestUser user2 = factory.createUser("user2", "user2@example.com", "User 2", "");
 
         // User1 should not access User2's profile data
         assertThrows(SecurityException.class, () -> {
-            authorizeProfileAccess(user1.getId(), user2.getId());
+            authorizeProfileAccess(user1.id, user2.id);
         });
     }
 
@@ -151,10 +149,10 @@ class SecurityAuthTest {
 
     @Test
     void testConcurrentSessionHandling() {
-        User user = factory.createTestUser("user", "user@example.com", "User", "");
+        TestFactory.TestUser user = factory.createUser("user", "user@example.com", "User", "");
 
-        String session1 = generateMockToken(user.getId(), Instant.now().plusSeconds(3600).getEpochSecond());
-        String session2 = generateMockToken(user.getId(), Instant.now().plusSeconds(3600).getEpochSecond());
+        String session1 = generateMockToken(user.id, Instant.now().plusSeconds(3600).getEpochSecond());
+        String session2 = generateMockToken(user.id, Instant.now().plusSeconds(3600).getEpochSecond());
 
         // Both sessions should be valid
         assertDoesNotThrow(() -> {
@@ -165,9 +163,9 @@ class SecurityAuthTest {
 
     @Test
     void testSessionInvalidationAfterLogout() {
-        User user = factory.createTestUser("user", "user@example.com", "User", "");
+        TestFactory.TestUser user = factory.createUser("user", "user@example.com", "User", "");
 
-        String token = generateMockToken(user.getId(), Instant.now().plusSeconds(3600).getEpochSecond());
+        String token = generateMockToken(user.id, Instant.now().plusSeconds(3600).getEpochSecond());
 
         // Simulate logout
         invalidateToken(token);
@@ -180,9 +178,9 @@ class SecurityAuthTest {
 
     @Test
     void testTokenReuse() {
-        User user = factory.createTestUser("user", "user@example.com", "User", "");
+        TestFactory.TestUser user = factory.createUser("user", "user@example.com", "User", "");
 
-        String token = generateMockToken(user.getId(), Instant.now().plusSeconds(3600).getEpochSecond());
+        String token = generateMockToken(user.id, Instant.now().plusSeconds(3600).getEpochSecond());
 
         // First use should succeed
         assertDoesNotThrow(() -> {
@@ -231,21 +229,22 @@ class SecurityAuthTest {
     }
 
     private void authorizeResourceAccess(String userId, String resourceId, String action) {
-        // Mock authorization check
-        Post post = factory.getPost(resourceId);
+        // Mock authorization check using TestFactory inner types
+        TestFactory.TestPost post = factory.getPost(resourceId);
         if (post == null) {
             throw new SecurityException("Resource not found");
         }
 
-        if (!post.getAuthorId().equals(userId)) {
+        TestFactory.TestUser requestingUser = factory.getUser(userId);
+        if (requestingUser == null || post.fkAuthor != requestingUser.pkUser) {
             throw new SecurityException("Unauthorized access to resource");
         }
     }
 
     private void checkAdminPrivileges(String userId) {
         // Mock admin check (always fails in test)
-        User user = factory.getUser(userId);
-        if (user == null || !user.getUsername().equals("admin")) {
+        TestFactory.TestUser user = factory.getUser(userId);
+        if (user == null || !user.username.equals("admin")) {
             throw new SecurityException("Admin privileges required");
         }
     }

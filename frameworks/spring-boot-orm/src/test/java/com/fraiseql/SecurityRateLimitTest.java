@@ -1,7 +1,7 @@
 package com.fraiseql;
 
-import com.fraiseql.models.User;
-import com.fraiseql.models.Post;
+import com.fraiseql.entities.User;
+import com.fraiseql.entities.Post;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;

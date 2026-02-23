@@ -5,7 +5,7 @@ import { register, collectDefaultMetrics, Counter, Histogram } from 'prom-client
 import http from 'http';
 import { typeDefs } from './schema.js';
 import { resolvers } from './resolvers.js';
-import { initDatabase } from './db.js';
+import { initDatabase, AppDataSource } from './db.js';
 import { createDataLoaders } from './dataloaders.js';
 
 // Prometheus metrics
@@ -67,7 +67,7 @@ async function startServer() {
       if (req.url === '/health') {
         try {
           // Simple health check using TypeORM
-          const userCount = await require('./db.js').AppDataSource.getRepository('User').count();
+          const userCount = await AppDataSource.getRepository('User').count();
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ status: 'healthy', framework: 'apollo-orm', userCount }));
         } catch (error) {

@@ -1,7 +1,7 @@
 package com.fraiseql;
 
-import com.fraiseql.models.User;
-import com.fraiseql.models.Post;
+import com.fraiseql.entities.User;
+import com.fraiseql.entities.Post;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
@@ -237,7 +237,8 @@ class SecurityAuthTest {
             throw new SecurityException("Resource not found");
         }
 
-        if (!post.getAuthorId().equals(userId)) {
+        User requestingUser = factory.getUser(userId);
+        if (requestingUser == null || !post.getFkAuthor().equals(requestingUser.getPkUser())) {
             throw new SecurityException("Unauthorized access to resource");
         }
     }

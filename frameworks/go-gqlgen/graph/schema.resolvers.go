@@ -72,7 +72,7 @@ func (r *queryResolver) Posts(ctx context.Context, limit *int32) ([]*model.Post,
 	}
 
 	rows, err := db.Pool.Query(ctx, `
-		SELECT p.id, u.id AS author_uuid, p.title, p.content, p.created_at::text
+		SELECT p.id, u.id AS author_uuid, u.username, u.full_name, p.title, p.content, p.created_at::text
 		FROM benchmark.tb_post p
 		JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
 		ORDER BY p.created_at DESC
@@ -86,15 +86,16 @@ func (r *queryResolver) Posts(ctx context.Context, limit *int32) ([]*model.Post,
 	var posts []*model.Post
 	for rows.Next() {
 		var p model.Post
-		var authorUUID string
+		var authorUUID, authorUsername string
+		var authorFullName *string
 		var content *string
 		var createdAt string
-		if err := rows.Scan(&p.ID, &authorUUID, &p.Title, &content, &createdAt); err != nil {
+		if err := rows.Scan(&p.ID, &authorUUID, &authorUsername, &authorFullName, &p.Title, &content, &createdAt); err != nil {
 			continue
 		}
 		p.Content = content
 		p.CreatedAt = createdAt
-		p.Author = &model.User{ID: authorUUID}
+		p.Author = &model.User{ID: authorUUID, Username: authorUsername, FullName: authorFullName}
 		posts = append(posts, &p)
 	}
 
@@ -201,11 +202,15 @@ func (r *commentResolver) Post(ctx context.Context, obj *model.Comment) (*model.
 
 // Author is the resolver for the author field (Post type).
 func (r *postResolver) Author(ctx context.Context, obj *model.Post) (*model.User, error) {
-	if obj.Author != nil && obj.Author.ID != "" {
-		loaders := GetLoaders(ctx)
-		return loaders.UserLoader.Load(ctx, obj.Author.ID)()
+	if obj.Author == nil || obj.Author.ID == "" {
+		return nil, nil
 	}
-	return nil, nil
+	// If the author was eagerly loaded (username populated by Posts query), return it directly.
+	if obj.Author.Username != "" {
+		return obj.Author, nil
+	}
+	loaders := GetLoaders(ctx)
+	return loaders.UserLoader.Load(ctx, obj.Author.ID)()
 }
 
 // Comments is the resolver for the comments field (Post type).

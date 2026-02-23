@@ -1,6 +1,8 @@
 package com.fraiseql.rest;
 
+import com.fraiseql.dto.PostAuthorDTO;
 import com.fraiseql.dto.PostDTO;
+import com.fraiseql.dto.PostWithAuthorDTO;
 import com.fraiseql.entities.Post;
 import com.fraiseql.entities.User;
 import com.fraiseql.repositories.PostRepository;
@@ -12,10 +14,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RestController
@@ -47,9 +49,24 @@ public class PostController {
     }
 
     @GetMapping
-    public ResponseEntity<List<PostDTO>> listPosts(
+    public ResponseEntity<?> listPosts(
         @RequestParam(defaultValue = "0") int page,
-        @RequestParam(defaultValue = "10") int size) {
+        @RequestParam(defaultValue = "10") int size,
+        @RequestParam(required = false) String include) {
+
+        if ("author".equals(include)) {
+            List<Object[]> rows = postRepository.findPublishedPostsWithAuthorLimit(size);
+            List<PostWithAuthorDTO> result = rows.stream()
+                .map(row -> new PostWithAuthorDTO(
+                    (String) row[0],
+                    (String) row[1],
+                    (String) row[2],
+                    row[3] instanceof Timestamp ? ((Timestamp) row[3]).toLocalDateTime() : (LocalDateTime) row[3],
+                    new PostAuthorDTO((String) row[4], (String) row[5])
+                ))
+                .collect(Collectors.toList());
+            return ResponseEntity.ok(result);
+        }
 
         List<Post> posts = postRepository.findPublishedPostsWithLimit(size);
         List<PostDTO> postDTOs = posts.stream()
@@ -64,19 +81,35 @@ public class PostController {
         return ResponseEntity.ok(postDTOs);
     }
 
+    @GetMapping("/with-author")
+    public ResponseEntity<List<PostWithAuthorDTO>> listPostsWithAuthor(
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "10") int size) {
+
+        List<Object[]> rows = postRepository.findPublishedPostsWithAuthorLimit(size);
+        List<PostWithAuthorDTO> result = rows.stream()
+            .map(row -> new PostWithAuthorDTO(
+                (String) row[0],
+                (String) row[1],
+                (String) row[2],
+                row[3] instanceof Timestamp ? ((Timestamp) row[3]).toLocalDateTime() : (LocalDateTime) row[3],
+                new PostAuthorDTO((String) row[4], (String) row[5])
+            ))
+            .collect(Collectors.toList());
+        return ResponseEntity.ok(result);
+    }
+
     @GetMapping("/by-author/{authorId}")
     public ResponseEntity<List<PostDTO>> getPostsByAuthor(
         @PathVariable String authorId,
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "10") int size) {
 
-        // Find user by UUID to get the integer primary key
         User user = userRepository.findByUuid(authorId);
         if (user == null) {
             return ResponseEntity.ok(Collections.emptyList());
         }
 
-        // Find posts by the integer foreign key
         List<Post> posts = postRepository.findByFkAuthor(user.getPkUser());
         List<PostDTO> postDTOs = posts.stream()
             .map(post -> new PostDTO(
@@ -89,6 +122,4 @@ public class PostController {
             .collect(Collectors.toList());
         return ResponseEntity.ok(postDTOs);
     }
-
-
 }

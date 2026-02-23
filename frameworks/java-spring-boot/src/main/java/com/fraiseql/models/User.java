@@ -2,16 +2,21 @@ package com.fraiseql.models;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
-import java.util.List;
-import java.util.UUID;
 
 @Entity
 @Table(name = "tb_user", schema = "benchmark")
 public class User {
 
     @Id
-    @Column(columnDefinition = "uuid")
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "pk_user")
+    private Integer pkUser;
+
+    @Column(name = "id", columnDefinition = "uuid")
+    private String id;
+
+    @Column(name = "identifier")
+    private String identifier;
 
     @NotBlank
     @Email
@@ -30,27 +35,21 @@ public class User {
     @Column(columnDefinition = "TEXT")
     private String bio;
 
-    @Column(name = "avatar_url")
-    private String avatarUrl;
-
-    @Column(name = "is_active", nullable = false)
-    private Boolean isActive = true;
-
     @Column(name = "created_at", nullable = false)
     private java.time.LocalDateTime createdAt;
 
     @Column(name = "updated_at", nullable = false)
     private java.time.LocalDateTime updatedAt;
 
-    @OneToMany(mappedBy = "author", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-    private List<Post> posts;
-
-    @OneToMany(mappedBy = "author", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
-    private List<Comment> comments;
-
     // Getters and setters
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
+    public Integer getPkUser() { return pkUser; }
+    public void setPkUser(Integer pkUser) { this.pkUser = pkUser; }
+
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
+
+    public String getIdentifier() { return identifier; }
+    public void setIdentifier(String identifier) { this.identifier = identifier; }
 
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
@@ -64,21 +63,9 @@ public class User {
     public String getBio() { return bio; }
     public void setBio(String bio) { this.bio = bio; }
 
-    public String getAvatarUrl() { return avatarUrl; }
-    public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
-
-    public Boolean getIsActive() { return isActive; }
-    public void setIsActive(Boolean isActive) { this.isActive = isActive; }
-
     public java.time.LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(java.time.LocalDateTime createdAt) { this.createdAt = createdAt; }
 
     public java.time.LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(java.time.LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
-
-    public List<Post> getPosts() { return posts; }
-    public void setPosts(List<Post> posts) { this.posts = posts; }
-
-    public List<Comment> getComments() { return comments; }
-    public void setComments(List<Comment> comments) { this.comments = comments; }
 }

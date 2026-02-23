@@ -7,11 +7,12 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     build-essential \
     libpq-dev \
+    libyaml-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Gemfile and install dependencies
 COPY Gemfile Gemfile.lock* ./
-RUN bundle config set --local deployment 'true' && \
+RUN bundle config set --local path 'vendor/bundle' && \
     bundle config set --local without 'development test' && \
     bundle install --jobs 4
 
@@ -36,8 +37,7 @@ COPY --from=builder /usr/local/bundle/config /usr/local/bundle/config
 COPY . .
 
 # Configure bundler for production
-RUN bundle config set --local deployment 'true' && \
-    bundle config set --local without 'development test' && \
+RUN bundle config set --local without 'development test' && \
     bundle config set --local path 'vendor/bundle'
 
 # Create non-root user
@@ -46,6 +46,7 @@ USER appuser
 
 ENV RACK_ENV=production
 ENV PORT=4000
+ENV BUNDLE_WITHOUT="development:test"
 
 EXPOSE 4000
 

@@ -14,9 +14,9 @@ public class Query
 
     public async Task<IEnumerable<User>> GetUsers(
         [Service] IUserRepository userRepository,
-        int first = 10)
+        int limit = 10)
     {
-        return await userRepository.GetAllAsync(0, first);
+        return await userRepository.GetAllAsync(0, limit);
     }
 
     public async Task<Post?> GetPost(
@@ -28,9 +28,9 @@ public class Query
 
     public async Task<IEnumerable<Post>> GetPosts(
         [Service] IPostRepository postRepository,
-        int first = 10)
+        int limit = 10)
     {
-        return await postRepository.GetAllAsync(0, first);
+        return await postRepository.GetAllAsync(0, limit);
     }
 
     public async Task<IEnumerable<Post>> GetPostsByUser(

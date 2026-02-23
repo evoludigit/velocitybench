@@ -104,7 +104,7 @@ public class UserRepository {
     private User mapRow(ResultSet rs) throws SQLException {
         return new User(
             rs.getInt("pk_user"),
-            rs.getString("id"),
+            rs.getObject("id", UUID.class),
             rs.getString("username"),
             rs.getString("full_name"),
             rs.getString("bio"),

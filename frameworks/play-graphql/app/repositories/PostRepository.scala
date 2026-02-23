@@ -124,7 +124,7 @@ class PostRepository @Inject()(database: Database) {
   private def mapRow(rs: java.sql.ResultSet): Post = {
     Post(
       pkPost = rs.getInt("pk_post"),
-      id = rs.getString("id"),
+      id = java.util.UUID.fromString(rs.getString("id")),
       fkAuthor = rs.getInt("fk_author"),
       title = rs.getString("title"),
       content = Option(rs.getString("content")),

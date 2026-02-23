@@ -29,22 +29,30 @@ class PostController extends Controller
     public function index(Request $request): JsonResponse
     {
         $page = $request->get("page", 0);
-        $size = $request->get("size", 10);
+        $limit = $request->get("limit", $request->get("size", 10));
+        $includeAuthor = $request->has("include") && $request->get("include") === "author";
 
         $posts = Post::with("author")
             ->orderBy("created_at", "desc")
-            ->skip($page * $size)
-            ->take($size)
+            ->skip($page * $limit)
+            ->take($limit)
             ->get();
 
-        $result = $posts->map(function ($post) {
-            return [
+        $result = $posts->map(function ($post) use ($includeAuthor) {
+            $item = [
                 "id" => $post->id,
                 "title" => $post->title,
                 "content" => $post->content,
                 "authorId" => $post->author?->id ?? $post->fk_author,
                 "createdAt" => $post->created_at->toISOString()
             ];
+            if ($includeAuthor && $post->author) {
+                $item["author"] = [
+                    "username" => $post->author->username,
+                    "fullName" => $post->author->full_name,
+                ];
+            }
+            return $item;
         });
 
         return response()->json($result);

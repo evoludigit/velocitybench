@@ -1,12 +1,9 @@
 package com.fraiseql;
 
-import com.fraiseql.models.User;
-import com.fraiseql.models.Post;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.time.Instant;
@@ -31,62 +28,62 @@ class SecurityRateLimitTest {
 
     @Test
     void testWithinRateLimit() {
-        User user = factory.createTestUser("user1", "user1@example.com", "User 1", "");
+        TestFactory.TestUser user = factory.createUser("user1", "user1@example.com", "User 1", "");
 
         // Make 5 requests (within limit)
         for (int i = 0; i < 5; i++) {
-            assertTrue(rateLimiter.allowRequest(user.getId()));
+            assertTrue(rateLimiter.allowRequest(user.id));
         }
     }
 
     @Test
     void testExceedRateLimit() {
-        User user = factory.createTestUser("user1", "user1@example.com", "User 1", "");
+        TestFactory.TestUser user = factory.createUser("user1", "user1@example.com", "User 1", "");
 
         // Make 5 requests (within limit)
         for (int i = 0; i < 5; i++) {
-            assertTrue(rateLimiter.allowRequest(user.getId()));
+            assertTrue(rateLimiter.allowRequest(user.id));
         }
 
         // 6th request should be blocked
-        assertFalse(rateLimiter.allowRequest(user.getId()));
+        assertFalse(rateLimiter.allowRequest(user.id));
     }
 
     @Test
     void testRateLimitWindowReset() throws InterruptedException {
-        User user = factory.createTestUser("user1", "user1@example.com", "User 1", "");
+        TestFactory.TestUser user = factory.createUser("user1", "user1@example.com", "User 1", "");
 
         // Use a short window for testing
         RateLimiter shortLimiter = new RateLimiter(2, 1); // 2 requests per 1 second
 
         // Make 2 requests
-        assertTrue(shortLimiter.allowRequest(user.getId()));
-        assertTrue(shortLimiter.allowRequest(user.getId()));
+        assertTrue(shortLimiter.allowRequest(user.id));
+        assertTrue(shortLimiter.allowRequest(user.id));
 
         // 3rd request should be blocked
-        assertFalse(shortLimiter.allowRequest(user.getId()));
+        assertFalse(shortLimiter.allowRequest(user.id));
 
         // Wait for window to reset
         Thread.sleep(1100);
 
         // Should allow new requests after window reset
-        assertTrue(shortLimiter.allowRequest(user.getId()));
+        assertTrue(shortLimiter.allowRequest(user.id));
     }
 
     @Test
     void testIndependentUserLimits() {
-        User user1 = factory.createTestUser("user1", "user1@example.com", "User 1", "");
-        User user2 = factory.createTestUser("user2", "user2@example.com", "User 2", "");
+        TestFactory.TestUser user1 = factory.createUser("user1", "user1@example.com", "User 1", "");
+        TestFactory.TestUser user2 = factory.createUser("user2", "user2@example.com", "User 2", "");
 
         // User1 exhausts their limit
         for (int i = 0; i < 5; i++) {
-            assertTrue(rateLimiter.allowRequest(user1.getId()));
+            assertTrue(rateLimiter.allowRequest(user1.id));
         }
-        assertFalse(rateLimiter.allowRequest(user1.getId()));
+        assertFalse(rateLimiter.allowRequest(user1.id));
 
         // User2 should still have their full limit
         for (int i = 0; i < 5; i++) {
-            assertTrue(rateLimiter.allowRequest(user2.getId()));
+            assertTrue(rateLimiter.allowRequest(user2.id));
         }
     }
 
@@ -104,31 +101,31 @@ class SecurityRateLimitTest {
 
     @Test
     void testDifferentEndpointsShareLimit() {
-        User user = factory.createTestUser("user1", "user1@example.com", "User 1", "");
+        TestFactory.TestUser user = factory.createUser("user1", "user1@example.com", "User 1", "");
 
         // All endpoints share the same rate limit per user
         for (int i = 0; i < 3; i++) {
-            assertTrue(rateLimiter.allowRequest(user.getId()));
+            assertTrue(rateLimiter.allowRequest(user.id));
         }
 
         for (int i = 0; i < 2; i++) {
-            assertTrue(rateLimiter.allowRequest(user.getId()));
+            assertTrue(rateLimiter.allowRequest(user.id));
         }
 
         // Next request should be blocked
-        assertFalse(rateLimiter.allowRequest(user.getId()));
+        assertFalse(rateLimiter.allowRequest(user.id));
     }
 
     @Test
     void testBurstRequests() {
-        User user = factory.createTestUser("user1", "user1@example.com", "User 1", "");
+        TestFactory.TestUser user = factory.createUser("user1", "user1@example.com", "User 1", "");
 
         // Simulate burst of requests
         int allowed = 0;
         int blocked = 0;
 
         for (int i = 0; i < 10; i++) {
-            if (rateLimiter.allowRequest(user.getId())) {
+            if (rateLimiter.allowRequest(user.id)) {
                 allowed++;
             } else {
                 blocked++;
@@ -141,32 +138,32 @@ class SecurityRateLimitTest {
 
     @Test
     void testRateLimitResetDoesNotAffectOtherUsers() throws InterruptedException {
-        User user1 = factory.createTestUser("user1", "user1@example.com", "User 1", "");
-        User user2 = factory.createTestUser("user2", "user2@example.com", "User 2", "");
+        TestFactory.TestUser user1 = factory.createUser("user1", "user1@example.com", "User 1", "");
+        TestFactory.TestUser user2 = factory.createUser("user2", "user2@example.com", "User 2", "");
 
         RateLimiter shortLimiter = new RateLimiter(2, 1); // 2 requests per 1 second
 
         // User1 makes requests
-        assertTrue(shortLimiter.allowRequest(user1.getId()));
-        assertTrue(shortLimiter.allowRequest(user1.getId()));
-        assertFalse(shortLimiter.allowRequest(user1.getId()));
+        assertTrue(shortLimiter.allowRequest(user1.id));
+        assertTrue(shortLimiter.allowRequest(user1.id));
+        assertFalse(shortLimiter.allowRequest(user1.id));
 
         // User2 makes requests (should have independent limit)
-        assertTrue(shortLimiter.allowRequest(user2.getId()));
-        assertTrue(shortLimiter.allowRequest(user2.getId()));
-        assertFalse(shortLimiter.allowRequest(user2.getId()));
+        assertTrue(shortLimiter.allowRequest(user2.id));
+        assertTrue(shortLimiter.allowRequest(user2.id));
+        assertFalse(shortLimiter.allowRequest(user2.id));
 
         // Wait for reset
         Thread.sleep(1100);
 
         // Both users should have limits reset
-        assertTrue(shortLimiter.allowRequest(user1.getId()));
-        assertTrue(shortLimiter.allowRequest(user2.getId()));
+        assertTrue(shortLimiter.allowRequest(user1.id));
+        assertTrue(shortLimiter.allowRequest(user2.id));
     }
 
     @Test
     void testConcurrentRequests() throws InterruptedException {
-        User user = factory.createTestUser("user1", "user1@example.com", "User 1", "");
+        TestFactory.TestUser user = factory.createUser("user1", "user1@example.com", "User 1", "");
 
         int threadCount = 10;
         Thread[] threads = new Thread[threadCount];
@@ -175,7 +172,7 @@ class SecurityRateLimitTest {
         for (int i = 0; i < threadCount; i++) {
             final int index = i;
             threads[i] = new Thread(() -> {
-                results[index] = rateLimiter.allowRequest(user.getId()) ? 1 : 0;
+                results[index] = rateLimiter.allowRequest(user.id) ? 1 : 0;
             });
             threads[i].start();
         }
@@ -195,15 +192,15 @@ class SecurityRateLimitTest {
 
     @Test
     void testGetRemainingRequests() {
-        User user = factory.createTestUser("user1", "user1@example.com", "User 1", "");
+        TestFactory.TestUser user = factory.createUser("user1", "user1@example.com", "User 1", "");
 
-        assertEquals(5, rateLimiter.getRemainingRequests(user.getId()));
+        assertEquals(5, rateLimiter.getRemainingRequests(user.id));
 
-        rateLimiter.allowRequest(user.getId());
-        assertEquals(4, rateLimiter.getRemainingRequests(user.getId()));
+        rateLimiter.allowRequest(user.id);
+        assertEquals(4, rateLimiter.getRemainingRequests(user.id));
 
-        rateLimiter.allowRequest(user.getId());
-        assertEquals(3, rateLimiter.getRemainingRequests(user.getId()));
+        rateLimiter.allowRequest(user.id);
+        assertEquals(3, rateLimiter.getRemainingRequests(user.id));
     }
 
     // ============================================================================

@@ -92,7 +92,7 @@ class UserRepository @Inject()(database: Database) {
   private def mapRow(rs: java.sql.ResultSet): User = {
     User(
       pkUser = rs.getInt("pk_user"),
-      id = rs.getString("id"),
+      id = java.util.UUID.fromString(rs.getString("id")),
       username = rs.getString("username"),
       fullName = Option(rs.getString("full_name")),
       bio = Option(rs.getString("bio")),
