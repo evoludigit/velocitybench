@@ -72,10 +72,6 @@ jobs:
             path: "frameworks/express-graphql"
             files: "package.json,package-lock.json"
             format: "npm"
-          - name: "nodejs-fastify-graphql"
-            path: "frameworks/fastify-graphql"
-            files: "package.json,package-lock.json"
-            format: "npm"
           - name: "nodejs-graphql-yoga"
             path: "frameworks/graphql-yoga"
             files: "package.json,package-lock.json"
@@ -122,10 +118,6 @@ jobs:
             format: "composer"
           - name: "ruby-rails"
             path: "frameworks/ruby-rails"
-            files: "Gemfile,Gemfile.lock"
-            format: "bundler"
-          - name: "ruby-rails-fixed"
-            path: "frameworks/ruby-rails-fixed"
             files: "Gemfile,Gemfile.lock"
             format: "bundler"
           - name: "ruby-hanami"
@@ -386,12 +378,11 @@ jobs:
           - `sbom-python-ariadne.json` - Ariadne GraphQL
           - `sbom-python-asgi-graphql.json` - ASGI-GraphQL
 
-          ### TypeScript/Node.js (9 frameworks)
+          ### TypeScript/Node.js (8 frameworks)
           - `sbom-nodejs-apollo.json` - Apollo Server GraphQL
           - `sbom-nodejs-express.json` - Express REST
           - `sbom-nodejs-apollo-orm.json` - Apollo Server + ORM
           - `sbom-nodejs-express-graphql.json` - Express + GraphQL
-          - `sbom-nodejs-fastify-graphql.json` - Fastify GraphQL
           - `sbom-nodejs-graphql-yoga.json` - GraphQL Yoga
           - `sbom-nodejs-mercurius.json` - Mercurius (Fastify GraphQL)
           - `sbom-nodejs-postgraphile.json` - PostGraphile
@@ -416,9 +407,8 @@ jobs:
           - `sbom-php-laravel.json` - Laravel REST
           - `sbom-php-webonyx.json` - Webonyx GraphQL PHP
 
-          ### Ruby (3 frameworks)
+          ### Ruby (2 frameworks)
           - `sbom-ruby-rails.json` - Rails REST
-          - `sbom-ruby-rails-fixed.json` - Rails REST (optimized)
           - `sbom-ruby-hanami.json` - Hanami REST
 
           ### C# (1 framework)
