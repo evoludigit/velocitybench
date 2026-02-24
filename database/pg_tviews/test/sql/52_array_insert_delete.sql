@@ -1,5 +1,3 @@
--- Phase 5 Task 6: Array Handling Implementation
--- Test 3: Array Element INSERT/DELETE Operations (RED Phase)
 -- This test verifies that array elements can be inserted and deleted properly
 
 BEGIN;

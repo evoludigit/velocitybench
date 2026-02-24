@@ -1,5 +1,5 @@
--- Phase 5 Task 6: Array Handling Implementation
--- Test 1: Array Column Materialization (RED Phase)
+-- Array Column Materialization Tests
+
 -- This test verifies that TVIEWs can materialize array columns correctly
 
 BEGIN;

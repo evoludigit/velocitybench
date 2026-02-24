@@ -1,5 +1,3 @@
--- Phase 5 Task 6: Array Handling Implementation
--- Test 4: Batch Update Optimization (RED Phase)
 -- This test verifies that batch updates work efficiently for large cascades
 
 BEGIN;

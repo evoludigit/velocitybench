@@ -1,4 +1,3 @@
--- Phase 5 Task 2 RED: Test metadata enhancement
 -- This test verifies that new metadata fields are populated
 
 BEGIN;
@@ -48,7 +47,7 @@ BEGIN;
     -- Expected: t, t, t
 
     -- Test Case 2: Verify columns can be queried
-    -- (values will be empty arrays until Task 3 implements detection logic)
+
     SELECT
         array_length(dependency_types, 1) AS dep_types_len,
         array_length(fk_columns, 1) AS fk_cols_len
