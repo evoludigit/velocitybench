@@ -1,6 +1,4 @@
 """
-Phase 1, Cycle 1: RED - Write failing tests for schema definition
-
 Tests verify:
 1. Schema exports valid JSON
 2. Schema has required types
