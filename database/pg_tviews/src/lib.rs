@@ -786,28 +786,33 @@ fn find_affected_tview_rows(
 }
 
 #[cfg(any(test, feature = "pg_test"))]
+pub mod pg_test {
+    pub fn setup(_options: Vec<&str>) {}
+
+    pub fn postgresql_conf_options() -> Vec<&'static str> {
+        vec![]
+    }
+}
+
+#[cfg(any(test, feature = "pg_test"))]
 #[pg_schema]
 mod tests {
-    #[cfg(feature = "pg_test")]
     use pgrx::prelude::*;
     #[cfg(feature = "pg_test")]
     use crate::error::TViewError;
 
 
-    #[cfg(feature = "pg_test")]
     #[pg_test]
     fn sanity_check() {
         assert_eq!(2, 1 + 1);
     }
 
-    #[cfg(feature = "pg_test")]
     #[pg_test]
     fn test_version_function() {
         let version = crate::pg_tviews_version();
         assert!(version.starts_with("0.1.0"));
     }
 
-    #[cfg(feature = "pg_test")]
     #[pg_test]
     fn test_version_callable_from_sql() {
         let result = crate::utils::spi_get_string(
@@ -819,7 +824,6 @@ mod tests {
         assert!(version.unwrap().starts_with("0.1.0"));
     }
 
-    #[cfg(feature = "pg_test")]
     #[pg_test]
     #[should_panic(expected = "TVIEW metadata not found")]
     fn test_error_propagates_to_postgres() {
@@ -830,7 +834,6 @@ mod tests {
     }
 
     // Phase 5 Task 1 RED: Tests for jsonb_delta detection
-    #[cfg(feature = "pg_test")]
     #[pg_test]
     fn test_jsonb_delta_check_function_exists() {
         // This test will fail because pg_tviews_check_jsonb_delta doesn't exist yet
@@ -838,7 +841,6 @@ mod tests {
         assert!(result.is_ok(), "pg_tviews_check_jsonb_delta() function should exist");
     }
 
-    #[cfg(feature = "pg_test")]
     #[pg_test]
     fn test_check_jsonb_delta_available_function() {
         // This test will fail because check_jsonb_delta_available() doesn't exist yet
@@ -846,7 +848,6 @@ mod tests {
         // Just calling it is enough - function must exist
     }
 
-    #[cfg(feature = "pg_test")]
     #[pg_test]
     fn test_pg_tviews_works_without_jsonb_delta() {
         // Setup: Ensure jsonb_delta is NOT installed
@@ -867,7 +868,6 @@ mod tests {
     /// pg_tviews_refresh() must not fail with a column-count mismatch even
     /// though the tv_* table has extra created_at/updated_at columns that
     /// the backing view does not expose.
-    #[cfg(feature = "pg_test")]
     #[pg_test]
     fn test_pg_tviews_refresh_no_column_mismatch() {
         Spi::run("CREATE TABLE tb_note (pk_note BIGSERIAL PRIMARY KEY, body TEXT)").unwrap();
@@ -892,7 +892,6 @@ mod tests {
 
     /// pg_tviews_refresh() re-populates the table from the backing view,
     /// restoring data that was manually altered.
-    #[cfg(feature = "pg_test")]
     #[pg_test]
     fn test_pg_tviews_refresh_repopulates_data() {
         Spi::run("CREATE TABLE tb_tag (pk_tag BIGSERIAL PRIMARY KEY, name TEXT)").unwrap();
