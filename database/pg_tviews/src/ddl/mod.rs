@@ -67,3 +67,4 @@ fn pg_tviews_convert_existing_table(table_name: &str) -> Result<String, String> 
         Err(e) => Err(format!("Failed to convert table to TVIEW: {e}")),
     }
 }
+

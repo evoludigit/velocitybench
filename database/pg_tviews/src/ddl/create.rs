@@ -7,19 +7,15 @@ use crate::error::{TViewError, TViewResult};
 /// Uses `current_schema()` to respect the active `search_path`, matching
 /// standard PostgreSQL convention for unqualified DDL statements.
 fn current_schema() -> TViewResult<String> {
-    Spi::connect(|client| -> spi::Result<Option<String>> {
-        let rows = client.select("SELECT current_schema()::text", Some(1), &[])?;
-        let val: Option<&str> = rows.first().get_one()?;
-        Ok(val.map(|s| s.to_string()))
-    })
-    .map_err(|e| TViewError::CatalogError {
-        operation: "Get current schema".to_string(),
-        pg_error: format!("{e:?}"),
-    })?
-    .ok_or_else(|| TViewError::CatalogError {
-        operation: "Get current schema".to_string(),
-        pg_error: "current_schema() returned NULL (no schema in search_path?)".to_string(),
-    })
+    crate::utils::spi_get_string("SELECT current_schema()")
+        .map_err(|e| TViewError::CatalogError {
+            operation: "Get current schema".to_string(),
+            pg_error: e.to_string(),
+        })?
+        .ok_or_else(|| TViewError::CatalogError {
+            operation: "Get current schema".to_string(),
+            pg_error: "current_schema() returned NULL (no schema in search_path?)".to_string(),
+        })
 }
 
 /// Create a TVIEW with atomic rollback on error
@@ -73,14 +69,14 @@ pub fn create_tview(
         transform_raw_select_to_tview(entity_name, select_sql)?
     } else {
         // Already in TVIEW format
-            let s = select_sql.to_string();
-            (s, schema)
+        (select_sql.to_string(), schema)
     };
 
     let entity_name = final_schema.entity_name.as_ref()
-        .ok_or_else(|| TViewError::InvalidSelectStatement {
-            sql: select_sql.to_string(),
-            reason: "Could not infer entity name from SELECT (missing pk_<entity> column?)".to_string(),
+        .ok_or_else(|| TViewError::RequiredColumnMissing {
+            column_name: format!("pk_{}", tview_name.strip_prefix("tv_").unwrap_or(tview_name)),
+            context: "pg_tviews requires a Trinity Pattern primary key column named \
+                      \"pk_<entity>\" (e.g., pk_user, pk_post)".to_string(),
         })?;
 
     // Resolve the target schema once, respecting the active search_path.
@@ -349,6 +345,18 @@ fn populate_initial_data(tview_name: &str, view_name: &str, schema: &TViewSchema
     Ok(())
 }
 
+/// Quote a string for use in a PostgreSQL array literal.
+///
+/// Empty strings and strings containing special characters must be double-quoted
+/// to avoid producing invalid array literals like `'{,}'`.
+fn pg_array_elem(s: &str) -> String {
+    if s.is_empty() || s.contains([',', '"', '\\', '{', '}', ' ']) {
+        format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
+    } else {
+        s.to_string()
+    }
+}
+
 /// Register the TVIEW in metadata tables
 fn register_metadata(
     entity_name: &str,
@@ -362,18 +370,7 @@ fn register_metadata(
     // Analyze dependencies to populate type/path/match_key info
     let dep_infos = analyze_dependencies(definition_sql, &schema.fk_columns);
 
-    // Serialize schema information. Quote elements that might be empty or contain
-    // special characters to produce valid PostgreSQL array literal contents.
-    // The format string wraps these in '{...}' to form a complete array literal.
-    fn pg_array_elem(s: &str) -> String {
-        // Empty strings and strings with special characters must be double-quoted
-        if s.is_empty() || s.contains([',', '"', '\\', '{', '}', ' ']) {
-            format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
-        } else {
-            s.to_string()
-        }
-    }
-
+    // Serialize schema information (quoted for safe PostgreSQL array literals)
     let fk_columns = schema.fk_columns.iter()
         .map(|s| pg_array_elem(s))
         .collect::<Vec<_>>()
@@ -389,13 +386,13 @@ fn register_metadata(
         .collect::<Vec<_>>()
         .join(",");
 
-    // Serialize dependency paths (TEXT[] format, NULL for None)
+    // Serialize dependency paths (TEXT[] format, empty string for None)
     let dep_paths = dep_infos.iter()
         .map(|d| pg_array_elem(&d.jsonb_path.as_ref().map_or_else(String::new, |path| path.join("."))))
         .collect::<Vec<_>>()
         .join(",");
 
-    // Serialize array match keys (NULL for None)
+    // Serialize array match keys (empty string for None)
     let array_keys = dep_infos.iter()
         .map(|d| pg_array_elem(&d.array_match_key.clone().unwrap_or_default()))
         .collect::<Vec<_>>()
@@ -406,7 +403,6 @@ fn register_metadata(
         .map(|oid| oid.to_u32().to_string())
         .collect::<Vec<_>>()
         .join(",");
-
 
     // Get OIDs for the created objects (schema-qualified to avoid false matches
     // when identical names exist in multiple schemas)
