@@ -43,7 +43,7 @@ BEGIN;
                     jsonb_agg(
                         jsonb_build_object('id', u.id, 'name', u.name)
                         ORDER BY u.pk_user
-                    ),
+                    ) FILTER (WHERE u.pk_user IS NOT NULL),
                     '[]'::jsonb
                 )
             ) AS data
