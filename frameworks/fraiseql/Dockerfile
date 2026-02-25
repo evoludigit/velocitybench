@@ -1,4 +1,4 @@
-# FraiseQL v2.0.0-beta.4 Dockerfile for VelocityBench
+# FraiseQL v2.0.0-rc.11 Dockerfile for VelocityBench
 # Multi-stage build: Rust builder -> Python schema gen -> Debian runtime
 #
 # NOTE: fraiseql-server v2.0.0-beta.4 is not yet published to crates.io.
