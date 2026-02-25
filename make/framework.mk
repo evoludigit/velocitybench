@@ -13,7 +13,12 @@ down:
 
 
 
-.PHONY: framework-list framework-start framework-stop framework-smoke test-seed smoke-test parity-test bench bench-one bench-all bench-sequential n1-guard validate up up-medium down
+.PHONY: framework-list framework-start framework-stop framework-smoke test-seed smoke-test parity-test bench bench-one bench-all bench-sequential n1-guard validate up up-medium down status
+
+# Framework health dashboard: container status, health check, Q1 smoke
+# Usage: make status [--json]
+status:
+	@$(VENV_PYTHON) $(PROJECT_ROOT)tests/benchmark/status.py $(ARGS)
 
 # List all available frameworks
 framework-list:
