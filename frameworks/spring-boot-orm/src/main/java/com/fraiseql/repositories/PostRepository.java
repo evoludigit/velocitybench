@@ -11,10 +11,10 @@ import java.util.List;
 @Repository
 public interface PostRepository extends JpaRepository<Post, Integer> {
 
-    @Query(value = "SELECT * FROM benchmark.tb_post WHERE id = :id", nativeQuery = true)
+    @Query(value = "SELECT * FROM tb_post WHERE id = :id", nativeQuery = true)
     Post findByUuid(@Param("id") String id);
 
-    @Query(value = "SELECT * FROM benchmark.tb_post WHERE published = true ORDER BY created_at DESC LIMIT :limit", nativeQuery = true)
+    @Query(value = "SELECT * FROM tb_post WHERE published = true ORDER BY created_at DESC LIMIT :limit", nativeQuery = true)
     List<Post> findPublishedPostsWithLimit(@Param("limit") int limit);
 
     /**
@@ -22,8 +22,8 @@ public interface PostRepository extends JpaRepository<Post, Integer> {
      * Each row: [id(uuid), title, content, created_at, username, full_name]
      */
     @Query(value = "SELECT p.id, p.title, p.content, p.created_at, u.username, u.full_name " +
-                   "FROM benchmark.tb_post p " +
-                   "JOIN benchmark.tb_user u ON p.fk_author = u.pk_user " +
+                   "FROM tb_post p " +
+                   "JOIN tb_user u ON p.fk_author = u.pk_user " +
                    "WHERE p.published = true " +
                    "ORDER BY p.created_at DESC " +
                    "LIMIT :limit",

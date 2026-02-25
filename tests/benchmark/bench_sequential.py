@@ -52,9 +52,9 @@ _GQL_Q2 = "{ posts(limit: 10) { id title } }"
 _GQL_Q2b = "{ posts(limit: 10) { id title author { username fullName } } }"
 
 # PostGraphile uses Relay-style schema with different field names
-_PG_Q1 = "{ allUsers(first: 20) { nodes { id username fullName } } }"
-_PG_Q2 = "{ allPosts(first: 10) { nodes { id title } } }"
-_PG_Q2b = "{ allPosts(first: 10) { nodes { id title userByFkAuthor { username fullName } } } }"
+_PG_Q1 = "{ allTbUsers(first: 20) { nodes { id username fullName } } }"
+_PG_Q2 = "{ allTbPosts(first: 10) { nodes { id title } } }"
+_PG_Q2b = "{ allTbPosts(first: 10) { nodes { id title tbUserByFkAuthor { username fullName } } } }"
 _GQL_Q3 = "{ comments(limit: 20) { id content author { username } post { title } } }"
 _GQL_M1_TMPL = (
     'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "bench" }}) {{ id bio }} }}'
@@ -1032,7 +1032,9 @@ def stop_service(service: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _row(r: BenchResult, detailed_errors: bool = False, show_language: bool = False) -> str:
+def _row(
+    r: BenchResult, detailed_errors: bool = False, show_language: bool = False
+) -> str:
     lang = FRAMEWORKS.get(r.framework, {}).get("language", "")
     lang_col = f" | {lang}" if show_language else ""
     if r.skipped:
@@ -1116,7 +1118,11 @@ def format_report(
 
     for cat, cat_label in _CATEGORY_LABELS.items():
         cat_results = sorted(
-            [r for r in q1_results if FRAMEWORKS.get(r.framework, {}).get("category") == cat],
+            [
+                r
+                for r in q1_results
+                if FRAMEWORKS.get(r.framework, {}).get("category") == cat
+            ],
             key=lambda r: r.rps,
             reverse=True,
         )
