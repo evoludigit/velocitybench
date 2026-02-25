@@ -386,8 +386,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
     profiles:
       - ariadne
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -411,8 +413,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
     profiles:
       - asgi-graphql
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -434,8 +438,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
     profiles:
       - graphql-yoga
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -457,8 +463,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
     profiles:
       - mercurius
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -480,8 +488,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
     profiles:
       - express-graphql
+      - benchmark
     networks:
       - velocitybench-benchmark
 
