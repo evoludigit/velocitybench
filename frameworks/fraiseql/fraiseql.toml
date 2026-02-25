@@ -28,9 +28,9 @@ bind_addr = "0.0.0.0:8815"
 # CORS disabled — benchmark runs in a closed Docker network
 cors_enabled = false
 
-# Connection pool
-pool_min_size = 5
-pool_max_size = 20
+# Connection pool (increased to match other frameworks)
+pool_min_size = 10
+pool_max_size = 50
 pool_timeout_secs = 30
 
 # Introspection enabled (unauthenticated) for benchmark tooling

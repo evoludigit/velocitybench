@@ -20,8 +20,8 @@ bind_addr = "0.0.0.0:8815"
 
 cors_enabled = false
 
-pool_min_size = 5
-pool_max_size = 20
+pool_min_size = 10
+pool_max_size = 50
 pool_timeout_secs = 30
 
 introspection_enabled = true
