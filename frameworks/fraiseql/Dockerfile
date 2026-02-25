@@ -17,7 +17,7 @@ ARG SCHEMA_FILE=schema.py
 # ============================================================================
 # Stage 1: Python — generate schema.json from the selected schema variant
 # ============================================================================
-FROM python:3.12-slim-bookworm AS schema-builder
+FROM python:3.13-slim-bookworm AS schema-builder
 
 ARG SCHEMA_FILE
 

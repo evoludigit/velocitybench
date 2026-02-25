@@ -1,6 +1,6 @@
 # Multi-stage build for Flask REST framework
 # Stage 1: Build dependencies
-FROM python:3.11-slim AS builder
+FROM python:3.13-slim AS builder
 
 # Install system dependencies for building
 RUN apt-get update && apt-get install -y \
@@ -17,7 +17,7 @@ COPY flask-rest/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Stage 2: Runtime image
-FROM python:3.11-slim AS runtime
+FROM python:3.13-slim AS runtime
 
 # Install runtime dependencies only
 RUN apt-get update && apt-get install -y \
