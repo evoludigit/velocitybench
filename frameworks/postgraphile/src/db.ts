@@ -4,7 +4,7 @@ const pool = new Pool({
   user: process.env.DB_USER || 'benchmark',
   password: process.env.DB_PASSWORD || 'benchmark123',
   host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5434'),
+  port: parseInt(process.env.DB_PORT || '5432'),
   database: process.env.DB_NAME || 'velocitybench_benchmark',
   max: 20,
   idleTimeoutMillis: 30000,
@@ -57,7 +57,6 @@ async function applyPostGraphileSchema(client: any) {
     COMMENT ON COLUMN benchmark.tb_comment.pk_comment IS E'@omit all\\nInternal primary key for database performance.';
     COMMENT ON COLUMN benchmark.tb_comment.fk_post IS E'@omit all\\nInternal foreign key - use "post" relation instead.';
     COMMENT ON COLUMN benchmark.tb_comment.fk_author IS E'@omit all\\nInternal foreign key - use "author" relation instead.';
-    COMMENT ON COLUMN benchmark.tb_comment.fk_parent IS E'@omit all\\nInternal foreign key - use "parentComment" relation instead.';
     COMMENT ON COLUMN benchmark.tb_comment.created_at IS E'@omit create,update\\nTimestamp when comment was created (read-only, server-managed).';
     COMMENT ON COLUMN benchmark.tb_comment.updated_at IS E'@omit create,update\\nTimestamp when comment was last updated (read-only, server-managed).';
   `;

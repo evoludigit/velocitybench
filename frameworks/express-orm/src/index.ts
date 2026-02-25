@@ -7,9 +7,6 @@ import { updateUserSchema } from './validation.js';
 const app = express();
 app.use(express.json());
 
-// Initialize database
-initDatabase();
-
 // Prometheus metrics
 collectDefaultMetrics();
 const requestCounter = new Counter({
@@ -272,7 +269,16 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 // Start server
 // ============================================================================
 
-const PORT = parseInt(process.env.PORT || '8001');
-app.listen(PORT, () => {
-  console.log(`🚀 Express ORM server ready at http://localhost:${PORT}`);
+const PORT = parseInt(process.env.PORT || '8007');
+
+async function main() {
+  await initDatabase();
+  app.listen(PORT, () => {
+    console.log(`🚀 Express ORM server ready at http://localhost:${PORT}`);
+  });
+}
+
+main().catch(err => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
 });

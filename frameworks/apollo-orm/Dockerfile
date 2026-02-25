@@ -14,9 +14,6 @@ COPY src ./src
 RUN npm run build
 RUN npm prune --production
 
-# Install curl for health checks
-RUN apk add --no-cache curl
-
 EXPOSE 4004 4005
 
 CMD ["node", "dist/index.js"]

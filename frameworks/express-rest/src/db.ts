@@ -9,7 +9,6 @@ export const pool = new Pool({
   user: process.env.DB_USER || 'benchmark',
   password: process.env.DB_PASSWORD || 'benchmark123',
   // Connection pool settings
-  min: 10,
   max: 50,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,

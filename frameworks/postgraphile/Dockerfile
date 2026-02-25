@@ -16,7 +16,7 @@ RUN npm prune --production
 
 # Health check
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:4000/health || exit 1
+  CMD node -e "require('http').get('http://localhost:4000/health', r => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"
 
 EXPOSE 4000
 

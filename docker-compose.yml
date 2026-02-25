@@ -254,18 +254,25 @@ services:
   apollo:
     build: ./frameworks/apollo-server
     ports:
-      - "4001:4001"
       - "4002:4002"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4002/health"]
-      interval: 30s
-      timeout: 15s
-      retries: 3
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4002/health', r => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - apollo
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -276,14 +283,22 @@ services:
       - "4005:4005"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4005/health"]
-      interval: 30s
-      timeout: 15s
-      retries: 3
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4005/health', r => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - apollo-orm
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -319,7 +334,7 @@ services:
       - "4000:4000"  # Standardized GraphQL port
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -327,10 +342,11 @@ services:
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4000/health"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/health', r => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
     profiles:
       - postgraphile
     networks:
@@ -392,7 +408,7 @@ services:
       - "4000:4000"  # Standardized GraphQL port
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -400,7 +416,7 @@ services:
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4000/health"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/health', r => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -415,7 +431,7 @@ services:
       - "4000:4000"  # Standardized GraphQL port
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -423,7 +439,7 @@ services:
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4000/health"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/health', r => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -438,7 +454,7 @@ services:
       - "4000:4000"  # Standardized GraphQL port
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -446,7 +462,7 @@ services:
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4000/health"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/health', r => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -702,15 +718,23 @@ services:
       - "8005:8005"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
       - PORT=8005
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8005/health"]
-      interval: 30s
-      timeout: 15s
-      retries: 3
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8005/health', r => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - express-rest
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -720,15 +744,23 @@ services:
       - "8007:8007"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
       - PORT=8007
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8007/health"]
-      interval: 30s
-      timeout: 15s
-      retries: 3
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8007/health', r => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - express-orm
+      - benchmark
     networks:
       - velocitybench-benchmark
 

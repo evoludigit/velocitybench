@@ -271,12 +271,13 @@ app.register(mercurius, {
 });
 
 // Health check endpoint
-app.get('/health', async () => {
+app.get('/health', async (_request, reply) => {
   try {
     await pool.query('SELECT 1');
     return { status: 'healthy', framework: 'mercurius' };
   } catch (error) {
-    throw { statusCode: 503, message: 'unhealthy', error: String(error) };
+    reply.code(503);
+    return { status: 'unhealthy', error: String(error) };
   }
 });
 
