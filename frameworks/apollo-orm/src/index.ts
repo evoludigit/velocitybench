@@ -1,12 +1,12 @@
 import 'reflect-metadata';
 import { ApolloServer } from '@apollo/server';
-import { startStandaloneServer } from '@apollo/server/standalone';
 import { register, collectDefaultMetrics, Counter, Histogram } from 'prom-client';
-import http from 'http';
+import express from 'express';
 import { typeDefs } from './schema.js';
 import { resolvers } from './resolvers.js';
 import { initDatabase, AppDataSource } from './db.js';
 import { createDataLoaders } from './dataloaders.js';
+import { User } from './entities/User.js';
 
 // Prometheus metrics
 collectDefaultMetrics();
@@ -21,6 +21,25 @@ const requestDuration = new Histogram({
   name: 'apollo_orm_request_duration_seconds',
   help: 'GraphQL request duration (ORM)',
   labelNames: ['operation'],
+});
+
+// Create Express app
+const app = express();
+
+// Health endpoint
+app.get('/health', async (req, res) => {
+  try {
+    const userCount = await AppDataSource.getRepository(User).count();
+    res.json({ status: 'healthy', framework: 'apollo-orm', userCount });
+  } catch (error) {
+    res.status(503).json({ status: 'unhealthy', error: String(error) });
+  }
+});
+
+// Metrics endpoint
+app.get('/metrics', async (req, res) => {
+  res.set('Content-Type', register.contentType);
+  res.send(await register.metrics());
 });
 
 // Create Apollo Server
@@ -45,46 +64,37 @@ const server = new ApolloServer({
 });
 
 // Initialize database and start server
-async function startServer() {
+async function main() {
   try {
     await initDatabase();
 
-    // Start server on port 4004 (GraphQL)
-    const { url } = await startStandaloneServer(server, {
-      listen: { port: 4004 },
-       context: async () => {
-         // Provide DataLoaders for N+1 query prevention
-         return {
-           dataLoaders: createDataLoaders(),
-         };
-       },
-    });
+    await server.start();
 
-    console.log(`🚀 Apollo ORM Server ready at ${url}`);
+    // Simple GraphQL endpoint
+    app.use('/graphql', express.json());
+    app.post('/graphql', async (req, res) => {
+      try {
+        const result = await server.executeOperation(req.body, {
+          contextValue: {
+            dataLoaders: createDataLoaders()
+          }
+        });
 
-    // Health & Metrics endpoints (separate HTTP server on port 4005)
-    const metricsServer = http.createServer(async (req, res) => {
-      if (req.url === '/health') {
-        try {
-          // Simple health check using TypeORM
-          const userCount = await AppDataSource.getRepository('User').count();
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ status: 'healthy', framework: 'apollo-orm', userCount }));
-        } catch (error) {
-          res.writeHead(503, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ status: 'unhealthy', error: String(error) }));
+        if (result.body.kind === 'single') {
+          res.json(result.body.singleResult);
+        } else {
+          res.json(result.body);
         }
-      } else if (req.url === '/metrics') {
-        res.writeHead(200, { 'Content-Type': register.contentType });
-        res.end(await register.metrics());
-      } else {
-        res.writeHead(404);
-        res.end();
+      } catch (error) {
+        res.status(400).json({ errors: [{ message: String(error) }] });
       }
     });
 
-    metricsServer.listen(4005, () => {
-      console.log('📊 Metrics server ready at http://localhost:4005');
+    const PORT = parseInt(process.env.PORT || '4004');
+    app.listen(PORT, () => {
+      console.log(`🚀 Apollo ORM Server ready at http://localhost:${PORT}/graphql`);
+      console.log(`📊 Health endpoint at http://localhost:${PORT}/health`);
+      console.log(`📊 Metrics endpoint at http://localhost:${PORT}/metrics`);
     });
 
   } catch (error) {
@@ -93,4 +103,4 @@ async function startServer() {
   }
 }
 
-startServer();
+main();

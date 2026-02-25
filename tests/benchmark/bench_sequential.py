@@ -182,7 +182,7 @@ FRAMEWORKS: dict[str, dict] = {
             "Q2": ("http://localhost:4004/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:4004/graphql", _GQL_Q2b),
         },
-        "health_url": "http://localhost:4005/health",  # health on separate port
+        "health_url": "http://localhost:4004/health",
     },
     "express-rest": {
         "compose_service": "express-rest",
