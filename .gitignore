@@ -42,8 +42,9 @@ package-lock.json
 dist/
 bin/
 
-# Java
+# Java / Gradle
 target/
+.gradle/
 .classpath
 .project
 .settings/
