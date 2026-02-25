@@ -62,6 +62,8 @@ FRAMEWORKS: dict[str, dict] = {
     "actix-web-rest": {
         "compose_service": "actix-web-rest",
         "type": "rest",
+        "language": "Rust",
+        "category": "rest",
         "queries": {
             "Q1": "http://localhost:8015/users?limit=20",
             "Q2": "http://localhost:8015/posts?limit=10",
@@ -73,6 +75,8 @@ FRAMEWORKS: dict[str, dict] = {
     "async-graphql": {
         "compose_service": "async-graphql",
         "type": "graphql",
+        "language": "Rust",
+        "category": "graphql",
         "queries": {
             "Q1": ("http://localhost:8016/graphql", _GQL_Q1),
             "Q2": ("http://localhost:8016/graphql", _GQL_Q2),
@@ -85,6 +89,8 @@ FRAMEWORKS: dict[str, dict] = {
     "juniper": {
         "compose_service": "juniper",
         "type": "graphql",
+        "language": "Rust",
+        "category": "graphql",
         "queries": {
             "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
@@ -99,6 +105,8 @@ FRAMEWORKS: dict[str, dict] = {
     "go-gqlgen": {
         "compose_service": "go-gqlgen",
         "type": "graphql",
+        "language": "Go",
+        "category": "graphql",
         "queries": {
             "Q1": ("http://localhost:4010/query", _GQL_Q1),
             "Q2": ("http://localhost:4010/query", _GQL_Q2),
@@ -110,6 +118,8 @@ FRAMEWORKS: dict[str, dict] = {
     "gin-rest": {
         "compose_service": "gin-rest",
         "type": "rest",
+        "language": "Go",
+        "category": "rest",
         "queries": {
             "Q1": "http://localhost:8006/users?limit=20",
             "Q2": "http://localhost:8006/posts?limit=10",
@@ -121,6 +131,8 @@ FRAMEWORKS: dict[str, dict] = {
     "go-graphql-go": {
         "compose_service": "go-graphql-go",
         "type": "graphql",
+        "language": "Go",
+        "category": "graphql",
         "queries": {
             "Q1": ("http://localhost:8008/graphql", _GQL_Q1),
             "Q2": ("http://localhost:8008/graphql", _GQL_Q2),
@@ -131,6 +143,8 @@ FRAMEWORKS: dict[str, dict] = {
     "graphql-go": {
         "compose_service": "graphql-go",
         "type": "graphql",
+        "language": "Go",
+        "category": "graphql",
         "queries": {
             "Q1": ("http://localhost:4011/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4011/graphql", _GQL_Q2),
@@ -144,6 +158,8 @@ FRAMEWORKS: dict[str, dict] = {
     "apollo-server": {
         "compose_service": "apollo",
         "type": "graphql",
+        "language": "Node.js",
+        "category": "graphql",
         "queries": {
             "Q1": ("http://localhost:4002/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4002/graphql", _GQL_Q2),
@@ -154,6 +170,8 @@ FRAMEWORKS: dict[str, dict] = {
     "apollo-orm": {
         "compose_service": "apollo-orm",
         "type": "graphql",
+        "language": "Node.js",
+        "category": "graphql",
         "queries": {
             "Q1": ("http://localhost:4004/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4004/graphql", _GQL_Q2),
@@ -164,6 +182,8 @@ FRAMEWORKS: dict[str, dict] = {
     "express-rest": {
         "compose_service": "express-rest",
         "type": "rest",
+        "language": "Node.js",
+        "category": "rest",
         "queries": {
             "Q1": "http://localhost:8005/users?limit=20",
             "Q2": "http://localhost:8005/posts?limit=10",
@@ -174,6 +194,8 @@ FRAMEWORKS: dict[str, dict] = {
     "express-orm": {
         "compose_service": "express-orm",
         "type": "rest",
+        "language": "Node.js",
+        "category": "rest",
         "queries": {
             "Q1": "http://localhost:8007/users?limit=20",
             "Q2": "http://localhost:8007/posts?limit=10",
@@ -184,6 +206,8 @@ FRAMEWORKS: dict[str, dict] = {
     "express-graphql": {
         "compose_service": "express-graphql",
         "type": "graphql",
+        "language": "Node.js",
+        "category": "graphql",
         "queries": {
             "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
@@ -194,6 +218,8 @@ FRAMEWORKS: dict[str, dict] = {
     "graphql-yoga": {
         "compose_service": "graphql-yoga",
         "type": "graphql",
+        "language": "Node.js",
+        "category": "graphql",
         "queries": {
             "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
@@ -204,6 +230,8 @@ FRAMEWORKS: dict[str, dict] = {
     "mercurius": {
         "compose_service": "mercurius",
         "type": "graphql",
+        "language": "Node.js",
+        "category": "graphql",
         "queries": {
             "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
@@ -217,6 +245,8 @@ FRAMEWORKS: dict[str, dict] = {
     "strawberry": {
         "compose_service": "strawberry",
         "type": "graphql",
+        "language": "Python",
+        "category": "graphql",
         "queries": {
             "Q1": ("http://localhost:8011/graphql", _GQL_Q1),
             "Q2": ("http://localhost:8011/graphql", _GQL_Q2),
@@ -227,6 +257,8 @@ FRAMEWORKS: dict[str, dict] = {
     "graphene": {
         "compose_service": "graphene",
         "type": "graphql",
+        "language": "Python",
+        "category": "graphql",
         "queries": {
             "Q1": ("http://localhost:8002/graphql", _GQL_Q1),
             "Q2": ("http://localhost:8002/graphql", _GQL_Q2),
@@ -237,6 +269,8 @@ FRAMEWORKS: dict[str, dict] = {
     "fastapi-rest": {
         "compose_service": "fastapi-rest",
         "type": "rest",
+        "language": "Python",
+        "category": "rest",
         "queries": {
             "Q1": "http://localhost:8003/users?limit=20",
             "Q2": "http://localhost:8003/posts?limit=10",
@@ -247,6 +281,8 @@ FRAMEWORKS: dict[str, dict] = {
     "flask-rest": {
         "compose_service": "flask-rest",
         "type": "rest",
+        "language": "Python",
+        "category": "rest",
         "queries": {
             "Q1": "http://localhost:8004/users?limit=20",
             "Q2": "http://localhost:8004/posts?limit=10",
@@ -257,6 +293,8 @@ FRAMEWORKS: dict[str, dict] = {
     "ariadne": {
         "compose_service": "ariadne",
         "type": "graphql",
+        "language": "Python",
+        "category": "graphql",
         "queries": {
             "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
@@ -267,6 +305,8 @@ FRAMEWORKS: dict[str, dict] = {
     "asgi-graphql": {
         "compose_service": "asgi-graphql",
         "type": "graphql",
+        "language": "Python",
+        "category": "graphql",
         "queries": {
             "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
@@ -280,6 +320,8 @@ FRAMEWORKS: dict[str, dict] = {
     "spring-boot": {
         "compose_service": "spring-boot",
         "type": "rest",
+        "language": "Java",
+        "category": "rest",
         "queries": {
             # Spring Boot uses page/size pagination, not limit
             "Q1": "http://localhost:8010/api/users?page=0&size=20",
@@ -291,6 +333,8 @@ FRAMEWORKS: dict[str, dict] = {
     "spring-boot-orm": {
         "compose_service": "spring-boot-orm",
         "type": "rest",
+        "language": "Java",
+        "category": "rest",
         "queries": {
             "Q1": "http://localhost:8013/api/users?page=0&size=20",
             "Q2": "http://localhost:8013/api/posts?size=10",
@@ -301,6 +345,8 @@ FRAMEWORKS: dict[str, dict] = {
     "spring-boot-orm-naive": {
         "compose_service": "spring-boot-orm-naive",
         "type": "rest",
+        "language": "Java",
+        "category": "rest",
         "queries": {
             "Q1": "http://localhost:8014/api/users?page=0&size=20",
             "Q2": "http://localhost:8014/api/posts?size=10",
@@ -310,6 +356,8 @@ FRAMEWORKS: dict[str, dict] = {
     "micronaut-graphql": {
         "compose_service": "micronaut-graphql",
         "type": "graphql",
+        "language": "Java",
+        "category": "graphql",
         "queries": {
             "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
@@ -320,6 +368,8 @@ FRAMEWORKS: dict[str, dict] = {
     "quarkus-graphql": {
         "compose_service": "quarkus-graphql",
         "type": "graphql",
+        "language": "Java",
+        "category": "graphql",
         "queries": {
             "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
@@ -334,6 +384,8 @@ FRAMEWORKS: dict[str, dict] = {
     "play-graphql": {
         "compose_service": "play-graphql",
         "type": "graphql",
+        "language": "Scala",
+        "category": "graphql",
         "queries": {
             "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
@@ -347,6 +399,8 @@ FRAMEWORKS: dict[str, dict] = {
     "ruby-rails": {
         "compose_service": "ruby-rails",
         "type": "rest",
+        "language": "Ruby",
+        "category": "rest",
         "queries": {
             "Q1": "http://localhost:8012/api/users?limit=20",
             "Q2": "http://localhost:8012/api/posts?limit=10",
@@ -357,6 +411,8 @@ FRAMEWORKS: dict[str, dict] = {
     "hanami": {
         "compose_service": "hanami",
         "type": "graphql",
+        "language": "Ruby",
+        "category": "graphql",
         "queries": {
             "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
@@ -370,6 +426,8 @@ FRAMEWORKS: dict[str, dict] = {
     "php-laravel": {
         "compose_service": "php-laravel",
         "type": "rest",
+        "language": "PHP",
+        "category": "rest",
         "queries": {
             "Q1": "http://localhost:8009/api/users?limit=20",
             "Q2": "http://localhost:8009/api/posts?limit=10",
@@ -380,6 +438,23 @@ FRAMEWORKS: dict[str, dict] = {
     "webonyx-graphql-php": {
         "compose_service": "webonyx-graphql-php",
         "type": "graphql",
+        "language": "PHP",
+        "category": "graphql",
+        "queries": {
+            "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
+            "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
+        },
+        "health_url": "http://localhost:4000/health",
+    },
+    # ------------------------------------------------------------------
+    # Node.js schema-first frameworks
+    # ------------------------------------------------------------------
+    "postgraphile": {
+        "compose_service": "postgraphile",
+        "type": "graphql",
+        "language": "Node.js",
+        "category": "graphql-schema-first",
         "queries": {
             "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
@@ -393,6 +468,8 @@ FRAMEWORKS: dict[str, dict] = {
     "csharp-dotnet": {
         "compose_service": "csharp-dotnet",
         "type": "graphql",
+        "language": "C#",
+        "category": "graphql",
         "queries": {
             "Q1": ("http://localhost:8025/graphql", _GQL_Q1),
             "Q2": ("http://localhost:8025/graphql", _GQL_Q2),
@@ -406,6 +483,8 @@ FRAMEWORKS: dict[str, dict] = {
     "fraiseql-tv": {
         "compose_service": "fraiseql-tv",
         "type": "graphql",
+        "language": "Python",
+        "category": "graphql-precomputed",
         "queries": {
             "Q1": ("http://localhost:8816/graphql", _GQL_Q1),
             "Q2": ("http://localhost:8816/graphql", _GQL_Q2),
@@ -419,6 +498,8 @@ FRAMEWORKS: dict[str, dict] = {
     "fraiseql-tv-nocache": {
         "compose_service": "fraiseql-tv-nocache",
         "type": "graphql",
+        "language": "Python",
+        "category": "graphql-precomputed",
         "queries": {
             "Q1": ("http://localhost:8817/graphql", _GQL_Q1),
             "Q2": ("http://localhost:8817/graphql", _GQL_Q2),
@@ -430,6 +511,8 @@ FRAMEWORKS: dict[str, dict] = {
     "fraiseql-v": {
         "compose_service": "fraiseql",
         "type": "graphql",
+        "language": "Python",
+        "category": "graphql-precomputed",
         "queries": {
             "Q1": ("http://localhost:8815/graphql", _GQL_Q1),
             "Q2": ("http://localhost:8815/graphql", _GQL_Q2),
@@ -461,6 +544,7 @@ DEFAULT_FRAMEWORK_ORDER = [
     "express-graphql",
     "graphql-yoga",
     "mercurius",
+    "postgraphile",
     # Python
     "strawberry",
     "graphene",
@@ -937,9 +1021,11 @@ def stop_service(service: str) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _row(r: BenchResult, detailed_errors: bool = False) -> str:
+def _row(r: BenchResult, detailed_errors: bool = False, show_language: bool = False) -> str:
+    lang = FRAMEWORKS.get(r.framework, {}).get("language", "")
+    lang_col = f" {lang} |" if show_language else ""
     if r.skipped:
-        return f"| {r.framework} | {r.query_name} | — | — | — | — | — | _{r.skip_reason}_ |"
+        return f"| {r.framework} |{lang_col} {r.query_name} | — | — | — | — | — | _{r.skip_reason}_ |"
     err_col = f"{r.error_rate_pct:.1f}%"
     if detailed_errors and r.error_breakdown:
         parts = []
@@ -949,7 +1035,7 @@ def _row(r: BenchResult, detailed_errors: bool = False) -> str:
             parts.append(f"{cat}: {pct:.0f}%")
         err_col += f" ({', '.join(parts)})"
     return (
-        f"| {r.framework} | {r.query_name} "
+        f"| {r.framework} |{lang_col} {r.query_name} "
         f"| {r.rps:.0f} "
         f"| {r.p50_ms:.1f} "
         f"| {r.p95_ms:.1f} "
@@ -1001,32 +1087,64 @@ def format_report(
             "",
             f"## {qname} — {label}",
             "",
-            "| Framework | Query | RPS | p50 ms | p95 ms | p99 ms | Requests | Errors |",
-            "|-----------|-------|----:|-------:|-------:|-------:|---------:|--------|",
+            "| Framework | Language | Query | RPS | p50 ms | p95 ms | p99 ms | Requests | Errors |",
+            "|-----------|----------|-------|----:|-------:|-------:|-------:|---------:|--------|",
         ]
         for r in results:
             if r.query_name == qname:
-                lines.append(_row(r, detailed_errors=detailed))
+                lines.append(_row(r, detailed_errors=detailed, show_language=True))
 
-    # Summary: Q1 cross-framework comparison
+    # Category leaderboards for Q1
+    _CATEGORY_LABELS = {
+        "rest": "REST Frameworks",
+        "graphql": "GraphQL Frameworks",
+        "graphql-precomputed": "Pre-computed GraphQL (FraiseQL)",
+        "graphql-schema-first": "Schema-first GraphQL",
+    }
+    q1_results = [r for r in results if r.query_name == "Q1" and not r.skipped]
+
+    for cat, cat_label in _CATEGORY_LABELS.items():
+        cat_results = sorted(
+            [r for r in q1_results if FRAMEWORKS.get(r.framework, {}).get("category") == cat],
+            key=lambda r: r.rps,
+            reverse=True,
+        )
+        if not cat_results:
+            continue
+        lines += [
+            "",
+            "---",
+            "",
+            f"## {cat_label} — Q1 (sorted by RPS)",
+            "",
+            "| Framework | Language | RPS | p50 ms | p99 ms | Errors |",
+            "|-----------|----------|----:|-------:|-------:|--------|",
+        ]
+        for r in cat_results:
+            lang = FRAMEWORKS.get(r.framework, {}).get("language", "")
+            lines.append(
+                f"| {r.framework} | {lang} "
+                f"| {r.rps:.0f} | {r.p50_ms:.1f} | {r.p99_ms:.1f} "
+                f"| {r.error_rate_pct:.1f}% |"
+            )
+
+    # Summary: Q1 cross-framework comparison (all categories)
     lines += [
         "",
         "---",
         "",
         "## Summary — Q1 Cross-Framework (sorted by RPS)",
         "",
-        "| Framework | Cache | RPS | p50 ms | p99 ms |",
-        "|-----------|-------|----:|-------:|-------:|",
+        "| Framework | Language | Category | RPS | p50 ms | p99 ms |",
+        "|-----------|----------|----------|----:|-------:|-------:|",
     ]
-    q1_results = sorted(
-        [r for r in results if r.query_name == "Q1" and not r.skipped],
-        key=lambda r: r.rps,
-        reverse=True,
-    )
-    for r in q1_results:
-        cache_label = "off" if "nocache" in r.framework else "on"
+    all_q1_sorted = sorted(q1_results, key=lambda r: r.rps, reverse=True)
+    for r in all_q1_sorted:
+        fw_cfg = FRAMEWORKS.get(r.framework, {})
+        lang = fw_cfg.get("language", "")
+        cat = fw_cfg.get("category", "")
         lines.append(
-            f"| {r.framework} | {cache_label} "
+            f"| {r.framework} | {lang} | {cat} "
             f"| {r.rps:.0f} | {r.p50_ms:.1f} | {r.p99_ms:.1f} |"
         )
 
