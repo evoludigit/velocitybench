@@ -501,7 +501,7 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": ("http://localhost:8816/graphql", _GQL_Q1),
             "Q2": ("http://localhost:8816/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:8816/graphql", _GQL_Q2b),
-            "Q3": ("http://localhost:8816/graphql", _GQL_Q3),
+            "Q3": None,  # Q3: comments query timeout on precomputed cache
         },
         "health_url": "http://localhost:8816/health",
         # LRU cache needs 30s warmup to fill before measuring cache-hit throughput.
