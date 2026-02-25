@@ -298,6 +298,15 @@ FRAMEWORKS: dict[str, dict] = {
         },
         "health_url": "http://localhost:8013/actuator/health",
     },
+    "spring-boot-orm-naive": {
+        "compose_service": "spring-boot-orm-naive",
+        "type": "rest",
+        "queries": {
+            "Q1": "http://localhost:8014/api/users?page=0&size=20",
+            "Q2": "http://localhost:8014/api/posts?size=10",
+        },
+        "health_url": "http://localhost:8014/health",
+    },
     "micronaut-graphql": {
         "compose_service": "micronaut-graphql",
         "type": "graphql",
@@ -462,6 +471,7 @@ DEFAULT_FRAMEWORK_ORDER = [
     # Java / JVM
     "spring-boot",
     "spring-boot-orm",
+    "spring-boot-orm-naive",
     "micronaut-graphql",
     "quarkus-graphql",
     # Scala

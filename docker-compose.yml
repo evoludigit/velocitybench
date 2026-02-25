@@ -196,7 +196,7 @@ services:
       - "8010:8010"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - SERVER_PORT=8010
@@ -208,6 +208,10 @@ services:
       interval: 30s
       timeout: 15s
       retries: 3
+      start_period: 60s
+    profiles:
+      - spring-boot
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -217,7 +221,7 @@ services:
       - "8013:8010"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/velocitybench_benchmark
@@ -228,6 +232,10 @@ services:
       interval: 30s
       timeout: 15s
       retries: 3
+      start_period: 60s
+    profiles:
+      - spring-boot-orm
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -237,17 +245,22 @@ services:
       - "8014:8010"
     depends_on:
       postgres:
-         condition: service_started
+        condition: service_healthy
     environment:
       - SPRING_PROFILES_ACTIVE=prod
+      - SERVER_PORT=8010
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/velocitybench_benchmark
       - SPRING_DATASOURCE_USERNAME=benchmark
       - SPRING_DATASOURCE_PASSWORD=benchmark123
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8010/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8010/health"]
       interval: 30s
       timeout: 15s
       retries: 3
+      start_period: 60s
+    profiles:
+      - spring-boot-orm-naive
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -576,7 +589,7 @@ services:
       - "4000:4000"  # Standardized GraphQL port
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -588,9 +601,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 60s
     profiles:
       - micronaut-graphql
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -600,7 +614,7 @@ services:
       - "4000:4000"  # Standardized GraphQL port
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -612,9 +626,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 60s
     profiles:
       - quarkus-graphql
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -624,7 +639,7 @@ services:
       - "4000:4000"  # Standardized GraphQL port
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -637,9 +652,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 60s
     profiles:
       - play-graphql
+      - benchmark
     networks:
       - velocitybench-benchmark
 
