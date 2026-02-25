@@ -7,7 +7,7 @@ uvicorn[standard]==0.24.0
 
 # GraphQL Framework (with Pydantic v2 support)
 strawberry-graphql[fastapi]==0.250.0
-pydantic==2.10.0
+pydantic==2.12.5
 
 # Database
 psycopg>=3.2.2
