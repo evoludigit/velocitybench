@@ -20,14 +20,87 @@ from flask import Flask, jsonify, request
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
-sys.path.insert(0, str(PathlibPath(__file__).parent.parent))
-from common.errors import (
-    AppError,
-    InputValidationError,
-    ResourceNotFoundError,
-)
-from common.logging_middleware import FlaskLoggingMiddleware
-from common.validators import Validator
+
+# Custom error classes for Flask-REST
+class AppError(Exception):
+    def __init__(self, message: str, status_code: int = 500):
+        self.message = message
+        self.status_code = status_code
+        self.error_code = "APP_ERROR"
+        super().__init__(self.message)
+
+    def to_dict(self):
+        return {"error": self.error_code, "message": self.message}
+
+
+class InputValidationError(AppError):
+    def __init__(self, message: str):
+        super().__init__(message, 400)
+        self.error_code = "VALIDATION_ERROR"
+
+
+class ResourceNotFoundError(AppError):
+    def __init__(self, message: str):
+        super().__init__(message, 404)
+        self.error_code = "NOT_FOUND"
+
+
+# Simple logging middleware for Flask-REST
+class FlaskLoggingMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    def __call__(self, environ, start_response):
+        # Simple logging - just log the request
+        print(f"Request: {environ['REQUEST_METHOD']} {environ['PATH_INFO']}")
+        return self.app(environ, start_response)
+
+
+# Simple validator class for Flask-REST
+class Validator:
+    @staticmethod
+    def validate_uuid(value: str, field_name: str) -> str:
+        """Validate UUID format"""
+        import uuid
+
+        try:
+            uuid.UUID(value)
+            return value
+        except ValueError:
+            raise InputValidationError(f"Invalid {field_name}: must be a valid UUID")
+
+    @staticmethod
+    def validate_uuid_list(value: str, max_count: int = 100) -> list[str]:
+        """Validate comma-separated UUID list"""
+        uuids = [uuid.strip() for uuid in value.split(",") if uuid.strip()]
+        if len(uuids) > max_count:
+            raise InputValidationError(f"Too many UUIDs: maximum {max_count} allowed")
+        for uuid in uuids:
+            Validator.validate_uuid(uuid, "uuid")
+        return uuids
+
+    @staticmethod
+    def validate_limit(value: int, min_val: int = 1, max_val: int = 100) -> int:
+        """Validate limit parameter"""
+        if not isinstance(value, int) or value < min_val or value > max_val:
+            raise InputValidationError(f"Limit must be between {min_val} and {max_val}")
+        return value
+
+    @staticmethod
+    def validate_include_fields(value: str, allowed_includes: list[str]) -> list[str]:
+        """Validate include fields"""
+        if not value:
+            return []
+        includes = [inc.strip() for inc in value.split(",") if inc.strip()]
+        invalid = [inc for inc in includes if inc not in allowed_includes]
+        if invalid:
+            raise InputValidationError(
+                f"Invalid include fields: {', '.join(invalid)}. Allowed: {', '.join(allowed_includes)}"
+            )
+        return includes
+
+
+# Validator class defined above
 
 # Metrics
 REQUEST_COUNT = prometheus_client.Counter(
@@ -354,7 +427,7 @@ def get_user(user_id):
     user_data = user[0]
 
     # Handle includes parameter
-    allowed_includes = {"posts", "posts.comments", "posts.comments.author"}
+    allowed_includes = ["posts", "posts.comments", "posts.comments.author"]
     include = request.args.get("include", "")
     if include:
         try:
@@ -449,7 +522,7 @@ def list_posts():
     except InputValidationError:
         raise
 
-    allowed_includes = {"author", "comments", "comments.author"}
+    allowed_includes = ["author", "comments", "comments.author"]
     include = request.args.get("include", "")
     if include:
         try:

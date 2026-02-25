@@ -102,6 +102,43 @@ func (r *queryResolver) Posts(ctx context.Context, limit *int32) ([]*model.Post,
 	return posts, nil
 }
 
+// Comments is the resolver for the comments field.
+func (r *queryResolver) Comments(ctx context.Context, limit *int32) ([]*model.Comment, error) {
+	l := 20
+	if limit != nil {
+		l = int(*limit)
+	}
+
+	rows, err := db.Pool.Query(ctx, `
+		SELECT c.id, u.id AS author_uuid, u.username, p.id AS post_uuid, p.title, c.content
+		FROM benchmark.tb_comment c
+		JOIN benchmark.tb_user u ON c.fk_author = u.pk_user
+		JOIN benchmark.tb_post p ON c.fk_post = p.pk_post
+		ORDER BY c.created_at DESC
+		LIMIT $1
+	`, l)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var comments []*model.Comment
+	for rows.Next() {
+		var c model.Comment
+		var authorUUID, authorUsername, postUUID, postTitle string
+		var content string
+		if err := rows.Scan(&c.ID, &authorUUID, &authorUsername, &postUUID, &postTitle, &content); err != nil {
+			continue
+		}
+		c.Content = content
+		c.Author = &model.User{ID: authorUUID, Username: authorUsername}
+		c.Post = &model.Post{ID: postUUID, Title: postTitle}
+		comments = append(comments, &c)
+	}
+
+	return comments, nil
+}
+
 // UpdateUserRequest represents the validated input for updating a user
 type UpdateUserRequest struct {
 	ID       string  `validate:"required,uuid"`

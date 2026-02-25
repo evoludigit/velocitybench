@@ -4,6 +4,7 @@ type Query {
   users(limit: Int = 10): [User!]!
   post(id: ID!): Post
   posts(limit: Int = 10): [Post!]!
+  comments(limit: Int = 20): [Comment!]!
 }
 
 type Mutation {
