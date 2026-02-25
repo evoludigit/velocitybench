@@ -14,7 +14,7 @@ psycopg>=3.2.2
 asyncpg==0.31.0  # Pinned to match other frameworks for consistent benchmarking
 
 # System monitoring
-psutil==5.9.6  # Required for health checks
+psutil==7.2.2  # Required for health checks
 
 # Testing - Modern 2025 Stack
 pytest==9.0.2                    # Latest stable
