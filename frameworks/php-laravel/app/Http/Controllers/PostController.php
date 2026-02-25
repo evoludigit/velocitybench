@@ -34,8 +34,8 @@ class PostController extends Controller
 
         $posts = Post::with("author")
             ->orderBy("created_at", "desc")
-            ->skip($page * $limit)
-            ->take($limit)
+            ->offset($page * $limit)
+            ->limit($limit)
             ->get();
 
         $result = $posts->map(function ($post) use ($includeAuthor) {
@@ -73,8 +73,8 @@ class PostController extends Controller
         $posts = Post::with("author")
             ->where("fk_author", $user->pk_user)
             ->orderBy("created_at", "desc")
-            ->skip($page * $size)
-            ->take($size)
+            ->offset($page * $size)
+            ->limit($size)
             ->get();
 
         $result = $posts->map(function ($post) {

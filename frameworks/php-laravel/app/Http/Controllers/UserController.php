@@ -26,12 +26,12 @@ class UserController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $page = $request->get("page", 0);
-        $size = $request->get("size", 10);
-        
+        $limit = $request->get("limit", $request->get("size", 10));
+        $offset = $request->get("offset", $request->get("page", 0) * $limit);
+
         $users = User::orderBy("username")
-            ->skip($page * $size)
-            ->take($size)
+            ->offset($offset)
+            ->limit($limit)
             ->get();
             
         $result = $users->map(function ($user) {
