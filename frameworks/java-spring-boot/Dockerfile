@@ -46,11 +46,11 @@ RUN chown -R appuser:appuser /app
 USER appuser
 
 # Expose port
-EXPOSE 8018
+EXPOSE 8010
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=15s --start-period=60s --retries=3 \
-  CMD curl -f http://localhost:8018/actuator/health || exit 1
+  CMD curl -f http://localhost:8010/actuator/health || exit 1
 
 # Default JVM options (can be overridden)
 ENV JAVA_OPTS="-XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"

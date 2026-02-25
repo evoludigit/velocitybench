@@ -6,7 +6,7 @@ echo "========================================"
 
 # Environment variables with defaults
 export SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE:-development}
-export SERVER_PORT=${SERVER_PORT:-8018}
+export SERVER_PORT=${SERVER_PORT:-8010}
 export DB_HOST=${DB_HOST:-postgres}
 export DB_PORT=${DB_PORT:-5432}
 export DB_NAME=${DB_NAME:-fraiseql_benchmark}

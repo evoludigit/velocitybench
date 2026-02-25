@@ -1023,9 +1023,9 @@ def stop_service(service: str) -> None:
 
 def _row(r: BenchResult, detailed_errors: bool = False, show_language: bool = False) -> str:
     lang = FRAMEWORKS.get(r.framework, {}).get("language", "")
-    lang_col = f" {lang} |" if show_language else ""
+    lang_col = f" | {lang}" if show_language else ""
     if r.skipped:
-        return f"| {r.framework} |{lang_col} {r.query_name} | — | — | — | — | — | _{r.skip_reason}_ |"
+        return f"| {r.framework}{lang_col} | {r.query_name} | — | — | — | — | — | _{r.skip_reason}_ |"
     err_col = f"{r.error_rate_pct:.1f}%"
     if detailed_errors and r.error_breakdown:
         parts = []
@@ -1035,7 +1035,7 @@ def _row(r: BenchResult, detailed_errors: bool = False, show_language: bool = Fa
             parts.append(f"{cat}: {pct:.0f}%")
         err_col += f" ({', '.join(parts)})"
     return (
-        f"| {r.framework} |{lang_col} {r.query_name} "
+        f"| {r.framework}{lang_col} | {r.query_name} "
         f"| {r.rps:.0f} "
         f"| {r.p50_ms:.1f} "
         f"| {r.p95_ms:.1f} "
