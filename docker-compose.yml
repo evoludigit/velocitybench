@@ -339,12 +339,12 @@ services:
     profiles:
       - hasura
     networks:
-      - velocitybench-benchmark
+       - velocitybench-benchmark
 
   postgraphile:
-    build: ./frameworks/postgraphile
-    ports:
-      - "4000:4000"  # Standardized GraphQL port
+     build: ./frameworks/postgraphile
+     ports:
+       - "4014:4000"  # PostGraphile port
     depends_on:
       postgres:
         condition: service_healthy
@@ -418,12 +418,12 @@ services:
       - asgi-graphql
       - benchmark
     networks:
-      - velocitybench-benchmark
+       - velocitybench-benchmark
 
   graphql-yoga:
     build: ./frameworks/graphql-yoga
     ports:
-      - "4000:4000"  # Standardized GraphQL port
+      - "4012:4000"  # GraphQL-Yoga port
     depends_on:
       postgres:
         condition: service_healthy
@@ -445,11 +445,11 @@ services:
     networks:
       - velocitybench-benchmark
 
-   mercurius:
-     build: ./frameworks/mercurius
-     ports:
-       - "4008:4000"  # Mercurius GraphQL port
-     depends_on:
+  mercurius:
+    build: ./frameworks/mercurius
+    ports:
+      - "4008:4000"  # Mercurius GraphQL port
+    depends_on:
       postgres:
         condition: service_healthy
     environment:
@@ -468,12 +468,12 @@ services:
       - mercurius
       - benchmark
     networks:
-      - velocitybench-benchmark
+       - velocitybench-benchmark
 
   express-graphql:
     build: ./frameworks/express-graphql
     ports:
-      - "4000:4000"  # Standardized GraphQL port
+      - "4010:4000"  # Express-GraphQL port
     depends_on:
       postgres:
         condition: service_healthy

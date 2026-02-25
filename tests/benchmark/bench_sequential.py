@@ -467,11 +467,11 @@ FRAMEWORKS: dict[str, dict] = {
         "language": "Node.js",
         "category": "graphql-schema-first",
         "queries": {
-            "Q1": ("http://localhost:4000/graphql", _PG_Q1),
-            "Q2": ("http://localhost:4000/graphql", _PG_Q2),
-            "Q2b": ("http://localhost:4000/graphql", _PG_Q2b),
+            "Q1": ("http://localhost:4014/graphql", _PG_Q1),
+            "Q2": ("http://localhost:4014/graphql", _PG_Q2),
+            "Q2b": ("http://localhost:4014/graphql", _PG_Q2b),
         },
-        "health_url": "http://localhost:4000/health",
+        "health_url": "http://localhost:4014/health",
     },
     # ------------------------------------------------------------------
     # C# / .NET frameworks
