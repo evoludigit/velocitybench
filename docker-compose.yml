@@ -445,11 +445,11 @@ services:
     networks:
       - velocitybench-benchmark
 
-  mercurius:
-    build: ./frameworks/mercurius
-    ports:
-      - "4000:4000"  # Standardized GraphQL port
-    depends_on:
+   mercurius:
+     build: ./frameworks/mercurius
+     ports:
+       - "4008:4000"  # Mercurius GraphQL port
+     depends_on:
       postgres:
         condition: service_healthy
     environment:
