@@ -13,7 +13,7 @@ from pathlib import Path as PathlibPath
 from typing import Any
 from uuid import UUID
 
-import prometheus_client
+# import prometheus_client  # Disabled for multi-worker compatibility
 from fastapi import FastAPI, Path, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -33,13 +33,9 @@ from common.validators import Validator  # noqa: E402
 
 from common.async_db import AsyncDatabase  # noqa: E402
 
-# Metrics
-REQUEST_COUNT = prometheus_client.Counter(
-    "fastapi_rest_requests_total", "Total requests", ["method", "endpoint"]
-)
-REQUEST_LATENCY = prometheus_client.Histogram(
-    "fastapi_rest_request_duration_seconds", "Request latency", ["method", "endpoint"]
-)
+# Metrics disabled for multi-worker compatibility
+REQUEST_COUNT = None
+REQUEST_LATENCY = None
 
 
 # Pydantic models for request/response
@@ -176,7 +172,8 @@ async def health_startup():
 @app.get("/ping")
 async def ping():
     """Simple ping endpoint for throughput testing"""
-    REQUEST_COUNT.labels(method="GET", endpoint="/ping").inc()
+    if REQUEST_COUNT:
+        REQUEST_COUNT.labels(method="GET", endpoint="/ping").inc()
     return {"message": "pong"}
 
 
@@ -189,7 +186,8 @@ async def list_users(
     ),
 ):
     """List users with optional includes or batch fetch by IDs"""
-    REQUEST_COUNT.labels(method="GET", endpoint="/users").inc()
+    if REQUEST_COUNT:
+        REQUEST_COUNT.labels(method="GET", endpoint="/users").inc()
 
     db = get_db()
 
@@ -244,7 +242,8 @@ async def list_users(
 @app.get("/users/{user_id}")
 async def get_user(user_id: str = Path(...), include: str | None = None):
     """Get user by ID with optional includes"""
-    REQUEST_COUNT.labels(method="GET", endpoint="/users/{id}").inc()
+    if REQUEST_COUNT:
+        REQUEST_COUNT.labels(method="GET", endpoint="/users/{id}").inc()
 
     db = get_db()
 
@@ -340,7 +339,8 @@ async def update_user(
     include: str | None = None,
 ):
     """Update user and optionally return related data"""
-    REQUEST_COUNT.labels(method="PUT", endpoint="/users/{id}").inc()
+    if REQUEST_COUNT:
+        REQUEST_COUNT.labels(method="PUT", endpoint="/users/{id}").inc()
 
     db = get_db()
 
@@ -376,7 +376,8 @@ async def update_user(
 @app.get("/posts")
 async def list_posts(limit: int = Query(10, ge=1, le=100), include: str | None = None):
     """List posts with optional includes"""
-    REQUEST_COUNT.labels(method="GET", endpoint="/posts").inc()
+    if REQUEST_COUNT:
+        REQUEST_COUNT.labels(method="GET", endpoint="/posts").inc()
 
     db = get_db()
 
@@ -435,7 +436,8 @@ async def list_posts(limit: int = Query(10, ge=1, le=100), include: str | None =
 @app.get("/posts/{post_id}")
 async def get_post(post_id: str = Path(...), include: str | None = None):
     """Get post by ID with optional includes"""
-    REQUEST_COUNT.labels(method="GET", endpoint="/posts/{id}").inc()
+    if REQUEST_COUNT:
+        REQUEST_COUNT.labels(method="GET", endpoint="/posts/{id}").inc()
 
     db = get_db()
 
@@ -505,7 +507,8 @@ async def get_post_comments(
     limit: int = Query(10, ge=1, le=100),
 ):
     """Get comments for a specific post"""
-    REQUEST_COUNT.labels(method="GET", endpoint="/posts/{id}/comments").inc()
+    if REQUEST_COUNT:
+        REQUEST_COUNT.labels(method="GET", endpoint="/posts/{id}/comments").inc()
 
     db = get_db()
 
@@ -530,10 +533,11 @@ async def get_post_comments(
 
 @app.get("/metrics")
 async def metrics():
-    return prometheus_client.generate_latest()
+    # Metrics disabled for multi-worker compatibility
+    return {"status": "metrics_disabled"}
 
 
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8003, workers=4)
+    uvicorn.run("main:app", host="0.0.0.0", port=8003, workers=4)
