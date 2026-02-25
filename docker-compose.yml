@@ -344,7 +344,7 @@ services:
       - "4000:4000"  # Standardized GraphQL port
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -369,7 +369,7 @@ services:
       - "4000:4000"  # Standardized GraphQL port
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -740,7 +740,7 @@ services:
       - "8004:8004"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -748,10 +748,14 @@ services:
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - flask-rest
+      - benchmark
     networks:
       - velocitybench-benchmark
 

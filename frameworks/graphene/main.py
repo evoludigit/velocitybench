@@ -34,7 +34,7 @@ class UserLoader(DataLoader):
             "SELECT id, username, full_name, bio FROM benchmark.tb_user WHERE id = ANY($1)",
             keys,
         )
-        user_map = {user["id"]: user for user in result}
+        user_map = {str(user["id"]): user for user in result}
         return [user_map.get(key) for key in keys]
 
 
@@ -53,7 +53,7 @@ class PostLoader(DataLoader):
             """,
             keys,
         )
-        post_map = {post["id"]: post for post in result}
+        post_map = {str(post["id"]): post for post in result}
         return [post_map.get(key) for key in keys]
 
 
@@ -75,7 +75,9 @@ class PostsByAuthorLoader(DataLoader):
         )
         posts_by_author = {key: [] for key in keys}
         for post in result:
-            posts_by_author[post["author_id"]].append(post)
+            author_id = str(post["author_id"])
+            if author_id in posts_by_author:
+                posts_by_author[author_id].append(post)
         return [posts_by_author[key] for key in keys]
 
 
@@ -98,7 +100,9 @@ class CommentsByPostLoader(DataLoader):
         )
         comments_by_post = {key: [] for key in keys}
         for comment in result:
-            comments_by_post[comment["post_id"]].append(comment)
+            post_id = str(comment["post_id"])
+            if post_id in comments_by_post:
+                comments_by_post[post_id].append(comment)
         return [comments_by_post[key][:5] for key in keys]  # Limit 5 per post
 
 
@@ -471,11 +475,6 @@ async def graphql_endpoint(request: Request):
         OSError,
     ) as e:
         return JSONResponse(status_code=400, content={"errors": [{"message": str(e)}]})
-
-
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy", "framework": "graphene"}
 
 
 if __name__ == "__main__":

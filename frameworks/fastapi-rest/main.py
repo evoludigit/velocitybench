@@ -279,56 +279,56 @@ async def get_user(user_id: str = Path(...), include: str | None = None):
     else:
         includes = []
 
-        if "posts" in includes:
-            posts = await db.fetch(
-                """
-                SELECT p.id, p.title, p.content
-                FROM benchmark.tb_post p
-                JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-                WHERE u.id = $1
-                ORDER BY p.created_at DESC
-                LIMIT 10
-            """,
-                user_id,
-            )
+    if "posts" in includes:
+        posts = await db.fetch(
+            """
+            SELECT p.id, p.title, p.content
+            FROM benchmark.tb_post p
+            JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+            WHERE u.id = $1
+            ORDER BY p.created_at DESC
+            LIMIT 10
+        """,
+            user_id,
+        )
 
-            # Handle nested includes
-            if "posts.comments" in includes or "posts.comments.author" in includes:
-                for post in posts:
-                    comments = await db.fetch(
-                        """
-                        SELECT c.id, c.content, c.created_at,
-                               u2.id as author_id, u2.username as author_username
-                        FROM benchmark.tb_comment c
-                        JOIN benchmark.tb_post p ON c.fk_post = p.pk_post
-                        JOIN benchmark.tb_user u2 ON c.fk_author = u2.pk_user
-                        WHERE p.id = $1
-                        ORDER BY c.created_at DESC
-                        LIMIT 5
-                    """,
-                        post["id"],
-                    )
+        # Handle nested includes
+        if "posts.comments" in includes or "posts.comments.author" in includes:
+            for post in posts:
+                comments = await db.fetch(
+                    """
+                    SELECT c.id, c.content, c.created_at,
+                           u2.id as author_id, u2.username as author_username
+                    FROM benchmark.tb_comment c
+                    JOIN benchmark.tb_post p ON c.fk_post = p.pk_post
+                    JOIN benchmark.tb_user u2 ON c.fk_author = u2.pk_user
+                    WHERE p.id = $1
+                    ORDER BY c.created_at DESC
+                    LIMIT 5
+                """,
+                    post["id"],
+                )
 
-                    # Add author info to comments if requested
-                    if "posts.comments.author" in includes:
-                        comments = [
-                            {
-                                **{
-                                    k: v
-                                    for k, v in comment.items()
-                                    if k not in ("author_id", "author_username")
-                                },
-                                "author": {
-                                    "id": comment["author_id"],
-                                    "username": comment["author_username"],
-                                },
-                            }
-                            for comment in comments
-                        ]
+                # Add author info to comments if requested
+                if "posts.comments.author" in includes:
+                    comments = [
+                        {
+                            **{
+                                k: v
+                                for k, v in comment.items()
+                                if k not in ("author_id", "author_username")
+                            },
+                            "author": {
+                                "id": comment["author_id"],
+                                "username": comment["author_username"],
+                            },
+                        }
+                        for comment in comments
+                    ]
 
-                    post["comments"] = comments
+                post["comments"] = comments
 
-            user_data["posts"] = posts
+        user_data["posts"] = posts
 
     return user_data
 

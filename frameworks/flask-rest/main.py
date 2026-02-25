@@ -93,17 +93,17 @@ def validate_update_user_data(data: dict[str, Any]) -> list[dict[str, str]]:
 def init_pool() -> ConnectionPool:
     """Initialize psycopg3 connection pool in app context."""
     # Password is REQUIRED - fail fast if not provided
-    password = os.getenv("DATABASE_PASSWORD")
+    password = os.getenv("DB_PASSWORD")
     if not password:
         raise ValueError(
-            "Database password is required. Set DATABASE_PASSWORD environment variable."
+            "Database password is required. Set DB_PASSWORD environment variable."
         )
 
     conninfo = psycopg.conninfo.make_conninfo(
-        host=os.getenv("DATABASE_HOST", "postgres"),
-        port=int(os.getenv("DATABASE_PORT", "5432")),
-        dbname=os.getenv("DATABASE_NAME", "fraiseql_benchmark"),
-        user=os.getenv("DATABASE_USER", "benchmark"),
+        host=os.getenv("DB_HOST", "postgres"),
+        port=int(os.getenv("DB_PORT", "5432")),
+        dbname=os.getenv("DB_NAME", "fraiseql_benchmark"),
+        user=os.getenv("DB_USER", "benchmark"),
         password=password,
     )
 
@@ -137,11 +137,17 @@ def execute_query(query: str, params: tuple | None = None) -> list[dict[str, Any
         return []
 
 
-# Initialize pool in app context on first request
-@app.before_serving
+# Initialize pool before first request
+_pool_initialized = False
+
+
+@app.before_request
 def setup_db() -> None:
-    """Initialize database pool."""
-    init_pool()
+    """Initialize database pool on first request."""
+    global _pool_initialized
+    if not _pool_initialized:
+        init_pool()
+        _pool_initialized = True
 
 
 # Register cleanup on app teardown
@@ -602,11 +608,6 @@ def get_post_comments(post_id):
     )
 
     return jsonify(comments)
-
-
-@app.route("/health")
-def health_check():
-    return jsonify({"status": "healthy", "framework": "flask-rest"})
 
 
 @app.route("/metrics")

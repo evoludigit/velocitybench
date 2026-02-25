@@ -59,7 +59,7 @@ async def load_users_batch(keys: list[str], db: AsyncDatabase) -> list[dict | No
             timeout=5.0,
         )
         # Create a map for O(1) lookup
-        user_map = {user["id"]: user for user in result}
+        user_map = {str(user["id"]): user for user in result}
         # Return in the same order as keys
         return [user_map.get(key) for key in keys]
     except asyncio.TimeoutError:
@@ -83,7 +83,7 @@ async def load_posts_batch(keys: list[str], db: AsyncDatabase) -> list[dict | No
             keys,
             timeout=5.0,
         )
-        post_map = {post["id"]: post for post in result}
+        post_map = {str(post["id"]): post for post in result}
         return [post_map.get(key) for key in keys]
     except asyncio.TimeoutError:
         logger.error(f"Timeout loading posts: {keys}")
@@ -112,7 +112,7 @@ async def load_posts_by_author_batch(
         # Group by author_id
         posts_by_author = {key: [] for key in keys}
         for post in result:
-            posts_by_author[post["author_id"]].append(post)
+            posts_by_author[str(post["author_id"])].append(post)
         return [posts_by_author[key] for key in keys]
     except asyncio.TimeoutError:
         logger.error(f"Timeout loading posts by author: {keys}")
@@ -143,7 +143,7 @@ async def load_comments_by_post_batch(
         # Group by post_id
         comments_by_post = {key: [] for key in keys}
         for comment in result:
-            comments_by_post[comment["post_id"]].append(comment)
+            comments_by_post[str(comment["post_id"])].append(comment)
         return [comments_by_post[key] for key in keys]
     except asyncio.TimeoutError:
         logger.error(f"Timeout loading comments by post: {keys}")

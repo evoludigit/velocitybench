@@ -56,10 +56,10 @@ class DataLoader:
             return self._cache[key]
 
         if key not in self._queue:
-            self._queue[key] = asyncio.get_event_loop().create_future()
+            self._queue[key] = asyncio.get_running_loop().create_future()
 
         # Schedule batch execution
-        asyncio.get_event_loop().call_soon(
+        asyncio.get_running_loop().call_soon(
             lambda: asyncio.create_task(self._dispatch())
         )
 
