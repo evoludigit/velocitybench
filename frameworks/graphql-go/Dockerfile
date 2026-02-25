@@ -30,11 +30,11 @@ RUN apk --no-cache add ca-certificates
 COPY --from=builder /app/server .
 
 # Expose port
-EXPOSE 4000
+EXPOSE 4011
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:4000/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:4011/health || exit 1
 
 # Run the application
 CMD ["./server"]

@@ -18,5 +18,5 @@ RUN mkdir -p /data/tmp && apk --no-cache add ca-certificates
 COPY --from=builder /server /server
 WORKDIR /
 
-EXPOSE 8007
+EXPOSE 8008
 CMD ["/server"]

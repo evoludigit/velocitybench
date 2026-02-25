@@ -128,6 +128,16 @@ FRAMEWORKS: dict[str, dict] = {
         },
         "health_url": "http://localhost:8008/health",
     },
+    "graphql-go": {
+        "compose_service": "graphql-go",
+        "type": "graphql",
+        "queries": {
+            "Q1": ("http://localhost:4011/graphql", _GQL_Q1),
+            "Q2": ("http://localhost:4011/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:4011/graphql", _GQL_Q2b),
+        },
+        "health_url": "http://localhost:4011/health",
+    },
     # ------------------------------------------------------------------
     # Node.js frameworks
     # ------------------------------------------------------------------
@@ -433,6 +443,7 @@ DEFAULT_FRAMEWORK_ORDER = [
     "go-gqlgen",
     "gin-rest",
     "go-graphql-go",
+    "graphql-go",
     # Node.js
     "apollo-server",
     "apollo-orm",
