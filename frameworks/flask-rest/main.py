@@ -80,11 +80,16 @@ class Validator:
         return uuids
 
     @staticmethod
-    def validate_limit(value: int, min_val: int = 1, max_val: int = 100) -> int:
+    def validate_limit(value, min_val: int = 1, max_val: int = 100) -> int:
         """Validate limit parameter"""
-        if not isinstance(value, int) or value < min_val or value > max_val:
+        try:
+            int_value = int(value)
+        except (ValueError, TypeError):
+            raise InputValidationError(f"Limit must be an integer")
+
+        if int_value < min_val or int_value > max_val:
             raise InputValidationError(f"Limit must be between {min_val} and {max_val}")
-        return value
+        return int_value
 
     @staticmethod
     def validate_include_fields(value: str, allowed_includes: list[str]) -> list[str]:

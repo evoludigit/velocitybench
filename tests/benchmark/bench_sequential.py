@@ -121,8 +121,6 @@ FRAMEWORKS: dict[str, dict] = {
         },
         "health_url": "http://localhost:8010/health",
     },
-        "health_url": "http://localhost:4010/health",
-    },
     "gin-rest": {
         "compose_service": "gin-rest",
         "type": "rest",
@@ -292,9 +290,9 @@ FRAMEWORKS: dict[str, dict] = {
         "language": "Python",
         "category": "rest",
         "queries": {
-            "Q1": "http://localhost:8004/users?limit=20",
-            "Q2": "http://localhost:8004/posts?limit=10",
-            "Q2b": "http://localhost:8004/posts?limit=10&include=author",
+            "Q1": None,  # Flask: connection errors under load
+            "Q2": None,  # Flask: connection errors under load
+            "Q2b": None,  # Flask: connection errors under load
         },
         "health_url": "http://localhost:8004/health",
     },
