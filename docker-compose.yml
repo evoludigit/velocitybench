@@ -339,12 +339,12 @@ services:
     profiles:
       - hasura
     networks:
-       - velocitybench-benchmark
+      - velocitybench-benchmark
 
   postgraphile:
-     build: ./frameworks/postgraphile
-     ports:
-       - "4014:4000"  # PostGraphile port
+    build: ./frameworks/postgraphile
+    ports:
+      - "4014:4000"  # PostGraphile port
     depends_on:
       postgres:
         condition: service_healthy
