@@ -21,6 +21,11 @@ module VelocityBench
         )
       end
 
+      def disconnect
+        @connection&.disconnect
+        @connection = nil
+      end
+
       def healthy?
         connection.test_connection
       rescue StandardError

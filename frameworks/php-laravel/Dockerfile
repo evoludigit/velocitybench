@@ -11,7 +11,8 @@ RUN apk add --no-cache \
     composer \
     git \
     unzip \
-    libxml2-dev
+    libxml2-dev \
+    curl
 
 # Install PHP extensions
 RUN docker-php-ext-install pdo pdo_pgsql session fileinfo dom

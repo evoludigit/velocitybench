@@ -29,6 +29,7 @@ RUN adduser -D -s /bin/sh appuser && chown -R appuser:appuser /app
 USER appuser
 
 ENV PORT=4000
+ENV PHP_CLI_SERVER_WORKERS=16
 
 EXPOSE 4000
 

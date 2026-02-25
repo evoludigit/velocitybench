@@ -540,7 +540,7 @@ services:
       - "4000:4000"  # Standardized GraphQL port
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -555,8 +555,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
     profiles:
       - hanami
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -566,7 +568,7 @@ services:
       - "4000:4000"  # Standardized GraphQL port
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -578,8 +580,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 15s
     profiles:
       - webonyx-graphql-php
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -866,19 +870,25 @@ services:
       - "8009:8009"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
+      - DB_CONNECTION=pgsql
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_DATABASE=velocitybench_benchmark
       - DB_USERNAME=benchmark
       - DB_PASSWORD=benchmark123
       - APP_ENV=production
+      - APP_KEY=base64:TFcpbZlWNEUUqqoRjCIDgOfeMxf8jaYlYTudoiR0YyY=
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8009/api/health"]
       interval: 30s
       timeout: 15s
       retries: 3
+      start_period: 30s
+    profiles:
+      - php-laravel
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -888,9 +898,14 @@ services:
       - "8012:8000"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
       - RAILS_ENV=production
       - SECRET_KEY_BASE=velocitybench_secret_key_base_for_benchmarking_only
     healthcheck:
@@ -898,6 +913,10 @@ services:
       interval: 30s
       timeout: 15s
       retries: 3
+      start_period: 30s
+    profiles:
+      - ruby-rails
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -907,9 +926,9 @@ services:
       - "8025:8080"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
-      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=velocitybench_benchmark;Username=benchmark;Password=benchmark123
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=velocitybench_benchmark;Username=benchmark;Password=benchmark123;Search Path=benchmark
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
     healthcheck:
@@ -917,6 +936,10 @@ services:
       interval: 30s
       timeout: 15s
       retries: 3
+      start_period: 30s
+    profiles:
+      - csharp-dotnet
+      - benchmark
     networks:
       - velocitybench-benchmark
 
