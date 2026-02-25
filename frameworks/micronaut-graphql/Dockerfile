@@ -31,7 +31,7 @@ ENV MICRONAUT_SERVER_PORT=4000
 EXPOSE 4000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=5 \
     CMD wget -qO- http://localhost:4000/health || exit 1
 
 CMD ["java", "-jar", "app.jar"]

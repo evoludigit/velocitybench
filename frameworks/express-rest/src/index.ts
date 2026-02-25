@@ -204,7 +204,7 @@ app.get('/posts', async (req: Request, res: Response) => {
     const authorIds = [...new Set(posts.map((p: any) => p.author_id))];
     const authors = await query(
       `SELECT id, username, full_name
-       FROM benchmark.tb_user WHERE id = ANY($1)`,
+       FROM benchmark.tb_user WHERE id = ANY($1::uuid[])`,
       [authorIds]
     );
     const authorMap = new Map(authors.map((a: any) => [a.id, a]));

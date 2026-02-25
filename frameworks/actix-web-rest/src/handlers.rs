@@ -1,7 +1,8 @@
 use crate::error::ApiError;
 use crate::metrics;
 use crate::AppState;
-use actix_web::{get, web, HttpResponse, Result};
+use actix_web::{get, put, web, HttpResponse, Result};
+use serde::Deserialize;
 use serde_json::json;
 
 // Health check endpoint
@@ -76,6 +77,24 @@ pub async fn get_post(
         Some(post) => Ok(HttpResponse::Ok().json(post)),
         None => Err(ApiError::NotFound),
     }
+}
+
+// Update user bio
+#[derive(Deserialize)]
+pub struct UpdateUserPayload {
+    pub bio: Option<String>,
+}
+
+#[put("/users/{user_id}")]
+pub async fn update_user(
+    user_id: web::Path<String>,
+    body: web::Json<UpdateUserPayload>,
+    state: web::Data<AppState>,
+) -> Result<HttpResponse, ApiError> {
+    let user_id = user_id.into_inner();
+    let bio = body.bio.as_deref().unwrap_or("");
+    let user = state.user_repository.update_bio(&user_id, bio).await?;
+    Ok(HttpResponse::Ok().json(user))
 }
 
 // List posts with pagination, eager-loaded authors, and optional comments

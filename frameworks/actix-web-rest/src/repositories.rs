@@ -72,6 +72,28 @@ impl UserRepository {
         Ok(users)
     }
 
+    pub async fn update_bio(&self, id: &str, bio: &str) -> Result<User, ApiError> {
+        let client = self.get_client().await?;
+
+        let row = client
+            .query_one(
+                "UPDATE benchmark.tb_user SET bio = $1
+                 WHERE id::text = $2
+                 RETURNING id::text, username, full_name, bio",
+                &[&bio, &id],
+            )
+            .await
+            .map_err(|_| ApiError::NotFound)?;
+
+        Ok(User {
+            id: row.get("id"),
+            username: row.get("username"),
+            full_name: row.get("full_name"),
+            bio: row.get("bio"),
+            posts: None,
+        })
+    }
+
     pub async fn find_posts_by_user(&self, user_id: &str, limit: i64) -> Result<Vec<Post>, ApiError> {
         let client = self.get_client().await?;
 

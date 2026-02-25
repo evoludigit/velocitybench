@@ -50,6 +50,11 @@ from pathlib import Path
 _GQL_Q1 = "{ users(limit: 20) { id username fullName } }"
 _GQL_Q2 = "{ posts(limit: 10) { id title } }"
 _GQL_Q2b = "{ posts(limit: 10) { id title author { username fullName } } }"
+
+# PostGraphile uses Relay-style schema with different field names
+_PG_Q1 = "{ allUsers(first: 20) { nodes { id username fullName } } }"
+_PG_Q2 = "{ allPosts(first: 10) { nodes { id title } } }"
+_PG_Q2b = "{ allPosts(first: 10) { nodes { id title userByFkAuthor { username fullName } } } }"
 _GQL_Q3 = "{ comments(limit: 20) { id content author { username } post { title } } }"
 _GQL_M1_TMPL = (
     'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "bench" }}) {{ id bio }} }}'
@@ -322,6 +327,7 @@ FRAMEWORKS: dict[str, dict] = {
         "type": "rest",
         "language": "Java",
         "category": "rest",
+        "start_timeout": 120,
         "queries": {
             # Spring Boot uses page/size pagination, not limit
             "Q1": "http://localhost:8010/api/users?page=0&size=20",
@@ -335,6 +341,7 @@ FRAMEWORKS: dict[str, dict] = {
         "type": "rest",
         "language": "Java",
         "category": "rest",
+        "start_timeout": 120,
         "queries": {
             "Q1": "http://localhost:8013/api/users?page=0&size=20",
             "Q2": "http://localhost:8013/api/posts?size=10",
@@ -347,6 +354,7 @@ FRAMEWORKS: dict[str, dict] = {
         "type": "rest",
         "language": "Java",
         "category": "rest",
+        "start_timeout": 120,
         "queries": {
             "Q1": "http://localhost:8014/api/users?page=0&size=20",
             "Q2": "http://localhost:8014/api/posts?size=10",
@@ -358,6 +366,7 @@ FRAMEWORKS: dict[str, dict] = {
         "type": "graphql",
         "language": "Java",
         "category": "graphql",
+        "start_timeout": 120,
         "queries": {
             "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
@@ -370,6 +379,7 @@ FRAMEWORKS: dict[str, dict] = {
         "type": "graphql",
         "language": "Java",
         "category": "graphql",
+        "start_timeout": 120,
         "queries": {
             "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
@@ -386,6 +396,7 @@ FRAMEWORKS: dict[str, dict] = {
         "type": "graphql",
         "language": "Scala",
         "category": "graphql",
+        "start_timeout": 120,
         "queries": {
             "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
@@ -456,9 +467,9 @@ FRAMEWORKS: dict[str, dict] = {
         "language": "Node.js",
         "category": "graphql-schema-first",
         "queries": {
-            "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
-            "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
-            "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
+            "Q1": ("http://localhost:4000/graphql", _PG_Q1),
+            "Q2": ("http://localhost:4000/graphql", _PG_Q2),
+            "Q2b": ("http://localhost:4000/graphql", _PG_Q2b),
         },
         "health_url": "http://localhost:4000/health",
     },
@@ -1255,13 +1266,18 @@ def main() -> None:
         query_names = list(fw_config["queries"])
 
         if not args.no_isolation:
+            timeout = fw_config.get("start_timeout", 60)
             healthy = (
                 start_service_or_skip(
-                    fw_config["compose_service"], fw_config["health_url"]
+                    fw_config["compose_service"], fw_config["health_url"], timeout
                 )
                 if args.skip_unhealthy
                 else (
-                    start_service(fw_config["compose_service"], fw_config["health_url"])
+                    start_service(
+                        fw_config["compose_service"],
+                        fw_config["health_url"],
+                        timeout,
+                    )
                     or True
                 )
             )

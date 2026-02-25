@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/benchmark/gin-rest/internal/db"
 	"github.com/benchmark/gin-rest/internal/models"
@@ -149,7 +150,10 @@ func UpdateUser(c *gin.Context) {
 	query += " WHERE id = $" + strconv.Itoa(argIdx)
 	args = append(args, id)
 
-	_, err := db.Pool.Exec(c.Request.Context(), query, args...)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
+
+	_, err := db.Pool.Exec(ctx, query, args...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -67,6 +67,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(app_state.clone()))
             .service(handlers::health)
             .service(handlers::get_user)
+            .service(handlers::update_user)
             .service(handlers::list_users)
             .service(handlers::get_post)
             .service(handlers::list_posts)
