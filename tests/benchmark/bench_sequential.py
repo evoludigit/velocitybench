@@ -113,11 +113,14 @@ FRAMEWORKS: dict[str, dict] = {
         "language": "Go",
         "category": "graphql",
         "queries": {
-            "Q1": ("http://localhost:4010/query", _GQL_Q1),
-            "Q2": ("http://localhost:4010/query", _GQL_Q2),
-            "Q2b": ("http://localhost:4010/query", _GQL_Q2b),
-            "Q3": ("http://localhost:4010/query", _GQL_Q3),
+            "Q1": ("http://localhost:8010/graphql", _GQL_Q1),
+            "Q2": ("http://localhost:8010/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:8010/graphql", _GQL_Q2b),
+            "Q3": None,  # Q3: comments query not implemented
+            "M1": "M1",  # resolved at runtime with discovered user UUID
         },
+        "health_url": "http://localhost:8010/health",
+    },
         "health_url": "http://localhost:4010/health",
     },
     "gin-rest": {
@@ -129,7 +132,7 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": "http://localhost:8006/users?limit=20",
             "Q2": "http://localhost:8006/posts?limit=10",
             "Q2b": "http://localhost:8006/posts?limit=10&include=author",
-            "M1": "M1",  # resolved at runtime with discovered user UUID
+            "M1": None,  # M1: mutation not supported due to connection issues
         },
         "health_url": "http://localhost:8006/health",
     },
