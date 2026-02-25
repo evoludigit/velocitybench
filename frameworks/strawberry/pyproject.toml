@@ -9,7 +9,7 @@ dependencies = [
     "uvicorn[standard]==0.24.0",
     "strawberry-graphql[fastapi]==0.250.0",
     "pydantic==2.10.0",
-    "psycopg==3.2.2",
+    "psycopg==3.3.3",
     "asyncpg>=0.31.0",
     "psutil==5.9.6",
 ]
