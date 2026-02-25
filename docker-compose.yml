@@ -147,9 +147,9 @@ services:
       - DB_NAME=velocitybench_benchmark
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
-      - DB_POOL_MIN=10
-      - DB_POOL_MAX=50
-      - DB_STATEMENT_CACHE_SIZE=100
+      - DB_POOL_MIN_SIZE=10
+      - DB_POOL_MAX_SIZE=50
+      - DB_POOL_STATEMENT_CACHE_SIZE=100
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
@@ -176,9 +176,9 @@ services:
       - DB_NAME=velocitybench_benchmark
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
-      - DB_POOL_MIN=10
-      - DB_POOL_MAX=50
-      - DB_STATEMENT_CACHE_SIZE=100
+      - DB_POOL_MIN_SIZE=10
+      - DB_POOL_MAX_SIZE=50
+      - DB_POOL_STATEMENT_CACHE_SIZE=100
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
@@ -913,7 +913,6 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_NAME=velocitybench_benchmark

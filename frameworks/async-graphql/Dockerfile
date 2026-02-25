@@ -30,7 +30,7 @@ COPY src/ src/
 RUN touch src/main.rs && cargo build --release
 
 # Runtime stage
-FROM alpine:latest
+FROM alpine:3.19
 
 # Set TMPDIR to use /data/tmp for builds to avoid /tmp filling up
 ENV TMPDIR=/data/tmp
