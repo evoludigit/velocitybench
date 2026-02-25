@@ -268,4 +268,31 @@ impl QueryRoot {
 
         Ok(posts)
     }
+
+    async fn comments(&self, ctx: &Context<'_>, limit: Option<i32>) -> Result<Vec<Comment>> {
+        let db = ctx.data::<Database>()?;
+        let limit = limit.unwrap_or(20).min(100) as i64;
+
+        let client = db.pool().get().await?;
+        let rows = client
+            .query(
+                "SELECT c.id, c.pk_comment, c.content, c.fk_post, c.fk_author, c.created_at FROM benchmark.tb_comment c ORDER BY c.created_at DESC LIMIT $1",
+                &[&limit],
+            )
+            .await?;
+
+        let comments = rows
+            .iter()
+            .map(|row| Comment {
+                id: row.get(0),
+                pk_comment: row.get(1),
+                content: row.get(2),
+                fk_post: row.get(3),
+                fk_author: row.get(4),
+                created_at: row.get(5),
+            })
+            .collect();
+
+        Ok(comments)
+    }
 }

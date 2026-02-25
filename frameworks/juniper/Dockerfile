@@ -36,8 +36,8 @@ FROM alpine:3.19
 ENV TMPDIR=/data/tmp
 RUN mkdir -p /data/tmp
 
-# Install ca-certificates for HTTPS requests
-RUN apk --no-cache add ca-certificates
+# Install ca-certificates and wget for health checks
+RUN apk --no-cache add ca-certificates wget
 
 # Create non-root user
 RUN addgroup -g 1000 appgroup && \

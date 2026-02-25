@@ -114,7 +114,13 @@ pub async fn list_posts(
         .and_then(|s| s.parse().ok())
         .unwrap_or(0);
 
-    let posts = state.post_repository.find_all(limit, offset).await?;
+    let include_author = query.get("include").map(|s| s == "author").unwrap_or(false);
+
+    let posts = if include_author {
+        state.post_repository.find_all_with_author(limit, offset).await?
+    } else {
+        state.post_repository.find_all_simple(limit, offset).await?
+    };
 
     Ok(HttpResponse::Ok().json(posts))
 }

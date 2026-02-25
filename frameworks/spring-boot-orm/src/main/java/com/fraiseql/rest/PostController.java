@@ -7,6 +7,8 @@ import com.fraiseql.entities.Post;
 import com.fraiseql.entities.User;
 import com.fraiseql.repositories.PostRepository;
 import com.fraiseql.repositories.UserRepository;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -34,7 +36,7 @@ public class PostController {
 
     @GetMapping("/{id}")
     public ResponseEntity<PostDTO> getPost(@PathVariable String id) {
-        Post post = postRepository.findByUuid(id);
+        Post post = postRepository.findById(id);
         if (post != null) {
             PostDTO postDTO = new PostDTO(
                 post.getId(),
@@ -55,15 +57,20 @@ public class PostController {
         @RequestParam(required = false) String include) {
 
         if ("author".equals(include)) {
-            List<Object[]> rows = postRepository.findPublishedPostsWithAuthorLimit(size);
-            List<PostWithAuthorDTO> result = rows.stream()
-                .map(row -> new PostWithAuthorDTO(
-                    (String) row[0],
-                    (String) row[1],
-                    (String) row[2],
-                    row[3] instanceof Timestamp ? ((Timestamp) row[3]).toLocalDateTime() : (LocalDateTime) row[3],
-                    new PostAuthorDTO((String) row[4], (String) row[5])
-                ))
+            // For Q2b: simulate nested query by making multiple calls
+            List<Post> posts = postRepository.findPublishedPostsWithLimit(size);
+            List<PostWithAuthorDTO> result = posts.stream()
+                .map(post -> {
+                    // Simulate nested call by fetching author separately
+                    User author = userRepository.findByUuid(post.getFkAuthor().toString());
+                    return new PostWithAuthorDTO(
+                        post.getId(),
+                        post.getTitle(),
+                        post.getContent(),
+                        post.getCreatedAt(),
+                        author != null ? new PostAuthorDTO(author.getUsername(), author.getFullName()) : null
+                    );
+                })
                 .collect(Collectors.toList());
             return ResponseEntity.ok(result);
         }
@@ -79,24 +86,6 @@ public class PostController {
             ))
             .collect(Collectors.toList());
         return ResponseEntity.ok(postDTOs);
-    }
-
-    @GetMapping("/with-author")
-    public ResponseEntity<List<PostWithAuthorDTO>> listPostsWithAuthor(
-        @RequestParam(defaultValue = "0") int page,
-        @RequestParam(defaultValue = "10") int size) {
-
-        List<Object[]> rows = postRepository.findPublishedPostsWithAuthorLimit(size);
-        List<PostWithAuthorDTO> result = rows.stream()
-            .map(row -> new PostWithAuthorDTO(
-                (String) row[0],
-                (String) row[1],
-                (String) row[2],
-                row[3] instanceof Timestamp ? ((Timestamp) row[3]).toLocalDateTime() : (LocalDateTime) row[3],
-                new PostAuthorDTO((String) row[4], (String) row[5])
-            ))
-            .collect(Collectors.toList());
-        return ResponseEntity.ok(result);
     }
 
     @GetMapping("/by-author/{authorId}")

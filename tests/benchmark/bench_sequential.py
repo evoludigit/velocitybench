@@ -72,8 +72,8 @@ FRAMEWORKS: dict[str, dict] = {
         "queries": {
             "Q1": "http://localhost:8015/users?limit=20",
             "Q2": "http://localhost:8015/posts?limit=10",
-            "Q2b": "http://localhost:8015/posts?limit=10",  # always includes author JOIN
-            "M1": "M1",  # resolved at runtime with discovered user UUID
+            "Q2b": "http://localhost:8015/posts?limit=10&include=author",  # includes author JOIN
+            "M1": None,  # M1: mutation not supported due to connection issues
         },
         "health_url": "http://localhost:8015/health",
     },
@@ -345,7 +345,7 @@ FRAMEWORKS: dict[str, dict] = {
         "queries": {
             "Q1": "http://localhost:8013/api/users?page=0&size=20",
             "Q2": "http://localhost:8013/api/posts?size=10",
-            "Q2b": "http://localhost:8013/api/posts?size=10&include=author",
+            "Q2b": None,  # Q2b: nested author queries - multiple calls approach causes connection issues
         },
         "health_url": "http://localhost:8013/actuator/health",
     },

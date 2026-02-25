@@ -113,22 +113,24 @@ impl Comment {
         self.created_at.to_rfc3339()
     }
 
-    async fn author(&self, context: &Context) -> FieldResult<Option<User>> {
+    async fn author(&self, context: &Context) -> FieldResult<User> {
         context
             .loaders
             .user_loader
             .load(self.fk_author)
             .await
-            .map_err(|e| juniper::FieldError::new(e, juniper::Value::null()))
+            .map_err(|e| juniper::FieldError::new(e, juniper::Value::null()))?
+            .ok_or_else(|| juniper::FieldError::new("Author not found", juniper::Value::null()))
     }
 
-    async fn post(&self, context: &Context) -> FieldResult<Option<Post>> {
+    async fn post(&self, context: &Context) -> FieldResult<Post> {
         context
             .loaders
             .post_loader
             .load_by_pk(self.fk_post)
             .await
-            .map_err(|e| juniper::FieldError::new(e, juniper::Value::null()))
+            .map_err(|e| juniper::FieldError::new(e, juniper::Value::null()))?
+            .ok_or_else(|| juniper::FieldError::new("Post not found", juniper::Value::null()))
     }
 }
 
@@ -234,6 +236,36 @@ impl QueryRoot {
                 pk_post: r.get(1),
                 title: r.get(2),
                 content: r.get(3),
+                fk_author: r.get(4),
+                created_at: r.get(5),
+            })
+            .collect())
+    }
+
+    async fn comments(context: &Context, limit: Option<i32>) -> FieldResult<Vec<Comment>> {
+        let limit = limit.unwrap_or(20).min(100) as i64;
+
+        let client = context.db.pool().get().await
+            .map_err(|e| juniper::FieldError::new(format!("DB error: {}", e), juniper::Value::null()))?;
+
+        let rows = client
+            .query(
+                "SELECT id, pk_comment, content, fk_post, fk_author, created_at
+                 FROM benchmark.tb_comment
+                 ORDER BY created_at DESC
+                 LIMIT $1",
+                &[&limit],
+            )
+            .await
+            .map_err(|e| juniper::FieldError::new(format!("Query error: {}", e), juniper::Value::null()))?;
+
+        Ok(rows
+            .iter()
+            .map(|r| Comment {
+                id: r.get(0),
+                pk_comment: r.get(1),
+                content: r.get(2),
+                fk_post: r.get(3),
                 fk_author: r.get(4),
                 created_at: r.get(5),
             })

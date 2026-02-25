@@ -17,7 +17,8 @@ pub struct Post {
     pub title: String,
     pub content: Option<String>,
     pub author_id: String,
-    pub author: User,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub author: Option<User>,
     pub created_at: DateTime<Utc>,
 }
 

@@ -1,9 +1,9 @@
 package com.fraiseql.repositories;
 
 import com.fraiseql.entities.Post;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -11,24 +11,23 @@ import java.util.List;
 @Repository
 public interface PostRepository extends JpaRepository<Post, Integer> {
 
-    @Query(value = "SELECT * FROM tb_post WHERE id = :id", nativeQuery = true)
-    Post findByUuid(@Param("id") String id);
+    Post findById(String uuid);
 
-    @Query(value = "SELECT * FROM tb_post WHERE published = true ORDER BY created_at DESC LIMIT :limit", nativeQuery = true)
-    List<Post> findPublishedPostsWithLimit(@Param("limit") int limit);
+    @Query("SELECT p FROM Post p JOIN FETCH p.author WHERE p.published = true ORDER BY p.createdAt DESC")
+    List<Post> findPublishedPostsWithAuthor(Pageable pageable);
 
-    /**
-     * Fetches published posts with joined author data.
-     * Each row: [id(uuid), title, content, created_at, username, full_name]
-     */
+    @Query("SELECT p FROM Post p WHERE p.published = true ORDER BY p.createdAt DESC")
+    List<Post> findPublishedPostsWithLimit(int limit);
+
     @Query(value = "SELECT p.id, p.title, p.content, p.created_at, u.username, u.full_name " +
-                   "FROM tb_post p " +
-                   "JOIN tb_user u ON p.fk_author = u.pk_user " +
+                   "FROM posts p " +
+                   "JOIN users u ON p.fk_author = u.pk_user " +
                    "WHERE p.published = true " +
                    "ORDER BY p.created_at DESC " +
-                   "LIMIT :limit",
-           nativeQuery = true)
-    List<Object[]> findPublishedPostsWithAuthorLimit(@Param("limit") int limit);
+                   "LIMIT ?1", nativeQuery = true)
+    List<Object[]> findPublishedPostsWithAuthorLimit(int limit);
 
     List<Post> findByFkAuthor(Integer fkAuthor);
+
+
 }
