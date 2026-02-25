@@ -47,7 +47,7 @@ jobs:
       - name: Install audit tools
         run: |
           if [ "${{ matrix.language }}" == "python" ]; then
-            pip install pip-audit safety cyclonedx-python
+            pip install pip-audit safety cyclonedx-bom
           else
             npm install -g npm-check-updates
             npm audit --version

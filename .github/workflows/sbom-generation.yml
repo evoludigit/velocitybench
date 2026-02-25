@@ -194,7 +194,7 @@ jobs:
 
       - name: Install CycloneDX tools
         run: |
-          pip install cyclonedx-bom cyclonedx-python cyclonedx-cli
+          pip install cyclonedx-bom
           npm install -g @cyclonedx/npm @cyclonedx/gomod @cyclonedx/cargo
           # Install additional SBOM tools
           pip install pip-audit || true
