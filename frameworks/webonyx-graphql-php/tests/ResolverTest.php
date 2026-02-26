@@ -146,7 +146,7 @@ class ResolverTest extends TestCase
         $author = $this->factory->createUser('author', 'author@example.com', 'Author');
         $post = $this->factory->createPost($author->id, 'Test Post', 'Content');
         $commenter = $this->factory->createUser('commenter', 'commenter@example.com', 'Commenter');
-        $comment = $this->factory->createComment($commenter->id, $post->id, 'Great!');
+        $comment = $this->factory->createComment($post->id, $commenter->id, 'Great!');
 
         $this->assertNotNull($comment->author);
         $this->assertEquals($commenter->pkUser, $comment->author->pkUser);
