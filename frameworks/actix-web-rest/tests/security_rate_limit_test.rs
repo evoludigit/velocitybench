@@ -36,12 +36,12 @@ fn test_rate_limit_per_user_exceeded() {
     let mut successful_requests = 0;
 
     for i in 0..120 {
-        if factory.get_user(&user.id).is_some() {
-            successful_requests += 1;
-        }
         // In real API, requests beyond 100 would return 429 Too Many Requests
         if i >= max_requests {
             break;
+        }
+        if factory.get_user(&user.id).is_some() {
+            successful_requests += 1;
         }
     }
 
@@ -116,10 +116,10 @@ fn test_rate_limit_by_ip_address() {
     // In real API, this would track requests by IP
     let mut requests_from_ip = 0;
     for _ in 0..250 {
-        requests_from_ip += 1;
-        if requests_from_ip > max_requests_per_ip {
+        if requests_from_ip >= max_requests_per_ip {
             break;
         }
+        requests_from_ip += 1;
     }
 
     assert!(

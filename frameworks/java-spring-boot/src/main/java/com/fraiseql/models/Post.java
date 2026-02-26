@@ -21,6 +21,12 @@ public class Post {
     @Column(name = "fk_author", nullable = false)
     private Integer fkAuthor;
 
+    @Transient
+    private String authorId;
+
+    @Transient
+    private com.fraiseql.models.User author;
+
     @NotBlank
     @Size(max = 500)
     @Column(nullable = false)
@@ -50,6 +56,12 @@ public class Post {
 
     public Integer getFkAuthor() { return fkAuthor; }
     public void setFkAuthor(Integer fkAuthor) { this.fkAuthor = fkAuthor; }
+
+    public String getAuthorId() { return authorId; }
+    public void setAuthorId(String authorId) { this.authorId = authorId; }
+
+    public com.fraiseql.models.User getAuthor() { return author; }
+    public void setAuthor(com.fraiseql.models.User author) { this.author = author; }
 
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }

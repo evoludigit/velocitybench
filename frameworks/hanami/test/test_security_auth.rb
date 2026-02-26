@@ -204,9 +204,10 @@ class SecurityAuthTest < Minitest::Test
   private
 
   def validate_token(token)
-    return false if token.nil? || token.strip.empty?
-    return false if token.length < 10
+    return false if token.nil? || token.empty?
+    return false if token.length <= 10
     return false if token.include?(' ')
+    return false unless token.match?(/\A[a-zA-Z0-9._\-]+\z/)
     true
   end
 

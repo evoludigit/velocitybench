@@ -122,11 +122,11 @@ func TestSecurityAuthorization(t *testing.T) {
 			factory := NewTestFactory(t)
 			defer factory.Reset()
 
-			owner := factory.CreateTestUser("owner", "owner@example.com", "Owner", "")
-			requester := factory.CreateTestUser("requester", "requester@example.com", "Requester", "")
+			_ = factory.CreateTestUser("owner", "owner@example.com", "Owner", "")
+			_ = factory.CreateTestUser("requester", "requester@example.com", "Requester", "")
 
-			// Act - Simulate authorization check in resolver
-			allowed := checkAuthorization(owner.ID, requester.ID, tt.action)
+			// Act - Simulate authorization check in resolver using the test case IDs
+			allowed := checkAuthorization(tt.resourceOwner, tt.requestingUser, tt.action)
 
 			// Assert
 			if allowed != tt.expectAllowed {

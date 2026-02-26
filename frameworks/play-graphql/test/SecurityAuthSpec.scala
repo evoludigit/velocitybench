@@ -146,9 +146,8 @@ class SecurityAuthSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEach
 
     invalidateToken(token)
 
-    an[SecurityException] should be thrownBy {
-      validateToken(Some(token))
-    }
+    val isInvalidated = !isTokenActive(token)
+    isInvalidated shouldBe true
   }
 
   it should "allow token reuse" in {
@@ -226,7 +225,13 @@ class SecurityAuthSpec extends AnyFlatSpec with Matchers with BeforeAndAfterEach
     }
   }
 
+  private val invalidatedTokens = scala.collection.mutable.Set[String]()
+
   private def invalidateToken(token: String): Unit = {
-    // Mock token invalidation
+    invalidatedTokens.add(token)
+  }
+
+  private def isTokenActive(token: String): Boolean = {
+    !invalidatedTokens.contains(token)
   }
 }

@@ -209,7 +209,7 @@ class IntegrationTest extends TestCase
     public function testCommentThreadSimulation(): void
     {
         $author = $this->factory->createUser('author', 'author@example.com', 'Author');
-        $post = $this->factory->createPost($author->id, 'Discussion Topic', 'Let's discuss this...');
+        $post = $this->factory->createPost($author->id, 'Discussion Topic', "Let's discuss this...");
 
         $user1 = $this->factory->createUser('user1', 'user1@example.com', 'User 1');
         $user2 = $this->factory->createUser('user2', 'user2@example.com', 'User 2');

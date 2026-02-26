@@ -273,7 +273,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: frameworks/${{ matrix.framework }}
-        run: composer install || echo "No composer.json found"
+        run: composer install --no-interaction --prefer-dist
 
       - name: Run tests with coverage
         working-directory: frameworks/${{ matrix.framework }}
