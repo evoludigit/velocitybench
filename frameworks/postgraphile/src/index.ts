@@ -15,7 +15,10 @@ async function startServer() {
   // Connect to database
   const connected = await connectDatabase();
   if (!connected) {
-    process.exit(1);
+    if (require.main === module) {
+      process.exit(1);
+    }
+    throw new Error('Failed to connect to database');
   }
 
   // Setup GraphQL

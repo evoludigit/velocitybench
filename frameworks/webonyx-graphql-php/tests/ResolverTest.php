@@ -93,7 +93,7 @@ class ResolverTest extends TestCase
         $author = $this->factory->createUser('author', 'author@example.com', 'Author');
         $post = $this->factory->createPost($author->id, 'Test Post', 'Content');
         $commenter = $this->factory->createUser('commenter', 'commenter@example.com', 'Commenter');
-        $comment = $this->factory->createComment($commenter->id, $post->id, 'Great post!');
+        $comment = $this->factory->createComment($post->id, $commenter->id, 'Great post!');
 
         $result = $this->factory->getComment($comment->id);
 
@@ -106,8 +106,8 @@ class ResolverTest extends TestCase
         $author = $this->factory->createUser('author', 'author@example.com', 'Author');
         $post = $this->factory->createPost($author->id, 'Test Post', 'Content');
         $commenter = $this->factory->createUser('commenter', 'commenter@example.com', 'Commenter');
-        $this->factory->createComment($commenter->id, $post->id, 'Comment 1');
-        $this->factory->createComment($commenter->id, $post->id, 'Comment 2');
+        $this->factory->createComment($post->id, $commenter->id, 'Comment 1');
+        $this->factory->createComment($post->id, $commenter->id, 'Comment 2');
 
         $comments = $this->factory->getCommentsByPost($post->pkPost);
 
@@ -242,7 +242,7 @@ class ResolverTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Post not found');
 
-        $this->factory->createComment($user->id, 'invalid-post', 'Content');
+        $this->factory->createComment('invalid-post', $user->id, 'Content');
     }
 
     public function testLongContent(): void
