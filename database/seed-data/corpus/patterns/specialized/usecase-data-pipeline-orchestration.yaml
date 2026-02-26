@@ -1,0 +1,28 @@
+id: usecase-data-pipeline-orchestration
+name: Data Pipeline Orchestration Patterns
+category: specialized
+type: standard
+tags:
+- usecase
+summary:
+  short: Patterns and practices for data pipeline orchestration patterns
+  long: Comprehensive guide to data pipeline orchestration patterns
+problem:
+  description: Challenges with data pipeline orchestration patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement data pipeline orchestration patterns
+key_concepts:
+  concept: Understanding Data Pipeline Orchestration Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Data Pipeline Orchestration Patterns
+  intermediate:
+    focus: Implementing Data Pipeline Orchestration Patterns
+  advanced:
+    focus: Advanced Data Pipeline Orchestration Patterns

@@ -1,0 +1,28 @@
+id: monitoring-validation
+name: Monitoring Validation
+category: comprehensive
+type: standard
+tags:
+- monitoring
+summary:
+  short: Monitoring Validation and implementation guidelines
+  long: Complete guide to monitoring validation
+problem:
+  description: Challenges without proper monitoring validation
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement monitoring validation
+key_concepts:
+  concept: Monitoring Validation
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

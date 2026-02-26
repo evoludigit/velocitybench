@@ -1,0 +1,28 @@
+id: performance-debugging
+name: Performance Debugging
+category: comprehensive
+type: standard
+tags:
+- performance
+summary:
+  short: Performance Debugging and implementation guidelines
+  long: Complete guide to performance debugging
+problem:
+  description: Challenges without proper performance debugging
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement performance debugging
+key_concepts:
+  concept: Performance Debugging
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

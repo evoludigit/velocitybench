@@ -1,0 +1,301 @@
+id: feature-flags
+name: "Feature Flags & Progressive Rollout"
+category: deployment
+type: standard
+tags:
+  - deployment
+  - feature-flags
+  - continuous-delivery
+  - risk-management
+
+summary:
+  short: "Decoupling code deployment from feature release using feature flags"
+  long: |
+    Feature flags allow deployment of incomplete or experimental code to production without exposing it to users. Code can be deployed, tested, and released incrementally without version bumps or redeployment.
+
+problem:
+  description: "Deploying code and releasing features are often coupled; incomplete features block releases, and bugs require full rollbacks"
+  symptoms:
+    - "Cannot deploy partial features; blocks other work"
+    - "Feature ready but business wants to release later; code sits in branch"
+    - "Bug found in deployed code; must roll back everything"
+    - "Cannot A/B test features with real users"
+    - "Different users need different features (tiered rollout)"
+  impact: "Slow feature velocity, risky deployments, poor user experience testing"
+
+solution:
+  description: "Use feature flags to decouple code deployment from release"
+  principle: |
+    Deploy code to production disabled (feature flag off)
+    - Code is active but feature is hidden from users
+    - Test in production with limited users
+    - Enable gradually (% rollout, specific segments)
+    - Easy rollback (flip flag off)
+    - No re-deployment needed
+
+flag_types:
+  release_flag:
+    description: "Hide incomplete features"
+    example: |
+      if feature_flags.is_enabled('new_checkout_flow'):
+        return render_new_checkout()
+      else:
+        return render_old_checkout()
+    lifecycle: |
+      1. Implement feature behind flag (disabled)
+      2. Deploy to production
+      3. Internal testing with flag enabled
+      4. Enable for canary % of users
+      5. Enable for all users
+      6. Remove flag after 2 weeks (dead code)
+
+  operational_flag:
+    description: "Control system behavior without deployment"
+    example: |
+      if feature_flags.is_enabled('use_new_payment_processor'):
+        return PaymentProcessor.new()
+      else:
+        return PaymentProcessor.legacy()
+    use_case: "Switch between implementations, disable problematic features"
+
+  experiment_flag:
+    description: "A/B testing and canary releases"
+    example: |
+      user_group = feature_flags.get_variant('checkout_ui_experiment')
+      if user_group == 'control':
+        return render_classic_checkout()
+      elif user_group == 'variant_a':
+        return render_new_checkout_v1()
+      else:
+        return render_new_checkout_v2()
+    metrics: "Track conversion by variant"
+
+  kill_switch:
+    description: "Emergency disable for failing features"
+    example: |
+      if feature_flags.is_enabled('recommendations_engine'):
+        show_recommendations()
+      # If recommendations service fails, flip flag; site still works
+    benefit: "System remains functional even if feature breaks"
+
+rollout_strategies:
+  percentage_based:
+    description: "Gradually enable for % of users"
+    example: |
+      Day 1: 1% of traffic
+      Day 2: 5% of traffic
+      Day 3: 25% of traffic
+      Day 4: 100% of traffic
+    monitoring: |
+      - Check error rates at each level
+      - Compare metrics (conversion, latency) vs control
+      - Auto-rollback if metrics degrade
+
+  user_segment_based:
+    description: "Enable for specific user segments"
+    rules:
+      - "Internal/beta users only"
+      - "Paying customers only"
+      - "Users in specific region"
+      - "Users with feature flag in their profile"
+    example: |
+      flag_value = feature_flags.is_enabled(
+        'new_feature',
+        user_id = user.id,
+        context = {'tier': user.tier}
+      )
+
+  time_based:
+    description: "Enable feature at specific time"
+    use_case: "Release at scheduled time without redeployment"
+    example: |
+      flag:
+        name: black_friday_sale
+        enabled_at: "2024-11-29 00:00:00 UTC"
+
+  attribute_based:
+    description: "Enable based on user attributes"
+    attributes:
+      - "Email domain: @company.com"
+      - "User agent: contains 'Chrome'"
+      - "Account age: > 90 days"
+      - "Monthly spend: > $100"
+
+  sticky_experiments:
+    description: "Same user always sees same variant"
+    why_important: "Consistent experience; valid A/B testing"
+    implementation: |
+      variant = hash(user_id + 'experiment_name') % 2
+      if variant == 0:
+        show_control()
+      else:
+        show_variant()
+
+implementation_patterns:
+  in_code_flags:
+    description: "Flags defined in application code"
+    pros: "Simple; no external dependency"
+    cons: "Requires recompile/redeploy to change"
+    use_case: "Simple features; local development"
+
+  remote_flag_service:
+    description: "Flags managed by external service"
+    examples: "LaunchDarkly, Unleash, Flagsmith"
+    pros:
+      - "Change flags without deployment"
+      - "Detailed rollout controls"
+      - "Audit trail and analytics"
+      - "Multi-environment support"
+    cons: "Added latency, dependency on flag service"
+
+  configuration:
+    in_memory_cache: |
+      # Flags cached locally; updated periodically
+      # Reduces external calls; still responsive
+
+    http_request: |
+      # Each flag check calls flag service
+      # Slower; always fresh; useful for experiments
+
+  fallback_behavior:
+    example: |
+      def is_enabled(flag_name):
+        try:
+          return call_flag_service(flag_name)
+        except:
+          # Flag service down; use local default
+          return DEFAULT_FLAGS.get(flag_name, False)
+
+analytics_and_observability:
+  tracking_what:
+    - "Flag evaluation (was flag on/off?)"
+    - "User variant assignment (A or B?)"
+    - "Conversion metrics by variant"
+    - "Performance metrics by variant"
+
+  metrics_collection:
+    method: "Send event on flag evaluation"
+    example: |
+      {
+        'timestamp': '2024-01-10T10:00:00Z',
+        'flag_name': 'new_checkout_flow',
+        'user_id': 'user_123',
+        'variant': 'enabled',
+        'context': {'region': 'US', 'tier': 'premium'}
+      }
+
+  analysis:
+    - "Conversion rate: variant vs control"
+    - "Error rate: variant vs control"
+    - "Latency: variant vs control"
+    - "Revenue impact"
+
+coordinating_with_feature_development:
+  development_cycle:
+    1: "Engineer writes code behind flag (disabled)"
+    2: "Deploy to staging; flag enabled in staging"
+    3: "Test in staging with flag enabled"
+    4: "Merge code; deploy to production (disabled)"
+    5: "Enable in production for internal team"
+    6: "Enable for % of users; monitor"
+    7: "Ramp to 100%"
+    8: "Remove flag after 2 weeks"
+
+  communication:
+    - "Ticket tracking feature's flag status"
+    - "Deployment checklist includes flag review"
+    - "Rollout schedule documented"
+
+  flag_cleanup:
+    - "Remove dead code after feature stable"
+    - "Don't accumulate old flags"
+    - "Document why each flag exists"
+
+anti_patterns:
+  - name: "Permanent flags"
+    description: "Flag left in code for months; dead code"
+    consequence: "Code accumulates; harder to understand"
+    prevention: "Set deadline for flag removal in ticket"
+
+  - name: "Too many flag combinations"
+    description: "Multiple nested flags; many code paths"
+    consequence: "Untested combinations; unpredictable behavior"
+    prevention: "Review flag combinations; prune redundant flags"
+
+  - name: "No monitoring during rollout"
+    description: "Enable flag and hope; no metrics"
+    consequence: "Bug goes unnoticed; affects many users"
+    prevention: "Mandatory metrics collection before enable"
+
+  - name: "Enabling for internal use only, never for users"
+    description: "Feature behind flag never reaches users"
+    consequence: "Wasted engineering effort"
+    prevention: "Product reviews flag status; prioritize rollout"
+
+  - name: "Inconsistent flag names"
+    description: "Same feature has different flag names in different services"
+    consequence: "Accidentally enable for only part of system"
+    prevention: "Naming convention; shared flag registry"
+
+best_practices:
+  - name: "Use consistent naming"
+    description: "feature_<name> for features, ops_<name> for operational flags"
+
+  - name: "Document flag purpose"
+    description: "Why does this flag exist? When should it be removed?"
+
+  - name: "Monitor metrics during rollout"
+    description: "Don't just watch error rate; track business metrics"
+
+  - name: "Automate rollout if possible"
+    description: "Specify % schedule; let system ramp automatically"
+
+  - name: "Set flag removal deadline"
+    description: "Schedule flag removal 2 weeks after full rollout"
+
+  - name: "Test with flags disabled"
+    description: "Ensure old code path still works"
+
+  - name: "Use sticky hash for experiments"
+    description: "Consistent experience for same user"
+
+  - name: "Coordinate across services"
+    description: "If feature spans services, use same flag name/state"
+
+comparison:
+  feature_flags_vs_branches:
+    feature_flags: "Deploy disabled; enable gradually"
+    branches: "Keep code in branch; merge when ready"
+    tradeoff: "Flags more risky (disabled code in prod); branches delay integration"
+
+  feature_flags_vs_deployment:
+    feature_flags: "Deploy and release separately"
+    deployment: "Deploy = release"
+    benefit: "Flags allow safe, gradual releases"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Feature flags are like a master dimmer switch:
+      - Code is always active (light always on)
+      - Flag controls brightness (0% to 100%)
+      - Gradually brighten feature as confidence grows
+      - Can instantly dim if problems found
+
+      No need to turn off entire light (rollback).
+
+  intermediate:
+    focus: "Feature flag implementation"
+    key_points:
+      - "Flag types (release, operational, experiment)"
+      - "Rollout strategies (%, segments, time-based)"
+      - "Metrics collection and A/B testing"
+      - "Flag lifecycle and cleanup"
+
+  advanced:
+    focus: "Feature flag coordination at scale"
+    key_points:
+      - "Multi-service flag coordination"
+      - "Complex rollout strategies"
+      - "Feature flag analytics"
+      - "Gradual rollout with automated rollback"

@@ -122,7 +122,14 @@ class AsyncDatabase:
         port = port or int(os.getenv("DB_PORT", "5432"))
         database = database or os.getenv("DB_NAME", "fraiseql_benchmark")
         user = user or os.getenv("DB_USER", "benchmark")
-        password = password or os.getenv("DB_PASSWORD", "benchmark123")
+
+        # Password is REQUIRED - fail fast if not provided
+        if not password:
+            password = os.getenv("DB_PASSWORD")
+            if not password:
+                raise ValueError(
+                    "Database password is required. Set DB_PASSWORD environment variable."
+                )
 
         logger.info(
             f"Creating asyncpg pool: {user}@{host}:{port}/{database} "
@@ -146,16 +153,13 @@ class AsyncDatabase:
                 init=self._init_connection,
             )
             logger.info("✅ Connection pool created successfully")
-        except Exception as e:
+        except (asyncpg.PostgresError, ConnectionError, TimeoutError, OSError) as e:
             logger.error(f"❌ Failed to create connection pool: {e}")
             raise
 
     async def _init_connection(self, conn):
         """Initialize each new connection with performance settings."""
-        # Set application name for pg_stat_activity monitoring
         await conn.execute("SET application_name = 'fraiseql-benchmark';")
-        # Enable query logging (optional, may impact performance)
-        # await conn.execute("SET log_statement = 'all';")
 
     async def close(self):
         """Close connection pool."""
@@ -342,9 +346,8 @@ class AsyncDatabase:
         if not self.pool:
             raise RuntimeError("Database pool not connected")
 
-        async with self.pool.acquire() as conn:
-            async with conn.transaction():
-                yield conn
+        async with self.pool.acquire() as conn, conn.transaction():
+            yield conn
 
     def get_metrics(self) -> dict[str, Any]:
         """Get current metrics snapshot."""

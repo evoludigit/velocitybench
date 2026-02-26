@@ -1,0 +1,28 @@
+id: scaling-guidelines
+name: Scaling Guidelines
+category: comprehensive
+type: standard
+tags:
+- scaling
+summary:
+  short: Scaling Guidelines and implementation guidelines
+  long: Complete guide to scaling guidelines
+problem:
+  description: Challenges without proper scaling guidelines
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement scaling guidelines
+key_concepts:
+  concept: Scaling Guidelines
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

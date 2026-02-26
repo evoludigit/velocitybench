@@ -4,7 +4,7 @@ export const sequelize = new Sequelize({
   dialect: 'postgres',
   host: process.env.DB_HOST || 'postgres',
   port: parseInt(process.env.DB_PORT || '5432'),
-  database: process.env.DB_NAME || 'fraiseql_benchmark',
+  database: process.env.DB_NAME || 'velocitybench_benchmark',
   username: process.env.DB_USER || 'benchmark',
   password: process.env.DB_PASSWORD || 'benchmark123',
   pool: {
@@ -63,7 +63,7 @@ export class Comment extends Model {
 // Initialize models
 User.init({
   id: {
-    type: DataTypes.STRING,
+    type: DataTypes.UUID,
     primaryKey: true,
   },
   pk_user: {
@@ -99,7 +99,7 @@ User.init({
 
 Post.init({
   id: {
-    type: DataTypes.STRING,
+    type: DataTypes.UUID,
     primaryKey: true,
   },
   pk_post: {
@@ -139,7 +139,7 @@ Post.init({
 
 Comment.init({
   id: {
-    type: DataTypes.STRING,
+    type: DataTypes.UUID,
     primaryKey: true,
   },
   pk_comment: {

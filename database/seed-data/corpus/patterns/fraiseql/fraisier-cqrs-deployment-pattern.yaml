@@ -1,0 +1,465 @@
+# Fraisier CQRS Deployment Pattern
+# VelocityBench Knowledge Corpus
+
+id: fraisier-cqrs-deployment
+name: "Fraisier: CQRS Architecture for Deployment State Management"
+category: fraiseql
+type: pattern
+severity: high
+tags:
+  - fraisier
+  - cqrs
+  - deployment
+  - state-management
+  - event-sourcing
+  - database-design
+
+summary:
+  short: "CQRS architecture for deployment tracking: separate write (tb_*) and read (v_*) layers"
+  long: |
+    Fraisier uses CQRS (Command Query Responsibility Segregation) pattern for deployment state.
+    Write operations target tb_* (write) tables: record deployments, webhooks, status changes.
+    Read operations query v_* (read) views: deployment history, statistics, current status.
+    Clear separation enables efficient queries for deployment history while maintaining accurate write history.
+    Same pattern as FraiseQL's three-layer view architecture applied to deployment orchestration.
+
+problem:
+  description: |
+    Simple deployments table has conflicting requirements:
+    - Need to write new deployments (INSERT fast)
+    - Need to read deployment history efficiently (JOIN, aggregate)
+    - Single table becomes denormalized or slow
+
+    CQRS separates concerns: optimize writes and reads independently.
+
+  symptoms:
+    - name: "Slow deployment history queries"
+      description: "Querying deployment history takes seconds"
+      detection: "SELECT FROM deployments ... GROUP BY is slow"
+
+    - name: "Complex joins for statistics"
+      description: "Computing deployment count, success rate requires complex queries"
+      detection: "Queries need 4+ joins, multiple GROUP BYs"
+
+    - name: "Denormalized schema"
+      description: "Adding redundant columns to speed up queries"
+      detection: "deployment_count_today in fraise table (updated on every deploy)"
+
+    - name: "Update conflicts"
+      description: "Writing new deployment conflicts with reading statistics"
+      detection: "Lock contention on single table during peak deployments"
+
+solution:
+  principle: "Separate write tables (tb_*) from read views (v_*) for deployment state"
+
+  components:
+    - name: "Write Tables (tb_*)"
+      type: "Transactional data"
+      purpose: "Record facts: deployments, webhooks, status changes"
+
+    - name: "Read Views (v_*)"
+      type: "Optimized queries"
+      purpose: "Query deployment history, statistics, current status"
+
+    - name: "Synchronization"
+      type: "Maintenance"
+      purpose: "Keep views up-to-date as tables change"
+
+write_tables:
+  description: "Append-only fact tables for deployment events"
+
+  tb_deployment: |
+    CREATE TABLE tb_deployment (
+        pk_deployment BIGSERIAL PRIMARY KEY,
+        id UUID UNIQUE NOT NULL,
+        fraise_id VARCHAR(100) NOT NULL,      -- "api", "worker", etc.
+        environment VARCHAR(50) NOT NULL,     -- "dev", "staging", "prod"
+        branch VARCHAR(255),
+        commit_sha VARCHAR(40),
+        status VARCHAR(50),                   -- "running", "success", "failed"
+        started_at TIMESTAMPTZ,
+        completed_at TIMESTAMPTZ,
+        duration_seconds INT,
+        triggered_by VARCHAR(100),            -- "webhook" or "manual" or username
+        error_message TEXT,
+        health_check_status VARCHAR(50),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    -- Fast lookups by fraise/environment
+    CREATE INDEX idx_tb_deployment_fraise_env
+        ON tb_deployment(fraise_id, environment, created_at DESC);
+
+  tb_webhook: |
+    CREATE TABLE tb_webhook (
+        pk_webhook BIGSERIAL PRIMARY KEY,
+        id UUID UNIQUE NOT NULL,
+        fk_deployment INTEGER,                -- Foreign key to tb_deployment
+        provider VARCHAR(50),                 -- "github", "gitlab", etc.
+        repository VARCHAR(255),
+        branch VARCHAR(255),
+        pusher VARCHAR(100),
+        webhook_payload JSONB,
+        verified BOOLEAN,
+        routing_status VARCHAR(50),           -- "routed", "unmapped", "skipped"
+        received_at TIMESTAMPTZ,
+        processed_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE INDEX idx_tb_webhook_deployment ON tb_webhook(fk_deployment);
+    CREATE INDEX idx_tb_webhook_received ON tb_webhook(received_at DESC);
+
+  tb_deployment_event: |
+    CREATE TABLE tb_deployment_event (
+        pk_event BIGSERIAL PRIMARY KEY,
+        id UUID UNIQUE NOT NULL,
+        fk_deployment INTEGER NOT NULL,
+        event_type VARCHAR(50),               -- "started", "migration_complete", "health_check"
+        message TEXT,
+        event_data JSONB,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    CREATE INDEX idx_tb_deployment_event_deployment
+        ON tb_deployment_event(fk_deployment, created_at);
+
+read_views:
+  description: "Optimized views for querying deployment data"
+
+  v_deployment_summary: |
+    CREATE OR REPLACE VIEW v_deployment_summary AS
+    SELECT
+        d.id,
+        d.fraise_id,
+        d.environment,
+        d.branch,
+        d.status,
+        d.started_at,
+        d.completed_at,
+        d.duration_seconds,
+        d.triggered_by,
+        d.created_at
+    FROM benchmark.tb_deployment d
+    ORDER BY d.created_at DESC;
+
+  v_deployment_history: |
+    CREATE OR REPLACE VIEW v_deployment_history AS
+    SELECT
+        d.fraise_id,
+        d.environment,
+        COUNT(*) as total_deployments,
+        SUM(CASE WHEN d.status = 'success' THEN 1 ELSE 0 END) as successful_deployments,
+        SUM(CASE WHEN d.status = 'failed' THEN 1 ELSE 0 END) as failed_deployments,
+        ROUND(100.0 * SUM(CASE WHEN d.status = 'success' THEN 1 ELSE 0 END) / COUNT(*), 2) as success_rate,
+        AVG(d.duration_seconds) as avg_duration_seconds,
+        MIN(d.created_at) as first_deployment,
+        MAX(d.created_at) as last_deployment
+    FROM benchmark.tb_deployment d
+    WHERE d.created_at >= CURRENT_DATE - INTERVAL '30 days'
+    GROUP BY d.fraise_id, d.environment;
+
+  v_webhook_status: |
+    CREATE OR REPLACE VIEW v_webhook_status AS
+    SELECT
+        w.provider,
+        COUNT(*) as total_webhooks,
+        SUM(CASE WHEN w.verified THEN 1 ELSE 0 END) as verified_webhooks,
+        SUM(CASE WHEN w.routing_status = 'routed' THEN 1 ELSE 0 END) as routed_webhooks,
+        SUM(CASE WHEN w.routing_status = 'unmapped' THEN 1 ELSE 0 END) as unmapped_webhooks,
+        MAX(w.received_at) as last_webhook
+    FROM benchmark.tb_webhook w
+    WHERE w.received_at >= CURRENT_DATE - INTERVAL '7 days'
+    GROUP BY w.provider;
+
+  v_deployment_status_current: |
+    -- Current status of each fraise in each environment
+    CREATE OR REPLACE VIEW v_deployment_status_current AS
+    SELECT DISTINCT ON (d.fraise_id, d.environment)
+        d.fraise_id,
+        d.environment,
+        d.status,
+        d.completed_at,
+        d.branch,
+        d.commit_sha,
+        d.health_check_status
+    FROM benchmark.tb_deployment d
+    ORDER BY d.fraise_id, d.environment, d.created_at DESC;
+
+deployment_state_machine:
+  description: "State transitions during deployment"
+  states: |
+    deployment status can be:
+    - "pending"       → Deployment queued, waiting to start
+    - "running"       → Git pull, migrations, service restart in progress
+    - "health_check"  → Waiting for health check to pass
+    - "success"       → Deployment complete, service healthy
+    - "failed"        → Something went wrong, needs investigation
+    - "rolled_back"   → Deployment rolled back to previous version
+
+  transitions: |
+    pending → running (deployment starts)
+    running → health_check (service restart complete)
+    running → failed (git pull failed, or migration error)
+    health_check → success (health check passes)
+    health_check → failed (health check timeout or bad response)
+    success → running (new deployment initiated)
+    failed → pending (manual retry)
+    any → rolled_back (manual rollback)
+
+  recording_events: |
+    Each state transition is recorded as an event in tb_deployment_event:
+
+    INSERT INTO tb_deployment_event (fk_deployment, event_type, message, event_data)
+    VALUES (
+        123,
+        'status_change',
+        'Status changed from pending to running',
+        jsonb_build_object(
+            'old_status', 'pending',
+            'new_status', 'running',
+            'timestamp', NOW()
+        )
+    );
+
+cqrs_write_operations:
+  description: "Deployment commands write to tb_* tables"
+
+  start_deployment: |
+    -- Record new deployment
+    INSERT INTO tb_deployment (
+        id, fraise_id, environment, branch, commit_sha,
+        status, triggered_by, started_at
+    )
+    VALUES (
+        gen_random_uuid(),
+        'api',
+        'production',
+        'main',
+        'abc123...',
+        'pending',
+        'webhook',
+        NOW()
+    );
+
+  record_webhook: |
+    -- Record incoming webhook
+    INSERT INTO tb_webhook (
+        id, provider, repository, branch, pusher,
+        webhook_payload, verified, routing_status, received_at
+    )
+    VALUES (
+        gen_random_uuid(),
+        'github',
+        'myorg/api',
+        'main',
+        'alice',
+        payload::JSONB,
+        true,
+        'routed',
+        NOW()
+    );
+
+  update_deployment_status: |
+    -- Update deployment status
+    UPDATE tb_deployment
+    SET status = 'health_check',
+        completed_at = NOW()
+    WHERE id = 'abc-123-uuid';
+
+    -- Record status change event
+    INSERT INTO tb_deployment_event (fk_deployment, event_type, message)
+    SELECT pk_deployment, 'status_change', 'Health check started'
+    FROM tb_deployment WHERE id = 'abc-123-uuid';
+
+cqrs_read_operations:
+  description: "Queries use v_* views for optimal performance"
+
+  get_deployment_history: |
+    -- Query read view (no writes affect this)
+    SELECT * FROM v_deployment_history
+    WHERE fraise_id = 'api'
+    AND environment = 'production';
+
+  get_deployment_statistics: |
+    -- Efficient aggregation from view
+    SELECT
+        success_rate,
+        avg_duration_seconds,
+        last_deployment
+    FROM v_deployment_history
+    WHERE fraise_id = 'api';
+
+  get_current_status: |
+    -- Current status of each service
+    SELECT * FROM v_deployment_status_current;
+
+  get_webhook_metrics: |
+    -- Webhook success rate
+    SELECT * FROM v_webhook_status;
+
+synchronization:
+  description: "Keep views up-to-date with tables"
+
+  materialized_view_refresh: |
+    -- Refresh materialized views after deployments
+    REFRESH MATERIALIZED VIEW CONCURRENTLY v_deployment_history;
+    REFRESH MATERIALIZED VIEW CONCURRENTLY v_deployment_status_current;
+
+  triggers: |
+    -- Automatically refresh views when tables change
+    CREATE TRIGGER trg_deployment_refresh
+    AFTER INSERT, UPDATE ON tb_deployment
+    FOR EACH STATEMENT
+    EXECUTE FUNCTION refresh_deployment_views();
+
+  incremental_update: |
+    -- For high-traffic systems, use incremental updates instead
+    CREATE OR REPLACE FUNCTION update_deployment_cache()
+    RETURNS void AS $$
+    BEGIN
+      -- Only refresh data that changed
+      WITH recent_deployments AS (
+          SELECT DISTINCT fraise_id, environment
+          FROM tb_deployment
+          WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL '1 hour'
+      )
+      UPDATE v_deployment_summary
+      SET ...
+      WHERE (fraise_id, environment) IN (SELECT fraise_id, environment FROM recent_deployments);
+    END;
+    $$ LANGUAGE plpgsql;
+
+benefits_of_cqrs_for_deployments:
+  separation_of_concerns: |
+    Write path: Fast inserts into tb_deployment (optimized for throughput)
+    Read path: Complex queries on v_* views (optimized for analytics)
+    No conflicts between deployments and queries
+
+  query_optimization: |
+    - v_deployment_history pre-aggregates success rates
+    - v_deployment_status_current indexed for fast lookups
+    - No need for expensive GROUP BY on every query
+
+  scaling: |
+    - Can add read replicas for queries without affecting writes
+    - Write table stays simple (just INSERTs)
+    - Read views can be materialized or cached
+
+  audit_trail: |
+    - tb_deployment records every deployment fact
+    - tb_deployment_event records every status change
+    - Complete audit trail for debugging
+
+  independent_optimization: |
+    - Optimize writes (simple schema, no complex indexes)
+    - Optimize reads (materialized views, aggregations)
+    - Changes to one don't break the other
+
+best_practices:
+  - name: "Write tables should be append-only"
+    description: "INSERT new deployment, don't UPDATE old ones"
+    rationale: "Immutable history, easier to audit"
+
+  - name: "Read views should be denormalized"
+    description: "Pre-compute aggregations in views"
+    rationale: "Fast queries without expensive JOINs"
+
+  - name: "Create indexes on write tables"
+    description: "Index (fraise_id, environment, created_at)"
+    rationale: "Fast lookups when writing new deployments"
+
+  - name: "Materialize views for complex queries"
+    description: "Use MATERIALIZED VIEW for expensive aggregations"
+    rationale: "Queries on materialized view are fast"
+
+  - name: "Refresh views regularly"
+    description: "REFRESH MATERIALIZED VIEW after batches of writes"
+    rationale: "Keep denormalized data in sync with source of truth"
+
+  - name: "Use triggers for automatic refresh"
+    description: "Trigger view refresh on table changes"
+    rationale: "Views always stay up-to-date"
+
+anti_patterns:
+  - name: "Single table for writes and reads"
+    consequence: "Queries slow down deployments and vice versa"
+    example: "Single tb_deployment table with complex indexes"
+
+  - name: "Updating old deployment records"
+    consequence: "Breaks audit trail, complex query logic"
+    example: "UPDATE tb_deployment SET status = ... WHERE ..."
+
+  - name: "No views, raw table queries"
+    consequence: "Expensive queries with many JOINs"
+    example: "SELECT ... FROM tb_deployment WHERE ... GROUP BY ..."
+
+  - name: "Never refreshing materialized views"
+    consequence: "Stale data, incorrect statistics"
+    example: "Create view but never REFRESH"
+
+  - name: "Indexes on read views"
+    consequence: "Overhead with no benefit"
+    example: "CREATE INDEX on materialized view"
+
+use_cases:
+  - scenario: "Deployment dashboard"
+    query: |
+      SELECT * FROM v_deployment_history
+      WHERE created_at >= NOW() - INTERVAL '7 days'
+    benefit: "Fast aggregations from pre-computed view"
+
+  - scenario: "Deployment history for audit"
+    query: |
+      SELECT * FROM v_deployment_summary
+      ORDER BY created_at DESC
+      LIMIT 100
+    benefit: "No expensive JOINs, fast pagination"
+
+  - scenario: "Service status monitoring"
+    query: |
+      SELECT * FROM v_deployment_status_current
+      WHERE status != 'success'
+    benefit: "Instant identification of failed deployments"
+
+  - scenario: "Webhook statistics"
+    query: |
+      SELECT provider, success_rate, last_webhook
+      FROM v_webhook_status
+    benefit: "Provider health monitoring"
+
+related_patterns:
+  - id: "trinity-pattern-fraiseql"
+    description: "CQRS applied to FraiseQL database layer (tb_*, v_*)"
+
+  - id: "fraisier-deployment-orchestration"
+    description: "Overall deployment orchestration system"
+
+  - id: "deployment-history-tracking"
+    description: "Recording and querying deployment events"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      CQRS is like separating a bank's operations:
+      - Tellers (writes): Fast, simple, just record the transaction
+      - Accountants (reads): Complex reports, aggregations, statistics
+      - Neither gets in the other's way
+
+  intermediate:
+    focus: "Write and read optimization for deployment state"
+    key_points:
+      - "Write tables (tb_*) record facts: deployments, webhooks"
+      - "Read views (v_*) pre-compute: history, statistics, status"
+      - "Separate schemas optimize writes and reads independently"
+      - "Materialized views provide fast queries without JOINs"
+      - "Complete audit trail for debugging and compliance"
+
+  advanced:
+    focus: "Event sourcing and view refreshing strategies"
+    key_points:
+      - "Each deployment is immutable event in tb_deployment"
+      - "Views materialize complex queries for performance"
+      - "Trigger-based or batch refreshing keeps views synchronized"
+      - "Separate read replicas for analytics without impacting writes"
+      - "Event sourcing enables complete audit and debugging"

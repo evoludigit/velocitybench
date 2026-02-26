@@ -1,0 +1,28 @@
+id: cloud-troubleshooting
+name: Cloud Troubleshooting
+category: comprehensive
+type: standard
+tags:
+- cloud
+summary:
+  short: Cloud Troubleshooting and implementation guidelines
+  long: Complete guide to cloud troubleshooting
+problem:
+  description: Challenges without proper cloud troubleshooting
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement cloud troubleshooting
+key_concepts:
+  concept: Cloud Troubleshooting
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

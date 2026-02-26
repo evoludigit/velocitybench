@@ -1,0 +1,49 @@
+id: database-execution-strategy
+name: Database Execution Strategy
+category: fraiseql
+type: standard
+tags:
+- execution
+- sql-generation
+- multi-database
+- adapters
+summary:
+  short: Translating execution plans to database dialect SQL
+  long: The execution engine translates pre-computed plans into database-specific
+    SQL, handling dialect differences and database-specific features.
+problem:
+  description: Single SQL generation approach fails on different databases
+  symptoms:
+  - Queries work on PostgreSQL but fail on SQLite
+  - Different results on different databases
+  - Can't use database-specific features
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Database Execution Strategy effectively
+key_concepts:
+  concept_1: SQL dialect handling
+  concept_2: Database feature detection
+  concept_3: Fallback strategies
+implementation_considerations:
+  consideration_1: Performance of dialect translation
+  consideration_2: Feature availability
+  consideration_3: Error handling
+best_practices:
+- name: Database adapters
+  description: Separate adapter per database
+- name: Feature detection
+  description: Check capability before using feature
+- name: Fallback paths
+  description: Provide alternatives if feature unavailable
+anti_patterns:
+- name: Single SQL generation
+  consequence: Fails on some databases
+- name: No adapters
+  consequence: Can't use database features
+blog_hooks:
+  beginner:
+    focus: Introduction to Database Execution Strategy
+  intermediate:
+    focus: Implementing Database Execution Strategy
+  advanced:
+    focus: Advanced Database Execution Strategy techniques

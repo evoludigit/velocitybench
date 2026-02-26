@@ -1,0 +1,49 @@
+id: schema-artifacts-generation
+name: Schema Artifacts Generation
+category: fraiseql
+type: standard
+tags:
+- compilation
+- artifacts
+- code-generation
+- outputs
+summary:
+  short: Generating CompiledSchema, GraphQL SDL, and validation reports
+  long: 'The compilation pipeline outputs multiple artifacts: CompiledSchema (execution
+    plan), GraphQL SDL (for clients), and validation reports (for developers).'
+problem:
+  description: Hard to know what was compiled or debug compilation issues
+  symptoms:
+  - No way to inspect compiled queries
+  - Clients don't know schema structure
+  - Validation errors not documented
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Schema Artifacts Generation effectively
+key_concepts:
+  concept_1: Artifact types and formats
+  concept_2: CompiledSchema structure
+  concept_3: Report generation and formatting
+implementation_considerations:
+  consideration_1: Artifact versioning
+  consideration_2: Artifact compatibility
+  consideration_3: Artifact documentation
+best_practices:
+- name: Generate all artifacts
+  description: Don't skip schema or reports
+- name: Version artifacts
+  description: Track schema versions
+- name: Document structure
+  description: Explain artifact contents
+anti_patterns:
+- name: Missing artifacts
+  consequence: No visibility into compilation
+- name: Incompatible versions
+  consequence: Client/server mismatches
+blog_hooks:
+  beginner:
+    focus: Introduction to Schema Artifacts Generation
+  intermediate:
+    focus: Implementing Schema Artifacts Generation
+  advanced:
+    focus: Advanced Schema Artifacts Generation techniques

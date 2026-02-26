@@ -1,0 +1,380 @@
+# Event-Driven Architecture
+# VelocityBench Knowledge Corpus
+
+id: event-driven-architecture
+name: "Event-Driven Architecture"
+category: architecture
+type: pattern
+severity: high
+tags:
+  - architecture
+  - events
+  - messaging
+  - decoupling
+  - microservices
+
+summary:
+  short: "Communicate between services through asynchronous events"
+  long: |
+    Event-driven architecture (EDA) uses events to trigger and communicate between
+    decoupled services. When something happens (user signs up, order placed, payment
+    received), an event is published and interested services react. This enables
+    loose coupling, scalability, and resilience - publishers don't need to know
+    about subscribers, and failures in one service don't block others.
+
+problem:
+  description: |
+    Synchronous, tightly-coupled architectures create problems:
+    - Adding a feature requires modifying the calling service
+    - Slow downstream services block upstream operations
+    - Failures cascade through service chains
+    - Scaling requires scaling entire call chains together
+
+  symptoms:
+    - name: "Circular dependencies"
+      description: "Services need to know about each other"
+      detection: "Import cycles, bidirectional API calls"
+
+    - name: "Deployment coupling"
+      description: "Deploying one service requires deploying others"
+      detection: "Coordinated deployments, version lock-step"
+
+    - name: "Latency accumulation"
+      description: "Response time is sum of all downstream calls"
+      detection: "Slow endpoints with multiple service calls"
+
+solution:
+  principle: "Publish facts, let interested parties react"
+
+  components:
+    - name: "Event"
+      type: "message"
+      purpose: "Immutable record of something that happened"
+
+    - name: "Producer/Publisher"
+      type: "service"
+      purpose: "Creates and publishes events when things happen"
+
+    - name: "Consumer/Subscriber"
+      type: "service"
+      purpose: "Reacts to events it's interested in"
+
+    - name: "Event Broker"
+      type: "infrastructure"
+      purpose: "Routes events from producers to consumers"
+
+event_types:
+  - name: "Domain Events"
+    description: "Business-meaningful occurrences"
+    examples:
+      - "UserRegistered"
+      - "OrderPlaced"
+      - "PaymentReceived"
+      - "InventoryLow"
+
+  - name: "Integration Events"
+    description: "Cross-service communication"
+    examples:
+      - "UserCreated (for other services to sync)"
+      - "OrderShipped (for notification service)"
+
+  - name: "Command Events"
+    description: "Request for action (use sparingly)"
+    examples:
+      - "SendWelcomeEmail"
+      - "ProcessRefund"
+
+implementation:
+  event_structure:
+    python: |
+      from dataclasses import dataclass
+      from datetime import datetime
+      from uuid import uuid4
+      import json
+
+      @dataclass
+      class Event:
+          """Base event structure."""
+          event_id: str
+          event_type: str
+          timestamp: datetime
+          source: str
+          data: dict
+          metadata: dict = None
+
+          @classmethod
+          def create(cls, event_type: str, data: dict, source: str):
+              return cls(
+                  event_id=str(uuid4()),
+                  event_type=event_type,
+                  timestamp=datetime.utcnow(),
+                  source=source,
+                  data=data,
+                  metadata={}
+              )
+
+          def to_json(self) -> str:
+              return json.dumps({
+                  "event_id": self.event_id,
+                  "event_type": self.event_type,
+                  "timestamp": self.timestamp.isoformat(),
+                  "source": self.source,
+                  "data": self.data,
+                  "metadata": self.metadata or {}
+              })
+
+      # Domain event examples
+      @dataclass
+      class UserRegistered(Event):
+          event_type: str = "user.registered"
+
+      @dataclass
+      class OrderPlaced(Event):
+          event_type: str = "order.placed"
+
+  simple_event_bus:
+    python: |
+      from collections import defaultdict
+      from typing import Callable, Dict, List
+      import asyncio
+
+      class EventBus:
+          """Simple in-process event bus."""
+
+          def __init__(self):
+              self._handlers: Dict[str, List[Callable]] = defaultdict(list)
+
+          def subscribe(self, event_type: str, handler: Callable):
+              """Register a handler for an event type."""
+              self._handlers[event_type].append(handler)
+
+          def unsubscribe(self, event_type: str, handler: Callable):
+              """Remove a handler."""
+              self._handlers[event_type].remove(handler)
+
+          async def publish(self, event: Event):
+              """Publish event to all registered handlers."""
+              handlers = self._handlers.get(event.event_type, [])
+
+              # Run handlers concurrently
+              await asyncio.gather(*[
+                  handler(event) for handler in handlers
+              ], return_exceptions=True)
+
+      # Usage
+      event_bus = EventBus()
+
+      # Subscribe handlers
+      async def send_welcome_email(event: Event):
+          user_email = event.data["email"]
+          await email_service.send_welcome(user_email)
+
+      async def create_default_settings(event: Event):
+          user_id = event.data["user_id"]
+          await settings_service.create_defaults(user_id)
+
+      event_bus.subscribe("user.registered", send_welcome_email)
+      event_bus.subscribe("user.registered", create_default_settings)
+
+      # Publish event
+      event = Event.create(
+          event_type="user.registered",
+          data={"user_id": "123", "email": "alice@example.com"},
+          source="user-service"
+      )
+      await event_bus.publish(event)
+
+  with_message_broker:
+    rabbitmq_python: |
+      import aio_pika
+      import json
+
+      class RabbitMQEventBus:
+          def __init__(self, url: str):
+              self.url = url
+              self.connection = None
+              self.channel = None
+
+          async def connect(self):
+              self.connection = await aio_pika.connect_robust(self.url)
+              self.channel = await self.connection.channel()
+              # Declare exchange for events
+              self.exchange = await self.channel.declare_exchange(
+                  "events",
+                  aio_pika.ExchangeType.TOPIC,
+                  durable=True
+              )
+
+          async def publish(self, event: Event):
+              message = aio_pika.Message(
+                  body=event.to_json().encode(),
+                  content_type="application/json",
+                  delivery_mode=aio_pika.DeliveryMode.PERSISTENT
+              )
+              await self.exchange.publish(
+                  message,
+                  routing_key=event.event_type
+              )
+
+          async def subscribe(self, event_pattern: str, handler: Callable):
+              """Subscribe to events matching pattern (e.g., 'user.*')."""
+              queue = await self.channel.declare_queue(exclusive=True)
+              await queue.bind(self.exchange, routing_key=event_pattern)
+
+              async def process_message(message: aio_pika.IncomingMessage):
+                  async with message.process():
+                      event_data = json.loads(message.body.decode())
+                      event = Event(**event_data)
+                      await handler(event)
+
+              await queue.consume(process_message)
+
+    kafka_python: |
+      from aiokafka import AIOKafkaProducer, AIOKafkaConsumer
+      import json
+
+      class KafkaEventBus:
+          def __init__(self, bootstrap_servers: str):
+              self.servers = bootstrap_servers
+              self.producer = None
+
+          async def connect(self):
+              self.producer = AIOKafkaProducer(
+                  bootstrap_servers=self.servers,
+                  value_serializer=lambda v: json.dumps(v).encode()
+              )
+              await self.producer.start()
+
+          async def publish(self, event: Event):
+              # Use event_type as topic
+              topic = event.event_type.replace(".", "-")
+              await self.producer.send(topic, event.to_json())
+
+          async def create_consumer(self, topics: list[str], group_id: str):
+              consumer = AIOKafkaConsumer(
+                  *topics,
+                  bootstrap_servers=self.servers,
+                  group_id=group_id,
+                  value_deserializer=lambda v: json.loads(v.decode())
+              )
+              await consumer.start()
+              return consumer
+
+      # Consumer usage
+      consumer = await event_bus.create_consumer(
+          ["user-registered", "user-updated"],
+          group_id="notification-service"
+      )
+
+      async for message in consumer:
+          event = Event(**message.value)
+          await handle_user_event(event)
+
+patterns:
+  - name: "Event Sourcing"
+    description: "Store state as sequence of events"
+    example: |
+      # Instead of storing current state:
+      # account.balance = 100
+
+      # Store events that led to current state:
+      events = [
+          {"type": "account.opened", "data": {"initial_balance": 0}},
+          {"type": "money.deposited", "data": {"amount": 150}},
+          {"type": "money.withdrawn", "data": {"amount": 50}}
+      ]
+
+      # Replay to get current state
+      def replay_events(events):
+          balance = 0
+          for event in events:
+              if event["type"] == "account.opened":
+                  balance = event["data"]["initial_balance"]
+              elif event["type"] == "money.deposited":
+                  balance += event["data"]["amount"]
+              elif event["type"] == "money.withdrawn":
+                  balance -= event["data"]["amount"]
+          return balance
+
+  - name: "Saga Pattern"
+    description: "Coordinate distributed transactions via events"
+    example: |
+      # Order saga: orchestrate across services
+      class OrderSaga:
+          async def start(self, order_id: str):
+              # Step 1: Reserve inventory
+              await event_bus.publish(Event.create(
+                  "inventory.reserve_requested",
+                  {"order_id": order_id, "items": items}
+              ))
+
+          @event_handler("inventory.reserved")
+          async def on_inventory_reserved(self, event):
+              # Step 2: Process payment
+              await event_bus.publish(Event.create(
+                  "payment.process_requested",
+                  {"order_id": event.data["order_id"]}
+              ))
+
+          @event_handler("payment.completed")
+          async def on_payment_completed(self, event):
+              # Step 3: Complete order
+              await event_bus.publish(Event.create(
+                  "order.completed",
+                  {"order_id": event.data["order_id"]}
+              ))
+
+          @event_handler("payment.failed")
+          async def on_payment_failed(self, event):
+              # Compensating action: release inventory
+              await event_bus.publish(Event.create(
+                  "inventory.release_requested",
+                  {"order_id": event.data["order_id"]}
+              ))
+
+  - name: "CQRS"
+    description: "Separate read and write models"
+    example: |
+      # Commands (writes) go through event bus
+      @app.post("/orders")
+      async def create_order(order: OrderCreate):
+          await event_bus.publish(Event.create(
+              "order.create_requested",
+              order.dict()
+          ))
+          return {"status": "processing"}
+
+      # Queries (reads) from optimized read model
+      @app.get("/orders/{order_id}")
+      async def get_order(order_id: str):
+          # Read from denormalized view
+          return await read_db.get_order_view(order_id)
+
+      # Event handler updates read model
+      @event_handler("order.created")
+      async def update_order_view(event):
+          await read_db.upsert_order_view(event.data)
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Event-driven architecture is like a newsroom:
+      - Synchronous: Reporter calls each subscriber individually to share news
+      - Event-driven: Reporter publishes to the wire, interested parties pick it up
+      The reporter doesn't need to know who reads the news or when!
+
+  intermediate:
+    focus: "Implementing reliable event handling"
+    key_points:
+      - "Choosing between message brokers (RabbitMQ, Kafka, Redis)"
+      - "Ensuring at-least-once vs exactly-once delivery"
+      - "Handling out-of-order events"
+      - "Idempotent event handlers"
+
+  advanced:
+    focus: "Event sourcing, CQRS, and saga patterns"
+    key_points:
+      - "Event store design and snapshots"
+      - "Saga orchestration vs choreography"
+      - "Schema evolution and versioning"
+      - "Event replay and projections"

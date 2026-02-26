@@ -1,0 +1,70 @@
+id: data-pipelines
+name: "Data Pipeline Architecture and Orchestration"
+category: data
+type: pattern
+tags:
+  - data
+  - pipelines
+  - etl
+  - orchestration
+  - streaming
+
+summary:
+  short: "Building reliable data pipelines for processing and moving data"
+  long: |
+    Data pipelines move and transform data between systems. Modern pipelines
+    handle both batch and streaming, with strong error handling, monitoring,
+    and recovery mechanisms.
+
+pipeline_patterns:
+  - name: "Batch Processing"
+    description: "Process data in fixed-size chunks"
+    tools: ["Apache Spark", "Hadoop", "Flink"]
+  
+  - name: "Stream Processing"
+    description: "Process data continuously as it arrives"
+    tools: ["Kafka Streams", "Flink", "Spark Structured Streaming"]
+  
+  - name: "Lambda Architecture"
+    description: "Batch and stream processing combined"
+    uses: "Real-time + accurate results"
+  
+  - name: "Kappa Architecture"
+    description: "Stream processing only"
+    uses: "Simpler, real-time focused"
+
+orchestration_tools:
+  - "Apache Airflow"
+  - "Dagster"
+  - "Prefect"
+  - "dbt"
+  - "Luigi"
+
+reliability_patterns:
+  - "Idempotent operations"
+  - "Exactly-once processing"
+  - "Dead letter queues"
+  - "Retry with backoff"
+  - "Circuit breakers"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Data pipelines are like assembly lines:
+      - Stations: Processing steps
+      - Conveyor: Data flow
+      - Quality checks: Validation
+
+  intermediate:
+    focus: "Building reliable pipelines"
+    key_points:
+      - "Error handling"
+      - "Idempotency"
+      - "Monitoring"
+
+  advanced:
+    focus: "Enterprise data platforms"
+    key_points:
+      - "Distributed processing"
+      - "Incremental updates"
+      - "Data lineage"

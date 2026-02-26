@@ -1,0 +1,28 @@
+id: serverless-integration
+name: Serverless Integration
+category: comprehensive
+type: standard
+tags:
+- serverless
+summary:
+  short: Serverless Integration and implementation guidelines
+  long: Complete guide to serverless integration
+problem:
+  description: Challenges without proper serverless integration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement serverless integration
+key_concepts:
+  concept: Serverless Integration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

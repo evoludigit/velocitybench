@@ -1,0 +1,49 @@
+id: where-clause-compilation
+name: WHERE Clause Compilation to SQL
+category: fraiseql
+type: standard
+tags:
+- execution
+- sql-generation
+- filters
+- security
+summary:
+  short: Converting GraphQL filter input to database-specific SQL WHERE clauses
+  long: WHERE clauses from GraphQL filter inputs are compiled to SQL WHERE clauses,
+    handling operators, types, and database-specific syntax.
+problem:
+  description: Manual WHERE clause construction is error-prone
+  symptoms:
+  - SQL injection vulnerabilities
+  - Incorrect filter logic
+  - Wrong operators for database
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement WHERE Clause Compilation to SQL effectively
+key_concepts:
+  concept_1: Filter input structure
+  concept_2: WHERE clause generation
+  concept_3: Operator mapping
+implementation_considerations:
+  consideration_1: Type conversion
+  consideration_2: Null handling
+  consideration_3: Complex filter composition
+best_practices:
+- name: Parameterized queries
+  description: Always use parameters, never string concat
+- name: Validate operators
+  description: Check operators are supported
+- name: Test filters
+  description: Test WHERE clause on all databases
+anti_patterns:
+- name: String concatenation
+  consequence: SQL injection vulnerability
+- name: No operator validation
+  consequence: Runtime errors
+blog_hooks:
+  beginner:
+    focus: Introduction to WHERE Clause Compilation to SQL
+  intermediate:
+    focus: Implementing WHERE Clause Compilation to SQL
+  advanced:
+    focus: Advanced WHERE Clause Compilation to SQL techniques

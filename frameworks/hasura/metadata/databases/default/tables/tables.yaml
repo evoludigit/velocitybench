@@ -1,0 +1,120 @@
+# Hasura table tracking configuration for VelocityBench benchmark schema
+# Tables: tb_user, tb_post, tb_comment (command side)
+# Views: tv_user, tv_post, tv_comment (query side - JSONB denormalized)
+
+# Command side tables (normalized)
+- table:
+    schema: benchmark
+    name: tb_user
+  object_relationships:
+    - name: posts
+      using:
+        foreign_key_constraint_on:
+          column: fk_author
+          table:
+            schema: benchmark
+            name: tb_post
+  select_permissions:
+    - role: public
+      permission:
+        columns:
+          - id
+          - identifier
+          - email
+          - username
+          - full_name
+          - bio
+          - created_at
+          - updated_at
+        filter: {}
+
+- table:
+    schema: benchmark
+    name: tb_post
+  object_relationships:
+    - name: author
+      using:
+        foreign_key_constraint_on: fk_author
+  array_relationships:
+    - name: comments
+      using:
+        foreign_key_constraint_on:
+          column: fk_post
+          table:
+            schema: benchmark
+            name: tb_comment
+  select_permissions:
+    - role: public
+      permission:
+        columns:
+          - id
+          - identifier
+          - title
+          - content
+          - published
+          - created_at
+          - updated_at
+        filter:
+          published:
+            _eq: true
+
+- table:
+    schema: benchmark
+    name: tb_comment
+  object_relationships:
+    - name: author
+      using:
+        foreign_key_constraint_on: fk_author
+    - name: post
+      using:
+        foreign_key_constraint_on: fk_post
+  select_permissions:
+    - role: public
+      permission:
+        columns:
+          - id
+          - identifier
+          - content
+          - created_at
+          - updated_at
+        filter: {}
+
+# Query side tables (denormalized JSONB)
+- table:
+    schema: benchmark
+    name: tv_user
+  select_permissions:
+    - role: public
+      permission:
+        columns:
+          - id
+          - identifier
+          - data
+          - updated_at
+        filter: {}
+
+- table:
+    schema: benchmark
+    name: tv_post
+  select_permissions:
+    - role: public
+      permission:
+        columns:
+          - id
+          - identifier
+          - data
+          - updated_at
+        filter: {}
+
+- table:
+    schema: benchmark
+    name: tv_comment
+  select_permissions:
+    - role: public
+      permission:
+        columns:
+          - id
+          - identifier
+          - data
+          - updated_at
+        filter: {}

@@ -1,0 +1,49 @@
+id: view-existence-validation
+name: View Existence Validation
+category: fraiseql
+type: standard
+tags:
+- compilation
+- validation
+- database
+- binding
+summary:
+  short: Verifying that all bound views exist in the database
+  long: The compiler checks that all views referenced in type bindings actually exist
+    in the target database, preventing broken bindings.
+problem:
+  description: Schema binds to views that don't exist
+  symptoms:
+  - Execution fails when views don't exist
+  - No way to validate bindings
+  - Hard to debug binding errors
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement View Existence Validation effectively
+key_concepts:
+  concept_1: View discovery strategies
+  concept_2: Validation algorithms
+  concept_3: Error reporting for missing views
+implementation_considerations:
+  consideration_1: Performance of view checking
+  consideration_2: Handling schema changes
+  consideration_3: View versioning
+best_practices:
+- name: Check all views
+  description: Verify every bound view exists
+- name: Clear errors
+  description: Say which views are missing
+- name: Suggestions
+  description: Suggest similar view names
+anti_patterns:
+- name: No view checking
+  consequence: Broken schemas deployed
+- name: Silent failures
+  consequence: No indication of problem
+blog_hooks:
+  beginner:
+    focus: Introduction to View Existence Validation
+  intermediate:
+    focus: Implementing View Existence Validation
+  advanced:
+    focus: Advanced View Existence Validation techniques

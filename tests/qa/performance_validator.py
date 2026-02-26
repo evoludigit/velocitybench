@@ -16,7 +16,7 @@ Outputs:
 
 import httpx
 import asyncio
-from typing import Dict, List
+from typing import Dict
 import statistics
 import time
 

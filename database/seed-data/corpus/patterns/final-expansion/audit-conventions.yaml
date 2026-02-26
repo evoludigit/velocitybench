@@ -1,0 +1,28 @@
+id: audit-conventions
+name: Audit Conventions
+category: comprehensive
+type: standard
+tags:
+- audit
+summary:
+  short: Audit Conventions and implementation guidelines
+  long: Complete guide to audit conventions
+problem:
+  description: Challenges without proper audit conventions
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement audit conventions
+key_concepts:
+  concept: Audit Conventions
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

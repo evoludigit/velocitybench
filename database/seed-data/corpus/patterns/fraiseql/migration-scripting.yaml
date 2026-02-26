@@ -1,0 +1,44 @@
+id: migration-scripting
+name: Migration Scripting
+category: fraiseql
+type: standard
+tags:
+- fraiseql
+- migration
+summary:
+  short: Automating migrations
+  long: Automating migrations
+problem:
+  description: Without migration scripting, systems face challenges
+  symptoms:
+  - Issue with automating migrations
+  impact: Reduced FraiseQL effectiveness
+solution:
+  description: Implement Migration Scripting effectively
+key_concepts:
+  concept_1: Migration Scripting fundamentals
+  concept_2: Implementation patterns
+  concept_3: Best practices
+implementation_considerations:
+  consideration_1: Requirements gathering
+  consideration_2: Design decisions
+  consideration_3: Implementation approach
+best_practices:
+- name: Plan carefully
+  description: Think through Migration Scripting design
+- name: Test thoroughly
+  description: Validate Migration Scripting works
+- name: Monitor
+  description: Track Migration Scripting performance
+anti_patterns:
+- name: Ignoring pattern
+  consequence: Migration Scripting fails
+- name: Incomplete implementation
+  consequence: Partial benefits only
+blog_hooks:
+  beginner:
+    focus: Introduction to Migration Scripting
+  intermediate:
+    focus: Implementing Migration Scripting
+  advanced:
+    focus: Advanced Migration Scripting techniques

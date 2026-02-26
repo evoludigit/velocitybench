@@ -1,0 +1,80 @@
+"""
+VelocityBench GraphQL Schema for Ariadne
+Schema-first GraphQL definition matching other framework implementations.
+"""
+
+type Query {
+    """Health check endpoint"""
+    ping: String!
+
+    """Fetch a single user by ID"""
+    user(id: ID!): User
+
+    """Fetch multiple users"""
+    users(limit: Int = 10): [User!]!
+
+    """Fetch a single post by ID"""
+    post(id: ID!): Post
+
+    """Fetch multiple posts"""
+    posts(limit: Int = 10): [Post!]!
+
+    """Fetch a single comment by ID"""
+    comment(id: ID!): Comment
+}
+
+type Mutation {
+    """Update a user's profile"""
+    updateUser(id: ID!, bio: String, fullName: String): User
+}
+
+type User {
+    """Unique user identifier"""
+    id: ID!
+
+    """User's login username"""
+    username: String!
+
+    """User's full name"""
+    fullName: String
+
+    """User's biography"""
+    bio: String
+
+    """Number of followers (placeholder)"""
+    followerCount: Int!
+
+    """Posts authored by this user"""
+    posts(limit: Int = 50): [Post!]!
+}
+
+type Post {
+    """Unique post identifier"""
+    id: ID!
+
+    """Post title"""
+    title: String!
+
+    """Post content (markdown format)"""
+    content: String
+
+    """Author who wrote this post"""
+    author: User
+
+    """Comments on this post (limited to 50)"""
+    comments(limit: Int = 50): [Comment!]!
+}
+
+type Comment {
+    """Unique comment identifier"""
+    id: ID!
+
+    """Comment text content"""
+    content: String!
+
+    """Author who wrote this comment"""
+    author: User
+
+    """Post this comment belongs to"""
+    post: Post
+}

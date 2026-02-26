@@ -1,0 +1,28 @@
+id: ops-uptime-monitoring
+name: Uptime Monitoring Patterns
+category: specialized
+type: standard
+tags:
+- ops
+summary:
+  short: Patterns and practices for uptime monitoring patterns
+  long: Comprehensive guide to uptime monitoring patterns
+problem:
+  description: Challenges with uptime monitoring patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement uptime monitoring patterns
+key_concepts:
+  concept: Understanding Uptime Monitoring Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Uptime Monitoring Patterns
+  intermediate:
+    focus: Implementing Uptime Monitoring Patterns
+  advanced:
+    focus: Advanced Uptime Monitoring Patterns

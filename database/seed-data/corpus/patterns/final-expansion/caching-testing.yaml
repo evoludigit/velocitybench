@@ -1,0 +1,28 @@
+id: caching-testing
+name: Caching Testing
+category: comprehensive
+type: standard
+tags:
+- caching
+summary:
+  short: Caching Testing and implementation guidelines
+  long: Complete guide to caching testing
+problem:
+  description: Challenges without proper caching testing
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement caching testing
+key_concepts:
+  concept: Caching Testing
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

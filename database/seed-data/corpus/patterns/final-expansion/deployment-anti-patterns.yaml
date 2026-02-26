@@ -1,0 +1,28 @@
+id: deployment-anti-patterns
+name: Deployment Anti Patterns
+category: comprehensive
+type: standard
+tags:
+- deployment
+summary:
+  short: Deployment Anti Patterns and implementation guidelines
+  long: Complete guide to deployment anti patterns
+problem:
+  description: Challenges without proper deployment anti patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement deployment anti patterns
+key_concepts:
+  concept: Deployment Anti Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Ruby
+.bundle/
+vendor/bundle/
+coverage/
+.rspec_status
+
+# Logs
+log/
+*.log
+
+# Temp
+tmp/
+.cache/
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Docs
+README.md
+*.md
+
+# Environment (use Docker env vars)
+.env*
+!.env.example

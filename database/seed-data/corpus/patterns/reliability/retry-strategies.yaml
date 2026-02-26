@@ -1,0 +1,283 @@
+# Retry Strategies
+# VelocityBench Knowledge Corpus
+
+id: retry-strategies
+name: "Retry Strategies and Backoff Patterns"
+category: reliability
+type: pattern
+severity: medium
+tags:
+  - reliability
+  - resilience
+  - error-handling
+  - distributed-systems
+  - api
+
+summary:
+  short: "Automatically retry failed operations with intelligent backoff"
+  long: |
+    Transient failures are common in distributed systems - network blips, temporary
+    overloads, brief service restarts. Retry strategies automatically recover from
+    these without user intervention. The key is knowing what to retry, how many times,
+    and how long to wait between attempts. Exponential backoff with jitter prevents
+    thundering herd problems when many clients retry simultaneously.
+
+problem:
+  description: |
+    Not all failures are permanent. Many are transient:
+    - Network timeout during brief congestion
+    - Database connection dropped during failover
+    - Rate limit exceeded momentarily
+    - Service restarting during deployment
+    Without retries, users see errors for temporary issues.
+
+  symptoms:
+    - name: "Intermittent failures"
+      description: "Same request fails, then succeeds on manual retry"
+      detection: "Error rate spikes that self-resolve"
+
+    - name: "Deployment-related errors"
+      description: "Errors during service deployments"
+      detection: "Error spikes correlate with deploy times"
+
+    - name: "Load-related failures"
+      description: "Failures increase with traffic, not permanently"
+      detection: "Errors during peak, recovery during off-peak"
+
+solution:
+  principle: "Retry transient failures with increasing delays"
+
+  components:
+    - name: "Retry Policy"
+      type: "configuration"
+      purpose: "Define what to retry and how many times"
+
+    - name: "Backoff Strategy"
+      type: "algorithm"
+      purpose: "Calculate delay between retries"
+
+    - name: "Jitter"
+      type: "technique"
+      purpose: "Randomize delays to prevent thundering herd"
+
+backoff_strategies:
+  - name: "Fixed Delay"
+    description: "Same delay between each retry"
+    formula: "delay = fixed_delay"
+    example: "1s, 1s, 1s, 1s"
+    pros: ["Simple", "Predictable"]
+    cons: ["Thundering herd risk", "May overwhelm recovering service"]
+
+  - name: "Linear Backoff"
+    description: "Delay increases linearly"
+    formula: "delay = initial_delay * attempt"
+    example: "1s, 2s, 3s, 4s"
+    pros: ["Gradual increase"]
+    cons: ["Still predictable, thundering herd possible"]
+
+  - name: "Exponential Backoff"
+    description: "Delay doubles each attempt"
+    formula: "delay = initial_delay * (2 ^ attempt)"
+    example: "1s, 2s, 4s, 8s, 16s"
+    pros: ["Backs off quickly", "Gives service time to recover"]
+    cons: ["Can get very long", "Still synchronized without jitter"]
+
+  - name: "Exponential with Jitter"
+    description: "Exponential backoff with random variation"
+    formula: "delay = random(0, initial_delay * (2 ^ attempt))"
+    example: "0.7s, 1.3s, 3.8s, 7.2s"
+    pros: ["Prevents thundering herd", "Best practice"]
+    cons: ["Less predictable for debugging"]
+
+  - name: "Decorrelated Jitter"
+    description: "Each delay based on previous, not attempt number"
+    formula: "delay = random(base, previous_delay * 3)"
+    pros: ["Better distribution than full jitter"]
+    cons: ["More complex to implement"]
+
+implementation:
+  exponential_with_jitter:
+    python: |
+      import asyncio
+      import random
+      from typing import TypeVar, Callable
+
+      T = TypeVar('T')
+
+      async def retry_with_backoff(
+          func: Callable[[], T],
+          max_retries: int = 3,
+          base_delay: float = 1.0,
+          max_delay: float = 60.0,
+          retryable_exceptions: tuple = (Exception,)
+      ) -> T:
+          """Retry with exponential backoff and full jitter."""
+          last_exception = None
+
+          for attempt in range(max_retries + 1):
+              try:
+                  return await func()
+              except retryable_exceptions as e:
+                  last_exception = e
+
+                  if attempt == max_retries:
+                      break
+
+                  # Exponential backoff with full jitter
+                  max_sleep = min(base_delay * (2 ** attempt), max_delay)
+                  sleep_time = random.uniform(0, max_sleep)
+
+                  print(f"Attempt {attempt + 1} failed, retrying in {sleep_time:.2f}s")
+                  await asyncio.sleep(sleep_time)
+
+          raise last_exception
+
+    javascript: |
+      async function retryWithBackoff(fn, options = {}) {
+        const {
+          maxRetries = 3,
+          baseDelay = 1000,
+          maxDelay = 60000,
+          shouldRetry = () => true
+        } = options;
+
+        let lastError;
+
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+          try {
+            return await fn();
+          } catch (error) {
+            lastError = error;
+
+            if (attempt === maxRetries || !shouldRetry(error)) {
+              throw error;
+            }
+
+            // Exponential backoff with full jitter
+            const maxSleep = Math.min(baseDelay * Math.pow(2, attempt), maxDelay);
+            const sleepTime = Math.random() * maxSleep;
+
+            console.log(`Attempt ${attempt + 1} failed, retrying in ${sleepTime.toFixed(0)}ms`);
+            await new Promise(resolve => setTimeout(resolve, sleepTime));
+          }
+        }
+
+        throw lastError;
+      }
+
+      // Usage
+      const result = await retryWithBackoff(
+        () => fetch('https://api.example.com/data'),
+        {
+          maxRetries: 5,
+          shouldRetry: (error) => error.status >= 500 || error.code === 'ECONNRESET'
+        }
+      );
+
+  with_tenacity:
+    python: |
+      from tenacity import retry, stop_after_attempt, wait_exponential_jitter
+
+      @retry(
+          stop=stop_after_attempt(5),
+          wait=wait_exponential_jitter(initial=1, max=60),
+          retry=retry_if_exception_type((ConnectionError, TimeoutError))
+      )
+      async def fetch_data():
+          async with aiohttp.ClientSession() as session:
+              async with session.get('https://api.example.com/data') as response:
+                  return await response.json()
+
+retryable_errors:
+  should_retry:
+    - "Network timeouts"
+    - "Connection reset"
+    - "HTTP 429 (Too Many Requests)"
+    - "HTTP 503 (Service Unavailable)"
+    - "HTTP 504 (Gateway Timeout)"
+    - "Database connection errors"
+    - "Lock wait timeouts"
+
+  should_not_retry:
+    - "HTTP 400 (Bad Request)"
+    - "HTTP 401 (Unauthorized)"
+    - "HTTP 403 (Forbidden)"
+    - "HTTP 404 (Not Found)"
+    - "Validation errors"
+    - "Business logic errors"
+    - "Constraint violations"
+
+advanced_patterns:
+  - name: "Retry Budget"
+    description: "Limit total retries across all clients"
+    example: |
+      class RetryBudget:
+          def __init__(self, budget_per_second: float = 0.1):
+              self.budget = budget_per_second
+              self.last_update = time.time()
+              self.tokens = budget_per_second
+
+          def can_retry(self) -> bool:
+              now = time.time()
+              self.tokens = min(
+                  self.budget,
+                  self.tokens + (now - self.last_update) * self.budget
+              )
+              self.last_update = now
+
+              if self.tokens >= 1:
+                  self.tokens -= 1
+                  return True
+              return False
+
+  - name: "Respect Retry-After Header"
+    description: "Use server-provided retry delay"
+    example: |
+      async def fetch_with_retry_after(url: str):
+          response = await fetch(url)
+
+          if response.status == 429:
+              retry_after = response.headers.get('Retry-After', 60)
+              await asyncio.sleep(int(retry_after))
+              return await fetch_with_retry_after(url)
+
+          return response
+
+  - name: "Idempotency Keys"
+    description: "Enable safe retries for non-idempotent operations"
+    example: |
+      async def create_payment(amount: float, idempotency_key: str):
+          return await client.post('/payments', {
+              'amount': amount,
+              'idempotency_key': idempotency_key  # Server deduplicates
+          })
+
+      # Safe to retry - server won't double-charge
+      result = await retry_with_backoff(
+          lambda: create_payment(100.0, 'order-123-payment')
+      )
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Retry strategies are like calling a busy restaurant:
+      - No retry: Call once, give up if busy
+      - Fixed delay: Call every 5 minutes (annoying if they're slammed)
+      - Exponential backoff: Wait 5 min, then 10, then 20 (gives them time)
+      - With jitter: Add randomness so not everyone calls at 5:00, 5:05, 5:10
+
+  intermediate:
+    focus: "Choosing retry policies for different failure types"
+    key_points:
+      - "Identifying retryable vs non-retryable errors"
+      - "Setting appropriate max retries and delays"
+      - "Combining with circuit breakers"
+      - "Logging and metrics for retry attempts"
+
+  advanced:
+    focus: "Distributed retry coordination and advanced patterns"
+    key_points:
+      - "Retry budgets to prevent retry storms"
+      - "Idempotency for safe retries"
+      - "Hedged requests (parallel speculative retries)"
+      - "Adaptive retry policies based on system health"

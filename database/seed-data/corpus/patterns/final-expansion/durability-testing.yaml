@@ -1,0 +1,28 @@
+id: durability-testing
+name: Durability Testing
+category: comprehensive
+type: standard
+tags:
+- durability
+summary:
+  short: Durability Testing and implementation guidelines
+  long: Complete guide to durability testing
+problem:
+  description: Challenges without proper durability testing
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement durability testing
+key_concepts:
+  concept: Durability Testing
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

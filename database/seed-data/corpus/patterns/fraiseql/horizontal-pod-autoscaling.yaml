@@ -1,0 +1,58 @@
+id: horizontal-pod-autoscaling
+name: Horizontal Pod Autoscaling (HPA)
+category: fraiseql
+type: standard
+tags:
+- deployment
+- kubernetes
+- autoscaling
+- performance
+- elasticity
+summary:
+  short: HPA with CPU, memory, and custom metrics (query latency, cache hit rate)
+  long: FraiseQL supports Horizontal Pod Autoscaling based on CPU utilization, memory
+    pressure, and custom metrics like query latency percentiles and cache hit rates,
+    with configurable scale-up/down policies for smooth elasticity.
+problem:
+  description: Fixed replica count causes over/under-provisioning
+  symptoms:
+  - High load causes slow queries
+  - Low load wastes resources
+  - Manual scaling is reactive and slow
+  - No metric-based scaling
+  impact: Poor resource utilization and performance issues
+solution:
+  description: Implement Horizontal Pod Autoscaling effectively
+key_concepts:
+  concept_1: CPU-based scaling (target 70%)
+  concept_2: Memory-based scaling (target 80%)
+  concept_3: Custom metrics (query p95 latency)
+  concept_4: Scale-up/down velocity limits
+implementation_considerations:
+  consideration_1: Metric collection frequency
+  consideration_2: Stabilization windows
+  consideration_3: Min/max replica limits (3-20)
+  consideration_4: Custom metric aggregation
+best_practices:
+- name: Multiple metrics
+  description: Scale on CPU AND custom metrics
+- name: Conservative targets
+  description: 70% CPU, 80% memory thresholds
+- name: Slow scale-down
+  description: Prevent flapping with longer cooldown
+- name: Monitor scaling
+  description: Track HPA decisions in metrics
+anti_patterns:
+- name: Aggressive targets
+  consequence: Constant scaling churn
+- name: No limits
+  consequence: Runaway scaling costs
+- name: Single metric
+  consequence: Missing important signals
+blog_hooks:
+  beginner:
+    focus: Introduction to Horizontal Pod Autoscaling
+  intermediate:
+    focus: Implementing HPA with custom metrics
+  advanced:
+    focus: Advanced scaling policies and multi-metric strategies

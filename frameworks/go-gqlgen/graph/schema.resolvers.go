@@ -72,9 +72,10 @@ func (r *queryResolver) Posts(ctx context.Context, limit *int32) ([]*model.Post,
 	}
 
 	rows, err := db.Pool.Query(ctx, `
-		SELECT id, fk_author, title, content, created_at
-		FROM benchmark.tb_post
-		ORDER BY created_at DESC
+		SELECT p.id, u.id AS author_uuid, u.username, u.full_name, p.title, p.content, p.created_at::text
+		FROM benchmark.tb_post p
+		JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+		ORDER BY p.created_at DESC
 		LIMIT $1
 	`, l)
 	if err != nil {
@@ -85,19 +86,57 @@ func (r *queryResolver) Posts(ctx context.Context, limit *int32) ([]*model.Post,
 	var posts []*model.Post
 	for rows.Next() {
 		var p model.Post
-		var authorID string
+		var authorUUID, authorUsername string
+		var authorFullName *string
 		var content *string
 		var createdAt string
-		if err := rows.Scan(&p.ID, &authorID, &p.Title, &content, &createdAt); err != nil {
+		if err := rows.Scan(&p.ID, &authorUUID, &authorUsername, &authorFullName, &p.Title, &content, &createdAt); err != nil {
 			continue
 		}
 		p.Content = content
 		p.CreatedAt = createdAt
-		// Load author via dataloader later
+		p.Author = &model.User{ID: authorUUID, Username: authorUsername, FullName: authorFullName}
 		posts = append(posts, &p)
 	}
 
 	return posts, nil
+}
+
+// Comments is the resolver for the comments field.
+func (r *queryResolver) Comments(ctx context.Context, limit *int32) ([]*model.Comment, error) {
+	l := 20
+	if limit != nil {
+		l = int(*limit)
+	}
+
+	rows, err := db.Pool.Query(ctx, `
+		SELECT c.id, u.id AS author_uuid, u.username, p.id AS post_uuid, p.title, c.content
+		FROM benchmark.tb_comment c
+		JOIN benchmark.tb_user u ON c.fk_author = u.pk_user
+		JOIN benchmark.tb_post p ON c.fk_post = p.pk_post
+		ORDER BY c.created_at DESC
+		LIMIT $1
+	`, l)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var comments []*model.Comment
+	for rows.Next() {
+		var c model.Comment
+		var authorUUID, authorUsername, postUUID, postTitle string
+		var content string
+		if err := rows.Scan(&c.ID, &authorUUID, &authorUsername, &postUUID, &postTitle, &content); err != nil {
+			continue
+		}
+		c.Content = content
+		c.Author = &model.User{ID: authorUUID, Username: authorUsername}
+		c.Post = &model.Post{ID: postUUID, Title: postTitle}
+		comments = append(comments, &c)
+	}
+
+	return comments, nil
 }
 
 // UpdateUserRequest represents the validated input for updating a user
@@ -200,11 +239,15 @@ func (r *commentResolver) Post(ctx context.Context, obj *model.Comment) (*model.
 
 // Author is the resolver for the author field (Post type).
 func (r *postResolver) Author(ctx context.Context, obj *model.Post) (*model.User, error) {
-	if obj.Author != nil && obj.Author.ID != "" {
-		loaders := GetLoaders(ctx)
-		return loaders.UserLoader.Load(ctx, obj.Author.ID)()
+	if obj.Author == nil || obj.Author.ID == "" {
+		return nil, nil
 	}
-	return nil, nil
+	// If the author was eagerly loaded (username populated by Posts query), return it directly.
+	if obj.Author.Username != "" {
+		return obj.Author, nil
+	}
+	loaders := GetLoaders(ctx)
+	return loaders.UserLoader.Load(ctx, obj.Author.ID)()
 }
 
 // Comments is the resolver for the comments field (Post type).

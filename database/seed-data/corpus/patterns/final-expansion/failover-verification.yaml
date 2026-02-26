@@ -1,0 +1,28 @@
+id: failover-verification
+name: Failover Verification
+category: comprehensive
+type: standard
+tags:
+- failover
+summary:
+  short: Failover Verification and implementation guidelines
+  long: Complete guide to failover verification
+problem:
+  description: Challenges without proper failover verification
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement failover verification
+key_concepts:
+  concept: Failover Verification
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

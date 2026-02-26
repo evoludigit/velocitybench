@@ -1,0 +1,113 @@
+id: denormalization-materialized-views
+name: "Denormalization & Materialized Views"
+category: data
+type: pattern
+tags:
+  - database
+  - denormalization
+  - materialized-views
+  - performance
+  - data-consistency
+
+summary:
+  short: "Strategic denormalization and materialized views for query performance"
+  long: |
+    While normalization ensures data integrity, denormalization trades storage for query speed. Materialized views pre-compute complex joins and aggregations, allowing instant query results. This pattern covers when and how to denormalize, refresh strategies, and consistency management.
+
+problem:
+  description: "Normalized schemas require expensive joins and aggregations, causing slow queries on large datasets"
+  symptoms:
+    - name: "Slow aggregations"
+      description: "SUM/COUNT/GROUP BY queries timeout on large tables"
+    - name: "Join bottlenecks"
+      description: "Queries spanning 5+ table joins perform poorly"
+    - name: "Complex report generation"
+      description: "Analytics queries are resource-intensive"
+    - name: "Real-time dashboard latency"
+      description: "Live dashboards can't refresh fast enough"
+
+solution:
+  approach: "Strategically denormalize frequently-accessed data and cache computation results in materialized views"
+  key_points:
+    - "Identify hot queries and analyze their join patterns"
+    - "Create materialized views for complex aggregations"
+    - "Implement refresh strategies (scheduled, event-driven, or incremental)"
+    - "Manage consistency between source and denormalized data"
+    - "Monitor storage costs and refresh overhead"
+
+denormalization_strategies:
+  - name: "Computed Columns"
+    description: "Store calculated values (e.g., total_order_amount) in the base table"
+    trade_off: "Faster reads, slower writes, additional storage"
+    example: "Store user's order count directly instead of counting on every query"
+
+  - name: "Duplicate Data"
+    description: "Store frequently-accessed data from other tables (e.g., customer_name in orders)"
+    trade_off: "Query speed, consistency risk if duplicated data changes"
+    example: "Store customer_email with order records for quick access"
+
+  - name: "Summary Tables"
+    description: "Pre-aggregated data by time period or dimension"
+    trade_off: "Quick analytics queries, stale data if not refreshed regularly"
+    example: "Daily_sales_by_region table with pre-computed totals"
+
+materialized_views:
+  - name: "Scheduled Refresh"
+    description: "Refresh MV on a fixed schedule (e.g., every hour)"
+    use_case: "Analytics, reports that tolerate slight staleness"
+    trade_off: "Simple, but data is stale between refreshes"
+
+  - name: "Event-Driven Refresh"
+    description: "Refresh when underlying data changes"
+    use_case: "Real-time dashboards, critical reports"
+    trade_off: "Complex to implement, but always fresh"
+
+  - name: "Incremental Refresh"
+    description: "Only update changed rows since last refresh"
+    use_case: "Large datasets with frequent refreshes"
+    trade_off: "More efficient, but harder to implement correctly"
+
+consistency_patterns:
+  - name: "Eventual Consistency"
+    description: "Accept that MV is stale; refresh periodically"
+    best_for: "Analytics, reporting, non-critical features"
+    examples: ["Daily dashboards", "Historical reports", "Aggregated metrics"]
+
+  - name: "Strong Consistency"
+    description: "Refresh immediately on source data change"
+    best_for: "Real-time features, financial systems"
+    examples: ["Account balances", "Inventory counts", "Live dashboards"]
+
+  - name: "Time-Based Consistency"
+    description: "Guarantee staleness is bounded (e.g., < 5 minutes)"
+    best_for: "Balanced approach for most systems"
+    examples: ["User feeds", "Search indexes", "Recommendation systems"]
+
+refresh_tools:
+  - "PostgreSQL: REFRESH MATERIALIZED VIEW, incremental views via pg_repack"
+  - "MySQL: Manual views with scheduled procedures, tools like Percona Toolkit"
+  - "Data warehouses: dbt, Apache Airflow, Presto"
+  - "Search: Elasticsearch, Solr with scheduled indexing"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Denormalization is like keeping a recipe card in your kitchen:
+      - Normalization: Keep all ingredients listed once in a central pantry
+      - Denormalization: Copy frequently-used ingredients to your workspace
+
+      Faster access, but you need to update copies if ingredients change.
+
+  intermediate:
+    focus: "Designing denormalization strategies"
+    key_points:
+      - "Identifying candidates for denormalization via query analysis"
+      - "Materialized view refresh strategies"
+      - "Consistency guarantees and staleness bounds"
+
+  advanced:
+    focus: "Scale-critical denormalization"
+    key_points:
+      - "Incremental refresh algorithms"
+      - "Change Data Capture for event-driven updates"
+      - "Multi-level caching hierarchies"

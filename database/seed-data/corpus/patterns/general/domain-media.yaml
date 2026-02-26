@@ -1,0 +1,31 @@
+id: domain-media
+name: Media Domain Patterns
+category: general
+type: standard
+tags:
+- domain
+summary:
+  short: Best practices for media domain patterns
+  long: Comprehensive guide to media domain patterns. This pattern covers implementation
+    details, best practices, and common pitfalls.
+problem:
+  description: Issues without proper media domain patterns
+  symptoms:
+  - Performance issues
+  - Reliability problems
+  - Scalability challenges
+  impact: System degradation
+solution:
+  description: Implement media domain patterns effectively
+key_concepts:
+  concept: Understanding media domain patterns
+best_practices:
+- name: Best practice 1
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Introduction to Media Domain Patterns
+  intermediate:
+    focus: Implementing Media Domain Patterns
+  advanced:
+    focus: Advanced Media Domain Patterns

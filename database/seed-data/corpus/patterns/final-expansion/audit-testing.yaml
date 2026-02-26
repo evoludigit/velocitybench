@@ -1,0 +1,28 @@
+id: audit-testing
+name: Audit Testing
+category: comprehensive
+type: standard
+tags:
+- audit
+summary:
+  short: Audit Testing and implementation guidelines
+  long: Complete guide to audit testing
+problem:
+  description: Challenges without proper audit testing
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement audit testing
+key_concepts:
+  concept: Audit Testing
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

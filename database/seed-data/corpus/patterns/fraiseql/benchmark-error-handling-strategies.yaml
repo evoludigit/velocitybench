@@ -1,0 +1,545 @@
+id: benchmark-error-handling-strategies
+name: "Architectural Benchmark: Error Handling Strategies (Exceptions vs Status vs Union Types)"
+category: fraiseql
+type: benchmark
+tags:
+  - benchmark
+  - error-handling
+  - api-design
+  - graphql
+  - client-experience
+
+summary:
+  short: "Compare error handling: Exceptions, HTTP status codes, custom types, union types, 3-state pattern"
+  long: |
+    Error handling architecture affects API surface, client complexity, debugging, and consistency.
+    Five approaches exist: exceptions (simplest), HTTP status codes (REST-inspired), custom error
+    types (verbose), union types (GraphQL standard), three-state responses (FraiseQL).
+    Each trades client complexity for server simplicity. FraiseQL chose three-state responses
+    (success/error/noop). This benchmark compares all approaches and evaluates FraiseQL's choice.
+
+problem:
+  description: |
+    GraphQL error handling is ambiguous:
+    - How to distinguish "not found" from "permission denied"?
+    - Is NULL in response an error or valid state?
+    - How should clients handle different failure modes?
+    - Can server distinguish temporary vs permanent failures?
+
+    GraphQL spec doesn't prescribe error format, leading to inconsistency.
+
+comparison:
+  approach_1:
+    name: "Exceptions (GraphQL Errors)"
+    philosophy: "Throw exceptions, let GraphQL handle errors"
+    implementation: |
+      @fraiseql.query
+      async def get_user(user_id: str) -> User:
+          user = db.query_one("SELECT * FROM tb_user WHERE id = %s", user_id)
+          if not user:
+              raise UserNotFoundError(f"User {user_id} not found")
+          if not user.is_active:
+              raise PermissionError(f"User {user_id} is inactive")
+          return user
+
+      # GraphQL response on error
+      {
+        "data": null,
+        "errors": [
+          {
+            "message": "User abc123 not found",
+            "extensions": {
+              "code": "USER_NOT_FOUND"
+            }
+          }
+        ]
+      }
+
+    client_code: |
+      // Client receives entire query as null
+      query GetUser($id: ID!) {
+        user(id: $id) {
+          id
+          name
+        }
+      }
+
+      // Response: data is null, errors is non-empty
+      // Client must check: if errors then show error
+
+    pros:
+      - "Simple to throw (familiar from other languages)"
+      - "Automatic GraphQL handling (no response wrapper)"
+      - "Works for all field types"
+      - "Familiar error handling (try/catch)"
+
+    cons:
+      - "Entire query fails (data is null)"
+      - "Can't distinguish error from NULL data"
+      - "Client must check errors array"
+      - "No partial success (all-or-nothing)"
+      - "Extension info not always parsed"
+      - "Inconsistent error codes between services"
+
+    client_complexity: "High (must handle null data + errors)"
+    partial_success: "No (all or nothing)"
+    consistency: "Poor (error codes vary)"
+    best_for: "Simple queries with single field"
+
+  approach_2:
+    name: "HTTP Status Codes"
+    philosophy: "Use REST-style status codes in GraphQL"
+    implementation: |
+      # GraphQL still sends 200 OK, but include status in response
+      {
+        "data": null,
+        "status": 404,
+        "message": "User not found"
+      }
+
+      # Or inline in errors extension
+      {
+        "data": null,
+        "errors": [
+          {
+            "message": "User not found",
+            "extensions": {
+              "http_status": 404,
+              "code": "NOT_FOUND"
+            }
+          }
+        ]
+      }
+
+    client_code: |
+      // Client checks HTTP-like status
+      if (response.status === 404) {
+        // User not found
+      } else if (response.status === 403) {
+        // Permission denied
+      }
+
+    pros:
+      - "Familiar (HTTP status codes)"
+      - "Distinguishes error types (404, 403, 500)"
+      - "Works with middleware (can inspect status)"
+
+    cons:
+      - "Not standard GraphQL practice"
+      - "Still entire query fails"
+      - "Mixing REST and GraphQL concepts"
+      - "Inconsistent between implementations"
+      - "No type safety (just numbers)"
+
+    client_complexity: "Medium"
+    partial_success: "No"
+    consistency: "Medium (more standardized than exceptions)"
+    best_for: "Teams familiar with REST"
+
+  approach_3:
+    name: "Custom Error Types"
+    philosophy: "Define explicit error types for different scenarios"
+    implementation: |
+      # Define error types
+      @fraiseql.type
+      class UserNotFoundError:
+          message: str
+          user_id: str
+          timestamp: str
+
+      @fraiseql.type
+      class PermissionError:
+          message: str
+          required_role: str
+          user_role: str
+
+      # Union of all possible results
+      UserResult = User | UserNotFoundError | PermissionError
+
+      @fraiseql.query
+      async def get_user(user_id: str) -> UserResult:
+          user = db.query_one("SELECT * FROM tb_user WHERE id = %s", user_id)
+          if not user:
+              return UserNotFoundError(
+                  message=f"User {user_id} not found",
+                  user_id=user_id,
+                  timestamp=now()
+              )
+          if not user.is_active:
+              return PermissionError(
+                  message="User is inactive",
+                  required_role="active",
+                  user_role="inactive"
+              )
+          return user
+
+    client_code: |
+      query GetUser($id: ID!) {
+        user(id: $id) {
+          ... on User {
+            id
+            name
+          }
+          ... on UserNotFoundError {
+            message
+            user_id
+          }
+          ... on PermissionError {
+            message
+            required_role
+          }
+        }
+      }
+
+    pros:
+      - "Type-safe (compiler checks fragments)"
+      - "Explicit error types (not magic strings)"
+      - "Error fields documented (schema)"
+      - "Client must handle all cases"
+
+    cons:
+      - "Verbose (define 3+ error types)"
+      - "Union types in GraphQL (confusing)"
+      - "Query gets complex (many fragments)"
+      - "Error types duplicate across fields"
+      - "Schema pollution (many error types)"
+
+    client_complexity: "Very high (must handle unions)"
+    partial_success: "Yes (can return error or data)"
+    consistency: "Good (types prevent mistakes)"
+    best_for: "Small APIs with few error types"
+
+  approach_4:
+    name: "Typed Result Union (Result<T, E>)"
+    philosophy: "Return Result type (Rust pattern)"
+    implementation: |
+      @fraiseql.type
+      class Result[T, E]:
+          success: bool
+          data: T | None
+          error: E | None
+
+      @fraiseql.query
+      async def get_user(user_id: str) -> Result[User, UserError]:
+          user = db.query_one("SELECT * FROM tb_user WHERE id = %s", user_id)
+          if not user:
+              return Result(
+                  success=False,
+                  data=None,
+                  error=UserError(
+                      code="NOT_FOUND",
+                      message=f"User {user_id} not found"
+                  )
+              )
+          return Result(success=True, data=user, error=None)
+
+    client_code: |
+      query GetUser($id: ID!) {
+        user(id: $id) {
+          success
+          data {
+            id
+            name
+          }
+          error {
+            code
+            message
+          }
+        }
+      }
+
+    pros:
+      - "Explicit success/error split"
+      - "Type-safe (generics)"
+      - "Works well with GraphQL"
+      - "Consistent pattern"
+
+    cons:
+      - "Verbose (every query wraps result)"
+      - "Boilerplate (success/error every time)"
+      - "Non-standard GraphQL pattern"
+      - "Extra nesting (not idiomatic)"
+
+    client_complexity: "Medium"
+    partial_success: "Yes"
+    consistency: "Good"
+    best_for: "Teams that want explicit success/error"
+
+  approach_5:
+    name: "Three-State Response (FraiseQL)"
+    philosophy: "success, error, or noop states with auto-injected status"
+    implementation: |
+      @fraiseql.type
+      class User:
+          id: str
+          email: str
+
+      @fraiseql.success(status=200)
+      class GetUserSuccess:
+          user: User
+
+      @fraiseql.error(status=404)
+      class GetUserNotFound:
+          message: str
+          user_id: str
+
+      @fraiseql.error(status=403)
+      class GetUserForbidden:
+          message: str
+
+      @fraiseql.query
+      async def get_user(user_id: str) -> GetUserSuccess | GetUserNotFound | GetUserForbidden:
+          user = db.query_one("SELECT * FROM tb_user WHERE id = %s", user_id)
+          if not user:
+              return GetUserNotFound(
+                  message=f"User {user_id} not found",
+                  user_id=user_id,
+                  # Status 404 auto-injected
+              )
+          if not user.is_active:
+              return GetUserForbidden(
+                  message="User is inactive"
+                  # Status 403 auto-injected
+              )
+          return GetUserSuccess(user=user)  # Status 200 auto-injected
+
+    client_code: |
+      query GetUser($id: ID!) {
+        getUser(id: $id) {
+          __typename
+          status
+          ... on GetUserSuccess {
+            user { id, name }
+          }
+          ... on GetUserNotFound {
+            message
+            user_id
+          }
+          ... on GetUserForbidden {
+            message
+          }
+        }
+      }
+
+    response_example: |
+      # Success (status 200)
+      {
+        "data": {
+          "getUser": {
+            "__typename": "GetUserSuccess",
+            "status": 200,
+            "user": { "id": "abc123", "name": "Alice" }
+          }
+        }
+      }
+
+      # Error (status 404)
+      {
+        "data": {
+          "getUser": {
+            "__typename": "GetUserNotFound",
+            "status": 404,
+            "message": "User not found",
+            "user_id": "xyz789"
+          }
+        }
+      }
+
+    pros:
+      - "Explicit states (success, error, noop)"
+      - "Status auto-injected (no boilerplate)"
+      - "Type-safe union types"
+      - "Consistent response structure"
+      - "HTTP status codes included"
+      - "Works with partial queries"
+      - "Same pattern for all mutations"
+
+    cons:
+      - "Union types (must learn pattern)"
+      - "Extra wrapper types (per operation)"
+      - "Not GraphQL spec standard"
+      - "Requires FraiseQL decorators"
+
+    client_complexity: "Medium (but uniform)"
+    partial_success: "Yes"
+    consistency: "Excellent (auto-injected status)"
+    best_for: "Production APIs, consistent error handling"
+
+  fraiseql_choice:
+    name: "Three-State Response Pattern"
+    rationale: |
+      FraiseQL chose three-state responses (@success, @error, @noop) because:
+      1. **Explicit states**: success, error, noop are clear intent
+      2. **Auto-injected status**: No boilerplate, status always present
+      3. **Type-safe**: Compiler ensures all states handled
+      4. **Consistent**: Same pattern for all operations
+      5. **Partial success**: Can distinguish error in one field from query failure
+
+    implementation_philosophy: |
+      FraiseQL three-state pattern:
+      1. @success(status=200): Successful response
+      2. @error(status=4xx): Client or server error (status auto-injected)
+      3. @noop(status=304): No-op (not modified, idempotent)
+
+      Example:
+      ```python
+      @fraiseql.success(status=201)
+      class CreateUserSuccess:
+          user: User
+
+      @fraiseql.error(status=409)
+      class UserAlreadyExists:
+          email: str
+
+      @fraiseql.mutation
+      async def create_user(email: str) -> CreateUserSuccess | UserAlreadyExists:
+          if db.user_exists(email):
+              return UserAlreadyExists(email=email)  # Status 409 auto-injected
+          user = db.create_user(email)
+          return CreateUserSuccess(user=user)  # Status 201 auto-injected
+      ```
+
+    assessment_strengths: |
+      ✓ **Explicit states**: Three types make intent clear
+      ✓ **Status auto-injection**: No need to manually set status
+      ✓ **Type-safe**: Compiler checks union handling
+      ✓ **Consistent patterns**: Every operation follows same structure
+      ✓ **Works with GraphQL**: Union types are standard
+      ✓ **Partial success**: Can error in one field, succeed in another
+      ✓ **Observable**: Clear what responses are possible
+
+    assessment_weaknesses: |
+      ✗ **Verbose**: Union types require separate type definitions
+      ✗ **Boilerplate**: Must define success/error types per operation
+      ✗ **Not standard GraphQL**: Uses decorators non-standard to spec
+      ✗ **Learning curve**: Union types confuse developers new to GraphQL
+      ✗ **More types**: Schema has many types (one per operation state)
+      ✗ **Harder migrations**: Existing code must adopt pattern
+
+    when_fraiseql_choice_is_right: |
+      FraiseQL's three-state pattern is optimal when:
+      - **Type safety critical** (catch errors at compile time)
+      - **Consistency important** (all operations same pattern)
+      - **Client knows all possibilities** (union handles all cases)
+      - **Status codes matter** (HTTP semantics important)
+      - **Partial success needed** (some fields succeed, others fail)
+
+    when_fraiseql_choice_is_suboptimal: |
+      FraiseQL's pattern has downsides when:
+      - **Simplicity valued** (just throw exceptions)
+      - **Small API** (few error types)
+      - **GraphQL spec compliance** (only standard patterns)
+      - **Team not familiar with Rust-like Result types**
+
+benchmarks:
+  scenario: "Get user by ID, various failure scenarios"
+
+  response_size:
+    exceptions: "Minimal (just errors array)"
+    custom_types: "Medium (type + fields)"
+    three_state_fraiseql: "Medium (wrapper + fields + status)"
+
+  client_code_size:
+    exceptions: "Small (if errors then error)"
+    custom_types: "Large (3+ fragments per union)"
+    three_state_fraiseql: "Medium (success/error fragments + status check)"
+
+  type_safety:
+    exceptions: "None (just strings)"
+    custom_types: "Good (typed error objects)"
+    three_state_fraiseql: "Excellent (union types enforced)"
+
+  consistency:
+    exceptions: "Poor (error codes vary)"
+    custom_types: "Medium (same types per operation)"
+    three_state_fraiseql: "Excellent (status auto-injected)"
+
+  developer_experience:
+    exceptions: "Familiar (try/catch)"
+    custom_types: "Complex (unions confusing)"
+    three_state_fraiseql: "Good (consistent pattern)"
+
+  recommendation: |
+    **For production APIs requiring type safety**: Three-state pattern (FraiseQL)
+    - Type-safe, consistent, status auto-injected
+    - Worth learning the pattern
+
+    **For GraphQL spec compliance**: Exceptions + extensions
+    - Standard approach, but less type-safe
+    - Simpler initially, harder at scale
+
+    **For small APIs**: Custom error types
+    - Explicit types, clear semantics
+    - Don't use if > 5 error types
+
+    **For existing REST teams**: HTTP status codes
+    - Familiar, but mixing paradigms
+    - Not recommended long-term
+
+cost_analysis:
+  exceptions:
+    initial_cost: "Very low (built-in)"
+    scaling_cost: "High (consistency problems)"
+    maintenance_cost: "High (error codes diverge)"
+
+  custom_types:
+    initial_cost: "Medium (define types)"
+    scaling_cost: "High (types proliferate)"
+    maintenance_cost: "Medium (types centralized)"
+
+  three_state_fraiseql:
+    initial_cost: "Medium (learn pattern)"
+    scaling_cost: "Low (pattern consistent)"
+    maintenance_cost: "Low (status auto-injected)"
+
+trade_off_summary:
+  simplicity_vs_type_safety: |
+    Exceptions: Simple, not type-safe
+    Three-state (FraiseQL): Slightly complex, fully type-safe
+
+    FraiseQL chose type safety.
+
+  boilerplate_vs_consistency: |
+    Exceptions: No boilerplate, inconsistent
+    Three-state (FraiseQL): Some boilerplate, very consistent
+
+    FraiseQL chose consistency.
+
+  familiarity_vs_soundness: |
+    Exceptions: Familiar (try/catch), unsound (data vs error mixing)
+    Three-state: Less familiar, sound (clear intent)
+
+    FraiseQL chose soundness.
+
+recommendations:
+  - "Use three-state pattern for production APIs"
+  - "Auto-inject status codes (don't add manually)"
+  - "Define success/error/noop types per operation"
+  - "Use GraphQL fragments to handle unions"
+  - "Educate clients about three-state pattern"
+  - "Document error states in schema"
+
+blog_hooks:
+  beginner:
+    focus: "Understanding error handling in GraphQL"
+    key_points:
+      - "Exceptions: Simple but inconsistent"
+      - "Custom types: Explicit but verbose"
+      - "Three-state: Explicit, consistent, type-safe"
+      - "FraiseQL: Three-state by default"
+
+  intermediate:
+    focus: "Three-state pattern in FraiseQL"
+    key_points:
+      - "@success(status), @error(status), @noop(status)"
+      - "Status auto-injected (no boilerplate)"
+      - "Union types ensure all cases handled"
+      - "Consistent pattern for all operations"
+
+  advanced:
+    focus: "Error handling at scale"
+    key_points:
+      - "Type safety prevents client bugs"
+      - "Auto-injection reduces boilerplate"
+      - "Partial success handles complex scenarios"
+      - "Monitoring status codes across services"

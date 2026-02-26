@@ -1,0 +1,28 @@
+id: on-premise-maintenance
+name: On-Premise Maintenance
+category: comprehensive
+type: standard
+tags:
+- on-premise
+summary:
+  short: On-Premise Maintenance and implementation guidelines
+  long: Complete guide to on-premise maintenance
+problem:
+  description: Challenges without proper on-premise maintenance
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement on-premise maintenance
+key_concepts:
+  concept: On-Premise Maintenance
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

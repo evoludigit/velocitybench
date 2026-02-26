@@ -1,0 +1,49 @@
+id: graphql-request-validation
+name: GraphQL Request Validation
+category: fraiseql
+type: standard
+tags:
+- execution
+- validation
+- graphql
+- quality
+summary:
+  short: Validating queries conform to compiled schema
+  long: GraphQL requests are validated against the CompiledSchema to ensure they conform
+    to the schema structure, argument requirements, and type constraints.
+problem:
+  description: Invalid queries reach execution without feedback
+  symptoms:
+  - Queries with syntax errors execute
+  - Wrong argument types accepted
+  - Confusing error messages
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement GraphQL Request Validation effectively
+key_concepts:
+  concept_1: Schema validation rules
+  concept_2: Query structure validation
+  concept_3: Argument type checking
+implementation_considerations:
+  consideration_1: Validation rule completeness
+  consideration_2: Error message clarity
+  consideration_3: Performance of validation
+best_practices:
+- name: Validate early
+  description: Check queries before execution
+- name: Clear errors
+  description: Explain validation failures
+- name: Suggest fixes
+  description: Help users fix invalid queries
+anti_patterns:
+- name: Partial validation
+  consequence: Some invalid queries pass through
+- name: Poor error messages
+  consequence: Hard to debug queries
+blog_hooks:
+  beginner:
+    focus: Introduction to GraphQL Request Validation
+  intermediate:
+    focus: Implementing GraphQL Request Validation
+  advanced:
+    focus: Advanced GraphQL Request Validation techniques

@@ -1,0 +1,28 @@
+id: audit-gotchas
+name: Audit Gotchas
+category: comprehensive
+type: standard
+tags:
+- audit
+summary:
+  short: Audit Gotchas and implementation guidelines
+  long: Complete guide to audit gotchas
+problem:
+  description: Challenges without proper audit gotchas
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement audit gotchas
+key_concepts:
+  concept: Audit Gotchas
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

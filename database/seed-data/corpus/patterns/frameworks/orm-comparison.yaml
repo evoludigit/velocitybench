@@ -1,0 +1,305 @@
+# ORM Framework Comparison
+# VelocityBench Knowledge Corpus
+
+id: orm-comparison
+name: "ORM Framework Comparison"
+category: frameworks
+type: comparison
+tags:
+  - orm
+  - database
+  - sqlalchemy
+  - prisma
+  - drizzle
+  - typeorm
+
+summary:
+  short: "Comparing Object-Relational Mappers across languages"
+  long: |
+    ORMs abstract database interactions into object-oriented code. They handle
+    SQL generation, connection management, and data mapping. Popular choices
+    include SQLAlchemy (Python), Prisma (TypeScript), TypeORM, Drizzle, and
+    ActiveRecord (Ruby). Each balances abstraction with control differently.
+
+frameworks:
+  - name: "SQLAlchemy"
+    language: "Python"
+    approach: "Both ORM and Core (raw SQL builder)"
+    maturity: "Very High"
+    description: |
+      The most powerful Python ORM. Offers both high-level ORM and low-level
+      SQL expression language. Extremely flexible but has a learning curve.
+
+    strengths:
+      - "Two APIs: ORM for convenience, Core for control"
+      - "Excellent PostgreSQL support"
+      - "Async support (2.0+)"
+      - "Very mature, battle-tested"
+    weaknesses:
+      - "Steep learning curve"
+      - "Verbose for simple cases"
+      - "Session management complexity"
+    best_for:
+      - "Complex queries"
+      - "PostgreSQL projects"
+      - "When you need SQL control"
+    example: |
+      from sqlalchemy import create_engine, select
+      from sqlalchemy.orm import Session, DeclarativeBase, Mapped, mapped_column
+
+      class Base(DeclarativeBase):
+          pass
+
+      class User(Base):
+          __tablename__ = "users"
+          id: Mapped[int] = mapped_column(primary_key=True)
+          name: Mapped[str]
+          email: Mapped[str]
+
+      engine = create_engine("postgresql://localhost/db")
+      with Session(engine) as session:
+          users = session.scalars(select(User).where(User.name == "John")).all()
+
+  - name: "Prisma"
+    language: "TypeScript/JavaScript"
+    approach: "Schema-first, type-safe"
+    maturity: "High"
+    description: |
+      Modern ORM with excellent TypeScript integration. Schema defined in
+      Prisma Schema Language, generates type-safe client. Great DX but
+      less flexible than traditional ORMs.
+
+    strengths:
+      - "Excellent TypeScript types"
+      - "Schema-first workflow"
+      - "Great developer experience"
+      - "Built-in migrations"
+    weaknesses:
+      - "Limited raw SQL escape hatches"
+      - "Can be slow for complex queries"
+      - "Prisma Schema Language learning"
+    best_for:
+      - "TypeScript projects"
+      - "Rapid development"
+      - "Teams wanting type safety"
+    example: |
+      // schema.prisma
+      model User {
+        id    Int     @id @default(autoincrement())
+        name  String
+        email String  @unique
+        posts Post[]
+      }
+
+      // Usage (fully typed)
+      const users = await prisma.user.findMany({
+        where: { name: "John" },
+        include: { posts: true }
+      });
+
+  - name: "Drizzle"
+    language: "TypeScript/JavaScript"
+    approach: "SQL-like, type-safe"
+    maturity: "Medium"
+    description: |
+      Lightweight, SQL-like TypeScript ORM. Queries look like SQL but are
+      fully type-safe. Lower abstraction than Prisma, more control.
+
+    strengths:
+      - "SQL-like syntax (easy to learn)"
+      - "Lightweight, fast"
+      - "Great TypeScript types"
+      - "Serverless-friendly"
+    weaknesses:
+      - "Newer, smaller ecosystem"
+      - "Less abstraction (more boilerplate)"
+      - "Fewer integrations"
+    best_for:
+      - "SQL-comfortable developers"
+      - "Serverless/edge deployments"
+      - "Performance-sensitive apps"
+    example: |
+      import { drizzle } from 'drizzle-orm/postgres-js';
+      import { pgTable, serial, varchar } from 'drizzle-orm/pg-core';
+
+      const users = pgTable('users', {
+        id: serial('id').primaryKey(),
+        name: varchar('name', { length: 255 }),
+        email: varchar('email', { length: 255 }),
+      });
+
+      const db = drizzle(sql);
+      const result = await db.select().from(users).where(eq(users.name, 'John'));
+
+  - name: "TypeORM"
+    language: "TypeScript/JavaScript"
+    approach: "Decorator-based, ActiveRecord or DataMapper"
+    maturity: "High"
+    description: |
+      Flexible TypeScript ORM supporting both ActiveRecord and DataMapper patterns.
+      Decorator-based entity definitions. Good for large applications.
+
+    strengths:
+      - "Flexible patterns (AR or DM)"
+      - "Decorator-based (familiar to Java devs)"
+      - "Supports many databases"
+      - "Migration support"
+    weaknesses:
+      - "TypeScript types not as strong as Prisma"
+      - "Can be complex"
+      - "Maintenance concerns (slow updates)"
+    best_for:
+      - "Large applications"
+      - "Multi-database support"
+      - "Teams from Java/C# background"
+    example: |
+      import { Entity, PrimaryGeneratedColumn, Column } from "typeorm";
+
+      @Entity()
+      class User {
+        @PrimaryGeneratedColumn()
+        id: number;
+
+        @Column()
+        name: string;
+
+        @Column({ unique: true })
+        email: string;
+      }
+
+      const users = await dataSource.getRepository(User)
+        .find({ where: { name: "John" } });
+
+  - name: "ActiveRecord (Rails)"
+    language: "Ruby"
+    approach: "Convention over configuration"
+    maturity: "Very High"
+    description: |
+      The ORM that popularized the pattern. Emphasizes convention over configuration.
+      Models are tables, instances are rows. Incredibly productive for CRUD.
+
+    strengths:
+      - "Extremely productive"
+      - "Excellent conventions"
+      - "Rich ecosystem"
+      - "Battle-tested at scale"
+    weaknesses:
+      - "Ruby-only"
+      - "Can hide SQL complexity"
+      - "Magic can be confusing"
+    best_for:
+      - "Ruby projects"
+      - "Rapid prototyping"
+      - "CRUD-heavy applications"
+    example: |
+      class User < ApplicationRecord
+        has_many :posts
+        validates :email, presence: true, uniqueness: true
+      end
+
+      users = User.where(name: "John").includes(:posts)
+
+  - name: "Django ORM"
+    language: "Python"
+    approach: "Convention-based, integrated"
+    maturity: "Very High"
+    description: |
+      Django's built-in ORM. Tightly integrated with Django ecosystem.
+      QuerySet API is elegant. Less flexible than SQLAlchemy but simpler.
+
+    strengths:
+      - "Django integration"
+      - "Simple QuerySet API"
+      - "Excellent admin integration"
+      - "Good documentation"
+    weaknesses:
+      - "Django-only"
+      - "Less flexible than SQLAlchemy"
+      - "Complex queries can be awkward"
+    best_for:
+      - "Django projects"
+      - "When Django admin is needed"
+      - "Simpler query patterns"
+    example: |
+      from django.db import models
+
+      class User(models.Model):
+          name = models.CharField(max_length=255)
+          email = models.EmailField(unique=True)
+
+      users = User.objects.filter(name="John").prefetch_related('posts')
+
+comparison_matrix:
+  type_safety:
+    prisma: "Excellent"
+    drizzle: "Excellent"
+    sqlalchemy: "Good (with type stubs)"
+    typeorm: "Good"
+    activerecord: "Limited"
+
+  learning_curve:
+    prisma: "Low"
+    drizzle: "Low"
+    sqlalchemy: "High"
+    typeorm: "Medium"
+    activerecord: "Low"
+
+  raw_sql_access:
+    prisma: "Limited"
+    drizzle: "Good"
+    sqlalchemy: "Excellent"
+    typeorm: "Good"
+    activerecord: "Good"
+
+  performance:
+    prisma: "Good"
+    drizzle: "Excellent"
+    sqlalchemy: "Excellent"
+    typeorm: "Good"
+    activerecord: "Good"
+
+recommendation_matrix:
+  - scenario: "TypeScript + PostgreSQL + Type Safety"
+    recommendation: "Prisma or Drizzle"
+    reason: "Excellent TS types, modern DX"
+
+  - scenario: "Python + Complex Queries"
+    recommendation: "SQLAlchemy"
+    reason: "Most powerful, flexible"
+
+  - scenario: "Python + Rapid Development"
+    recommendation: "Django ORM"
+    reason: "Integrated, productive"
+
+  - scenario: "Ruby Web Application"
+    recommendation: "ActiveRecord"
+    reason: "Rails standard, excellent conventions"
+
+  - scenario: "Serverless/Edge"
+    recommendation: "Drizzle"
+    reason: "Lightweight, fast cold starts"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      ORMs are like translators between your code and the database:
+      - SQLAlchemy: A fluent translator who can also speak SQL directly
+      - Prisma: An AI translator with perfect grammar but limited vocabulary
+      - ActiveRecord: A translator who guesses what you mean (usually right)
+      - Drizzle: A translator who speaks SQL with a slight accent
+
+  intermediate:
+    focus: "Choosing the right ORM for your project"
+    key_points:
+      - "Type safety vs flexibility tradeoffs"
+      - "Query builder vs Active Record patterns"
+      - "Migration strategies"
+      - "N+1 query prevention"
+
+  advanced:
+    focus: "ORM optimization and alternatives"
+    key_points:
+      - "When to drop down to raw SQL"
+      - "Connection pooling with ORMs"
+      - "Query plan analysis through ORMs"
+      - "Micro-ORMs and query builders"

@@ -1,0 +1,28 @@
+id: profiling-best-practices
+name: Profiling Best Practices
+category: comprehensive
+type: standard
+tags:
+- profiling
+summary:
+  short: Profiling Best Practices and implementation guidelines
+  long: Complete guide to profiling best practices
+problem:
+  description: Challenges without proper profiling best practices
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement profiling best practices
+key_concepts:
+  concept: Profiling Best Practices
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

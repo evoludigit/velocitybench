@@ -1,0 +1,337 @@
+id: api-documentation
+name: "API Documentation Best Practices"
+category: frameworks
+type: standard
+tags:
+  - api
+  - documentation
+  - developer-experience
+  - communication
+
+summary:
+  short: "Creating clear, accurate, and maintainable API documentation"
+  long: |
+    Good API documentation is as important as the API itself. Poor documentation forces developers to read source code or spend time in trial-and-error. Comprehensive documentation reduces support burden, enables faster integration, and prevents bugs caused by misunderstanding API behavior.
+
+problem:
+  description: "Developers struggle to understand API; support requests pile up"
+  symptoms:
+    - "Developer doesn't know required vs optional parameters"
+    - "Error codes not documented; developers guess what errors mean"
+    - "No examples; developers spend hours figuring out usage"
+    - "Documentation outdated; doesn't match current API"
+    - "No explanation of rate limits or pagination behavior"
+  impact: "Slow adoption, frustrated developers, support burden, integration errors"
+
+solution:
+  description: "Create comprehensive, up-to-date, examples-first documentation"
+
+documentation_structure:
+  overview: |
+    1. Getting Started (5 min read)
+       - What is this API?
+       - Quick example (copy-paste ready)
+       - Link to full docs
+
+    2. Authentication (10 min read)
+       - How to get API key
+       - How to authenticate requests
+       - Token expiry and refresh
+
+    3. Core Concepts (20 min read)
+       - Main entities/resources
+       - Relationships between entities
+       - Typical workflows
+
+    4. API Reference (detailed)
+       - Each endpoint documented
+       - Request/response examples
+       - Error codes
+       - Rate limits
+
+    5. Examples & Guides (practical)
+       - Common use cases with code
+       - Multi-language examples
+       - Troubleshooting guide
+
+documentation_content:
+  endpoint_documentation: |
+    GET /api/users/{id}
+
+    Description:
+    Retrieve user by ID
+
+    Authentication:
+    Required. Bearer token in Authorization header.
+
+    Parameters:
+    - id (path, required): User ID
+    - include (query, optional): Related resources to include (e.g., "posts,comments")
+
+    Response:
+    200 OK:
+    {
+      "id": "user123",
+      "email": "user@example.com",
+      "name": "John Doe",
+      "created_at": "2025-01-01T00:00:00Z"
+    }
+
+    400 Bad Request:
+    Invalid id format
+
+    401 Unauthorized:
+    Missing or invalid authentication
+
+    404 Not Found:
+    User does not exist
+
+  rate_limits: |
+    Rate limits prevent abuse and ensure fair usage:
+
+    - 1000 requests per hour (authenticated)
+    - 100 requests per hour (unauthenticated)
+    - 10 requests per second (burst limit)
+
+    Headers:
+    X-RateLimit-Limit: 1000
+    X-RateLimit-Remaining: 999
+    X-RateLimit-Reset: 1234567890
+
+    When rate limited:
+    HTTP 429 Too Many Requests
+
+  error_handling: |
+    All errors return structured JSON:
+
+    {
+      "error": {
+        "code": "USER_NOT_FOUND",
+        "message": "User with ID 'invalid' not found",
+        "status": 404,
+        "details": {
+          "user_id": "invalid"
+        }
+      }
+    }
+
+    Common error codes:
+    - INVALID_REQUEST: Malformed request
+    - AUTHENTICATION_REQUIRED: No or invalid auth
+    - PERMISSION_DENIED: User lacks permission
+    - RESOURCE_NOT_FOUND: Resource does not exist
+    - RATE_LIMIT_EXCEEDED: Too many requests
+    - SERVER_ERROR: Internal server error
+
+  pagination: |
+    List endpoints support pagination:
+
+    GET /api/users?page=1&limit=10
+
+    Response:
+    {
+      "data": [...],
+      "pagination": {
+        "page": 1,
+        "limit": 10,
+        "total": 150,
+        "total_pages": 15,
+        "next_page": 2,
+        "prev_page": null
+      }
+    }
+
+    Alternatively, cursor-based:
+    GET /api/users?after=user123&limit=10
+
+    Response:
+    {
+      "data": [...],
+      "cursor": {
+        "has_more": true,
+        "next_cursor": "user456"
+      }
+    }
+
+documentation_tools:
+  swagger_openapi: |
+    Standard format for API documentation
+    Define API in YAML, auto-generate interactive docs
+
+    openapi: 3.0.0
+    info:
+      title: Users API
+      version: 1.0.0
+    paths:
+      /users/{id}:
+        get:
+          summary: Get user by ID
+          parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                type: string
+          responses:
+            '200':
+              description: User found
+              content:
+                application/json:
+                  schema:
+                    $ref: '#/components/schemas/User'
+            '404':
+              description: User not found
+
+  postman: |
+    Interactive API exploration and documentation
+    - Create collections of API requests
+    - Auto-generate from OpenAPI spec
+    - Embed in website
+    - Run tests
+
+  readme: |
+    Markdown-based API docs
+    - Simple and clean
+    - Version control friendly
+    - Integrates with GitHub
+
+  api_blueprint: |
+    Markdown-based API design language
+    Alternative to Swagger/OpenAPI
+
+keeping_documentation_updated:
+  version_control: |
+    Keep documentation in same repo as code
+    - Docs updated with code changes
+    - Code review includes doc review
+    - Docs versioned with API
+
+    /docs/api/v1/
+    /docs/api/v2/
+
+  auto_generation: |
+    Generate docs from code annotations
+
+    Python:
+    def get_user(user_id: str) -> User:
+        """
+        Retrieve user by ID
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            User object
+
+        Raises:
+            NotFound: User does not exist
+        """
+
+  ci_validation: |
+    Automated checks in CI/CD:
+    - Documentation examples are valid code
+    - Code examples actually work
+    - No broken links
+    - Consistency checks
+
+examples_first_approach:
+  copy_paste_ready: |
+    # Bad example (conceptual)
+    # Make requests to the API using the HTTP protocol
+
+    # Good example (copy-paste ready)
+    curl -X GET https://api.example.com/users/user123 \
+      -H "Authorization: Bearer YOUR_API_KEY"
+
+  multiple_languages: |
+    Provide examples in popular languages:
+    - cURL
+    - Python
+    - Node.js
+    - JavaScript (fetch)
+    - Java
+    - Go
+    - Ruby
+
+  realistic_scenarios: |
+    # Example 1: Get user
+    curl https://api.example.com/users/user123
+
+    # Example 2: Create post as user
+    curl -X POST https://api.example.com/posts \
+      -H "Content-Type: application/json" \
+      -d '{
+        "title": "My first post",
+        "content": "Hello world"
+      }'
+
+    # Example 3: Handle rate limiting
+    # Make request, get 429, wait, retry
+
+best_practices:
+  - name: "Start with examples"
+    description: "Developer's first question: 'how do I use this?'"
+
+  - name: "Document error cases"
+    description: "Include codes, meanings, and how to handle"
+
+  - name: "Include rate limits"
+    description: "Developers need to know throughput expectations"
+
+  - name: "Version documentation"
+    description: "Keep old API docs for legacy clients"
+
+  - name: "Keep examples updated"
+    description: "Test examples in CI to prevent drift"
+
+  - name: "Use standard formats"
+    description: "OpenAPI/Swagger enables tools and auto-generation"
+
+  - name: "Include authentication details"
+    description: "Different auth methods need different examples"
+
+  - name: "Document common errors"
+    description: "Troubleshooting section saves support time"
+
+anti_patterns:
+  - name: "Code-only documentation"
+    consequence: "Developers read source code instead of learning API"
+    fix: "Write clear documentation separate from code"
+
+  - name: "Outdated examples"
+    consequence: "Developer follows example, gets error, assumes bug"
+    fix: "Test examples in CI"
+
+  - name: "Missing error documentation"
+    consequence: "Developer doesn't know how to handle errors"
+    fix: "Document all error codes and meanings"
+
+  - name: "No authentication examples"
+    consequence: "Developer spends hours figuring out auth"
+    fix: "Clear, working authentication examples"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      API documentation is like recipes:
+      - No recipe: "Make pizza" (too vague)
+      - With recipe: Exact steps, ingredient quantities, timings
+      - With photos: See what result should look like
+
+      Good documentation is a recipe for using your API!
+
+  intermediate:
+    focus: "Creating API documentation"
+    key_points:
+      - "Documentation structure and content"
+      - "Using OpenAPI/Swagger for specs"
+      - "Example-first documentation approach"
+      - "Keeping documentation updated"
+
+  advanced:
+    focus: "Advanced documentation strategies"
+    key_points:
+      - "Multi-version documentation"
+      - "Auto-generated documentation from code"
+      - "Documentation testing and validation"
+      - "Developer experience and adoption"

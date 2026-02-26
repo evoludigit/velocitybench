@@ -4,8 +4,10 @@
 SET search_path TO benchmark, public;
 
 -- tb_user: Users table (core entity, write-side)
+-- Trinity Pattern: pk_user (integer PK) + id (UUID for API) + fk_* (integer FKs)
 CREATE TABLE tb_user (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    pk_user SERIAL PRIMARY KEY,
+    id UUID UNIQUE NOT NULL DEFAULT uuid_generate_v4(),
     email VARCHAR(255) UNIQUE NOT NULL,
     username VARCHAR(100) UNIQUE NOT NULL,
     first_name VARCHAR(100),
@@ -18,9 +20,11 @@ CREATE TABLE tb_user (
 );
 
 -- tb_post: Posts table (content with relationships, write-side)
+-- Trinity Pattern: pk_post (integer PK) + id (UUID for API) + fk_author (integer FK to author)
 CREATE TABLE tb_post (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    author_id UUID NOT NULL REFERENCES tb_user(id) ON DELETE CASCADE,
+    pk_post SERIAL PRIMARY KEY,
+    id UUID UNIQUE NOT NULL DEFAULT uuid_generate_v4(),
+    fk_author INTEGER NOT NULL REFERENCES tb_user(pk_user) ON DELETE CASCADE,
     title VARCHAR(500) NOT NULL,
     content TEXT,
     excerpt VARCHAR(500),
@@ -31,11 +35,13 @@ CREATE TABLE tb_post (
 );
 
 -- tb_comment: Comments table (nested relationships, write-side)
+-- Trinity Pattern: pk_comment (integer PK) + id (UUID for API) + fk_post/fk_author (integer FKs)
 CREATE TABLE tb_comment (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    post_id UUID NOT NULL REFERENCES tb_post(id) ON DELETE CASCADE,
-    author_id UUID NOT NULL REFERENCES tb_user(id) ON DELETE CASCADE,
-    parent_id UUID REFERENCES tb_comment(id) ON DELETE CASCADE, -- for nested comments
+    pk_comment SERIAL PRIMARY KEY,
+    id UUID UNIQUE NOT NULL DEFAULT uuid_generate_v4(),
+    fk_post INTEGER NOT NULL REFERENCES tb_post(pk_post) ON DELETE CASCADE,
+    fk_author INTEGER NOT NULL REFERENCES tb_user(pk_user) ON DELETE CASCADE,
+    fk_parent INTEGER REFERENCES tb_comment(pk_comment) ON DELETE CASCADE,
     content TEXT NOT NULL,
     is_approved BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -86,12 +92,17 @@ CREATE TABLE user_profiles (
 );
 
 -- Indexes for performance (critical for benchmarking)
-CREATE INDEX idx_tb_post_author_id ON tb_post(author_id);
+-- Trinity Pattern indexes: use integer FKs for better performance than UUID
+CREATE INDEX idx_tb_post_fk_user ON tb_post(fk_user);
 CREATE INDEX idx_tb_post_status ON tb_post(status);
 CREATE INDEX idx_tb_post_published_at ON tb_post(published_at);
-CREATE INDEX idx_tb_comment_post_id ON tb_comment(post_id);
-CREATE INDEX idx_tb_comment_author_id ON tb_comment(author_id);
-CREATE INDEX idx_tb_comment_parent_id ON tb_comment(parent_id);
+CREATE INDEX idx_tb_comment_fk_post ON tb_comment(fk_post);
+CREATE INDEX idx_tb_comment_fk_user ON tb_comment(fk_user);
+CREATE INDEX idx_tb_comment_fk_parent ON tb_comment(fk_parent);
+-- API UUID indexes for lookups by id
+CREATE INDEX idx_tb_user_id ON tb_user(id);
+CREATE INDEX idx_tb_post_id ON tb_post(id);
+CREATE INDEX idx_tb_comment_id ON tb_comment(id);
 CREATE INDEX idx_user_follows_follower ON user_follows(follower_id);
 CREATE INDEX idx_user_follows_following ON user_follows(following_id);
 CREATE INDEX idx_post_likes_post ON post_likes(post_id);
@@ -100,257 +111,10 @@ CREATE INDEX idx_post_categories_category ON post_categories(category_id);
 -- JSONB indexes for advanced queries
 CREATE INDEX idx_user_profiles_data ON user_profiles USING GIN (profile_data);
 
--- Denormalized Table Views (tv_*) for FraiseQL performance testing
--- These follow the printoptim_backend pattern of denormalized JSON data
+-- Framework-specific views (v_* and tv_*) are created by each framework
+-- as part of their schema extensions (e.g., frameworks/fraiseql/database/schema.sql)
+-- This keeps the shared schema clean and framework-agnostic
 
--- tv_post: Denormalized posts with embedded author data
-CREATE TABLE tv_post (
-    id UUID PRIMARY KEY,
-    identifier TEXT,
-    author_id UUID,
-    title TEXT,
-    content TEXT,
-    status TEXT,
-    published BOOLEAN,
-    created_at TIMESTAMPTZ,
-    updated_at TIMESTAMPTZ,
-    data JSONB
-);
-
--- Populate tv_post with denormalized data
-INSERT INTO tv_post (id, identifier, author_id, title, content, status, published, created_at, updated_at, data)
-SELECT
-    p.id,
-    'post-' || p.id::text as identifier,
-    p.author_id,
-    p.title,
-    p.content,
-    p.status,
-    CASE WHEN p.status = 'published' THEN true ELSE false END as published,
-    p.created_at,
-    p.updated_at,
-    jsonb_build_object(
-        'id', p.id,
-        'title', p.title,
-        'content', p.content,
-        'published', CASE WHEN p.status = 'published' THEN true ELSE false END,
-        'createdAt', p.created_at,
-        'updatedAt', p.updated_at,
-        'author', tu.data
-    ) as data
-FROM tb_post p
-JOIN tv_user tu ON p.author_id = tu.id;
-
--- Indexes for tv_post
-CREATE INDEX idx_tv_post_id ON tv_post(id);
-CREATE INDEX idx_tv_post_data ON tv_post USING GIN (data);
-CREATE INDEX idx_tv_post_published ON tv_post(published);
-
-COMMENT ON TABLE tv_post IS 'Denormalized table view for posts with embedded author data, following printoptim_backend patterns';
-
--- Sync function for tv_post: posts → tv_post
-CREATE OR REPLACE FUNCTION sync_tv_post(p_id UUID)
-RETURNS void AS $$
-BEGIN
-    -- Delete existing record
-    DELETE FROM tv_post WHERE id = p_id;
-
-    -- Insert updated record
-    INSERT INTO tv_post (id, identifier, author_id, title, content, status, published, created_at, updated_at, data)
-    SELECT
-        p.id,
-        'post-' || p.id::text as identifier,
-        p.author_id,
-        p.title,
-        p.content,
-        p.status,
-        CASE WHEN p.status = 'published' THEN true ELSE false END as published,
-        p.created_at,
-        p.updated_at,
-        jsonb_build_object(
-            'id', p.id,
-            'title', p.title,
-            'content', p.content,
-            'published', CASE WHEN p.status = 'published' THEN true ELSE false END,
-            'createdAt', p.created_at,
-            'updatedAt', p.updated_at,
-            'author', tu.data
-        ) as data
-    FROM tb_post p
-    JOIN tv_user tu ON p.author_id = tu.id
-    WHERE p.id = p_id;
-END;
-$$ LANGUAGE plpgsql;
-
-COMMENT ON FUNCTION sync_tv_post(UUID) IS 'Sync function: posts → tv_post (call after INSERT/UPDATE/DELETE on posts)';
-
--- Triggers to keep tv_post synchronized
-CREATE OR REPLACE FUNCTION trigger_sync_tv_post()
-RETURNS trigger AS $$
-BEGIN
-    IF TG_OP = 'DELETE' THEN
-        DELETE FROM tv_post WHERE id = OLD.id;
-        RETURN OLD;
-    ELSE
-        PERFORM sync_tv_post(NEW.id);
-        RETURN NEW;
-    END IF;
-END;
-$$ LANGUAGE plpgsql;
-
--- Function to sync all posts for a user when user data changes
-CREATE OR REPLACE FUNCTION sync_tv_posts_for_user(p_user_id UUID)
-RETURNS void AS $$
-BEGIN
-    -- Update all posts for this user
-    UPDATE tv_post
-    SET data = jsonb_set(data, '{author}', (SELECT data FROM tv_user WHERE id = p_user_id))
-    WHERE author_id = p_user_id;
-END;
-$$ LANGUAGE plpgsql;
-
--- Function to handle both posts and tv_user changes
-CREATE OR REPLACE FUNCTION trigger_sync_tv_post_comprehensive()
-RETURNS trigger AS $$
-BEGIN
-    -- Handle posts table changes
-    IF TG_TABLE_NAME = 'posts' THEN
-        IF TG_OP = 'DELETE' THEN
-            DELETE FROM tv_post WHERE id = OLD.id;
-            RETURN OLD;
-        ELSE
-            PERFORM sync_tv_post(NEW.id);
-            RETURN NEW;
-        END IF;
-    -- Handle tv_user changes (author data updates)
-    ELSIF TG_TABLE_NAME = 'tv_user' THEN
-        PERFORM sync_tv_posts_for_user(NEW.id);
-        RETURN NEW;
-    END IF;
-    RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
-
--- Apply triggers
-CREATE TRIGGER trg_sync_tv_post_posts
-AFTER INSERT OR UPDATE OR DELETE ON tb_post
-FOR EACH ROW
-EXECUTE FUNCTION trigger_sync_tv_post_comprehensive();
-
-CREATE TRIGGER trg_sync_tv_post_users
-AFTER UPDATE ON tv_user
-FOR EACH ROW
-EXECUTE FUNCTION trigger_sync_tv_post_comprehensive();
-
-COMMENT ON TRIGGER trg_sync_tv_post_posts ON tb_post IS 'Automatically sync tv_post when tb_post table changes';
-COMMENT ON TRIGGER trg_sync_tv_post_users ON tv_user IS 'Automatically sync tv_post author data when tv_user changes';
-
--- tv_user: Denormalized users table
-CREATE TABLE tv_user (
-    id UUID PRIMARY KEY,
-    identifier TEXT,
-    username TEXT,
-    email TEXT,
-    first_name TEXT,
-    last_name TEXT,
-    bio TEXT,
-    is_active BOOLEAN,
-    created_at TIMESTAMPTZ,
-    updated_at TIMESTAMPTZ,
-    data JSONB
-);
-
--- Populate tv_user with denormalized data
-INSERT INTO tv_user (id, identifier, username, email, first_name, last_name, bio, is_active, created_at, updated_at, data)
-SELECT
-    u.id,
-    'user-' || u.id::text as identifier,
-    u.username,
-    u.email,
-    u.first_name,
-    u.last_name,
-    u.bio,
-    u.is_active,
-    u.created_at,
-    u.updated_at,
-    jsonb_build_object(
-        'id', u.id,
-        'username', u.username,
-        'email', u.email,
-        'first_name', u.first_name,
-        'last_name', u.last_name,
-        'bio', u.bio,
-        'is_active', u.is_active,
-        'created_at', u.created_at,
-        'updated_at', u.updated_at
-    ) as data
-FROM tb_user u;
-
--- Indexes for tv_user
-CREATE INDEX idx_tv_user_id ON tv_user(id);
-CREATE INDEX idx_tv_user_data ON tv_user USING GIN (data);
-
-COMMENT ON TABLE tv_user IS 'Denormalized table view for users, following printoptim_backend patterns';
-
--- Sync function for tv_user: users → tv_user
-CREATE OR REPLACE FUNCTION sync_tv_user(p_id UUID)
-RETURNS void AS $$
-BEGIN
-    -- Delete existing record
-    DELETE FROM tv_user WHERE id = p_id;
-
-    -- Insert updated record
-    INSERT INTO tv_user (id, identifier, username, email, first_name, last_name, bio, is_active, created_at, updated_at, data)
-    SELECT
-        u.id,
-        'user-' || u.id::text as identifier,
-        u.username,
-        u.email,
-        u.first_name,
-        u.last_name,
-        u.bio,
-        u.is_active,
-        u.created_at,
-        u.updated_at,
-        jsonb_build_object(
-            'id', u.id,
-            'username', u.username,
-            'email', u.email,
-            'first_name', u.first_name,
-            'last_name', u.last_name,
-            'bio', u.bio,
-            'is_active', u.is_active,
-            'created_at', u.created_at,
-            'updated_at', u.updated_at
-        ) as data
-    FROM tb_user u
-    WHERE u.id = p_id;
-END;
-$$ LANGUAGE plpgsql;
-
-COMMENT ON FUNCTION sync_tv_user(UUID) IS 'Sync function: users → tv_user (call after INSERT/UPDATE/DELETE on users)';
-
--- Triggers to keep tv_user synchronized
-CREATE OR REPLACE FUNCTION trigger_sync_tv_user()
-RETURNS trigger AS $$
-BEGIN
-    IF TG_OP = 'DELETE' THEN
-        DELETE FROM tv_user WHERE id = OLD.id;
-        RETURN OLD;
-    ELSE
-        PERFORM sync_tv_user(NEW.id);
-        RETURN NEW;
-    END IF;
-END;
-$$ LANGUAGE plpgsql;
-
--- Apply trigger to tb_user table
-CREATE TRIGGER trg_sync_tv_user
-AFTER INSERT OR UPDATE OR DELETE ON tb_user
-FOR EACH ROW
-EXECUTE FUNCTION trigger_sync_tv_user();
-
-COMMENT ON TRIGGER trg_sync_tv_user ON tb_user IS 'Automatically sync tv_user when tb_user table changes';
 CREATE INDEX idx_user_profiles_settings ON user_profiles USING GIN (settings);
 
 -- Partial indexes for common queries

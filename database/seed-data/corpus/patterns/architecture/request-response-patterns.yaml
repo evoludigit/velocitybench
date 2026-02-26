@@ -1,0 +1,59 @@
+id: request-response-patterns
+name: Request-Response vs Event-Driven Patterns
+category: architecture
+type: standard
+tags:
+- architecture
+- request_response_patterns
+summary:
+  short: Choosing between synchronous and asynchronous communication
+  long: Choosing between synchronous and asynchronous communication. This pattern
+    provides comprehensive guidance on implementing and optimizing this aspect of
+    software engineering.
+problem:
+  description: Issues arise when choosing between synchronous and asynchronous communication
+    is not properly implemented
+  symptoms:
+  - System performance degrades without proper request-response-patterns
+  - Lack of visibility into system behavior
+  - Frequent failures and reliability issues
+  - Difficult to debug and troubleshoot problems
+  - Scaling issues as load increases
+  impact: Poor system reliability, performance issues, increased debugging time, production
+    incidents
+solution:
+  description: Implement best practices for choosing between synchronous and asynchronous
+    communication
+key_concepts:
+  concept_1: Understanding request-response-patterns fundamentals
+  concept_2: Implementing request-response-patterns effectively
+  concept_3: Monitoring and maintaining request-response-patterns
+best_practices:
+- name: Use request-response-patterns strategically
+  description: Apply this pattern where it provides the most value
+- name: Monitor effectiveness
+  description: Track metrics to verify the pattern is working
+- name: Document decisions
+  description: Record why you chose this approach
+anti_patterns:
+- name: Ignoring this pattern
+  consequence: Systems become unreliable and difficult to maintain
+- name: Over-engineering
+  consequence: Unnecessary complexity
+blog_hooks:
+  beginner:
+    analogy: Choosing between synchronous and asynchronous communication is a critical
+      part of software engineering.
+    focus: Understanding the basics
+  intermediate:
+    focus: Implementing request-response-patterns effectively
+    key_points:
+    - Core concepts of request-response-patterns
+    - Common implementation approaches
+    - Trade-offs and considerations
+  advanced:
+    focus: Advanced request-response-patterns techniques
+    key_points:
+    - Optimization strategies
+    - Complex scenarios
+    - Production considerations

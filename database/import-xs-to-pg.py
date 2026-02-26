@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Import XS SQLite database to PostgreSQL"""
 
+import atexit
 import sqlite3
-import psycopg
 import sys
 import time
-import atexit
 from pathlib import Path
+
+import psycopg
 
 try:
     import psycopg
@@ -53,18 +54,65 @@ def import_xs(sqlite_path: str, pg_conn_str: str):
             with pg_conn.cursor() as cur:
                 cur.execute("SET session_replication_role = 'origin'")
             pg_conn.commit()
-        except:
+        except Exception:
             pass
+
     atexit.register(re_enable_fks)
 
     # Map SQLite tables to PostgreSQL tables
     # Skip pk_* columns as they're GENERATED ALWAYS in PostgreSQL
     table_mappings = [
-        ('users', 'tb_user', ['id', 'identifier', 'email', 'username', 'full_name', 'bio', 'created_at', 'updated_at']),
-        ('posts', 'tb_post', ['id', 'identifier', 'title', 'content', 'fk_author', 'published', 'created_at', 'updated_at']),
-        ('comments', 'tb_comment', ['id', 'identifier', 'content', 'fk_post', 'fk_author', 'created_at', 'updated_at']),
-        ('user_follows', 'tb_user_follows', ['fk_follower', 'fk_following', 'created_at']),
-        ('post_likes', 'tb_post_like', ['fk_user', 'fk_post', 'reaction_type', 'created_at']),
+        (
+            "users",
+            "tb_user",
+            [
+                "id",
+                "identifier",
+                "email",
+                "username",
+                "full_name",
+                "bio",
+                "created_at",
+                "updated_at",
+            ],
+        ),
+        (
+            "posts",
+            "tb_post",
+            [
+                "id",
+                "identifier",
+                "title",
+                "content",
+                "fk_author",
+                "published",
+                "created_at",
+                "updated_at",
+            ],
+        ),
+        (
+            "comments",
+            "tb_comment",
+            [
+                "id",
+                "identifier",
+                "content",
+                "fk_post",
+                "fk_author",
+                "created_at",
+                "updated_at",
+            ],
+        ),
+        (
+            "user_follows",
+            "tb_user_follows",
+            ["fk_follower", "fk_following", "created_at"],
+        ),
+        (
+            "post_likes",
+            "tb_post_like",
+            ["fk_user", "fk_post", "reaction_type", "created_at"],
+        ),
     ]
 
     start = time.time()
@@ -84,7 +132,7 @@ def import_xs(sqlite_path: str, pg_conn_str: str):
             all_rows = cursor.fetchall()
 
             if not all_rows:
-                print(f"✓ (no data)")
+                print("✓ (no data)")
                 continue
 
             # Get column indices to extract from SQLite rows
@@ -96,7 +144,7 @@ def import_xs(sqlite_path: str, pg_conn_str: str):
             rows = [[row[i] for i in col_indices] for row in all_rows]
 
             # For posts table, cast published int to boolean
-            if pg_table == 'tb_post':
+            if pg_table == "tb_post":
                 rows = [[*row[:5], bool(row[5]), row[6], row[7]] for row in rows]
 
             # Insert into PostgreSQL in batches
@@ -110,7 +158,7 @@ def import_xs(sqlite_path: str, pg_conn_str: str):
                     try:
                         cur.executemany(insert_sql, batch)
                         pg_conn.commit()
-                    except Exception as e:
+                    except Exception:
                         # Rollback and skip this batch
                         pg_conn.rollback()
                         continue
@@ -118,7 +166,7 @@ def import_xs(sqlite_path: str, pg_conn_str: str):
             # Final commit
             try:
                 pg_conn.commit()
-            except:
+            except Exception:
                 pass
 
             elapsed = time.time() - table_start
@@ -160,10 +208,21 @@ if __name__ == "__main__":
     import os
 
     sqlite_path = sys.argv[1] if len(sys.argv) > 1 else "datasets/fraiseql_xs_test.db"
-    pg_conn_str = os.getenv(
-        "DATABASE_URL",
-        "postgresql://benchmark:benchmark123@localhost:5434/fraiseql_benchmark"
-    )
+    pg_conn_str = os.getenv("DATABASE_URL")
+
+    # If DATABASE_URL not set, build from environment variables
+    if not pg_conn_str:
+        db_password = os.getenv("DB_PASSWORD")
+        if not db_password:
+            print("❌ Database password is required.")
+            print("Set either DATABASE_URL or DB_PASSWORD environment variable.")
+            sys.exit(1)
+
+        pg_conn_str = (
+            f"postgresql://{os.getenv('DB_USER', 'benchmark')}:{db_password}"
+            f"@{os.getenv('DB_HOST', 'localhost')}:{os.getenv('DB_PORT', '5434')}"
+            f"/{os.getenv('DB_NAME', 'fraiseql_benchmark')}"
+        )
 
     success = import_xs(sqlite_path, pg_conn_str)
     sys.exit(0 if success else 1)

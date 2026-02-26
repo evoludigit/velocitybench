@@ -1,0 +1,28 @@
+id: caching-validation
+name: Caching Validation
+category: comprehensive
+type: standard
+tags:
+- caching
+summary:
+  short: Caching Validation and implementation guidelines
+  long: Complete guide to caching validation
+problem:
+  description: Challenges without proper caching validation
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement caching validation
+key_concepts:
+  concept: Caching Validation
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

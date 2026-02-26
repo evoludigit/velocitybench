@@ -1,0 +1,28 @@
+id: ml-mlops
+name: Mlops Patterns
+category: specialized
+type: standard
+tags:
+- ml
+summary:
+  short: Patterns and practices for mlops patterns
+  long: Comprehensive guide to mlops patterns
+problem:
+  description: Challenges with mlops patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement mlops patterns
+key_concepts:
+  concept: Understanding Mlops Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Mlops Patterns
+  intermediate:
+    focus: Implementing Mlops Patterns
+  advanced:
+    focus: Advanced Mlops Patterns

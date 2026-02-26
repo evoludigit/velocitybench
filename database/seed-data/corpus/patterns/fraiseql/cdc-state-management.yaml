@@ -1,0 +1,44 @@
+id: cdc-state-management
+name: CDC State Management
+category: fraiseql
+type: standard
+tags:
+- fraiseql
+- cdc
+summary:
+  short: Managing subscription state
+  long: Managing subscription state
+problem:
+  description: Without cdc state management, systems face challenges
+  symptoms:
+  - Issue with managing subscription state
+  impact: Reduced FraiseQL effectiveness
+solution:
+  description: Implement CDC State Management effectively
+key_concepts:
+  concept_1: CDC State Management fundamentals
+  concept_2: Implementation patterns
+  concept_3: Best practices
+implementation_considerations:
+  consideration_1: Requirements gathering
+  consideration_2: Design decisions
+  consideration_3: Implementation approach
+best_practices:
+- name: Plan carefully
+  description: Think through CDC State Management design
+- name: Test thoroughly
+  description: Validate CDC State Management works
+- name: Monitor
+  description: Track CDC State Management performance
+anti_patterns:
+- name: Ignoring pattern
+  consequence: CDC State Management fails
+- name: Incomplete implementation
+  consequence: Partial benefits only
+blog_hooks:
+  beginner:
+    focus: Introduction to CDC State Management
+  intermediate:
+    focus: Implementing CDC State Management
+  advanced:
+    focus: Advanced CDC State Management techniques

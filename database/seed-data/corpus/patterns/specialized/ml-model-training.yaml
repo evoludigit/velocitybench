@@ -1,0 +1,28 @@
+id: ml-model-training
+name: Model Training Patterns
+category: specialized
+type: standard
+tags:
+- ml
+summary:
+  short: Patterns and practices for model training patterns
+  long: Comprehensive guide to model training patterns
+problem:
+  description: Challenges with model training patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement model training patterns
+key_concepts:
+  concept: Understanding Model Training Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Model Training Patterns
+  intermediate:
+    focus: Implementing Model Training Patterns
+  advanced:
+    focus: Advanced Model Training Patterns

@@ -1,0 +1,37 @@
+[package]
+name = "velocitybench-healthcheck"
+version = "1.0.0"
+edition = "2021"
+authors = ["VelocityBench Team"]
+description = "Standardized health check library for VelocityBench Rust frameworks"
+license = "MIT"
+
+[dependencies]
+# Async runtime (optional, framework brings its own)
+tokio = { version = "1.35", features = ["time", "macros"], optional = true }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# HTTP (optional, framework brings its own)
+actix-web = { version = "4.4", optional = true }
+axum = { version = "0.7", optional = true }
+
+# Database (optional)
+sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-rustls"], optional = true }
+
+# System info
+sysinfo = "0.30"
+
+# Time handling
+chrono = "0.4"
+
+[features]
+default = []
+actix = ["actix-web", "tokio"]
+axum_support = ["axum", "tokio"]
+database = ["sqlx"]
+
+[dev-dependencies]
+tokio = { version = "1.35", features = ["full"] }

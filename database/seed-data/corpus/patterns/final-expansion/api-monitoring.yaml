@@ -1,0 +1,28 @@
+id: api-monitoring
+name: Api Monitoring
+category: comprehensive
+type: standard
+tags:
+- api
+summary:
+  short: Api Monitoring and implementation guidelines
+  long: Complete guide to api monitoring
+problem:
+  description: Challenges without proper api monitoring
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement api monitoring
+key_concepts:
+  concept: Api Monitoring
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

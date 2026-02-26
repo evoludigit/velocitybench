@@ -1,0 +1,28 @@
+id: debugging-testing
+name: Debugging Testing
+category: comprehensive
+type: standard
+tags:
+- debugging
+summary:
+  short: Debugging Testing and implementation guidelines
+  long: Complete guide to debugging testing
+problem:
+  description: Challenges without proper debugging testing
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement debugging testing
+key_concepts:
+  concept: Debugging Testing
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

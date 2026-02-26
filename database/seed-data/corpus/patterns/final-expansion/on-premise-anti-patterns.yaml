@@ -1,0 +1,28 @@
+id: on-premise-anti-patterns
+name: On-Premise Anti Patterns
+category: comprehensive
+type: standard
+tags:
+- on-premise
+summary:
+  short: On-Premise Anti Patterns and implementation guidelines
+  long: Complete guide to on-premise anti patterns
+problem:
+  description: Challenges without proper on-premise anti patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement on-premise anti patterns
+key_concepts:
+  concept: On-Premise Anti Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

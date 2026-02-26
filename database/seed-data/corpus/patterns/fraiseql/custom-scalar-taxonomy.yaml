@@ -1,0 +1,58 @@
+id: custom-scalar-taxonomy
+name: Custom Scalar Taxonomy
+category: fraiseql
+type: standard
+tags:
+- types
+- scalars
+- validation
+- domains
+- type-safety
+summary:
+  short: 56 custom scalars across 18 domains for rich type safety
+  long: FraiseQL provides 56 pre-defined custom scalar types across 18 domain categories
+    (temporal, geographic, network, financial, vectors, identifiers, etc.) with automatic
+    validation at serialization boundaries for type-safe APIs.
+problem:
+  description: Using String for everything loses type safety and validation
+  symptoms:
+  - Invalid data passes through API
+  - No domain-specific validation
+  - Client can't infer expected format
+  - Runtime errors from malformed data
+  impact: API reliability issues and client integration problems
+solution:
+  description: Implement Custom Scalar Taxonomy effectively
+key_concepts:
+  concept_1: Domain-specific scalar types
+  concept_2: Validation at serialization boundaries
+  concept_3: 18 domain categories coverage
+  concept_4: Database type mapping
+implementation_considerations:
+  consideration_1: Scalar serialization performance
+  consideration_2: Custom scalar documentation
+  consideration_3: Client-side scalar handling
+  consideration_4: Database type compatibility
+best_practices:
+- name: Use domain scalars
+  description: Prefer EmailAddress over String
+- name: Validate eagerly
+  description: Fail fast on invalid input
+- name: Document formats
+  description: Provide clear format specifications
+- name: Map to database types
+  description: Use appropriate database column types
+anti_patterns:
+- name: Overuse of String
+  consequence: Lost type safety and validation
+- name: Custom scalars everywhere
+  consequence: Client integration complexity
+- name: No validation
+  consequence: Invalid data in database
+blog_hooks:
+  beginner:
+    focus: Introduction to Custom Scalar Taxonomy
+  intermediate:
+    focus: Implementing domain-specific scalars with validation
+  advanced:
+    focus: Advanced scalar design and performance optimization

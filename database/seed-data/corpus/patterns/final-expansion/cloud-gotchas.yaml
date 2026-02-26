@@ -1,0 +1,28 @@
+id: cloud-gotchas
+name: Cloud Gotchas
+category: comprehensive
+type: standard
+tags:
+- cloud
+summary:
+  short: Cloud Gotchas and implementation guidelines
+  long: Complete guide to cloud gotchas
+problem:
+  description: Challenges without proper cloud gotchas
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement cloud gotchas
+key_concepts:
+  concept: Cloud Gotchas
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

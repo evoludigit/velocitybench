@@ -1,0 +1,51 @@
+id: cqrs-pattern
+name: CQRS Pattern
+category: architecture
+type: standard
+tags:
+- architecture
+- cqrs_pattern
+summary:
+  short: Separating read and write models
+  long: Separating read and write models. This is a comprehensive pattern that provides
+    guidance on implementation and best practices.
+problem:
+  description: Issues arise without proper cqrs pattern
+  symptoms:
+  - System lacks proper cqrs pattern
+  - Performance or reliability issues
+  - Difficulty scaling the system
+  - Maintenance challenges
+  - Integration problems
+  impact: System reliability and performance degradation
+solution:
+  description: Implement cqrs pattern effectively
+key_concepts:
+  concept_1: Understanding cqrs pattern fundamentals
+  concept_2: Implementing cqrs pattern in your system
+  concept_3: Best practices for cqrs pattern
+implementation_considerations:
+  consideration_1: Understand your specific use case
+  consideration_2: Consider trade-offs and scalability
+  consideration_3: Plan for maintenance and evolution
+best_practices:
+- name: Understand cqrs-pattern
+  description: Learn the fundamentals before implementing
+- name: Plan carefully
+  description: Design for your specific requirements
+- name: Test thoroughly
+  description: Validate your implementation works
+- name: Monitor continuously
+  description: Track performance and issues
+anti_patterns:
+- name: Ignoring the pattern
+  consequence: Systems become unreliable
+- name: Misapplication
+  consequence: Wasted effort and poor results
+blog_hooks:
+  beginner:
+    focus: Introduction to CQRS Pattern
+  intermediate:
+    focus: Implementing CQRS Pattern
+  advanced:
+    focus: Advanced CQRS Pattern techniques

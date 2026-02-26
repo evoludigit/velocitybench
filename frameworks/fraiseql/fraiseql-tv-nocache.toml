@@ -1,0 +1,56 @@
+# FraiseQL v2 Configuration — TV Tables Variant, Cache DISABLED
+# VelocityBench Benchmark — Phase 1 Cache Comparison
+#
+# Identical to fraiseql-tv.toml except cache_enabled = false.
+# Used as the cold-read baseline to measure LRU cache speedup.
+# Start with:
+#   docker compose up -d fraiseql-tv-nocache
+
+schema_path = "schema.compiled.json"
+database_url = "postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark"
+bind_addr = "0.0.0.0:8815"
+
+cors_enabled = false
+
+pool_min_size = 10
+pool_max_size = 50
+pool_timeout_secs = 30
+
+introspection_enabled = true
+introspection_require_auth = false
+
+playground_enabled = false
+
+metrics_enabled = false
+
+# Cache explicitly disabled — cold reads hit PostgreSQL every time.
+cache_enabled = false
+
+[jsonb_optimization]
+default_strategy = "project"
+auto_threshold_percent = 80
+
+[project]
+name = "velocitybench-tv-nocache"
+version = "1.0.0"
+description = "VelocityBench FraiseQL TV-tables variant (cache disabled, cold-read baseline)"
+
+[fraiseql]
+schema_file = "schema.json"
+output_file = "schema.compiled.json"
+
+[fraiseql.security.audit_logging]
+enabled = false
+log_level = "info"
+include_sensitive_data = false
+async_logging = true
+
+[fraiseql.security.error_sanitization]
+enabled = true
+generic_messages = true
+
+[fraiseql.security.rate_limiting]
+enabled = false
+
+[fraiseql.security.state_encryption]
+enabled = false

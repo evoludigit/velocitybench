@@ -1,0 +1,58 @@
+id: view-refresh-strategies
+name: View Refresh Strategies
+category: fraiseql
+type: standard
+tags:
+- database
+- materialized-views
+- performance
+- maintenance
+- optimization
+summary:
+  short: Materialized view refresh patterns and concurrency handling
+  long: FraiseQL supports multiple materialized view refresh strategies (full refresh,
+    incremental, continuous) with configurable schedules, concurrent refresh for
+    zero-downtime updates, and automatic dependency ordering for cascading refreshes.
+problem:
+  description: Stale materialized views cause incorrect results
+  symptoms:
+  - Queries return outdated data
+  - Long refresh times block queries
+  - No refresh scheduling
+  - Cascading view refresh order issues
+  impact: Data staleness and query blocking
+solution:
+  description: Implement View Refresh Strategies effectively
+key_concepts:
+  concept_1: Full vs incremental vs continuous refresh
+  concept_2: Concurrent refresh for availability
+  concept_3: Dependency-aware refresh ordering
+  concept_4: Scheduled refresh triggers
+implementation_considerations:
+  consideration_1: Refresh frequency per view
+  consideration_2: Concurrency mode configuration
+  consideration_3: Refresh performance optimization
+  consideration_4: Failure handling and retry
+best_practices:
+- name: Use concurrent refresh
+  description: CONCURRENTLY for zero downtime
+- name: Incremental where possible
+  description: Faster refreshes for large views
+- name: Schedule appropriately
+  description: Balance freshness vs overhead
+- name: Order dependencies
+  description: Refresh base views before dependent
+anti_patterns:
+- name: Blocking refresh
+  consequence: Query downtime during refresh
+- name: No scheduling
+  consequence: Manual refresh or stale data
+- name: Wrong order
+  consequence: Dependent views still stale
+blog_hooks:
+  beginner:
+    focus: Introduction to View Refresh Strategies
+  intermediate:
+    focus: Implementing scheduled concurrent refreshes
+  advanced:
+    focus: Advanced incremental refresh and dependency management

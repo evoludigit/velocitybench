@@ -1,0 +1,28 @@
+id: performance-tuning
+name: Performance Tuning
+category: comprehensive
+type: standard
+tags:
+- performance
+summary:
+  short: Performance Tuning and implementation guidelines
+  long: Complete guide to performance tuning
+problem:
+  description: Challenges without proper performance tuning
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement performance tuning
+key_concepts:
+  concept: Performance Tuning
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

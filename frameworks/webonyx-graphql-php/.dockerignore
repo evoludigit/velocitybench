@@ -1,0 +1,30 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# PHP
+vendor/
+.phpunit.result.cache
+phpunit.xml
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Docs
+README.md
+*.md
+
+# Environment (use Docker env vars)
+.env*
+!.env.example
+
+# Database
+database/

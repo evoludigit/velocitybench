@@ -1,0 +1,73 @@
+# FraiseQL v2.0.0-beta.4 Configuration — TV Tables Variant
+# VelocityBench Benchmark Environment
+#
+# Variant B: Pre-computed JSONB tables (tv_*)
+#   - JSONB is baked in at INSERT time via fn_sync_tv_* functions
+#   - Zero join overhead at query time: fraiseql-server just SELECTs the column
+#   - Schema source: schema_tv.py → schema_tv.json → schema.compiled.json
+#
+# This file is identical to fraiseql.toml at runtime — the compiled schema
+# (schema.compiled.json) differs per image (built from schema_tv.py instead
+# of schema.py). Maintained separately for documentation clarity.
+
+# ============================================================================
+# Server Runtime Configuration
+# ============================================================================
+
+schema_path = "schema.compiled.json"
+database_url = "postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark"
+bind_addr = "0.0.0.0:8815"
+
+cors_enabled = false
+
+pool_min_size = 10
+pool_max_size = 50
+pool_timeout_secs = 30
+
+introspection_enabled = true
+introspection_require_auth = false
+
+playground_enabled = false
+
+metrics_enabled = false
+
+# Query result cache enabled — LRU with SHA-256 keying, 24h TTL, 10 000 entries
+# For cold-read baseline comparison, use fraiseql-tv-nocache.toml (cache_enabled = false).
+cache_enabled = true
+
+# ============================================================================
+# JSONB Optimization Strategy
+# ============================================================================
+
+[jsonb_optimization]
+default_strategy = "project"
+auto_threshold_percent = 80
+
+# ============================================================================
+# Compiler Configuration (fraiseql-cli compile fraiseql-tv.toml)
+# ============================================================================
+
+[project]
+name = "velocitybench-tv"
+version = "1.0.0"
+description = "VelocityBench FraiseQL TV-tables variant (pre-computed JSONB)"
+
+[fraiseql]
+schema_file = "schema.json"
+output_file = "schema.compiled.json"
+
+[fraiseql.security.audit_logging]
+enabled = false
+log_level = "info"
+include_sensitive_data = false
+async_logging = true
+
+[fraiseql.security.error_sanitization]
+enabled = true
+generic_messages = true
+
+[fraiseql.security.rate_limiting]
+enabled = false
+
+[fraiseql.security.state_encryption]
+enabled = false

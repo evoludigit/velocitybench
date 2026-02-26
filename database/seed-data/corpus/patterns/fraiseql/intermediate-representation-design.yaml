@@ -1,0 +1,50 @@
+id: intermediate-representation-design
+name: Intermediate Representation Design
+category: fraiseql
+type: standard
+tags:
+- compilation
+- intermediate-representation
+- architecture
+- design
+summary:
+  short: Language-agnostic compilation IR for schema normalization
+  long: The compilation pipeline uses an intermediate representation (IR) to normalize
+    schemas from different input languages, enabling database-agnostic compilation
+    and validation.
+problem:
+  description: Each input format requires custom compilation logic
+  symptoms:
+  - Code duplication across compilers
+  - Difficult to add new input formats
+  - Inconsistent compilation behavior
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Intermediate Representation Design effectively
+key_concepts:
+  concept_1: IR design and structure
+  concept_2: Format-to-IR translation
+  concept_3: IR-to-output generation
+implementation_considerations:
+  consideration_1: IR completeness and expressiveness
+  consideration_2: Round-trip conversion capability
+  consideration_3: Performance and memory efficiency
+best_practices:
+- name: Design for extension
+  description: IR should support new formats easily
+- name: Preserve fidelity
+  description: IR should not lose source information
+- name: Validate IR
+  description: Check IR consistency after translation
+anti_patterns:
+- name: Incomplete IR
+  consequence: Some formats lose information
+- name: Format-specific hacks
+  consequence: IR bloat and complexity
+blog_hooks:
+  beginner:
+    focus: Introduction to Intermediate Representation Design
+  intermediate:
+    focus: Implementing Intermediate Representation Design
+  advanced:
+    focus: Advanced Intermediate Representation Design techniques

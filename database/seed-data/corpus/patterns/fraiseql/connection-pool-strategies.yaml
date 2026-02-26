@@ -1,0 +1,58 @@
+id: connection-pool-strategies
+name: Connection Pool Strategies
+category: fraiseql
+type: standard
+tags:
+- performance
+- database
+- connection-pooling
+- scalability
+- resources
+summary:
+  short: Connection pool sizing formulas and lifecycle management
+  long: FraiseQL provides connection pool strategies with sizing formulas based on
+    CPU cores and workload, connection lifecycle management (idle timeout, max lifetime),
+    health checks, and automatic reconnection on failures.
+problem:
+  description: Poor connection pool configuration causes bottlenecks or waste
+  symptoms:
+  - Connection exhaustion under load
+  - Too many idle connections waste resources
+  - Stale connections cause errors
+  - No connection health checks
+  impact: Database bottlenecks and resource waste
+solution:
+  description: Implement Connection Pool Strategies effectively
+key_concepts:
+  concept_1: Pool size formula (cores * 2 + effective_spindle_count)
+  concept_2: Idle timeout configuration (10 minutes)
+  concept_3: Max connection lifetime (30 minutes)
+  concept_4: Health check queries
+implementation_considerations:
+  consideration_1: Pool size per instance
+  consideration_2: Connection acquisition timeout
+  consideration_3: Idle connection eviction
+  consideration_4: Reconnection strategies
+best_practices:
+- name: Size conservatively
+  description: Start with cores * 2, tune up
+- name: Set timeouts
+  description: Idle timeout and max lifetime
+- name: Health checks
+  description: Validate connections before use
+- name: Monitor pool
+  description: Track active/idle connection metrics
+anti_patterns:
+- name: Huge pools
+  consequence: Database connection exhaustion
+- name: No timeouts
+  consequence: Stale connection errors
+- name: No health checks
+  consequence: Errors from dead connections
+blog_hooks:
+  beginner:
+    focus: Introduction to Connection Pool Strategies
+  intermediate:
+    focus: Implementing optimal pool sizing and timeouts
+  advanced:
+    focus: Advanced pool tuning and connection lifecycle management

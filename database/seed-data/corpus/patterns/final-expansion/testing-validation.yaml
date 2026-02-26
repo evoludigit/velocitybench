@@ -1,0 +1,28 @@
+id: testing-validation
+name: Testing Validation
+category: comprehensive
+type: standard
+tags:
+- testing
+summary:
+  short: Testing Validation and implementation guidelines
+  long: Complete guide to testing validation
+problem:
+  description: Challenges without proper testing validation
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement testing validation
+key_concepts:
+  concept: Testing Validation
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

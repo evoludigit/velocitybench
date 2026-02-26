@@ -1,0 +1,28 @@
+id: durability-conventions
+name: Durability Conventions
+category: comprehensive
+type: standard
+tags:
+- durability
+summary:
+  short: Durability Conventions and implementation guidelines
+  long: Complete guide to durability conventions
+problem:
+  description: Challenges without proper durability conventions
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement durability conventions
+key_concepts:
+  concept: Durability Conventions
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

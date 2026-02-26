@@ -1,0 +1,16 @@
+# Python virtual environment
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# uv lock file
+uv.lock
+
+# Generated TSV files
+*.tsv
+
+# IDE
+.vscode/
+.idea/

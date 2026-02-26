@@ -1,0 +1,28 @@
+id: graphql-gotchas
+name: Graphql Gotchas
+category: comprehensive
+type: standard
+tags:
+- graphql
+summary:
+  short: Graphql Gotchas and implementation guidelines
+  long: Complete guide to graphql gotchas
+problem:
+  description: Challenges without proper graphql gotchas
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement graphql gotchas
+key_concepts:
+  concept: Graphql Gotchas
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

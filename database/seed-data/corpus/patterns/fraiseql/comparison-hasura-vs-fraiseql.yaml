@@ -1,0 +1,343 @@
+id: comparison-hasura-vs-fraiseql
+name: "Framework Comparison: Hasura vs FraiseQL (Zero-Code vs Code-First)"
+category: fraiseql
+type: comparison
+tags:
+  - framework-comparison
+  - graphql-architecture
+  - no-code
+  - customization
+
+summary:
+  short: "Compare Hasura (zero-code GraphQL platform) vs FraiseQL (code-first for optimization and customization)"
+  long: |
+    Hasura and FraiseQL occupy opposite ends of the automation spectrum.
+    Hasura eliminates code entirely - define relationships in UI, get GraphQL API instantly.
+    FraiseQL gives developers full control via Python code to optimize and customize everything.
+    This comparison helps teams choose between speed-with-constraints (Hasura) and control-with-responsibility (FraiseQL).
+
+problem:
+  description: |
+    As teams scale, they face the automation dilemma:
+    - Do we want maximum automation (zero code, constraints apply)?
+    - Or maximum control (more code, unlimited customization)?
+
+    Hasura: 100% automated, hits limits when you need customization
+    FraiseQL: 0% automated, full control when you need it
+
+comparison:
+  approach_1:
+    name: "Hasura (Zero-Code GraphQL Platform)"
+    philosophy: "Define relationships in UI, GraphQL API auto-generated, no code needed"
+
+    workflow: |
+      1. Connect PostgreSQL database to Hasura cloud
+      2. Define relationships between tables in UI (drag-and-drop)
+      3. Set permissions and roles (configuration)
+      4. GraphQL API available immediately (no deployment, no code)
+      5. Query via built-in GraphiQL or client
+
+      Visual example:
+      ┌──────────────────┐
+      │   Hasura Cloud   │
+      │  (No Code Setup) │
+      └────────┬─────────┘
+               │
+      Connect Database
+               │
+      ┌────────▼──────────┐
+      │  Define Tables    │ (UI)
+      │  Relationships    │
+      │  Permissions      │
+      └────────┬──────────┘
+               │
+      ┌────────▼──────────────────┐
+      │   GraphQL API Auto-Gen    │
+      │   (No Code Written)        │
+      └───────────────────────────┘
+
+    schema_ownership: "Database (introspected, managed via UI)"
+    customization: "Limited (constraints of platform, extensions for custom logic)"
+    deployment: "Cloud-hosted (or self-hosted but managed infrastructure)"
+
+    pros:
+      - "Zero code required (business logic only, no API boilerplate)"
+      - "Fastest time to API (minutes, not hours)"
+      - "No developers needed for setup (business users can configure)"
+      - "Automatic schema sync (database changes reflect immediately)"
+      - "Built-in permissions (role-based access control in UI)"
+      - "Built-in caching (Redis caching layer included)"
+      - "Hosted option (zero infrastructure management)"
+      - "Real-time subscriptions (WebSocket support out of box)"
+
+    cons:
+      - "Limited customization (stuck with framework limitations)"
+      - "Can't hand-optimize queries (no control over query generation)"
+      - "Vendor lock-in (Hasura cloud, custom config format)"
+      - "Custom logic requires webhooks or actions (extra infrastructure)"
+      - "N+1 problem not solved (generates naive queries)"
+      - "Expensive at scale (per-request pricing on cloud)"
+      - "Team dependency (knowledge of Hasura, not general GraphQL)"
+      - "Constraints you can't work around (hit walls at scale)"
+
+    best_for: "Rapid MVP development, non-technical stakeholders, traditional CRUD apps"
+    developer_experience: "Configuration over coding, hits limits as complexity grows"
+    scaling_model: "Good for traffic, limited for query optimization"
+
+  approach_2:
+    name: "FraiseQL (Code-First Framework)"
+    philosophy: "Python code defines schema and queries, full control over optimization and customization"
+
+    workflow: |
+      1. Define types as Python classes
+      2. Write queries (hand-optimized with SQL or framework helpers)
+      3. Deploy as application (traditional deployment)
+      4. GraphQL API runs on your infrastructure
+      5. All customization is code (full control)
+
+      Code example:
+      ```python
+      @fraiseql.type
+      class User:
+          id: str
+          email: str
+          posts: list[Post]
+
+      @fraiseql.type
+      class Post:
+          id: str
+          title: str
+          user: User
+
+      @fraiseql.query
+      async def get_user(user_id: str) -> User:
+          # Hand-optimized query
+          result = await db.query_one("""
+            SELECT
+              u.id, u.email,
+              jsonb_agg(p.*, NULL) as posts
+            FROM tb_user u
+            LEFT JOIN tb_post p ON p.user_id = u.id
+            WHERE u.id = %s
+            GROUP BY u.id
+          """, user_id)
+          return User(**result)
+
+      # Deploy as standard Python application
+      # app = fraiseql.create_app()
+      ```
+
+    schema_ownership: "Python code (types are source of truth)"
+    customization: "Unlimited (it's just Python code)"
+    deployment: "Self-hosted (Docker, Kubernetes, standard infrastructure)"
+
+    pros:
+      - "Full customization (no limits, it's code)"
+      - "Query optimization under control (hand-craft with JSONB, TV tables)"
+      - "No vendor lock-in (open framework, deploy anywhere)"
+      - "Customization is natural (business logic is just code)"
+      - "Cost predictable (standard infrastructure, not per-request)"
+      - "Team independence (general Python knowledge transfers)"
+      - "Advanced features (cascade invalidation, three-state, streaming)"
+      - "Integration natural (it's part of your application)"
+
+    cons:
+      - "More code required (types and queries explicitly written)"
+      - "Slower initial setup (write code first)"
+      - "Requires developers (not a no-code platform)"
+      - "Infrastructure management (deploy and maintain yourself)"
+      - "Team knowledge required (SQL optimization, Python)"
+      - "Not zero-code (customization requires coding)"
+      - "Feature velocity lower initially (more code upfront)"
+      - "Permissions in code (not drag-and-drop UI)"
+
+    best_for: "Long-term scalability, complex business logic, optimization critical"
+    developer_experience: "Maximum control, more responsibility"
+    scaling_model: "Excellent (JSONB composition, TV tables, cascade invalidation)"
+
+  fraiseql_choice:
+    name: "Code-First for Control and Customization"
+    rationale: |
+      FraiseQL chose **code-first framework** (not zero-code platform) because:
+      1. **Unlimited customization**: Business logic never hits framework limits
+      2. **Query optimization**: Hand-optimize when needed (not when framework allows)
+      3. **Cost efficiency**: Standard infrastructure (not per-request pricing)
+      4. **Team independence**: General Python knowledge, not platform-specific
+      5. **Long-term viability**: Own your API, not locked into vendor
+
+    implementation_philosophy: |
+      FraiseQL's philosophy:
+      - Code is more flexible than configuration (always can do more)
+      - Explicit queries prevent surprise N+1s (visible in code)
+      - Type system enforces consistency (Python types)
+      - Optimization is always available (can use JSONB, TV tables anytime)
+      - Customization grows with code (no artificial limits)
+
+      Key insight: Code-first isn't slower for long-term projects:
+      - Initial setup: Yes, slower than Hasura (define types, write queries)
+      - At 1 month: Same speed (APIs are running)
+      - At 3 months: FraiseQL faster (less time fighting constraints)
+      - At 6 months+: FraiseQL much faster (no vendor roadmap dependency)
+
+    assessment_strengths: |
+      ✓ **Unlimited customization**: No framework limits (it's your code)
+      ✓ **Query optimization**: Hand-optimize when economics demand it
+      ✓ **Cost efficiency**: Standard infrastructure, no surprise scaling costs
+      ✓ **Team independence**: Python knowledge transfers to other projects
+      ✓ **No vendor lock-in**: Run anywhere, modify anything
+      ✓ **Advanced features**: Cascade invalidation, streaming, JSONB composition
+      ✓ **Type safety**: Python type system prevents bugs
+      ✓ **Sustainable**: Not dependent on vendor roadmap
+
+    assessment_weaknesses: |
+      ✗ **More code**: Write types and queries explicitly
+      ✗ **Slower initial**: Setup takes longer than Hasura
+      ✗ **Requires developers**: Not a no-code solution
+      ✗ **Infrastructure**: Deploy and manage yourself
+      ✗ **Team knowledge**: Need SQL optimization understanding
+      ✗ **Feature velocity initially**: More code before first API call
+      ✗ **Permissions complex**: Not UI-based drag-and-drop
+
+    why_not_hasura: |
+      Hasura was rejected because:
+      - Zero-code means zero customization (hit limits inevitably)
+      - Vendor lock-in (configuration in Hasura format, not transferable)
+      - Per-request pricing (scales cost with traffic, not infrastructure)
+      - Custom logic requires webhooks (extra infrastructure, complexity)
+      - N+1 problem not solved (generated queries are naive)
+      - Can't hand-optimize when needed (framework decides query strategy)
+      - Team dependency (specific to Hasura, doesn't transfer)
+
+benchmarks:
+  scenario: "Building user API with posts, comments, aggregations, custom business logic"
+
+  time_to_first_query:
+    hasura: "15 minutes (connect DB, define relationships, query)"
+    fraiseql: "1 hour (define types, write queries, deploy)"
+
+  time_to_production_ready:
+    hasura: "2-3 weeks (add custom logic via webhooks, find workarounds)"
+    fraiseql: "2-3 weeks (implement features properly, no workarounds)"
+
+  time_to_add_custom_business_logic:
+    hasura: "Very high (webhook, extra infrastructure, coordination)"
+    fraiseql: "Low (add resolver, it's just Python)"
+
+  query_latency_naive:
+    hasura: "150-300ms (N+1 generated queries)"
+    fraiseql: "35-45ms (JSONB composition)"
+
+  cost_at_scale:
+    hasura_cloud_1m_req_month: "$3,000-5,000 (per-request pricing)"
+    fraiseql_infrastructure: "$500-1,000 (standard servers)"
+
+  team_onboarding:
+    hasura: "Quick (learn UI), then hits ceiling (need coding to go further)"
+    fraiseql: "Slower initially (learn framework), then unlimited (full Python)"
+
+  vendor_lock_in:
+    hasura: "High (proprietary configuration, Hasura-specific knowledge)"
+    fraiseql: "None (standard Python, open framework)"
+
+decision_matrix:
+  mvp_speed_critical:
+    question: "How critical is speed to first working prototype?"
+    answer_very_critical_days: "Hasura (15 min to working API)"
+    answer_normal_weeks: "FraiseQL (1 hour, better long-term)"
+
+  custom_business_logic:
+    question: "Do you have custom business logic beyond CRUD?"
+    answer_minimal_just_crud: "Hasura (sufficient for simple operations)"
+    answer_complex_logic: "FraiseQL (customization always available)"
+
+  query_optimization_maturity:
+    question: "Will query optimization become important?"
+    answer_probably_yes: "FraiseQL (control from day one)"
+    answer_unlikely_no: "Hasura (defer until needed, if it becomes needed)"
+
+  team_infrastructure:
+    question: "Does your team manage infrastructure?"
+    answer_yes_own_deployment: "FraiseQL (standard Docker, Kubernetes)"
+    answer_no_prefer_managed: "Hasura (cloud-hosted is easy)"
+
+  vendor_lock_in_tolerance:
+    question: "How acceptable is vendor lock-in?"
+    answer_acceptable_benefit_speed: "Hasura (trade lock-in for speed)"
+    answer_unacceptable_own_destiny: "FraiseQL (complete independence)"
+
+  cost_sensitivity:
+    question: "How sensitive is cost to request volume?"
+    answer_very_cost_sensitive: "FraiseQL (fixed cost, scales with infrastructure)"
+    answer_cost_insensitive: "Hasura (per-request is fine)"
+
+trade_off_summary:
+  speed_vs_customization: |
+    Hasura: Very fast initially (15 min), zero customization
+    FraiseQL: Moderate setup (1 hour), unlimited customization
+
+    **Hasura is faster at start, FraiseQL catches up at month 2 (when customization needed).**
+
+  zero_code_vs_full_control: |
+    Hasura: No code means no control
+    FraiseQL: Full code means full control
+
+    **FraiseQL's code is actually faster when hitting Hasura's limits.**
+
+  vendor_managed_vs_self_managed: |
+    Hasura: Vendor manages infrastructure (and lock-in cost)
+    FraiseQL: You manage infrastructure (and own it completely)
+
+    **Hasura pays in lock-in and cost at scale, FraiseQL pays in management effort.**
+
+  configuration_vs_coding: |
+    Hasura: Configuration-driven (limited to framework capabilities)
+    FraiseQL: Code-driven (limited only by imagination and effort)
+
+    **Configuration is fast until you hit limits. Code is slower until you don't.**
+
+recommendations:
+  - "Use Hasura for true CRUD-only MVPs (no custom logic)"
+  - "Use Hasura for non-technical teams (business users configure)"
+  - "Use FraiseQL if custom business logic is anticipated"
+  - "Use FraiseQL if query optimization will matter (scale expectations)"
+  - "Use FraiseQL if you want cost predictability (standard infrastructure)"
+  - "Use FraiseQL if you want to own your API (no vendor risk)"
+  - "Consider switching from Hasura to FraiseQL when custom logic becomes critical"
+
+cost_analysis:
+  hasura:
+    cloud_pricing: "per-request (0.001-0.0001 $ per request)"
+    at_1m_daily_requests: "$3,000/month (unsustainable for large scale)"
+    infrastructure_ops: "Zero (managed by Hasura)"
+    customization_cost: "High (webhooks, workarounds, extra services)"
+
+  fraiseql:
+    infrastructure_cost: "$500-2,000/month (standard cloud servers)"
+    at_10m_daily_requests: "$500-2,000/month (doesn't scale with traffic)"
+    infrastructure_ops: "Moderate (manage your deployment)"
+    customization_cost: "Low (just code)"
+
+blog_hooks:
+  beginner:
+    focus: "Understanding zero-code vs code-first"
+    key_points:
+      - "Hasura: No code, no customization (hits limits quickly)"
+      - "FraiseQL: Code-first, unlimited customization"
+      - "Hasura faster to start (15 min vs 1 hour)"
+      - "FraiseQL better long-term (no vendor limits)"
+
+  intermediate:
+    focus: "Trade-offs in practice as projects grow"
+    key_points:
+      - "Hasura: Great for MVP, problems at month 2-3 (need custom logic)"
+      - "FraiseQL: Slower start, no ceiling as project grows"
+      - "Hasura: Cost explodes with scale (per-request pricing)"
+      - "FraiseQL: Cost stays predictable (standard infrastructure)"
+
+  advanced:
+    focus: "Choosing for production at scale"
+    key_points:
+      - "Hasura: Lock-in cost becomes real at scale"
+      - "FraiseQL: Optimization control critical for performance"
+      - "Hasura: Good for simple products (CRUD, standard patterns)"
+      - "FraiseQL: Good for complex products (custom logic, optimization)"

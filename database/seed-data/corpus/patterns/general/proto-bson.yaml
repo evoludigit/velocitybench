@@ -1,0 +1,31 @@
+id: proto-bson
+name: BSON Protocol Patterns
+category: general
+type: standard
+tags:
+- proto
+summary:
+  short: Best practices for bson protocol patterns
+  long: Comprehensive guide to bson protocol patterns. This pattern covers implementation
+    details, best practices, and common pitfalls.
+problem:
+  description: Issues without proper bson protocol patterns
+  symptoms:
+  - Performance issues
+  - Reliability problems
+  - Scalability challenges
+  impact: System degradation
+solution:
+  description: Implement bson protocol patterns effectively
+key_concepts:
+  concept: Understanding bson protocol patterns
+best_practices:
+- name: Best practice 1
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Introduction to BSON Protocol Patterns
+  intermediate:
+    focus: Implementing BSON Protocol Patterns
+  advanced:
+    focus: Advanced BSON Protocol Patterns

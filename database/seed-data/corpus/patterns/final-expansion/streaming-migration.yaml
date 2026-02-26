@@ -1,0 +1,28 @@
+id: streaming-migration
+name: Streaming Migration
+category: comprehensive
+type: standard
+tags:
+- streaming
+summary:
+  short: Streaming Migration and implementation guidelines
+  long: Complete guide to streaming migration
+problem:
+  description: Challenges without proper streaming migration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement streaming migration
+key_concepts:
+  concept: Streaming Migration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

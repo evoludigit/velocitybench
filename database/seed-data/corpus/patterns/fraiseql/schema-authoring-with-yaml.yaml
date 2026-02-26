@@ -1,0 +1,49 @@
+id: schema-authoring-with-yaml
+name: Schema Authoring with YAML
+category: fraiseql
+type: standard
+tags:
+- compilation
+- yaml
+- schema-authoring
+- declarative
+summary:
+  short: Declarative schema definition using YAML syntax
+  long: YAML-based schema authoring provides a language-agnostic way to define GraphQL
+    schemas, ideal for configuration-driven development and multi-language teams.
+problem:
+  description: Complex schema definitions are hard to version control and review
+  symptoms:
+  - Large schema files difficult to maintain
+  - Version control conflicts in schema files
+  - Difficulty in generating alternative formats
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Schema Authoring with YAML effectively
+key_concepts:
+  concept_1: YAML schema structure and syntax
+  concept_2: Type relationships and bindings
+  concept_3: Validation rules in YAML
+implementation_considerations:
+  consideration_1: YAML parser compatibility
+  consideration_2: Schema organization and modularity
+  consideration_3: Cross-platform line ending handling
+best_practices:
+- name: Modularize
+  description: Split large schemas into multiple files
+- name: Use anchors
+  description: Leverage YAML anchors for reusable definitions
+- name: Version control
+  description: Track schema changes with clear diffs
+anti_patterns:
+- name: Monolithic files
+  consequence: Difficult to review and merge
+- name: Missing validation
+  consequence: Invalid schemas deployed to production
+blog_hooks:
+  beginner:
+    focus: Introduction to Schema Authoring with YAML
+  intermediate:
+    focus: Implementing Schema Authoring with YAML
+  advanced:
+    focus: Advanced Schema Authoring with YAML techniques

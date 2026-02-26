@@ -1,0 +1,345 @@
+# HAVING Clause Filtering (FraiseQL)
+# VelocityBench Knowledge Corpus
+
+id: having-clause-filtering
+name: "HAVING Clause for Post-Aggregation Filtering"
+category: fraiseql
+type: pattern
+severity: medium
+tags:
+  - fraiseql
+  - analytics
+  - having
+  - filtering
+  - sql
+  - aggregation
+
+summary:
+  short: "Filter grouped results after aggregation (revenue_sum > 10000)"
+  long: |
+    HAVING filters aggregated results after GROUP BY, while WHERE filters rows before
+    aggregation. FraiseQL compiles GraphQL having arguments into SQL HAVING clauses,
+    enabling filters like "show categories with revenue > $10k" or "products with avg rating > 4.5".
+
+problem:
+  description: |
+    Filtering aggregated data requires understanding SQL execution order:
+    - WHERE filters BEFORE aggregation (filters individual rows)
+    - HAVING filters AFTER aggregation (filters grouped results)
+    - Using WHERE on aggregate functions causes SQL errors
+    - Application-side filtering wastes resources aggregating unwanted groups
+
+    FraiseQL generates correct HAVING clauses for post-aggregation filters.
+
+  symptoms:
+    - name: "SQL error on aggregate in WHERE"
+      description: "WHERE revenue_sum > 10000 causes error"
+      detection: "SQL error: aggregate functions not allowed in WHERE clause"
+
+    - name: "Over-aggregation in application"
+      description: "Aggregate all groups, filter in code"
+      detection: "Transferring 1000s of groups, filtering down to 10 in application"
+
+    - name: "Confusion about WHERE vs HAVING"
+      description: "Developers unsure when to use each"
+      detection: "Wrong results or slow queries from incorrect filter placement"
+
+solution:
+  principle: "Use HAVING to filter grouped results after aggregation completes"
+
+  components:
+    - name: "HAVING Clause"
+      type: "SQL clause"
+      purpose: "Filters groups after GROUP BY and aggregation"
+
+    - name: "Aggregate Comparison"
+      type: "Filter condition"
+      purpose: "Compare aggregate results (SUM, AVG, COUNT) to threshold values"
+
+    - name: "Multiple Conditions"
+      type: "Boolean logic"
+      purpose: "Combine HAVING filters with AND/OR"
+
+execution_order:
+  sql_execution_sequence:
+    - step: 1
+      clause: "FROM"
+      description: "Select tables"
+
+    - step: 2
+      clause: "WHERE"
+      description: "Filter individual rows BEFORE aggregation"
+
+    - step: 3
+      clause: "GROUP BY"
+      description: "Group rows by dimensions"
+
+    - step: 4
+      clause: "Aggregate Functions"
+      description: "Calculate SUM, AVG, COUNT for each group"
+
+    - step: 5
+      clause: "HAVING"
+      description: "Filter groups AFTER aggregation"
+
+    - step: 6
+      clause: "ORDER BY"
+      description: "Sort final results"
+
+    - step: 7
+      clause: "LIMIT"
+      description: "Limit result count"
+
+implementation:
+  simple_having:
+    graphql: |
+      query {
+        sales_aggregate(
+          groupBy: { category: true },
+          having: { revenue_sum_gt: 10000 }
+        ) {
+          category
+          revenue_sum
+          count
+        }
+      }
+
+    postgresql: |
+      SELECT
+          data->>'category' AS category,
+          SUM(revenue) AS revenue_sum,
+          COUNT(*) AS count
+      FROM tf_sales
+      GROUP BY data->>'category'
+      HAVING SUM(revenue) > $1;
+      -- Parameters: [10000]
+
+    result: "Only categories with total revenue > $10,000"
+    performance: "~1-2ms for 1M rows"
+
+  multiple_conditions:
+    graphql: |
+      query {
+        sales_aggregate(
+          groupBy: { category: true },
+          having: {
+            revenue_sum_gt: 10000,
+            count_gte: 100
+          }
+        ) {
+          category
+          revenue_sum
+          count
+        }
+      }
+
+    postgresql: |
+      SELECT
+          data->>'category' AS category,
+          SUM(revenue) AS revenue_sum,
+          COUNT(*) AS count
+      FROM tf_sales
+      GROUP BY data->>'category'
+      HAVING SUM(revenue) > $1 AND COUNT(*) >= $2;
+      -- Parameters: [10000, 100]
+
+    result: "Categories with revenue > $10k AND at least 100 orders"
+
+  average_threshold:
+    graphql: |
+      query {
+        sales_aggregate(
+          groupBy: { product_id: true },
+          having: { revenue_avg_gte: 500 }
+        ) {
+          product_id
+          revenue_avg
+          count
+        }
+      }
+
+    postgresql: |
+      SELECT
+          product_id,
+          AVG(revenue) AS revenue_avg,
+          COUNT(*) AS count
+      FROM tf_sales
+      GROUP BY product_id
+      HAVING AVG(revenue) >= $1;
+      -- Parameters: [500]
+
+    result: "Products with average order value >= $500"
+
+  count_filter:
+    graphql: |
+      query {
+        sales_aggregate(
+          groupBy: { customer_id: true },
+          having: { count_gte: 5 }
+        ) {
+          customer_id
+          count
+          revenue_sum
+        }
+      }
+
+    postgresql: |
+      SELECT
+          customer_id,
+          COUNT(*) AS count,
+          SUM(revenue) AS revenue_sum
+      FROM tf_sales
+      GROUP BY customer_id
+      HAVING COUNT(*) >= $1
+      ORDER BY revenue_sum DESC;
+      -- Parameters: [5]
+
+    result: "Customers with 5+ orders (loyalty segment)"
+
+  combined_where_and_having:
+    graphql: |
+      query {
+        sales_aggregate(
+          where: { occurred_at_gte: "2024-01-01" },
+          groupBy: { category: true },
+          having: { revenue_sum_gt: 10000 }
+        ) {
+          category
+          revenue_sum
+          count
+        }
+      }
+
+    postgresql: |
+      SELECT
+          data->>'category' AS category,
+          SUM(revenue) AS revenue_sum,
+          COUNT(*) AS count
+      FROM tf_sales
+      WHERE occurred_at >= $1              -- Filter BEFORE aggregation
+      GROUP BY data->>'category'
+      HAVING SUM(revenue) > $2;            -- Filter AFTER aggregation
+      -- Parameters: ["2024-01-01", 10000]
+
+    explanation: "WHERE filters individual sales (2024+), then HAVING filters categories ($10k+)"
+
+where_vs_having:
+  where_clause:
+    purpose: "Filter individual rows BEFORE aggregation"
+    example: "WHERE customer_id = 'uuid-123'"
+    use_case: "Narrow down data before expensive aggregation"
+    performance: "Fast with indexes, reduces rows to aggregate"
+
+  having_clause:
+    purpose: "Filter grouped results AFTER aggregation"
+    example: "HAVING SUM(revenue) > 10000"
+    use_case: "Filter on aggregate calculations"
+    performance: "Runs after aggregation, filters final groups"
+
+  wrong_usage:
+    - error: "WHERE SUM(revenue) > 10000"
+      reason: "Aggregate functions not allowed in WHERE"
+      fix: "Use HAVING SUM(revenue) > 10000"
+
+    - error: "HAVING customer_id = 'uuid-123'"
+      reason: "Inefficient - filters after aggregation"
+      fix: "Use WHERE customer_id = 'uuid-123' (filter before aggregation)"
+
+best_practices:
+  - name: "Use WHERE for row-level filters"
+    description: "Filter before aggregation to reduce workload"
+    example: "WHERE occurred_at >= '2024-01-01' AND status = 'completed'"
+    rationale: "Less data to aggregate = faster query"
+
+  - name: "Use HAVING for aggregate filters"
+    description: "Filter on SUM, AVG, COUNT, MIN, MAX results"
+    example: "HAVING SUM(revenue) > 10000"
+    rationale: "Only way to filter aggregated values"
+
+  - name: "Combine WHERE and HAVING"
+    description: "Filter rows first (WHERE), then filter groups (HAVING)"
+    example: "WHERE status = 'completed' ... HAVING COUNT(*) >= 5"
+    rationale: "Optimal performance - filter early, aggregate less data"
+
+  - name: "Use appropriate comparison operators"
+    description: "gt (>), gte (>=), lt (<), lte (<=), eq (=), ne (!=)"
+    example: "having: { revenue_sum_gte: 10000, count_lt: 1000 }"
+    rationale: "Clear intent, compiles to correct SQL operator"
+
+anti_patterns:
+  - name: "WHERE on aggregate function"
+    consequence: "SQL error - aggregate functions not allowed in WHERE"
+    example: "WHERE SUM(revenue) > 10000 ❌"
+    fix: "HAVING SUM(revenue) > 10000 ✓"
+
+  - name: "HAVING without GROUP BY"
+    consequence: "Treats entire table as single group (may not be intended)"
+    example: "SELECT COUNT(*) FROM sales HAVING COUNT(*) > 100"
+    note: "Valid SQL but usually not what you want"
+
+  - name: "Row-level filter in HAVING"
+    consequence: "Filters after aggregation (inefficient)"
+    example: "HAVING customer_id = 'uuid-123' ❌"
+    fix: "WHERE customer_id = 'uuid-123' ✓"
+
+  - name: "Application-side filtering of aggregates"
+    consequence: "Wasted network transfer and memory"
+    example: "Aggregate all 1000 categories, filter to 10 in code ❌"
+    fix: "HAVING revenue_sum > 10000 in SQL ✓"
+
+use_cases:
+  - scenario: "Top categories by revenue"
+    query: "Categories with revenue > $10k"
+    having: "revenue_sum_gt: 10000"
+    benefit: "Database returns only relevant categories"
+
+  - scenario: "High-value customers"
+    query: "Customers with 5+ orders and $1000+ total spend"
+    having: "count_gte: 5, revenue_sum_gte: 1000"
+    benefit: "Target loyalty programs efficiently"
+
+  - scenario: "Underperforming products"
+    query: "Products with low average rating but many reviews"
+    having: "rating_avg_lt: 3.0, count_gte: 20"
+    benefit: "Identify products needing attention"
+
+  - scenario: "Active API customers"
+    query: "Customers with 1000+ API requests this month"
+    having: "request_count_gte: 1000"
+    benefit: "Monitor usage-based billing thresholds"
+
+related_patterns:
+  - id: "aggregation-model"
+    description: "How FraiseQL compiles aggregate functions"
+
+  - id: "groupby-jsonb-dimensions"
+    description: "Grouping by JSONB dimensions before HAVING filters"
+
+  - id: "fact-dimension-pattern"
+    description: "Table structure enabling efficient aggregation + filtering"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      WHERE vs HAVING is like sorting apples:
+      - WHERE: "Pick only red apples" (filter individual apples)
+      - GROUP BY: "Sort apples into boxes by size"
+      - HAVING: "Keep only boxes with 10+ apples" (filter boxes, not apples)
+
+      You can't say "pick only apples in boxes with 10+ apples" before sorting them!
+
+  intermediate:
+    focus: "SQL execution order and performance optimization"
+    key_points:
+      - "Execution order: WHERE → GROUP BY → HAVING"
+      - "WHERE filters rows (fast with indexes)"
+      - "HAVING filters groups (after expensive aggregation)"
+      - "Combine both for optimal performance"
+
+  advanced:
+    focus: "Complex filters and query optimization"
+    key_points:
+      - "Multiple HAVING conditions with AND/OR"
+      - "Performance implications of early vs late filtering"
+      - "Index strategy for WHERE + GROUP BY + HAVING queries"
+      - "When to push filters to WHERE vs keep in HAVING"

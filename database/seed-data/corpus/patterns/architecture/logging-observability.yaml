@@ -1,0 +1,249 @@
+# Logging and Observability Patterns
+# VelocityBench Knowledge Corpus
+
+id: logging-observability
+name: "Logging and Observability Best Practices"
+category: architecture
+type: pattern
+tags:
+  - logging
+  - observability
+  - monitoring
+  - tracing
+  - metrics
+
+summary:
+  short: "Understand system behavior through logs, metrics, and traces"
+  long: |
+    Observability is the ability to understand what's happening inside your system
+    by examining its outputs. The three pillars are logs (events), metrics (numbers),
+    and traces (request flows). Together, they enable debugging, performance analysis,
+    and proactive monitoring of distributed systems.
+
+problem:
+  description: |
+    Modern distributed systems are complex. When something goes wrong, finding the
+    root cause requires understanding what happened across multiple services.
+    Without proper observability, debugging becomes guesswork, performance issues
+    go undetected, and outages take longer to resolve.
+
+  symptoms:
+    - name: "Slow incident resolution"
+      description: "Hours spent finding root cause"
+      detection: "High MTTR (Mean Time to Recovery)"
+
+    - name: "Unknown unknowns"
+      description: "Problems discovered by users, not monitoring"
+      detection: "User complaints before alerts"
+
+    - name: "Finger pointing"
+      description: "Can't determine which service caused issue"
+      detection: "Blame games during incidents"
+
+three_pillars:
+  - name: "Logs"
+    description: "Discrete events with context"
+    purpose: "What happened and when"
+    example: |
+      {
+        "timestamp": "2024-01-15T10:30:45.123Z",
+        "level": "ERROR",
+        "service": "order-service",
+        "request_id": "req_abc123",
+        "user_id": "user_456",
+        "message": "Payment failed",
+        "error": {
+          "code": "INSUFFICIENT_FUNDS",
+          "details": "Card declined"
+        }
+      }
+    best_practices:
+      - "Use structured logging (JSON)"
+      - "Include correlation IDs"
+      - "Use appropriate log levels"
+      - "Don't log sensitive data"
+      - "Include context (user, request, service)"
+
+  - name: "Metrics"
+    description: "Numerical measurements over time"
+    purpose: "How is the system performing"
+    types:
+      - name: "Counter"
+        description: "Monotonically increasing value"
+        example: "Total requests, errors, sales"
+      - name: "Gauge"
+        description: "Point-in-time value"
+        example: "CPU usage, queue length, active users"
+      - name: "Histogram"
+        description: "Distribution of values"
+        example: "Request latency percentiles"
+    key_metrics:
+      - name: "RED Method (Request-focused)"
+        metrics:
+          - "Rate: Requests per second"
+          - "Errors: Failed requests per second"
+          - "Duration: Latency distribution"
+      - name: "USE Method (Resource-focused)"
+        metrics:
+          - "Utilization: % time resource is busy"
+          - "Saturation: Work queued"
+          - "Errors: Error events"
+
+  - name: "Traces"
+    description: "Request flow across services"
+    purpose: "How does a request traverse the system"
+    example: |
+      Trace ID: trace_xyz789
+
+      Service: API Gateway (50ms)
+      └── Service: User Service (20ms)
+      └── Service: Order Service (200ms)
+          └── Service: Payment Service (150ms)
+          └── Service: Inventory Service (30ms)
+      └── Service: Notification Service (10ms)
+    components:
+      - name: "Trace"
+        description: "Complete request journey"
+      - name: "Span"
+        description: "Single operation within a trace"
+      - name: "Context Propagation"
+        description: "Passing trace ID across services"
+
+logging_levels:
+  - level: "DEBUG"
+    use_for: "Detailed diagnostic information"
+    production: "Disabled or sampling"
+
+  - level: "INFO"
+    use_for: "General operational events"
+    production: "Enabled"
+
+  - level: "WARN"
+    use_for: "Potentially harmful situations"
+    production: "Enabled, alert on frequency"
+
+  - level: "ERROR"
+    use_for: "Error events (system continues)"
+    production: "Enabled, alert immediately"
+
+  - level: "FATAL"
+    use_for: "Critical errors (system stops)"
+    production: "Enabled, page on-call"
+
+implementation:
+  structured_logging: |
+    # Python with structlog
+    import structlog
+
+    logger = structlog.get_logger()
+
+    logger.info(
+        "Order processed",
+        order_id="ord_123",
+        user_id="user_456",
+        total=99.99,
+        items=3
+    )
+
+  correlation_ids: |
+    # Middleware to propagate request ID
+    from uuid import uuid4
+
+    @app.middleware("http")
+    async def add_request_id(request, call_next):
+        request_id = request.headers.get("X-Request-ID") or str(uuid4())
+        request.state.request_id = request_id
+
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
+
+  metrics: |
+    # Python with Prometheus client
+    from prometheus_client import Counter, Histogram
+
+    REQUEST_COUNT = Counter(
+        'http_requests_total',
+        'Total HTTP requests',
+        ['method', 'endpoint', 'status']
+    )
+
+    REQUEST_LATENCY = Histogram(
+        'http_request_duration_seconds',
+        'HTTP request latency',
+        ['method', 'endpoint']
+    )
+
+    @app.route("/users")
+    def get_users():
+        with REQUEST_LATENCY.labels("GET", "/users").time():
+            result = fetch_users()
+            REQUEST_COUNT.labels("GET", "/users", "200").inc()
+            return result
+
+  tracing: |
+    # Python with OpenTelemetry
+    from opentelemetry import trace
+    from opentelemetry.sdk.trace import TracerProvider
+
+    tracer = trace.get_tracer(__name__)
+
+    async def process_order(order_id):
+        with tracer.start_as_current_span("process_order") as span:
+            span.set_attribute("order_id", order_id)
+
+            with tracer.start_as_current_span("validate_order"):
+                await validate(order_id)
+
+            with tracer.start_as_current_span("charge_payment"):
+                await charge(order_id)
+
+tools:
+  logging:
+    - "ELK Stack (Elasticsearch, Logstash, Kibana)"
+    - "Loki + Grafana"
+    - "Datadog Logs"
+    - "Splunk"
+
+  metrics:
+    - "Prometheus + Grafana"
+    - "Datadog Metrics"
+    - "InfluxDB"
+    - "CloudWatch"
+
+  tracing:
+    - "Jaeger"
+    - "Zipkin"
+    - "Datadog APM"
+    - "Honeycomb"
+
+  all_in_one:
+    - "Datadog"
+    - "New Relic"
+    - "Dynatrace"
+    - "Grafana Cloud"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Observability is like a car's dashboard:
+      - Logs: Trip computer messages ("Door ajar", "Low fuel")
+      - Metrics: Gauges (speed, RPM, fuel level)
+      - Traces: GPS navigation showing route taken
+      Without a dashboard, you're driving blind. Same with software!
+
+  intermediate:
+    focus: "Implementing the three pillars"
+    key_points:
+      - "Structured logging best practices"
+      - "Key metrics to track (RED/USE methods)"
+      - "Distributed tracing setup"
+      - "Correlation IDs for debugging"
+
+  advanced:
+    focus: "Observability at scale"
+    key_points:
+      - "Log sampling and aggregation"
+      - "High-cardinality metrics"
+      - "Trace sampling strategies"
+      - "SLIs, SLOs, and error budgets"

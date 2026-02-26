@@ -1,0 +1,28 @@
+id: serverless-validation
+name: Serverless Validation
+category: comprehensive
+type: standard
+tags:
+- serverless
+summary:
+  short: Serverless Validation and implementation guidelines
+  long: Complete guide to serverless validation
+problem:
+  description: Challenges without proper serverless validation
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement serverless validation
+key_concepts:
+  concept: Serverless Validation
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

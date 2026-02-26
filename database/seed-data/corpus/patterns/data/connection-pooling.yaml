@@ -1,0 +1,319 @@
+id: connection-pooling
+name: "Database Connection Pooling"
+category: data
+type: standard
+tags:
+  - database
+  - connections
+  - performance
+  - resource-management
+
+summary:
+  short: "Reusing database connections to avoid expensive connection overhead"
+  long: |
+    Opening a database connection requires authenticating, initializing protocol, and allocating resources - expensive operations. Connection pooling maintains a pool of pre-opened connections that applications reuse, dramatically improving performance and reducing database load.
+
+problem:
+  description: "Creating new database connection per request is slow and exhausts resources"
+  symptoms:
+    - "Application creates 10k connections; database max is 100"
+    - "Connection timeout: Too many connections to database"
+    - "Each request takes 100ms just to connect"
+    - "Database memory exhausted by connection overhead"
+    - "Spikes cause \"connection refused\" errors"
+  impact: "Poor performance, connection timeouts, database crashes, lost requests"
+
+solution:
+  description: "Use connection pool to maintain and reuse connections"
+
+how_pooling_works:
+  without_pooling: |
+    Request 1: Connect (100ms) → Query (50ms) → Disconnect (50ms) = 200ms total
+    Request 2: Connect (100ms) → Query (50ms) → Disconnect (50ms) = 200ms total
+    Request 3: Connect (100ms) → Query (50ms) → Disconnect (50ms) = 200ms total
+
+    Problem: 300ms wasted on connect/disconnect for 3 requests!
+
+  with_pooling: |
+    Setup: Pre-open 10 connections
+    Request 1: Borrow (0ms) → Query (50ms) → Return (0ms) = 50ms total
+    Request 2: Borrow (0ms) → Query (50ms) → Return (0ms) = 50ms total
+    Request 3: Borrow (0ms) → Query (50ms) → Return (0ms) = 50ms total
+
+    Benefit: 150ms instead of 600ms (4x faster!)
+
+  process: |
+    Pool maintains N connections:
+    [Conn1] [Conn2] [Conn3] ... [ConnN]
+
+    Request arrives:
+    1. Request asks pool for connection
+    2. Pool returns idle connection (or waits if all busy)
+    3. Request executes query
+    4. Request returns connection to pool
+    5. Connection ready for next request
+
+pool_configuration:
+  min_size: |
+    Minimum connections to keep open
+    Default: 2-5
+
+    Too low: Slow for sudden traffic spikes
+    Too high: Waste resources when idle
+
+  max_size: |
+    Maximum connections to create
+    Default: 10-50 (database dependent)
+
+    Database limit: PostgreSQL default max_connections = 100
+    Application max_size = 20 (leaves room for other apps)
+
+  queue_timeout: |
+    How long to wait for available connection
+    Default: 30 seconds
+
+    If no connection available after 30s:
+    Throw: "Connection pool exhausted"
+
+  idle_timeout: |
+    How long idle connection stays open
+    Default: 10-15 minutes
+
+    Idle connection closed after timeout to free resources
+
+  example_config: |
+    pool = Pool(
+        host='db.example.com',
+        user='app_user',
+        password='secret',
+        database='myapp',
+        min_size=5,          # Always keep 5 open
+        max_size=20,         # Never more than 20
+        queue_timeout=30,    # Wait max 30 sec for connection
+        idle_timeout=900     # Close after 15 min idle
+    )
+
+pool_types:
+  single_threaded_pool: |
+    Application: Single process/thread
+    Pool size: 1-2 connections
+
+    Example: Cron job, background task
+    Uses: One connection per task
+
+  multi_threaded_pool: |
+    Application: Multi-threaded
+    Pool size: Number of threads + buffer
+
+    Example: Web server with 20 threads
+    Pool size: 20-30 connections (one per thread + 10% buffer)
+
+  connection_per_request: |
+    Web application pattern:
+    Each HTTP request gets connection for duration of request
+
+    Flask + SQLAlchemy:
+    @app.before_request
+    def get_db():
+        g.db = pool.get_connection()
+
+    @app.teardown_request
+    def close_db(error):
+        if hasattr(g, 'db'):
+            pool.return_connection(g.db)
+
+  async_pool: |
+    Async applications (many concurrent requests, few connections)
+
+    Example: 1000 concurrent requests, 10 connections
+    Traditional threading: Need 1000 connections (impossible)
+    Async: 10 connections handle all requests
+
+    async with pool.acquire() as conn:
+        await conn.fetch("SELECT ...")
+
+pooling_libraries:
+  python: |
+    psycopg3 (PostgreSQL):
+    pool = ConnectionPool("postgresql://user:pass@host/dbname")
+    async with pool.connection() as conn:
+        await conn.execute("SELECT 1")
+
+    SQLAlchemy:
+    engine = create_engine(
+        'postgresql://...',
+        poolclass=QueuePool,
+        pool_size=20,
+        max_overflow=40
+    )
+
+  nodejs: |
+    pg (PostgreSQL):
+    const pool = new Pool({
+        host: 'localhost',
+        user: 'postgres',
+        password: 'password',
+        database: 'mydb',
+        max: 20,              // max connections
+        connectionTimeoutMillis: 10000
+    });
+
+    const client = await pool.connect();
+    try {
+        await client.query("SELECT ...");
+    } finally {
+        client.release();
+    }
+
+  java: |
+    HikariCP (popular pool for Java):
+    HikariConfig config = new HikariConfig();
+    config.setJdbcUrl("jdbc:postgresql://localhost/mydb");
+    config.setMaximumPoolSize(20);
+    config.setMinimumIdle(5);
+    HikariDataSource ds = new HikariDataSource(config);
+
+    Connection conn = ds.getConnection();
+    // Use connection
+    conn.close();  // Returns to pool, not really closed
+
+resource_management:
+  connection_leak: |
+    Problem: Connection obtained but never returned
+
+    Code:
+    conn = pool.get_connection()
+    result = conn.query(sql)
+    # Forgot to return connection!
+    return result
+
+    Effect: Connection stays in "in-use" state forever
+    After N leaks: All connections exhausted
+
+    Fix: Always return connection
+    try:
+        conn = pool.get_connection()
+        result = conn.query(sql)
+        return result
+    finally:
+        pool.return_connection(conn)
+
+  timeout_handling: |
+    When pool exhausted:
+    - More requests arrive
+    - All connections busy
+    - New requests wait in queue
+
+    If queue_timeout = 30s:
+    After 30s waiting, request fails with:
+    TimeoutError: Connection pool exhausted
+
+    Solution: Increase pool size or reduce query time
+
+  monitoring: |
+    Metrics to track:
+    - Active connections: Currently in use
+    - Idle connections: Available for use
+    - Queued requests: Waiting for connection
+    - Pool utilization: Active / Max
+
+    Example dashboard:
+    Active: 15/20 (75% utilized)
+    Idle: 5
+    Queued: 0
+    If Queued > 0: Need more connections
+
+scaling_strategies:
+  vertical_scaling: |
+    Increase pool size to handle more requests
+
+    Before: pool_size = 10 (exhausted)
+    After: pool_size = 20 (no exhaustion)
+
+    Limit: Database max_connections
+
+  horizontal_scaling: |
+    Multiple application servers share database
+
+    Problem: 3 servers × 20 pool_size = 60 connections
+    Database max = 100 (limited)
+
+    Solution: Use pgBouncer, PgPool (external pooler)
+    Clients → PgBouncer (100 connections) → Database (10 connections)
+
+  connection_pooling_service: |
+    Shared pooling service:
+    - Multiple applications
+    - Single connection pool to database
+    - Applications connect to pooler (lightweight)
+    - Pooler manages database connections
+
+    Example: pgBouncer
+    App1 → pgBouncer (lightweight connection) ← DB
+    App2 → pgBouncer (lightweight connection) ← DB
+    App3 → pgBouncer (lightweight connection) ← DB
+
+best_practices:
+  - name: "Always use connection pooling"
+    description: "Never create connections per-request without pooling"
+
+  - name: "Return connections promptly"
+    description: "Don't hold connections longer than needed"
+
+  - name: "Use try-finally to ensure return"
+    description: "Prevent connection leaks on exceptions"
+
+  - name: "Set appropriate pool size"
+    description: "Too small: timeouts; Too large: memory waste"
+
+  - name: "Monitor pool health"
+    description: "Track active, idle, and queued connections"
+
+  - name: "Test under load"
+    description: "Verify pool size handles expected concurrent requests"
+
+  - name: "Handle timeout gracefully"
+    description: "Retry or degrade service; don't just fail"
+
+anti_patterns:
+  - name: "Creating new connection per request"
+    consequence: "Slow (connection overhead), resource exhaustion"
+    fix: "Use connection pooling"
+
+  - name: "Connection leaks"
+    consequence: "Pool exhausted after running a while"
+    fix: "Always return connections in finally block"
+
+  - name: "Too small pool size"
+    consequence: "Requests timeout under normal load"
+    fix: "Set pool_size = expected concurrent requests + buffer"
+
+  - name: "Too large pool size"
+    consequence: "Database exhausted, memory waste"
+    fix: "Set pool_size to database max / num_apps"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Connection pooling is like a taxi dispatch system:
+      - No pool: Each ride, find new taxi (slow)
+      - With pool: 10 taxis wait for rides (fast)
+      - Taxi returns to queue for next ride
+
+      Reusable resources = faster service!
+
+  intermediate:
+    focus: "Connection pooling implementation"
+    key_points:
+      - "How pooling reduces connection overhead"
+      - "Pool configuration (size, timeout)"
+      - "Handling connection leaks and timeouts"
+      - "Monitoring pool health"
+
+  advanced:
+    focus: "Advanced pooling scenarios"
+    key_points:
+      - "Async connection pooling"
+      - "Distributed pooling (pgBouncer, PgPool)"
+      - "Scaling pooling across multiple servers"
+      - "Performance tuning and optimization"

@@ -1,0 +1,28 @@
+id: websockets-gotchas
+name: Websockets Gotchas
+category: comprehensive
+type: standard
+tags:
+- websockets
+summary:
+  short: Websockets Gotchas and implementation guidelines
+  long: Complete guide to websockets gotchas
+problem:
+  description: Challenges without proper websockets gotchas
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement websockets gotchas
+key_concepts:
+  concept: Websockets Gotchas
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

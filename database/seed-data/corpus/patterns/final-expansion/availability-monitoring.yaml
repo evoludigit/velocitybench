@@ -1,0 +1,28 @@
+id: availability-monitoring
+name: Availability Monitoring
+category: comprehensive
+type: standard
+tags:
+- availability
+summary:
+  short: Availability Monitoring and implementation guidelines
+  long: Complete guide to availability monitoring
+problem:
+  description: Challenges without proper availability monitoring
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement availability monitoring
+key_concepts:
+  concept: Availability Monitoring
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

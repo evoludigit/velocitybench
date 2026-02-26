@@ -1,0 +1,89 @@
+# FraiseQL v2.0.0-rc.11 Configuration
+# VelocityBench Benchmark Environment
+#
+# This file is read by BOTH the compiler and the server:
+#   - fraiseql-cli reads [project] and [fraiseql.*] sections for schema compilation
+#   - fraiseql-server reads the flat root-level keys for runtime configuration
+#
+# IMPORTANT (TOML scoping): flat server keys MUST appear before any [section]
+# headers so they are parsed as root-level keys, not nested inside a section.
+#
+# Security features intentionally disabled for fair benchmark comparison:
+#   - audit_logging: disabled — adds file I/O, skews latency measurements
+#   - rate_limiting: disabled — artificial throttle would invalidate comparisons
+#   - state_encryption: disabled — no OAuth flow in benchmark workload
+#   - cors: disabled — all traffic is within the closed Docker network
+
+# ============================================================================
+# Server Runtime Configuration (fraiseql-server via FRAISEQL_CONFIG)
+# These MUST be at the root level (before any [section] headers) so TOML
+# parses them as top-level keys for fraiseql-server's ServerConfig.
+# DATABASE_URL is overridden at container start by docker-compose.
+# ============================================================================
+
+schema_path = "schema.compiled.json"
+database_url = "postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark"
+bind_addr = "0.0.0.0:8815"
+
+# CORS disabled — benchmark runs in a closed Docker network
+cors_enabled = false
+
+# Connection pool (increased to match other frameworks)
+pool_min_size = 10
+pool_max_size = 50
+pool_timeout_secs = 30
+
+# Introspection enabled (unauthenticated) for benchmark tooling
+introspection_enabled = true
+introspection_require_auth = false
+
+# Playground disabled in benchmark — reduces attack surface and noise
+playground_enabled = false
+
+# Metrics disabled — reduces overhead for fairer benchmark comparison
+metrics_enabled = false
+
+# Query result cache enabled — LRU with SHA-256 keying, 24h TTL, 10 000 entries
+# This is the default (cache_enabled = true), stated explicitly for documentation.
+# For cold-read baseline comparison, use fraiseql-nocache.toml (cache_enabled = false).
+cache_enabled = true
+
+# ============================================================================
+# JSONB Optimization Strategy
+# "project": generates SQL like data->>'field' for scalars, data->'field'
+#   for Object types — fixed in beta.4 (issue #27).
+# "stream": returns the full data JSONB column and filters in Rust.
+# ============================================================================
+
+[jsonb_optimization]
+default_strategy = "project"
+auto_threshold_percent = 80
+
+# ============================================================================
+# Compiler Configuration (fraiseql-cli compile fraiseql.toml)
+# ============================================================================
+
+[project]
+name = "velocitybench"
+version = "1.0.0"
+description = "VelocityBench FraiseQL GraphQL benchmark framework"
+
+[fraiseql]
+schema_file = "schema.json"
+output_file = "schema.compiled.json"
+
+[fraiseql.security.audit_logging]
+enabled = false
+log_level = "info"
+include_sensitive_data = false
+async_logging = true
+
+[fraiseql.security.error_sanitization]
+enabled = true
+generic_messages = true
+
+[fraiseql.security.rate_limiting]
+enabled = false
+
+[fraiseql.security.state_encryption]
+enabled = false

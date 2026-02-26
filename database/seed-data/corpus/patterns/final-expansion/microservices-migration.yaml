@@ -1,0 +1,28 @@
+id: microservices-migration
+name: Microservices Migration
+category: comprehensive
+type: standard
+tags:
+- microservices
+summary:
+  short: Microservices Migration and implementation guidelines
+  long: Complete guide to microservices migration
+problem:
+  description: Challenges without proper microservices migration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement microservices migration
+key_concepts:
+  concept: Microservices Migration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

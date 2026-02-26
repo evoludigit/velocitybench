@@ -1,0 +1,28 @@
+id: scaling-validation
+name: Scaling Validation
+category: comprehensive
+type: standard
+tags:
+- scaling
+summary:
+  short: Scaling Validation and implementation guidelines
+  long: Complete guide to scaling validation
+problem:
+  description: Challenges without proper scaling validation
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement scaling validation
+key_concepts:
+  concept: Scaling Validation
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

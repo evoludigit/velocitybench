@@ -1,0 +1,59 @@
+id: capability-detection-runtime
+name: Capability Detection Runtime
+category: fraiseql
+type: standard
+tags:
+- compilation
+- database
+- capabilities
+- detection
+- multi-database
+summary:
+  short: Runtime database feature probing and capability adjustment
+  long: FraiseQL performs runtime database capability detection during compilation
+    through feature probing (querying database version, extensions, operator support)
+    to dynamically adjust schema compilation and provide graceful degradation for
+    missing features.
+problem:
+  description: Hardcoded assumptions about database features fail
+  symptoms:
+  - Queries fail on older database versions
+  - Missing extensions cause compilation errors
+  - Can't detect supported operators dynamically
+  - No graceful degradation
+  impact: Reduced database compatibility and deployment failures
+solution:
+  description: Implement Capability Detection Runtime effectively
+key_concepts:
+  concept_1: Database version detection
+  concept_2: Extension availability checking
+  concept_3: Operator support probing
+  concept_4: Dynamic capability manifest generation
+implementation_considerations:
+  consideration_1: Probing performance overhead
+  consideration_2: Caching detection results
+  consideration_3: Handling probe failures
+  consideration_4: Capability refresh frequency
+best_practices:
+- name: Probe on startup
+  description: Detect capabilities during initialization
+- name: Cache results
+  description: Store capability manifest in memory
+- name: Graceful degradation
+  description: Disable features if not supported
+- name: Document requirements
+  description: List minimum required capabilities
+anti_patterns:
+- name: Hardcoded features
+  consequence: Fails on different database versions
+- name: No probing
+  consequence: Runtime errors from missing features
+- name: Probe per query
+  consequence: Performance overhead
+blog_hooks:
+  beginner:
+    focus: Introduction to Capability Detection Runtime
+  intermediate:
+    focus: Implementing database feature probing
+  advanced:
+    focus: Advanced capability caching and dynamic compilation

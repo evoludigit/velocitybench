@@ -1,0 +1,9 @@
+{
+  "fraiseql_compiled": {
+    "resources": {
+      "memory_mb": 4.4,
+      "vms_mb": 1590.0,
+      "num_threads": 25
+    }
+  }
+}

@@ -23,7 +23,7 @@ public class Post {
     @Column(name = "pk_post")
     private Integer pkPost;
 
-    @Column(name = "id")
+    @Column(name = "id", columnDefinition = "uuid")
     private String id;
 
     @Column(name = "fk_author")

@@ -1,0 +1,28 @@
+id: mobile-offline-first
+name: Offline First Patterns
+category: specialized
+type: standard
+tags:
+- mobile
+summary:
+  short: Patterns and practices for offline first patterns
+  long: Comprehensive guide to offline first patterns
+problem:
+  description: Challenges with offline first patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement offline first patterns
+key_concepts:
+  concept: Understanding Offline First Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Offline First Patterns
+  intermediate:
+    focus: Implementing Offline First Patterns
+  advanced:
+    focus: Advanced Offline First Patterns

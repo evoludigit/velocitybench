@@ -1,0 +1,28 @@
+id: databases-monitoring
+name: Databases Monitoring
+category: comprehensive
+type: standard
+tags:
+- databases
+summary:
+  short: Databases Monitoring and implementation guidelines
+  long: Complete guide to databases monitoring
+problem:
+  description: Challenges without proper databases monitoring
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement databases monitoring
+key_concepts:
+  concept: Databases Monitoring
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

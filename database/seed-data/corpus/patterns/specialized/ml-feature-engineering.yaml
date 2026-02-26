@@ -1,0 +1,28 @@
+id: ml-feature-engineering
+name: Feature Engineering Patterns
+category: specialized
+type: standard
+tags:
+- ml
+summary:
+  short: Patterns and practices for feature engineering patterns
+  long: Comprehensive guide to feature engineering patterns
+problem:
+  description: Challenges with feature engineering patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement feature engineering patterns
+key_concepts:
+  concept: Understanding Feature Engineering Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Feature Engineering Patterns
+  intermediate:
+    focus: Implementing Feature Engineering Patterns
+  advanced:
+    focus: Advanced Feature Engineering Patterns

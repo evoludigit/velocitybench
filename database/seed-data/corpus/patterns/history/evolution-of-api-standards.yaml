@@ -1,0 +1,89 @@
+id: evolution-of-api-standards
+name: "Evolution of API Standards: REST, GraphQL, gRPC, and Beyond"
+category: history
+type: timeline
+tags:
+  - apis
+  - history
+  - standards
+  - architecture
+
+summary:
+  short: "How API design evolved from RPC to REST to GraphQL and gRPC"
+  long: |
+    API standards have evolved significantly over decades. From SOAP's XML-based
+    RPC model, through REST's resource-oriented approach, to GraphQL's query language
+    and gRPC's efficiency focus, each paradigm solved specific problems while
+    introducing tradeoffs.
+
+timeline:
+  - year: 1981
+    title: "RPC (Remote Procedure Call)"
+    description: "Call functions on remote servers as if local"
+    innovation: "First distributed computing model"
+  
+  - year: 2000
+    title: "SOAP/XML-RPC"
+    description: "Enterprise web services with XML"
+    complexity: "Heavy, verbose, hard to debug"
+  
+  - year: 2004
+    title: "REST Emerges"
+    description: "Roy Fielding's dissertation on REST architectural style"
+    simplicity: "Resources, HTTP methods, status codes"
+  
+  - year: 2010
+    title: "REST Becomes Standard"
+    description: "REST widely adopted for public APIs"
+    adoption: "Amazon, Twitter, GitHub APIs"
+  
+  - year: 2015
+    title: "GraphQL Created"
+    description: "Facebook releases GraphQL to solve REST limitations"
+    innovation: "Client queries exact data needed"
+  
+  - year: 2015
+    title: "gRPC Released"
+    description: "Google's high-performance RPC framework"
+    focus: "Speed, efficiency, type safety"
+  
+  - year: 2020
+    title: "Convergence"
+    description: "APIs use multiple standards based on use case"
+    strategy: "Polyglot API architecture"
+
+comparisons:
+  - name: "REST"
+    strengths: ["Simple", "Stateless", "Cacheable", "Standard methods"]
+    weaknesses: ["Over-fetching", "Under-fetching", "Multiple requests"]
+  
+  - name: "GraphQL"
+    strengths: ["Precise queries", "Single request", "Strong typing", "Introspection"]
+    weaknesses: ["Caching complexity", "Learning curve", "Server complexity"]
+  
+  - name: "gRPC"
+    strengths: ["Performance", "Efficiency", "Type safety", "Streaming"]
+    weaknesses: ["Binary protocol", "Browser incompatible", "Limited tooling"]
+
+blog_hooks:
+  beginner:
+    analogy: |
+      API standards are like transportation:
+      - SOAP: Formal diplomatic protocols
+      - REST: Highway system
+      - GraphQL: Direct delivery service
+      - gRPC: Express train
+
+  intermediate:
+    focus: "Understanding API tradeoffs"
+    key_points:
+      - "REST simplicity vs GraphQL flexibility"
+      - "HTTP vs gRPC efficiency"
+      - "Polyglot API strategies"
+
+  advanced:
+    focus: "Strategic API architecture"
+    key_points:
+      - "When to use each standard"
+      - "API gateway patterns"
+      - "Versioning strategies"

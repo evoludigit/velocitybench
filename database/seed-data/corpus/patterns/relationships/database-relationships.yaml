@@ -1,0 +1,254 @@
+# Database Relationship Patterns
+# VelocityBench Knowledge Corpus
+
+id: database-relationships
+name: "Database Relationship Patterns"
+category: relationships
+type: pattern
+tags:
+  - database
+  - relationships
+  - foreign-keys
+  - joins
+  - normalization
+
+summary:
+  short: "Modeling connections between data entities in relational databases"
+  long: |
+    Database relationships define how tables connect to each other. The three
+    fundamental types are one-to-one, one-to-many, and many-to-many. Proper
+    relationship modeling enables data integrity, efficient queries, and
+    normalized schemas. Understanding these patterns is foundational to
+    database design.
+
+relationship_types:
+  - name: "One-to-One (1:1)"
+    description: "Each row in Table A relates to exactly one row in Table B"
+    use_cases:
+      - "Splitting a table for performance (cold data separation)"
+      - "Optional extended attributes"
+      - "Security isolation (sensitive fields in separate table)"
+    schema: |
+      -- User base info (frequently accessed)
+      CREATE TABLE users (
+          id SERIAL PRIMARY KEY,
+          email VARCHAR(255) NOT NULL UNIQUE,
+          name VARCHAR(255)
+      );
+
+      -- User profile (infrequently accessed)
+      CREATE TABLE user_profiles (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER UNIQUE REFERENCES users(id),
+          bio TEXT,
+          avatar_url VARCHAR(500),
+          preferences JSONB
+      );
+    query: |
+      -- Join to get full user data
+      SELECT u.*, p.bio, p.avatar_url
+      FROM users u
+      LEFT JOIN user_profiles p ON p.user_id = u.id
+      WHERE u.id = 1;
+
+  - name: "One-to-Many (1:N)"
+    description: "One row in Table A relates to multiple rows in Table B"
+    use_cases:
+      - "Parent-child relationships (user → orders)"
+      - "Categorization (category → products)"
+      - "Ownership (author → posts)"
+    schema: |
+      -- Parent table (the "one" side)
+      CREATE TABLE users (
+          id SERIAL PRIMARY KEY,
+          email VARCHAR(255) NOT NULL
+      );
+
+      -- Child table (the "many" side)
+      CREATE TABLE orders (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER NOT NULL REFERENCES users(id),
+          total DECIMAL(10, 2),
+          created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      -- Index for efficient lookups
+      CREATE INDEX idx_orders_user_id ON orders(user_id);
+    queries: |
+      -- Get user with their orders
+      SELECT u.*, o.*
+      FROM users u
+      LEFT JOIN orders o ON o.user_id = u.id
+      WHERE u.id = 1;
+
+      -- Count orders per user
+      SELECT u.id, u.email, COUNT(o.id) as order_count
+      FROM users u
+      LEFT JOIN orders o ON o.user_id = u.id
+      GROUP BY u.id;
+
+  - name: "Many-to-Many (M:N)"
+    description: "Multiple rows in Table A relate to multiple rows in Table B"
+    use_cases:
+      - "Tags on posts"
+      - "Students in courses"
+      - "Products in orders"
+      - "Permissions for roles"
+    implementation: "Requires a junction/join/bridge table"
+    schema: |
+      -- First entity
+      CREATE TABLE posts (
+          id SERIAL PRIMARY KEY,
+          title VARCHAR(255) NOT NULL,
+          content TEXT
+      );
+
+      -- Second entity
+      CREATE TABLE tags (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(50) NOT NULL UNIQUE
+      );
+
+      -- Junction table (connects the two)
+      CREATE TABLE post_tags (
+          post_id INTEGER REFERENCES posts(id) ON DELETE CASCADE,
+          tag_id INTEGER REFERENCES tags(id) ON DELETE CASCADE,
+          PRIMARY KEY (post_id, tag_id),
+          created_at TIMESTAMP DEFAULT NOW()
+      );
+
+      -- Indexes for both directions
+      CREATE INDEX idx_post_tags_post ON post_tags(post_id);
+      CREATE INDEX idx_post_tags_tag ON post_tags(tag_id);
+    queries: |
+      -- Get all tags for a post
+      SELECT t.*
+      FROM tags t
+      JOIN post_tags pt ON pt.tag_id = t.id
+      WHERE pt.post_id = 1;
+
+      -- Get all posts with a tag
+      SELECT p.*
+      FROM posts p
+      JOIN post_tags pt ON pt.post_id = p.id
+      JOIN tags t ON t.id = pt.tag_id
+      WHERE t.name = 'graphql';
+
+      -- Get posts with all their tags (aggregated)
+      SELECT p.*, ARRAY_AGG(t.name) as tags
+      FROM posts p
+      LEFT JOIN post_tags pt ON pt.post_id = p.id
+      LEFT JOIN tags t ON t.id = pt.tag_id
+      GROUP BY p.id;
+
+  - name: "Self-Referential"
+    description: "A table relates to itself"
+    use_cases:
+      - "Organizational hierarchy (employee → manager)"
+      - "Threaded comments (comment → parent_comment)"
+      - "Category trees (category → parent_category)"
+    schema: |
+      -- Employees with manager relationship
+      CREATE TABLE employees (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          manager_id INTEGER REFERENCES employees(id)
+      );
+
+      -- Comments with threading
+      CREATE TABLE comments (
+          id SERIAL PRIMARY KEY,
+          content TEXT NOT NULL,
+          post_id INTEGER REFERENCES posts(id),
+          parent_id INTEGER REFERENCES comments(id),
+          created_at TIMESTAMP DEFAULT NOW()
+      );
+    recursive_query: |
+      -- Get full org hierarchy
+      WITH RECURSIVE org_tree AS (
+          -- Base case: top-level (no manager)
+          SELECT id, name, manager_id, 1 as level
+          FROM employees
+          WHERE manager_id IS NULL
+
+          UNION ALL
+
+          -- Recursive case: employees with managers
+          SELECT e.id, e.name, e.manager_id, t.level + 1
+          FROM employees e
+          JOIN org_tree t ON e.manager_id = t.id
+      )
+      SELECT * FROM org_tree ORDER BY level, name;
+
+foreign_key_options:
+  - name: "ON DELETE CASCADE"
+    description: "Delete child rows when parent is deleted"
+    use_when: "Child has no meaning without parent (order_items when order deleted)"
+
+  - name: "ON DELETE SET NULL"
+    description: "Set foreign key to NULL when parent deleted"
+    use_when: "Child can exist independently (posts when author deleted)"
+
+  - name: "ON DELETE RESTRICT"
+    description: "Prevent deletion if children exist"
+    use_when: "Protect against accidental cascade (users with orders)"
+
+  - name: "ON UPDATE CASCADE"
+    description: "Update child foreign keys when parent key changes"
+    use_when: "Primary key might change (rare, avoid if possible)"
+
+normalization:
+  - form: "1NF (First Normal Form)"
+    rule: "No repeating groups, atomic values"
+    violation: |
+      -- BAD: Multiple values in one column
+      users(id, name, phone_numbers: "555-1234,555-5678")
+    fix: |
+      -- GOOD: Separate table for multiple values
+      users(id, name)
+      phone_numbers(id, user_id, number)
+
+  - form: "2NF (Second Normal Form)"
+    rule: "No partial dependencies on composite key"
+    violation: |
+      -- BAD: product_name depends only on product_id, not full key
+      order_items(order_id, product_id, quantity, product_name)
+    fix: |
+      -- GOOD: product_name in products table
+      order_items(order_id, product_id, quantity)
+      products(id, name)
+
+  - form: "3NF (Third Normal Form)"
+    rule: "No transitive dependencies"
+    violation: |
+      -- BAD: city depends on zip_code, not directly on id
+      users(id, name, zip_code, city)
+    fix: |
+      -- GOOD: city in separate table
+      users(id, name, zip_code)
+      zip_codes(zip_code, city, state)
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Database relationships are like real-world connections:
+      - One-to-One: Person ↔ Passport (each person has one passport)
+      - One-to-Many: Mother → Children (one mother, multiple children)
+      - Many-to-Many: Students ↔ Courses (students take many courses, courses have many students)
+      The junction table is like a class roster - connecting students to their courses.
+
+  intermediate:
+    focus: "Designing relationships and foreign keys"
+    key_points:
+      - "Choosing relationship types"
+      - "Foreign key constraints and cascades"
+      - "Indexing for join performance"
+      - "Denormalization tradeoffs"
+
+  advanced:
+    focus: "Complex relationship patterns"
+    key_points:
+      - "Polymorphic associations"
+      - "Soft deletes and relationships"
+      - "Temporal relationships (valid_from, valid_to)"
+      - "Graph-like queries with recursive CTEs"

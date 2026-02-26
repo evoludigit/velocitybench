@@ -1,0 +1,28 @@
+id: ml-active-learning
+name: Active Learning Patterns
+category: specialized
+type: standard
+tags:
+- ml
+summary:
+  short: Patterns and practices for active learning patterns
+  long: Comprehensive guide to active learning patterns
+problem:
+  description: Challenges with active learning patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement active learning patterns
+key_concepts:
+  concept: Understanding Active Learning Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Active Learning Patterns
+  intermediate:
+    focus: Implementing Active Learning Patterns
+  advanced:
+    focus: Advanced Active Learning Patterns

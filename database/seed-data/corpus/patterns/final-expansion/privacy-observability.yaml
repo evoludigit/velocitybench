@@ -1,0 +1,28 @@
+id: privacy-observability
+name: Privacy Observability
+category: comprehensive
+type: standard
+tags:
+- privacy
+summary:
+  short: Privacy Observability and implementation guidelines
+  long: Complete guide to privacy observability
+problem:
+  description: Challenges without proper privacy observability
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement privacy observability
+key_concepts:
+  concept: Privacy Observability
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

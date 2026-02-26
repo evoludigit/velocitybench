@@ -1,0 +1,28 @@
+id: ops-cost-monitoring
+name: Cost Monitoring Patterns
+category: specialized
+type: standard
+tags:
+- ops
+summary:
+  short: Patterns and practices for cost monitoring patterns
+  long: Comprehensive guide to cost monitoring patterns
+problem:
+  description: Challenges with cost monitoring patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement cost monitoring patterns
+key_concepts:
+  concept: Understanding Cost Monitoring Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Cost Monitoring Patterns
+  intermediate:
+    focus: Implementing Cost Monitoring Patterns
+  advanced:
+    focus: Advanced Cost Monitoring Patterns

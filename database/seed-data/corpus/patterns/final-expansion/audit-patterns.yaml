@@ -1,0 +1,28 @@
+id: audit-patterns
+name: Audit Patterns
+category: comprehensive
+type: standard
+tags:
+- audit
+summary:
+  short: Audit Patterns and implementation guidelines
+  long: Complete guide to audit patterns
+problem:
+  description: Challenges without proper audit patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement audit patterns
+key_concepts:
+  concept: Audit Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

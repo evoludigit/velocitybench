@@ -1,10 +1,14 @@
 package com.fraiseql.rest;
 
+import com.fraiseql.dto.PostAuthorDTO;
 import com.fraiseql.dto.PostDTO;
+import com.fraiseql.dto.PostWithAuthorDTO;
 import com.fraiseql.entities.Post;
 import com.fraiseql.entities.User;
 import com.fraiseql.repositories.PostRepository;
 import com.fraiseql.repositories.UserRepository;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -12,10 +16,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RestController
@@ -32,7 +36,7 @@ public class PostController {
 
     @GetMapping("/{id}")
     public ResponseEntity<PostDTO> getPost(@PathVariable String id) {
-        Post post = postRepository.findByUuid(id);
+        Post post = postRepository.findById(id);
         if (post != null) {
             PostDTO postDTO = new PostDTO(
                 post.getId(),
@@ -47,9 +51,29 @@ public class PostController {
     }
 
     @GetMapping
-    public ResponseEntity<List<PostDTO>> listPosts(
+    public ResponseEntity<?> listPosts(
         @RequestParam(defaultValue = "0") int page,
-        @RequestParam(defaultValue = "10") int size) {
+        @RequestParam(defaultValue = "10") int size,
+        @RequestParam(required = false) String include) {
+
+        if ("author".equals(include)) {
+            // For Q2b: simulate nested query by making multiple calls
+            List<Post> posts = postRepository.findPublishedPostsWithLimit(size);
+            List<PostWithAuthorDTO> result = posts.stream()
+                .map(post -> {
+                    // Simulate nested call by fetching author separately
+                    User author = userRepository.findByUuid(post.getFkAuthor().toString());
+                    return new PostWithAuthorDTO(
+                        post.getId(),
+                        post.getTitle(),
+                        post.getContent(),
+                        post.getCreatedAt(),
+                        author != null ? new PostAuthorDTO(author.getUsername(), author.getFullName()) : null
+                    );
+                })
+                .collect(Collectors.toList());
+            return ResponseEntity.ok(result);
+        }
 
         List<Post> posts = postRepository.findPublishedPostsWithLimit(size);
         List<PostDTO> postDTOs = posts.stream()
@@ -70,13 +94,11 @@ public class PostController {
         @RequestParam(defaultValue = "0") int page,
         @RequestParam(defaultValue = "10") int size) {
 
-        // Find user by UUID to get the integer primary key
         User user = userRepository.findByUuid(authorId);
         if (user == null) {
             return ResponseEntity.ok(Collections.emptyList());
         }
 
-        // Find posts by the integer foreign key
         List<Post> posts = postRepository.findByFkAuthor(user.getPkUser());
         List<PostDTO> postDTOs = posts.stream()
             .map(post -> new PostDTO(
@@ -89,6 +111,4 @@ public class PostController {
             .collect(Collectors.toList());
         return ResponseEntity.ok(postDTOs);
     }
-
-
 }

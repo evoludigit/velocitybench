@@ -1,0 +1,49 @@
+id: cascade-operation-tracking
+name: Cascade Operation Tracking
+category: fraiseql
+type: standard
+tags:
+- execution
+- mutations
+- audit
+- cascades
+summary:
+  short: Following and logging cascade operations through mutations
+  long: When mutations cascade to related entities, all affected entities are tracked
+    and logged in the change log.
+problem:
+  description: Cascade operations not tracked
+  symptoms:
+  - Can't see what data was affected
+  - Difficult to audit mutations
+  - Hard to undo cascades
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Cascade Operation Tracking effectively
+key_concepts:
+  concept_1: Cascade metadata
+  concept_2: Affected entity tracking
+  concept_3: Cascade logging
+implementation_considerations:
+  consideration_1: Deep cascade chains
+  consideration_2: Performance of tracking
+  consideration_3: Log size management
+best_practices:
+- name: Track cascades
+  description: Log all affected entities
+- name: Include context
+  description: Store cascade reason and chain
+- name: Audit trail
+  description: Maintain complete mutation audit
+anti_patterns:
+- name: No cascade tracking
+  consequence: Invisible side effects
+- name: Partial logging
+  consequence: Incomplete audit trail
+blog_hooks:
+  beginner:
+    focus: Introduction to Cascade Operation Tracking
+  intermediate:
+    focus: Implementing Cascade Operation Tracking
+  advanced:
+    focus: Advanced Cascade Operation Tracking techniques

@@ -1,0 +1,28 @@
+id: rest-standards
+name: Rest Standards
+category: comprehensive
+type: standard
+tags:
+- rest
+summary:
+  short: Rest Standards and implementation guidelines
+  long: Complete guide to rest standards
+problem:
+  description: Challenges without proper rest standards
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement rest standards
+key_concepts:
+  concept: Rest Standards
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

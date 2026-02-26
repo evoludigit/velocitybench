@@ -1,0 +1,157 @@
+id: search-filtering
+name: "Search & Filtering"
+category: architecture
+type: pattern
+tags:
+  - search
+  - filtering
+  - elasticsearch
+  - full-text-search
+  - api
+
+summary:
+  short: "Implementing efficient search and filtering for large datasets"
+  long: |
+    As datasets grow, simple database queries become slow. Full-text search engines (Elasticsearch) and specialized indexing enable fast searching across millions of records. Filtering with facets and aggregations provide rich discovery experiences.
+
+problem:
+  description: "Searching large datasets is slow; filtering across multiple fields is expensive"
+  symptoms:
+    - name: "Slow queries"
+      description: "Search takes seconds or times out"
+    - name: "Poor UX"
+      description: "No autocomplete, no faceted search"
+    - name: "Typos cause no results"
+      description: "Exact match only; no fuzzy matching"
+    - name: "Relevance poor"
+      description: "Results not ranked by relevance"
+
+solution:
+  approach: "Use search engines (Elasticsearch, Solr) for full-text search; index relevant fields; provide filtering and facets"
+  key_points:
+    - "Choose search engine suited to use case"
+    - "Index documents strategically (not all fields)"
+    - "Implement relevance scoring (boost important fields)"
+    - "Add filtering and aggregations for navigation"
+    - "Cache common queries"
+
+search_engines:
+  elasticsearch:
+    strength: "Full-text search, aggregations, geo-search"
+    learning_curve: "Moderate; good documentation"
+    scalability: "Scales to billions of documents"
+
+  solr:
+    strength: "Similar to Elasticsearch; more stable"
+    learning_curve: "Similar to Elasticsearch"
+    adoption: "Less trendy; good for established systems"
+
+  algolia:
+    strength: "Hosted SaaS; instant search UX"
+    cost: "Expensive; good for small-medium datasets"
+    benefit: "Minimal setup; managed infrastructure"
+
+  postgres_full_text:
+    strength: "Built-in; no additional infrastructure"
+    limitation: "Less powerful than Elasticsearch"
+    use_case: "Simple full-text search on existing Postgres"
+
+indexing_strategy:
+  what_to_index:
+    searchable_fields: ["title", "description", "tags", "author_name"]
+    non_searchable: ["created_at", "updated_at", "internal_id"]
+    benefit: "Smaller index, faster queries"
+
+  analyzer_selection:
+    english_analyzer: "Stemming: 'running' matches 'run'"
+    ngram_analyzer: "Substring matching: 'tyre' matches 'type'"
+    custom_analyzer: "Domain-specific tokenization"
+
+  boost_fields:
+    title: "Boost 10x (most important)"
+    description: "Boost 2x"
+    tags: "Boost 5x"
+    result: "Matches in title ranked higher"
+
+filtering:
+  exact_filters:
+    syntax: "filter by exact category, status, type"
+    example: "category=electronics&status=active"
+    performance: "Fast with proper indexing"
+
+  range_filters:
+    syntax: "filter by numeric range (price, date, rating)"
+    example: "price_min=10&price_max=100&date_from=2024-01-01"
+    use_case: "Common in e-commerce, marketplaces"
+
+  boolean_operators:
+    AND: "All conditions must match"
+    OR: "Any condition matches"
+    NOT: "Exclude matching documents"
+    example: "(category=book OR category=ebook) AND price<20"
+
+faceted_search:
+  definition: "Show available filter options with counts"
+  example: |
+    Category (10 total)
+    - Electronics (5)
+    - Books (3)
+    - Clothing (2)
+  benefit: "Users see what's available before filtering"
+  implementation: "Request aggregations from search engine"
+
+relevance_scoring:
+  tf_idf: "Term frequency × inverse document frequency"
+  bm25: "Okapi BM25 algorithm (best for text search)"
+  custom_scoring: "Use document fields to influence ranking"
+  example: "Boost popular products (high ratings, many reviews)"
+
+autocomplete:
+  prefix_search: "Match beginning of words (fast)"
+  edge_ngram: "Index word prefixes; match from start"
+  performance: "Must be very fast (< 100ms)"
+  implementation: "Dedicated autocomplete index"
+
+geo_search:
+  location_indexing: "Index latitude/longitude"
+  geo_distance: "Find documents within N miles"
+  geo_aggregations: "Cluster results by location"
+  use_case: "Maps, local search, delivery radius"
+
+search_optimization:
+  index_size: "Keep index small; only index necessary data"
+  query_optimization: "Cache common queries; limit result sets"
+  partial_match: "Use ngrams or edge-ngrams for partial matching"
+  pagination: "Limit results to 10-100 per page"
+  denormalization: "Store frequently-accessed data in index"
+
+search_synchronization:
+  indexing_lag: "Delay between document update and index refresh"
+  acceptable_lag: "Usually < 1 second for near-real-time"
+  strategies:
+    immediate: "Index immediately (expensive)"
+    batch: "Batch index every 5 seconds (balanced)"
+    eventual: "Index periodically (cheap, stale)"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Search engines are like library card catalog:
+      - Without: Manually read every book spine (slow)
+      - With: Organized index, organized by subject (fast)
+
+      Index speeds up finding documents by order of magnitude.
+
+  intermediate:
+    focus: "Implementing search"
+    key_points:
+      - "Choosing search engine"
+      - "Indexing strategy and relevance"
+      - "Filtering and faceted search"
+
+  advanced:
+    focus: "Search at scale"
+    key_points:
+      - "Relevance tuning and A/B testing"
+      - "Geo-search and spatial indexing"
+      - "Distributed search across shards"

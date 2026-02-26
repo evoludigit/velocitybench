@@ -1,0 +1,28 @@
+id: caching-troubleshooting
+name: Caching Troubleshooting
+category: comprehensive
+type: standard
+tags:
+- caching
+summary:
+  short: Caching Troubleshooting and implementation guidelines
+  long: Complete guide to caching troubleshooting
+problem:
+  description: Challenges without proper caching troubleshooting
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement caching troubleshooting
+key_concepts:
+  concept: Caching Troubleshooting
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

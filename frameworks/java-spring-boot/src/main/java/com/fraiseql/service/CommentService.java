@@ -24,7 +24,8 @@ public class CommentService {
 
     public List<CommentDTO> getCommentsByPost(String postId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        List<Comment> comments = commentRepository.findByPostIdOrderByCreatedAt(postId, pageable);
+        Integer fkPost = Integer.parseInt(postId);
+        List<Comment> comments = commentRepository.findByFkPostOrderByCreatedAt(fkPost, pageable);
         return comments.stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
@@ -32,15 +33,21 @@ public class CommentService {
 
     public List<CommentDTO> getCommentsByAuthor(String authorId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        List<Comment> comments = commentRepository.findByAuthorIdOrderByCreatedAt(authorId, pageable);
+        Integer fkAuthor = Integer.parseInt(authorId);
+        List<Comment> comments = commentRepository.findByFkAuthorOrderByCreatedAt(fkAuthor, pageable);
         return comments.stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
 
     public Optional<CommentDTO> getCommentById(String id) {
-        return commentRepository.findById(id)
-                .map(this::toDTO);
+        try {
+            Integer pkComment = Integer.parseInt(id);
+            return commentRepository.findById(pkComment)
+                    .map(this::toDTO);
+        } catch (NumberFormatException e) {
+            return Optional.empty();
+        }
     }
 
     private CommentDTO toDTO(Comment comment) {
@@ -50,9 +57,9 @@ public class CommentService {
         CommentDTO dto = new CommentDTO();
         dto.setId(comment.getId());
         dto.setContent(comment.getContent());
-        dto.setPostId(comment.getPostId());
-        dto.setAuthorId(comment.getAuthorId());
-        dto.setParentId(comment.getParentId());
+        dto.setPostId(comment.getFkPost() != null ? comment.getFkPost().toString() : null);
+        dto.setAuthorId(comment.getFkAuthor() != null ? comment.getFkAuthor().toString() : null);
+        dto.setParentId(comment.getFkParent() != null ? comment.getFkParent().toString() : null);
         dto.setIsApproved(comment.getIsApproved());
         dto.setCreatedAt(comment.getCreatedAt() != null ? comment.getCreatedAt().toString() : null);
         return dto;

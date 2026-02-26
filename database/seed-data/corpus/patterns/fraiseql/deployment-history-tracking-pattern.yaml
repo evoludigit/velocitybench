@@ -1,0 +1,478 @@
+# Deployment History Tracking Pattern (Fraisier)
+# VelocityBench Knowledge Corpus
+
+id: deployment-history-tracking
+name: "Fraisier: Deployment History and Audit Trail Tracking"
+category: fraiseql
+type: pattern
+severity: high
+tags:
+  - fraisier
+  - deployment
+  - history
+  - audit-trail
+  - observability
+  - compliance
+
+summary:
+  short: "Track complete deployment history, audit trail, and rollback capability"
+  long: |
+    Fraisier maintains complete audit trail of all deployments: when, what, who, why, and result.
+    Every deployment is recorded with timestamps, status, duration, health check results.
+    Every webhook event is logged. Every status change is tracked as event.
+    Enables debugging failed deployments, rolling back to previous versions, and compliance auditing.
+
+problem:
+  description: |
+    Without deployment history, it's hard to:
+    - Find out when a bug was introduced
+    - Determine what changed between versions
+    - Debug why a deployment failed
+    - Roll back to known good version
+    - Prove compliance with deployment procedures
+
+    Deployment history is essential for reliability and compliance.
+
+  symptoms:
+    - name: "Can't find which deployment caused the bug"
+      description: "Need to dig through commit logs manually"
+      detection: "Takes hours to trace bug to specific deployment"
+
+    - name: "No way to rollback"
+      description: "Have to manually check out old code and redeploy"
+      detection: "Rollbacks are error-prone manual process"
+
+    - name: "Missing audit trail"
+      description: "No record of who deployed what when"
+      detection: "Can't prove compliance with deployment procedures"
+
+    - name: "No failure analysis"
+      description: "When deployment fails, hard to know why"
+      detection: "Have to ask the person who ran it"
+
+solution:
+  principle: "Complete audit trail of every deployment: timing, status, changes, and results"
+
+  components:
+    - name: "Deployment Records"
+      type: "Core facts"
+      purpose: "When, what, who, why for each deployment"
+
+    - name: "Webhook Events"
+      type: "Event log"
+      purpose: "Trace webhook → deployment path"
+
+    - name: "Status Change Events"
+      type: "State transitions"
+      purpose: "Running → health_check → success/failed"
+
+    - name: "Comparison/Diff"
+      type: "Change tracking"
+      purpose: "What changed between deployments"
+
+    - name: "Rollback Records"
+      type: "Recovery history"
+      purpose: "Track rollbacks and recovery actions"
+
+deployment_record_schema:
+  description: "What information is tracked for each deployment"
+  fields: |
+    deployment:
+      id: UUID                              # Unique identifier
+      fraise_id: string                     # Service name ("api", "worker")
+      environment: string                   # "dev", "staging", "prod"
+      branch: string                        # Git branch deployed
+      commit_sha: string                    # Specific git commit
+      commit_message: string                # What changed
+      status: "pending|running|success|failed|rolled_back"
+      triggered_by: "webhook|manual|cli"    # How deployment started
+      triggered_by_user: string             # Username if manual
+      triggered_at: datetime                # When deployment triggered
+      started_at: datetime                  # When deployment execution started
+      completed_at: datetime                # When deployment finished
+      duration_seconds: integer             # How long deployment took
+      error_message: string                 # If failed, why
+      health_check_status: string           # Did service come up healthy
+      previous_deployment_id: UUID          # Previous deployment (for rollbacks)
+      created_at: datetime                  # When record created (now)
+
+webhook_event_record:
+  description: "Track source of deployment (webhook)"
+  fields: |
+    webhook_event:
+      id: UUID
+      fk_deployment: integer                # Links to deployment
+      provider: string                      # "github", "gitlab", "gitea", "bitbucket"
+      repository: string                    # "myorg/api"
+      branch: string                        # "main"
+      pusher: string                        # "alice"
+      commit_sha: string
+      commit_message: string
+      webhook_payload: JSONB                # Full event for debugging
+      verified: boolean                     # Signature verification passed
+      routing_status: string                # "routed", "unmapped", "skipped"
+      received_at: datetime
+      processed_at: datetime
+
+deployment_event_record:
+  description: "Status changes during deployment"
+  fields: |
+    deployment_event:
+      id: UUID
+      fk_deployment: integer                # Links to deployment
+      event_type: string                    # "started", "git_pull_done", "migration_done", "service_restarted", "health_check_passed", "health_check_failed"
+      message: string
+      event_data: JSONB                     # Provider-specific details
+      created_at: datetime
+
+history_queries:
+  description: "Common queries on deployment history"
+
+  last_10_deployments: |
+    SELECT id, fraise_id, environment, status, triggered_at
+    FROM v_deployment_summary
+    ORDER BY triggered_at DESC
+    LIMIT 10;
+
+  deployment_timeline: |
+    -- Get timeline of events for single deployment
+    SELECT
+        'deployment_start' as event_type,
+        d.triggered_at as occurred_at,
+        'Deployment started'::text as message
+    FROM tb_deployment d
+    WHERE d.id = 'abc-uuid'
+
+    UNION ALL
+
+    SELECT
+        de.event_type,
+        de.created_at as occurred_at,
+        de.message
+    FROM tb_deployment_event de
+    WHERE de.fk_deployment = (
+        SELECT pk_deployment FROM tb_deployment WHERE id = 'abc-uuid'
+    )
+
+    ORDER BY occurred_at;
+
+  deployment_by_user: |
+    -- Who deployed what when
+    SELECT
+        triggered_at,
+        fraise_id,
+        environment,
+        status,
+        triggered_by_user
+    FROM tb_deployment
+    WHERE triggered_by = 'manual'
+    AND triggered_by_user = 'alice'
+    ORDER BY triggered_at DESC;
+
+  failures_in_last_7_days: |
+    SELECT
+        fraise_id,
+        environment,
+        COUNT(*) as failure_count,
+        STRING_AGG(error_message, '; ') as errors
+    FROM tb_deployment
+    WHERE status = 'failed'
+    AND triggered_at >= NOW() - INTERVAL '7 days'
+    GROUP BY fraise_id, environment;
+
+  deployment_duration_stats: |
+    SELECT
+        fraise_id,
+        environment,
+        COUNT(*) as deployment_count,
+        AVG(duration_seconds) as avg_duration,
+        MIN(duration_seconds) as fastest,
+        MAX(duration_seconds) as slowest
+    FROM tb_deployment
+    WHERE status = 'success'
+    AND triggered_at >= NOW() - INTERVAL '30 days'
+    GROUP BY fraise_id, environment;
+
+  success_rate_by_environment: |
+    SELECT
+        environment,
+        COUNT(*) as total_deployments,
+        SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as successful,
+        ROUND(100.0 * SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) / COUNT(*), 2) as success_rate
+    FROM tb_deployment
+    WHERE triggered_at >= NOW() - INTERVAL '7 days'
+    GROUP BY environment;
+
+rollback_tracking:
+  description: "Track rollbacks and recovery"
+  rollback_record: |
+    -- Record rollback as new deployment
+    INSERT INTO tb_deployment (
+        id, fraise_id, environment, branch, commit_sha,
+        status, triggered_by, triggered_by_user,
+        previous_deployment_id,
+        triggered_at, created_at
+    ) VALUES (
+        gen_random_uuid(),
+        'api',
+        'production',
+        'main',
+        'xyz789...',  -- Older commit SHA
+        'running',
+        'manual',
+        'ops-alice',
+        'abc-123-uuid',  -- Points to failed deployment
+        NOW(),
+        NOW()
+    );
+
+  rollback_query: |
+    -- Query rollback history
+    SELECT
+        d1.id as failed_deployment,
+        d1.triggered_at as failed_at,
+        d1.error_message,
+        d2.id as rollback_deployment,
+        d2.triggered_at as rolled_back_at
+    FROM tb_deployment d1
+    JOIN tb_deployment d2 ON d2.previous_deployment_id = d1.id
+    WHERE d1.fraise_id = 'api'
+    ORDER BY d1.triggered_at DESC;
+
+deployment_diff_tracking:
+  description: "What changed between deployments"
+  schema: |
+    CREATE TABLE tb_deployment_diff (
+        pk_diff BIGSERIAL PRIMARY KEY,
+        id UUID UNIQUE NOT NULL,
+        fk_deployment INTEGER NOT NULL,
+        fk_previous_deployment INTEGER,
+        commits_count INT,
+        files_changed INT,
+        lines_added INT,
+        lines_removed INT,
+        commit_list TEXT,              -- JSON array of commits between versions
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+  record_diff: |
+    -- After deployment succeeds, compute diff from previous
+    INSERT INTO tb_deployment_diff (
+        id, fk_deployment, fk_previous_deployment,
+        commits_count, files_changed, lines_added, lines_removed,
+        commit_list
+    )
+    SELECT
+        gen_random_uuid(),
+        NEW.pk_deployment,
+        (SELECT pk_deployment FROM tb_deployment
+         WHERE fraise_id = NEW.fraise_id
+         AND environment = NEW.environment
+         AND pk_deployment < NEW.pk_deployment
+         ORDER BY pk_deployment DESC LIMIT 1),
+        (COUNT(DISTINCT c.id)),
+        COUNT(DISTINCT CONCAT(c.file_path)),
+        SUM(c.additions),
+        SUM(c.deletions),
+        jsonb_agg(jsonb_build_object(
+            'sha', c.sha,
+            'message', c.message,
+            'author', c.author
+        ))
+    FROM git_commits c
+    WHERE c.sha IN (SELECT jsonb_array_elements_text(NEW.commits_info));
+
+  compare_deployments: |
+    -- What changed between two versions
+    SELECT
+        d.fraise_id,
+        d.environment,
+        d1.triggered_at as version1_time,
+        d1.commit_sha as version1_commit,
+        d2.triggered_at as version2_time,
+        d2.commit_sha as version2_commit,
+        dd.commits_count,
+        dd.files_changed,
+        dd.lines_added,
+        dd.lines_removed
+    FROM tb_deployment d
+    JOIN tb_deployment d1 ON d.fk_previous_deployment = d1.pk_deployment
+    JOIN tb_deployment d2 ON d.pk_deployment = d2.pk_deployment
+    JOIN tb_deployment_diff dd ON dd.fk_deployment = d2.pk_deployment
+    WHERE d.fraise_id = 'api';
+
+compliance_auditing:
+  description: "Prove compliance with deployment procedures"
+  audit_log: |
+    -- Who deployed what when to production
+    SELECT
+        triggered_at,
+        triggered_by_user,
+        fraise_id,
+        environment,
+        commit_sha,
+        status
+    FROM tb_deployment
+    WHERE environment = 'production'
+    AND triggered_at >= '2026-01-01'
+    ORDER BY triggered_at;
+
+  change_tracking: |
+    -- Proof that only approved changes are deployed
+    SELECT
+        d.id,
+        d.fraise_id,
+        d.commit_sha,
+        c.pr_number,
+        c.approved_by,
+        c.approval_date,
+        d.triggered_at as deployment_time
+    FROM tb_deployment d
+    JOIN git_commits_to_pr cpr ON cpr.commit_sha = d.commit_sha
+    JOIN git_pull_requests c ON c.pr_number = cpr.pr_number
+    WHERE d.environment = 'production'
+    AND c.status = 'approved'
+    AND c.approval_date < d.triggered_at;
+
+best_practices:
+  - name: "Record all deployment metadata"
+    description: "Capture triggered_by, triggered_by_user, timestamps, etc."
+    rationale: "Complete audit trail for compliance and debugging"
+
+  - name: "Link deployments to webhook events"
+    description: "Record which webhook triggered deployment"
+    rationale: "Trace bug back to specific commit and pusher"
+
+  - name: "Record every status change as event"
+    description: "pending → running → health_check → success"
+    rationale: "Detailed timeline helps debug failures"
+
+  - name: "Track failed deployments with error messages"
+    description: "Always record why deployment failed"
+    rationale: "Learn from failures, improve procedures"
+
+  - name: "Keep deployment history immutable"
+    description: "Never delete or update historical records"
+    rationale: "Audit trail must be tamper-proof"
+
+  - name: "Compute diff between deployments"
+    description: "Record what changed between versions"
+    rationale: "Easy to identify which commit caused bug"
+
+  - name: "Store complete webhook payload"
+    description: "Keep full webhook JSON for debugging"
+    rationale: "Can debug parsing issues later"
+
+  - name: "Enable easy rollback queries"
+    description: "Make it easy to find previous good version"
+    rationale: "Quick recovery from bad deployments"
+
+anti_patterns:
+  - name: "No deployment history"
+    consequence: "Can't trace bugs to deployments"
+    example: "No tb_deployment table, just notes in Slack"
+
+  - name: "Deleting old deployment records"
+    consequence: "Audit trail incomplete"
+    example: "DELETE FROM tb_deployment WHERE created_at < ..."
+
+  - name: "Not linking webhooks to deployments"
+    consequence: "Can't trace webhook → deployment path"
+    example: "Log webhooks separately, no fk relationship"
+
+  - name: "Not recording failure reasons"
+    consequence: "Can't learn from failures"
+    example: "Just record status='failed', no error message"
+
+  - name: "Not tracking rollbacks"
+    consequence: "Can't find previous good version"
+    example: "Rollback is unrecorded, looks like new deployment"
+
+  - name: "Storing webhook payload as text"
+    consequence: "Hard to query webhook data"
+    example: "webhook_payload VARCHAR instead of JSONB"
+
+use_cases:
+  - scenario: "Bug report: 'When was this deployed?'"
+    query: |
+      SELECT * FROM tb_deployment
+      WHERE commit_sha LIKE '%abc123%'
+      ORDER BY triggered_at DESC;
+    benefit: "Instantly find deployment date and who deployed it"
+
+  - scenario: "Incident: 'Roll back to previous version'"
+    query: |
+      SELECT * FROM tb_deployment
+      WHERE fraise_id = 'api'
+      AND environment = 'production'
+      AND status = 'success'
+      ORDER BY triggered_at DESC
+      LIMIT 2;
+    benefit: "Find previous good version for quick rollback"
+
+  - scenario: "Compliance audit: 'Prove all prod deployments were reviewed'"
+    query: |
+      SELECT d.*, pr.approved_by, pr.approval_date
+      FROM tb_deployment d
+      JOIN pull_requests pr ON pr.commit_sha = d.commit_sha
+      WHERE d.environment = 'production'
+      AND pr.status = 'approved';
+    benefit: "Prove compliance with change control procedures"
+
+  - scenario: "Performance analysis: 'Which deployments take longest?'"
+    query: |
+      SELECT fraise_id, AVG(duration_seconds) as avg_duration
+      FROM tb_deployment
+      WHERE status = 'success'
+      GROUP BY fraise_id
+      ORDER BY avg_duration DESC;
+    benefit: "Identify slow deployments for optimization"
+
+  - scenario: "Reliability analysis: 'What's our failure rate?'"
+    query: |
+      SELECT
+        environment,
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as successes,
+        ROUND(100.0 * SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) / COUNT(*), 2) as success_rate
+      FROM tb_deployment
+      WHERE triggered_at >= NOW() - INTERVAL '30 days'
+      GROUP BY environment;
+    benefit: "Measure and track deployment reliability"
+
+related_patterns:
+  - id: "fraisier-cqrs-deployment"
+    description: "CQRS architecture for deployment state"
+
+  - id: "fraisier-deployment-orchestration"
+    description: "Overall deployment orchestration system"
+
+  - id: "webhook-event-driven-deployment"
+    description: "Recording webhook events"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Deployment history is like a flight recorder:
+      - Records every action taken during flight
+      - Used to investigate crashes and incidents
+      - Provides proof of what happened when
+      - Essential for safety and compliance
+
+  intermediate:
+    focus: "Audit trail and rollback capability"
+    key_points:
+      - "Every deployment recorded with timing, status, who"
+      - "Link deployments to webhook events for traceability"
+      - "Record every status change as event"
+      - "Store complete webhook payload for debugging"
+      - "Track rollbacks and recovery actions"
+
+  advanced:
+    focus: "Compliance auditing and incident analysis"
+    key_points:
+      - "Compute diffs between deployments to identify changes"
+      - "Enable audit queries for compliance proofs"
+      - "Track which commits were approved before deployment"
+      - "Analyze failure patterns and reliability metrics"
+      - "Immutable audit trail for incident post-mortems"

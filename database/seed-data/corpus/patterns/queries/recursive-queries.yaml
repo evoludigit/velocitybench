@@ -1,0 +1,340 @@
+# Recursive Queries (CTEs)
+# VelocityBench Knowledge Corpus
+
+id: recursive-queries
+name: "Recursive CTEs for Hierarchical Data"
+category: queries
+type: pattern
+severity: medium
+tags:
+  - sql
+  - postgresql
+  - hierarchy
+  - tree
+  - cte
+
+summary:
+  short: "Query hierarchical data structures with recursive Common Table Expressions"
+  long: |
+    Recursive CTEs (Common Table Expressions) enable querying hierarchical and graph-like
+    data in SQL. They're essential for organizational charts, category trees, bill of
+    materials, threaded comments, and folder structures. A recursive CTE has an anchor
+    member (base case) and a recursive member that references itself to traverse the
+    hierarchy.
+
+problem:
+  description: |
+    Hierarchical data is common but hard to query with standard SQL:
+    - How do you find all descendants of a category?
+    - How do you build a path from root to leaf?
+    - How do you calculate totals rolling up a hierarchy?
+    - Without recursion, you need multiple queries or application logic
+
+  symptoms:
+    - name: "N+1 queries for trees"
+      description: "Loading each level requires another query"
+      detection: "Query count grows with tree depth"
+
+    - name: "Application-side recursion"
+      description: "Building trees in code instead of database"
+      detection: "Multiple round-trips to build hierarchy"
+
+    - name: "Limited depth"
+      description: "Hardcoded JOINs limit hierarchy depth"
+      detection: "Query fails on deeper hierarchies"
+
+solution:
+  principle: "Let the database traverse the hierarchy with recursive CTEs"
+
+  components:
+    - name: "Anchor member"
+      type: "query"
+      purpose: "Starting point - root or specific nodes"
+
+    - name: "Recursive member"
+      type: "query"
+      purpose: "How to traverse to next level"
+
+    - name: "UNION ALL"
+      type: "operator"
+      purpose: "Combines results from each recursion level"
+
+implementation:
+  basic_structure:
+    postgresql: |
+      -- Basic recursive CTE structure
+      WITH RECURSIVE cte_name AS (
+          -- Anchor member: starting point
+          SELECT columns
+          FROM table
+          WHERE condition  -- e.g., parent_id IS NULL for roots
+
+          UNION ALL
+
+          -- Recursive member: traverse to next level
+          SELECT columns
+          FROM table
+          INNER JOIN cte_name ON table.parent_id = cte_name.id
+      )
+      SELECT * FROM cte_name;
+
+  organizational_hierarchy:
+    schema: |
+      -- Employee hierarchy table
+      CREATE TABLE employees (
+          id UUID PRIMARY KEY,
+          name TEXT NOT NULL,
+          manager_id UUID REFERENCES employees(id),
+          department TEXT,
+          salary DECIMAL
+      );
+
+    find_all_reports: |
+      -- Find all reports (direct and indirect) for a manager
+      WITH RECURSIVE reports AS (
+          -- Anchor: direct reports
+          SELECT id, name, manager_id, 1 AS level
+          FROM employees
+          WHERE manager_id = 'manager-uuid'
+
+          UNION ALL
+
+          -- Recursive: their reports, and their reports...
+          SELECT e.id, e.name, e.manager_id, r.level + 1
+          FROM employees e
+          INNER JOIN reports r ON e.manager_id = r.id
+      )
+      SELECT * FROM reports ORDER BY level, name;
+
+    build_org_path: |
+      -- Build path from employee to CEO
+      WITH RECURSIVE org_path AS (
+          -- Anchor: start with target employee
+          SELECT id, name, manager_id, ARRAY[name] AS path
+          FROM employees
+          WHERE id = 'employee-uuid'
+
+          UNION ALL
+
+          -- Recursive: go up to manager
+          SELECT e.id, e.name, e.manager_id, e.name || p.path
+          FROM employees e
+          INNER JOIN org_path p ON p.manager_id = e.id
+      )
+      SELECT path FROM org_path WHERE manager_id IS NULL;
+      -- Result: ['CEO', 'VP Sales', 'Director', 'Employee']
+
+    salary_rollup: |
+      -- Calculate total salary for each manager (including all reports)
+      WITH RECURSIVE team_salaries AS (
+          -- Anchor: each employee with their own salary
+          SELECT id, name, manager_id, salary, salary AS team_total
+          FROM employees
+
+          UNION ALL
+
+          -- Recursive: add employee salary to their manager's total
+          SELECT e.id, e.name, e.manager_id, e.salary,
+                 e.team_total + ts.salary
+          FROM employees e
+          INNER JOIN team_salaries ts ON ts.manager_id = e.id
+      )
+      SELECT id, name, SUM(team_total) AS total_team_salary
+      FROM team_salaries
+      GROUP BY id, name;
+
+  category_tree:
+    schema: |
+      CREATE TABLE categories (
+          id UUID PRIMARY KEY,
+          name TEXT NOT NULL,
+          parent_id UUID REFERENCES categories(id),
+          slug TEXT NOT NULL
+      );
+
+    get_all_descendants: |
+      -- Get all subcategories of "Electronics"
+      WITH RECURSIVE category_tree AS (
+          -- Anchor: the parent category
+          SELECT id, name, parent_id, slug, 0 AS depth
+          FROM categories
+          WHERE slug = 'electronics'
+
+          UNION ALL
+
+          -- Recursive: all children
+          SELECT c.id, c.name, c.parent_id, c.slug, ct.depth + 1
+          FROM categories c
+          INNER JOIN category_tree ct ON c.parent_id = ct.id
+      )
+      SELECT * FROM category_tree ORDER BY depth, name;
+
+    build_breadcrumb: |
+      -- Build breadcrumb path for a category
+      WITH RECURSIVE breadcrumb AS (
+          -- Anchor: target category
+          SELECT id, name, parent_id, ARRAY[name] AS path, ARRAY[slug] AS slugs
+          FROM categories
+          WHERE slug = 'laptop-batteries'
+
+          UNION ALL
+
+          -- Recursive: go up to parents
+          SELECT c.id, c.name, c.parent_id,
+                 c.name || b.path,
+                 c.slug || b.slugs
+          FROM categories c
+          INNER JOIN breadcrumb b ON b.parent_id = c.id
+      )
+      SELECT path, slugs FROM breadcrumb WHERE parent_id IS NULL;
+      -- path: ['Electronics', 'Computers', 'Laptops', 'Laptop Batteries']
+      -- slugs: ['electronics', 'computers', 'laptops', 'laptop-batteries']
+
+  threaded_comments:
+    schema: |
+      CREATE TABLE comments (
+          id UUID PRIMARY KEY,
+          post_id UUID NOT NULL,
+          parent_id UUID REFERENCES comments(id),
+          author_id UUID NOT NULL,
+          content TEXT NOT NULL,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+    fetch_thread: |
+      -- Fetch all comments in a thread, preserving hierarchy
+      WITH RECURSIVE thread AS (
+          -- Anchor: top-level comments
+          SELECT
+              id, parent_id, author_id, content, created_at,
+              ARRAY[id] AS path,
+              0 AS depth
+          FROM comments
+          WHERE post_id = 'post-uuid' AND parent_id IS NULL
+
+          UNION ALL
+
+          -- Recursive: replies
+          SELECT
+              c.id, c.parent_id, c.author_id, c.content, c.created_at,
+              t.path || c.id,
+              t.depth + 1
+          FROM comments c
+          INNER JOIN thread t ON c.parent_id = t.id
+      )
+      SELECT * FROM thread ORDER BY path;  -- Preserves nested order
+
+  graph_traversal:
+    schema: |
+      -- Generic graph edges
+      CREATE TABLE edges (
+          from_node UUID NOT NULL,
+          to_node UUID NOT NULL,
+          weight DECIMAL DEFAULT 1,
+          PRIMARY KEY (from_node, to_node)
+      );
+
+    find_all_paths: |
+      -- Find all paths between two nodes
+      WITH RECURSIVE paths AS (
+          -- Anchor: start node
+          SELECT
+              from_node,
+              to_node,
+              ARRAY[from_node] AS path,
+              weight AS total_weight,
+              false AS is_cycle
+          FROM edges
+          WHERE from_node = 'start-uuid'
+
+          UNION ALL
+
+          -- Recursive: follow edges
+          SELECT
+              e.from_node,
+              e.to_node,
+              p.path || e.from_node,
+              p.total_weight + e.weight,
+              e.to_node = ANY(p.path)  -- Detect cycles
+          FROM edges e
+          INNER JOIN paths p ON e.from_node = p.to_node
+          WHERE NOT p.is_cycle AND array_length(p.path, 1) < 10  -- Limit depth
+      )
+      SELECT path || to_node AS full_path, total_weight
+      FROM paths
+      WHERE to_node = 'end-uuid'
+      ORDER BY total_weight;
+
+best_practices:
+  - name: "Always limit recursion depth"
+    description: "Prevent infinite loops from cycles or deep hierarchies"
+    example: |
+      WITH RECURSIVE cte AS (
+          SELECT *, 1 AS depth FROM table WHERE ...
+          UNION ALL
+          SELECT *, depth + 1 FROM table JOIN cte ON ...
+          WHERE depth < 100  -- Prevent runaway recursion
+      )
+      SELECT * FROM cte;
+
+  - name: "Detect and handle cycles"
+    description: "Track visited nodes to detect cycles"
+    example: |
+      WITH RECURSIVE traverse AS (
+          SELECT id, ARRAY[id] AS visited
+          FROM nodes WHERE id = 'start'
+
+          UNION ALL
+
+          SELECT n.id, t.visited || n.id
+          FROM nodes n
+          JOIN traverse t ON n.parent_id = t.id
+          WHERE n.id <> ALL(t.visited)  -- Skip if already visited
+      )
+      SELECT * FROM traverse;
+
+  - name: "Index the join columns"
+    description: "Index parent_id and other join columns"
+    example: |
+      CREATE INDEX idx_employees_manager ON employees(manager_id);
+      CREATE INDEX idx_categories_parent ON categories(parent_id);
+      CREATE INDEX idx_comments_parent ON comments(parent_id);
+
+performance_considerations:
+  - name: "Materialized path alternative"
+    description: "Store full path for faster reads"
+    example: |
+      -- Materialized path pattern
+      ALTER TABLE categories ADD COLUMN path TEXT;
+      -- path: 'electronics/computers/laptops'
+
+      -- Fast descendant lookup
+      SELECT * FROM categories WHERE path LIKE 'electronics/%';
+
+  - name: "Nested sets alternative"
+    description: "Store left/right boundaries for fast subtree queries"
+    reference: "Good for read-heavy workloads with rare updates"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Recursive queries are like following a family tree:
+      - "Find all descendants of grandpa" - start at grandpa, find children,
+        then their children, then their children...
+      - The database keeps going until there are no more to find!
+
+  intermediate:
+    focus: "Common recursive CTE patterns"
+    key_points:
+      - "Organizational hierarchies and reporting chains"
+      - "Category trees and breadcrumbs"
+      - "Threaded comments and forums"
+      - "Cycle detection and depth limiting"
+
+  advanced:
+    focus: "Performance and alternative approaches"
+    key_points:
+      - "Recursive CTE vs materialized path"
+      - "Graph traversal and shortest path"
+      - "Optimizing recursive query performance"
+      - "Closure table pattern"

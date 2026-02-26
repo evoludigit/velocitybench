@@ -1,0 +1,28 @@
+id: optimization-gotchas
+name: Optimization Gotchas
+category: comprehensive
+type: standard
+tags:
+- optimization
+summary:
+  short: Optimization Gotchas and implementation guidelines
+  long: Complete guide to optimization gotchas
+problem:
+  description: Challenges without proper optimization gotchas
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement optimization gotchas
+key_concepts:
+  concept: Optimization Gotchas
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

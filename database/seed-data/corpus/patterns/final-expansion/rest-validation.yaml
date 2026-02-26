@@ -1,0 +1,28 @@
+id: rest-validation
+name: Rest Validation
+category: comprehensive
+type: standard
+tags:
+- rest
+summary:
+  short: Rest Validation and implementation guidelines
+  long: Complete guide to rest validation
+problem:
+  description: Challenges without proper rest validation
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement rest validation
+key_concepts:
+  concept: Rest Validation
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

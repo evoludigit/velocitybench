@@ -57,6 +57,22 @@ app.get('/ping', (req: Request, res: Response) => {
 // ============================================================================
 
 app.get('/users', async (req: Request, res: Response) => {
+  // Batch fetch by IDs if provided
+  const ids = req.query.ids as string;
+  if (ids) {
+    const idList = ids.split(',').map(id => id.trim()).filter(Boolean);
+    if (idList.length === 0) {
+      return res.json({ users: [] });
+    }
+    const users = await query(
+      `SELECT id, username, full_name, bio, avatar_url
+       FROM benchmark.tb_user
+       WHERE id = ANY($1::uuid[])`,
+      [idList]
+    );
+    return res.json({ users });
+  }
+
   const limit = parseInt(req.query.limit as string) || 10;
   const users = await query(
     `SELECT id, username, full_name, bio
@@ -188,7 +204,7 @@ app.get('/posts', async (req: Request, res: Response) => {
     const authorIds = [...new Set(posts.map((p: any) => p.author_id))];
     const authors = await query(
       `SELECT id, username, full_name
-       FROM benchmark.tb_user WHERE id = ANY($1)`,
+       FROM benchmark.tb_user WHERE id = ANY($1::uuid[])`,
       [authorIds]
     );
     const authorMap = new Map(authors.map((a: any) => [a.id, a]));
@@ -238,6 +254,25 @@ app.get('/posts/:id', async (req: Request, res: Response) => {
   }
 
   res.json(result);
+});
+
+app.get('/posts/:id/comments', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const limit = parseInt(req.query.limit as string) || 10;
+
+  const comments = await query(
+    `SELECT c.id, c.content, c.created_at, c.is_approved,
+            u.id as author_id, u.username as author_username, u.avatar_url as author_avatar
+     FROM benchmark.tb_comment c
+     JOIN benchmark.tb_post p ON c.fk_post = p.pk_post
+     JOIN benchmark.tb_user u ON c.fk_author = u.pk_user
+     WHERE p.id = $1
+     ORDER BY c.created_at DESC
+     LIMIT $2`,
+    [id, limit]
+  );
+
+  res.json(comments);
 });
 
 // ============================================================================

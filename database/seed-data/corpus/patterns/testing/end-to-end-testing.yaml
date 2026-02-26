@@ -1,0 +1,334 @@
+id: end-to-end-testing
+name: "End-to-End Testing Patterns"
+category: testing
+type: standard
+tags:
+  - testing
+  - e2e-tests
+  - quality-assurance
+  - automation
+
+summary:
+  short: "Testing complete user workflows through entire application stack"
+  long: |
+    End-to-end tests verify that the complete system works as users expect. Unlike unit and integration tests that test in isolation, E2E tests exercise the entire application including UI, API, database, and external services. They catch issues that component tests miss and provide confidence in deployments.
+
+problem:
+  description: "System works in tests but fails for real users; critical workflows broken"
+  symptoms:
+    - "All unit tests pass; user reports can't login"
+    - "Order creation works in integration tests; checkout breaks in production"
+    - "Database schema migration works; UI breaks with new data"
+    - "Critical user workflow fails after deployment"
+  impact: "Production incidents, customer impact, lost trust, revenue loss"
+
+solution:
+  description: "Test complete user workflows end-to-end"
+
+test_pyramid:
+  overview: |
+    Test Pyramid (by count):
+    - Unit Tests (70%): Fast, isolated
+    - Integration Tests (20%): Real dependencies
+    - E2E Tests (10%): Complete workflows
+    - Manual Testing (not automated)
+
+  speed_vs_coverage: |
+    |          | Speed | Coverage | Environment | Cost |
+    |----------|-------|----------|-------------|------|
+    | Unit     | Fast  | Component| Isolated    | Low |
+    | Integ.   | Med   | Module   | Partial     | Med |
+    | E2E      | Slow  | System   | Real        | High |
+
+  recommended_ratio: |
+    Don't: 50% E2E (slow CI/CD)
+    Don't: 0% E2E (miss integration bugs)
+    Do: 70% unit, 20% integration, 10% E2E
+
+e2e_testing_tools:
+  web_ui_testing:
+    selenium: |
+      Popular, mature, supports all browsers
+      Slower (browser overhead), requires explicit waits
+
+      from selenium import webdriver
+      driver = webdriver.Chrome()
+      driver.get('https://example.com')
+
+      email = driver.find_element('id', 'email')
+      email.send_keys('user@example.com')
+
+      submit = driver.find_element('id', 'submit')
+      submit.click()
+
+      # Wait for result
+      wait = WebDriverWait(driver, 10)
+      wait.until(EC.presence_of_element_located(('id', 'success')))
+
+    playwright: |
+      Modern, fast, supports multiple browsers
+      More fluent API than Selenium
+
+      async with async_playwright() as p:
+          browser = await p.chromium.launch()
+          page = await browser.new_page()
+
+          await page.goto('https://example.com')
+          await page.fill('#email', 'user@example.com')
+          await page.click('#submit')
+          await page.wait_for_selector('.success')
+
+    cypress: |
+      JavaScript-focused, great developer experience
+      Focuses on web apps (best for SPA testing)
+
+      describe('Login flow', () => {
+          it('logs in user', () => {
+              cy.visit('https://example.com')
+              cy.get('#email').type('user@example.com')
+              cy.get('#password').type('password123')
+              cy.get('#submit').click()
+              cy.url().should('include', '/dashboard')
+          })
+      })
+
+  api_testing:
+    postman: |
+      Visual API testing, good for manual exploration
+      Can automate with scripts
+
+      POST /api/login
+      {
+          "email": "user@example.com",
+          "password": "password123"
+      }
+
+      Response: 200 OK
+      {
+          "token": "jwt_token_here"
+      }
+
+    rest_assured: |
+      Java library for API testing
+      Fluent, readable API
+
+      given()
+          .contentType(ContentType.JSON)
+          .body(new LoginRequest("user@example.com", "password"))
+      .when()
+          .post("/api/login")
+      .then()
+          .statusCode(200)
+          .body("token", notNullValue())
+
+  mobile_testing:
+    appium: |
+      Mobile app testing (iOS/Android)
+      Uses WebDriver protocol
+
+    xcode_simulator: |
+      iOS testing in Xcode
+      Native integration
+
+testing_workflows:
+  happy_path: |
+    Test normal user flow:
+    1. User signup
+    2. User login
+    3. Create content
+    4. View content
+    5. Logout
+
+  edge_cases: |
+    Test unusual but valid scenarios:
+    1. Signup with special characters in name
+    2. Login from multiple devices
+    3. Create content with max length input
+    4. View content with thousands of items
+    5. Logout after session timeout
+
+  error_paths: |
+    Test failure scenarios:
+    1. Login with wrong password (3x → lockout)
+    2. Signup with existing email
+    3. Create content with invalid data
+    4. Network timeout during request
+    5. Server error (500)
+
+test_data_management:
+  setup_and_teardown: |
+    def test_user_creates_post():
+        # Setup: Create test user
+        user = create_test_user(email='test@example.com')
+
+        # Test: Create post
+        post = user.create_post(title='Test Post')
+
+        # Assert
+        assert post.title == 'Test Post'
+        assert post.author == user
+
+        # Teardown: Clean up
+        delete_test_user(user)
+
+  factories: |
+    class UserFactory:
+        @staticmethod
+        def create(email='user@example.com'):
+            return User(
+                email=email,
+                password=hash_password('password123'),
+                created_at=now()
+            )
+
+    def test_user_post_creation():
+        user = UserFactory.create()
+        post = user.create_post(title='Test')
+        assert post.author == user
+
+  seeding: |
+    # Seed test database with realistic data
+    def seed_test_database():
+        for i in range(1000):
+            user = User(
+                email=f'user{i}@example.com',
+                name=f'User {i}'
+            )
+            db.insert(user)
+
+      # Then test operations on realistic dataset
+
+common_challenges:
+  flakiness: |
+    Tests pass sometimes, fail other times (timing issues)
+
+    Example:
+    def test_user_created():
+        user = create_user('test@example.com')
+        time.sleep(0.1)  # BAD: Arbitrary sleep
+        found_user = get_user('test@example.com')
+        assert found_user is not None
+
+    Problem: 0.1s might not be enough in slow CI
+    Solution: Wait for explicit condition, not time
+
+    def test_user_created():
+        user = create_user('test@example.com')
+        wait_until(
+            lambda: get_user('test@example.com') is not None,
+            timeout=10
+        )
+        found_user = get_user('test@example.com')
+        assert found_user is not None
+
+  slow_tests: |
+    E2E tests are inherently slow (browser startup ~2 seconds per test)
+
+    Don't: Create 100 E2E tests (200+ seconds)
+    Do: Create 10 critical E2E tests (20 seconds)
+    Do: Test edge cases with faster unit/integration tests
+
+  maintenance: |
+    UI changes break many E2E tests
+
+    Example:
+    # Test was written when button had id="submit"
+    button = driver.find_element('id', 'submit')
+
+    # UI refactoring changes to class="btn-primary"
+    # Test now breaks (button not found)
+
+    Solution: Use stable locators (data-testid attributes)
+    button = driver.find_element('css selector', '[data-testid="submit"]')
+
+cross_browser_testing:
+  browser_matrix: |
+    Test on multiple browsers:
+    - Chrome (latest)
+    - Firefox (latest)
+    - Safari (latest)
+    - Edge (latest)
+
+    Can test locally or use cloud services:
+    - BrowserStack
+    - Sauce Labs
+    - Cloud browser providers
+
+  headless_vs_headed: |
+    Headless (no UI):
+    - Faster (no rendering overhead)
+    - Good for CI/CD
+    - Can't see visual issues
+
+    Headed (with UI):
+    - Slower
+    - Can debug visually
+    - Can spot CSS/layout issues
+
+best_practices:
+  - name: "Keep E2E tests focused"
+    description: "Test critical workflows only; use unit/integration for details"
+
+  - name: "Make tests independent"
+    description: "Tests should not depend on order or shared state"
+
+  - name: "Use stable locators"
+    description: "Use data-testid or unique IDs; avoid brittle CSS selectors"
+
+  - name: "Wait for conditions explicitly"
+    description: "Don't use sleep(); wait for elements or events"
+
+  - name: "Test in parallel"
+    description: "Distribute E2E tests across machines to reduce total time"
+
+  - name: "Monitor test flakiness"
+    description: "Re-run flaky tests; fix root cause, don't just retry"
+
+  - name: "Use visual regression testing"
+    description: "Screenshot comparison to catch CSS/layout bugs"
+
+  - name: "Keep E2E test count low"
+    description: "Only test critical paths; use lower-level tests for edge cases"
+
+anti_patterns:
+  - name: "E2E tests for everything"
+    consequence: "Slow CI/CD (1+ hour), flaky, expensive to maintain"
+    fix: "Only critical workflows (10-20 tests); move details to unit tests"
+
+  - name: "Brittle selectors"
+    consequence: "Tests break on UI changes even if functionality works"
+    fix: "Use data-testid attributes; stable locators"
+
+  - name: "Long test execution"
+    consequence: "Developers skip running tests locally"
+    fix: "Run critical tests locally; full suite in CI"
+
+  - name: "No waiting for conditions"
+    consequence: "Tests intermittently fail on slow systems"
+    fix: "Explicit waits for elements, not sleep()"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      E2E testing is like user acceptance testing (UAT):
+      - Unit tests: Engine works
+      - Integration tests: Transmission connects to engine
+      - E2E tests: Full car works for driver
+
+      Only complete test ensures the car is drivable!
+
+  intermediate:
+    focus: "E2E test implementation"
+    key_points:
+      - "E2E test tools (Cypress, Playwright, Selenium)"
+      - "Testing user workflows end-to-end"
+      - "Test data setup and cleanup"
+      - "Dealing with flakiness"
+
+  advanced:
+    focus: "Complex E2E testing scenarios"
+    key_points:
+      - "Cross-browser testing at scale"
+      - "Visual regression testing"
+      - "Mobile E2E testing"
+      - "Reducing E2E test maintenance burden"

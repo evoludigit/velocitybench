@@ -1,0 +1,29 @@
+# Rust build artifacts (1-2GB each)
+*/target
+
+# Node.js dependencies
+*/node_modules
+
+# Python virtual environments
+*/.venv
+*/venv
+
+# Java/Gradle/Maven build output
+*/build
+*/.gradle
+*/target/
+
+# Go build cache
+*/vendor
+
+# Ruby gems
+*/vendor/bundle
+*/.bundle
+
+# Misc
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache

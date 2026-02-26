@@ -1,0 +1,28 @@
+id: websockets-guidelines
+name: Websockets Guidelines
+category: comprehensive
+type: standard
+tags:
+- websockets
+summary:
+  short: Websockets Guidelines and implementation guidelines
+  long: Complete guide to websockets guidelines
+problem:
+  description: Challenges without proper websockets guidelines
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement websockets guidelines
+key_concepts:
+  concept: Websockets Guidelines
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

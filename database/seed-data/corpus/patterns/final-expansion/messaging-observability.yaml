@@ -1,0 +1,28 @@
+id: messaging-observability
+name: Messaging Observability
+category: comprehensive
+type: standard
+tags:
+- messaging
+summary:
+  short: Messaging Observability and implementation guidelines
+  long: Complete guide to messaging observability
+problem:
+  description: Challenges without proper messaging observability
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement messaging observability
+key_concepts:
+  concept: Messaging Observability
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

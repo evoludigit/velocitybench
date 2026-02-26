@@ -1,0 +1,292 @@
+# Open Source vs Commercial Software
+# VelocityBench Knowledge Corpus
+
+id: open-source-vs-commercial
+name: "Open Source vs Commercial Software Trade-offs"
+category: infrastructure
+type: pattern
+severity: medium
+tags:
+  - open-source
+  - commercial
+  - licensing
+  - dependencies
+  - procurement
+
+summary:
+  short: "Evaluate trade-offs between open-source and commercial software"
+  long: |
+    The choice between open-source and commercial software affects cost, control, support,
+    and risk. Open-source offers transparency and community, but requires internal expertise.
+    Commercial software provides professional support and indemnification, but at cost and
+    with vendor dependency. The decision depends on technical requirements, support needs,
+    budget, compliance, and team capability.
+
+problem:
+  description: |
+    Wrong choices have downstream impacts:
+    - Open-source without expertise creates technical debt
+    - Commercial software with no open alternative creates lock-in
+    - License compliance violations expose to legal risk
+    - Abandoned open-source projects cause security problems
+    - Commercial pricing scales unexpectedly
+
+  symptoms:
+    - name: "Unexpected licensing costs"
+      description: "Commercial licensing fees escalate with scale"
+      detection: "Licensing costs spike when business grows"
+
+    - name: "Security vulnerabilities in open-source"
+      description: "Unmaintained dependencies have known CVEs"
+      detection: "Security audits find unpatched vulnerabilities"
+
+    - name: "Vendor lock-in"
+      description: "Switching costs make changing vendors prohibitive"
+      detection: "Custom integrations making migration hard"
+
+solution:
+  principle: "Choose based on control, cost, support, and risk tolerance"
+
+decision_factors:
+  - name: "Cost"
+    open_source:
+      - "$0 software license (but costs in engineering)"
+      - "Scaling cost is human time, not licenses"
+      - "No per-user or per-transaction fees"
+    commercial:
+      - "Fixed or usage-based licensing"
+      - "Can become expensive with scale"
+      - "Professional support often bundled"
+
+  - name: "Control"
+    open_source:
+      - "Source code available"
+      - "Can modify and fork"
+      - "Not dependent on vendor roadmap"
+    commercial:
+      - "Black-box (usually)"
+      - "Can't modify"
+      - "Dependent on vendor decisions"
+
+  - name: "Support"
+    open_source:
+      - "Community support (free, variable quality)"
+      - "Stack Overflow, forums, Discord"
+      - "No SLA"
+      - "Professional support available (paid)"
+    commercial:
+      - "Professional support (usually included)"
+      - "SLA guarantees"
+      - "Paid priority support"
+      - "May be outsourced"
+
+  - name: "Security"
+    open_source:
+      - "Transparency (more eyes on code)"
+      - "Depends on project maintenance level"
+      - "Responsible disclosure process varies"
+      - "Security in depth may be better (auditable)"
+    commercial:
+      - "Vendor security team"
+      - "Indemnification clause"
+      - "Penetration testing"
+      - "May have undisclosed vulnerabilities"
+
+  - name: "Risk"
+    open_source:
+      - "Project abandonment risk"
+      - "License violation risk"
+      - "Community fragmentation risk"
+    commercial:
+      - "Vendor going out of business"
+      - "Pricing changes"
+      - "Vendor priorities vs your needs"
+
+comparison:
+  database:
+    postgresql_opensource:
+      cost: "Free"
+      control: "Full (open source)"
+      support: "Community + commercial (EDB)"
+      lock_in: "None (can host anywhere)"
+      best_for: "Cost-sensitive, technical team"
+
+    oracle_commercial:
+      cost: "Very expensive (per core licensing)"
+      control: "None (proprietary)"
+      support: "Oracle support (premium)"
+      lock_in: "High (licensing model)"
+      best_for: "Enterprise, existing Oracle investment"
+
+    dynamodb_commercial:
+      cost: "Usage-based (can be expensive)"
+      control: "None (fully managed)"
+      support: "AWS support"
+      lock_in: "Very high (AWS-only)"
+      best_for: "Serverless, minimal ops"
+
+  message_queue:
+    kafka_opensource:
+      cost: "Free"
+      control: "Full"
+      support: "Community + Confluent"
+      lock_in: "Low (portable, self-hosted)"
+      best_for: "High-throughput streaming"
+
+    rabbitmq_opensource:
+      cost: "Free"
+      control: "Full"
+      support: "Community + commercial"
+      lock_in: "Low"
+      best_for: "Traditional messaging"
+
+    sqs_commercial:
+      cost: "Per request ($0.40 per million)"
+      control: "None (managed)"
+      support: "AWS"
+      lock_in: "High (AWS-only)"
+      best_for: "Low-volume async"
+
+  monitoring:
+    prometheus_opensource:
+      cost: "Free"
+      control: "Full"
+      support: "Community"
+      lock_in: "Low (open format)"
+      best_for: "Full control needed"
+
+    datadog_commercial:
+      cost: "$10-30 per host/month"
+      control: "Some (limited customization)"
+      support: "Datadog support"
+      lock_in: "Medium (vendor data format)"
+      best_for: "Full-service monitoring, less ops"
+
+implementation:
+  open_source_best_practices:
+    selection: |
+      When evaluating open-source projects:
+      1. Check GitHub activity
+         - Recent commits (active maintenance)
+         - Responsiveness to issues
+         - Contributor diversity
+
+      2. Review release schedule
+         - Regular releases indicate maturity
+         - Long gaps between releases = concerning
+
+      3. Assess community health
+         - Active discussions/issues
+         - Quick responses to bugs
+         - Contributors responding to maintainer
+
+      4. Evaluate license
+         - MIT, Apache 2.0, GPL (check compatibility)
+         - Avoid custom unknown licenses
+         - Understand implications for your use
+
+      5. Check security practices
+         - Security.md file for reporting
+         - CVE tracking
+         - Security patches released promptly
+
+      6. Look for commercial support
+         - Some projects have commercial backers
+         - Professional support options available
+         - Reduces risk of abandonment
+
+  license_compliance:
+    python: |
+      # Scan dependencies for license compliance
+      pip install pip-audit
+
+      # Audit for security vulnerabilities
+      pip-audit
+
+      # Generate license report
+      pip install pip-licenses
+      pip-licenses --format=json > licenses.json
+
+    nodejs: |
+      # License compliance check
+      npm install -g license-checker
+      license-checker --onlyunknown --markdown
+
+      # Security audit
+      npm audit
+
+      # Generate SBOM (Software Bill of Materials)
+      npm install -g sbom
+      sbom . > sbom.json
+
+  commercial_negotiation_tips: |
+    1. Negotiate volume discounts
+       - Most vendors have flexibility on large deals
+       - Multi-year contracts often cheaper per year
+
+    2. Evaluate true cost
+       - License + support + training + migration
+       - Don't just look at license fee
+
+    3. Include exit clause
+       - Ability to export data
+       - Migration support period
+       - Avoid perpetual lock-in
+
+    4. Get it in writing
+       - SLA response times
+       - Uptime guarantees
+       - Pricing escalation limits
+
+    5. Consider hybrid
+       - Free/open core + commercial extensions
+       - Examples: GitLab, HashiCorp, Elastic
+
+risk_mitigation:
+  open_source_abandonment:
+    mitigations:
+      - "Monitor project activity"
+      - "Choose projects with commercial backing"
+      - "Plan for forking if necessary"
+      - "Contribute to maintain project"
+      - "Consider commercial support option"
+
+  license_violations:
+    mitigations:
+      - "Use license scanning tools"
+      - "Understand GPL implications (requires source disclosure)"
+      - "Prefer permissive licenses (MIT, Apache) when possible"
+      - "Document all dependencies"
+      - "Regular compliance audits"
+
+  vendor_lock_in:
+    mitigations:
+      - "Prefer open standards"
+      - "Avoid proprietary extensions"
+      - "Test migration path"
+      - "Keep data in open formats"
+      - "Consider multi-vendor strategy"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Open-source vs commercial is like car ownership:
+      - Open-source: Buy parts, assemble (free, but you fix it)
+      - Commercial: Buy a car (support included, but you don't own it)
+      - Hybrid: Buy a car with access to engine specs (best of both)
+
+  intermediate:
+    focus: "Evaluating projects and making trade-off decisions"
+    key_points:
+      - "Assessing open-source project health"
+      - "License implications for your business"
+      - "Total cost of ownership (not just licenses)"
+      - "Support and SLA considerations"
+
+  advanced:
+    focus: "License compliance and vendor strategies"
+    key_points:
+      - "GPL vs permissive licenses"
+      - "SBOM and supply chain security"
+      - "Multi-vendor strategies"
+      - "Commercial support for open-source"

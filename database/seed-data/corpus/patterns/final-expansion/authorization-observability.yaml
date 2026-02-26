@@ -1,0 +1,28 @@
+id: authorization-observability
+name: Authorization Observability
+category: comprehensive
+type: standard
+tags:
+- authorization
+summary:
+  short: Authorization Observability and implementation guidelines
+  long: Complete guide to authorization observability
+problem:
+  description: Challenges without proper authorization observability
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement authorization observability
+key_concepts:
+  concept: Authorization Observability
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

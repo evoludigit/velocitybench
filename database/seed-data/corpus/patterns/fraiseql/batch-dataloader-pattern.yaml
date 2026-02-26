@@ -1,0 +1,58 @@
+id: batch-dataloader-pattern
+name: Batch DataLoader Pattern
+category: fraiseql
+type: standard
+tags:
+- performance
+- batching
+- n-plus-one
+- optimization
+- caching
+summary:
+  short: Batching multiple queries with deduplication for N+1 prevention
+  long: FraiseQL uses DataLoader pattern to batch multiple GraphQL field resolutions
+    into single database queries with automatic deduplication, caching, and optimal
+    execution ordering to eliminate N+1 query problems.
+problem:
+  description: N+1 queries cause database overload
+  symptoms:
+  - 1 query + N queries for N items
+  - Slow response times
+  - Database connection saturation
+  - Duplicate queries for same data
+  impact: Poor performance and scalability issues
+solution:
+  description: Implement Batch DataLoader Pattern effectively
+key_concepts:
+  concept_1: Batch multiple field resolutions
+  concept_2: Automatic query deduplication
+  concept_3: Request-scoped caching
+  concept_4: Optimal batch size configuration
+implementation_considerations:
+  consideration_1: Batch window duration
+  consideration_2: Maximum batch size
+  consideration_3: Cache key generation
+  consideration_4: Error handling in batches
+best_practices:
+- name: Use dataloaders
+  description: Wrap all database calls in dataloaders
+- name: Request-scoped cache
+  description: Cache loader results per request
+- name: Deduplicate keys
+  description: Eliminate duplicate IDs in batch
+- name: Limit batch size
+  description: Configure maximum batch size (1000)
+anti_patterns:
+- name: No batching
+  consequence: N+1 queries and poor performance
+- name: Global cache
+  consequence: Stale data across requests
+- name: Unbounded batches
+  consequence: Large query failures
+blog_hooks:
+  beginner:
+    focus: Introduction to Batch DataLoader Pattern
+  intermediate:
+    focus: Implementing dataloaders for N+1 prevention
+  advanced:
+    focus: Advanced batching strategies and performance optimization

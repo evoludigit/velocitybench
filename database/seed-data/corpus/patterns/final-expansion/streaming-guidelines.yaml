@@ -1,0 +1,28 @@
+id: streaming-guidelines
+name: Streaming Guidelines
+category: comprehensive
+type: standard
+tags:
+- streaming
+summary:
+  short: Streaming Guidelines and implementation guidelines
+  long: Complete guide to streaming guidelines
+problem:
+  description: Challenges without proper streaming guidelines
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement streaming guidelines
+key_concepts:
+  concept: Streaming Guidelines
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

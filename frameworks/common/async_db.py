@@ -14,8 +14,8 @@ Features:
 import asyncpg
 import os
 import time
-from typing import List, Dict, Any, Optional, Callable
-from datetime import datetime
+from contextlib import asynccontextmanager
+from typing import Any
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 class PoolMetrics:
     """Track connection pool usage metrics."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.total_connections_acquired = 0
         self.total_connections_released = 0
         self.max_concurrent_connections = 0
@@ -33,33 +33,35 @@ class PoolMetrics:
         self.statement_cache_hits = 0
         self.statement_cache_misses = 0
 
-    def record_acquire(self):
+    def record_acquire(self) -> None:
         self.total_connections_acquired += 1
         self.current_concurrent_connections += 1
         self.max_concurrent_connections = max(
-            self.max_concurrent_connections,
-            self.current_concurrent_connections
+            self.max_concurrent_connections, self.current_concurrent_connections
         )
 
-    def record_release(self):
-        self.current_concurrent_connections = max(0, self.current_concurrent_connections - 1)
+    def record_release(self) -> None:
+        self.current_concurrent_connections = max(
+            0, self.current_concurrent_connections - 1
+        )
         self.total_connections_released += 1
 
-    def record_wait(self, wait_time_ms: float):
+    def record_wait(self, wait_time_ms: float) -> None:
         self.total_wait_time_ms += wait_time_ms
 
-    def record_statement_hit(self):
+    def record_statement_hit(self) -> None:
         self.statement_cache_hits += 1
 
-    def record_statement_miss(self):
+    def record_statement_miss(self) -> None:
         self.statement_cache_misses += 1
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Get metrics summary for logging/monitoring."""
         total_statements = self.statement_cache_hits + self.statement_cache_misses
         cache_hit_rate = (
             (self.statement_cache_hits / total_statements * 100)
-            if total_statements > 0 else 0
+            if total_statements > 0
+            else 0
         )
 
         return {
@@ -69,7 +71,8 @@ class PoolMetrics:
             "current_concurrent": self.current_concurrent_connections,
             "avg_wait_time_ms": (
                 self.total_wait_time_ms / self.total_connections_acquired
-                if self.total_connections_acquired > 0 else 0
+                if self.total_connections_acquired > 0
+                else 0
             ),
             "statement_cache_hit_rate_pct": cache_hit_rate,
         }
@@ -86,23 +89,23 @@ class AsyncDatabase:
     - Unified interface (fetch, fetchrow, execute, etc.)
     """
 
-    def __init__(self):
-        self.pool: Optional[asyncpg.Pool] = None
+    def __init__(self) -> None:
+        self.pool: asyncpg.Pool | None = None
         self.metrics = PoolMetrics()
-        self._connection_semaphore: Optional[asyncpg.pool.Pool] = None
+        self._connection_semaphore: asyncpg.pool.Pool | None = None
 
     async def connect(
         self,
-        host: Optional[str] = None,
-        port: Optional[int] = None,
-        database: Optional[str] = None,
-        user: Optional[str] = None,
-        password: Optional[str] = None,
+        host: str | None = None,
+        port: int | None = None,
+        database: str | None = None,
+        user: str | None = None,
+        password: str | None = None,
         min_size: int = 10,
         max_size: int = 50,
         statement_cache_size: int = 100,
         max_cached_statement_lifetime: int = 300,
-    ):
+    ) -> None:
         """
         Initialize connection pool with production settings.
 
@@ -119,10 +122,18 @@ class AsyncDatabase:
         """
         # Get connection parameters from args or environment
         host = host or os.getenv("DB_HOST", "postgres")
-        port = port or int(os.getenv("DB_PORT", "5432"))
+        port = port if port is not None else int(os.getenv("DB_PORT", "5432"))
         database = database or os.getenv("DB_NAME", "fraiseql_benchmark")
         user = user or os.getenv("DB_USER", "benchmark")
-        password = password or os.getenv("DB_PASSWORD", "benchmark123")
+
+        # Password is REQUIRED - fail fast if not provided
+        if not password:
+            password = os.getenv("DB_PASSWORD")
+            if not password:
+                raise ValueError(
+                    "Database password is required. "
+                    "Set DB_PASSWORD environment variable."
+                )
 
         logger.info(
             f"Creating asyncpg pool: {user}@{host}:{port}/{database} "
@@ -146,18 +157,15 @@ class AsyncDatabase:
                 init=self._init_connection,
             )
             logger.info("✅ Connection pool created successfully")
-        except Exception as e:
+        except (asyncpg.PostgresError, ConnectionError, TimeoutError, OSError) as e:
             logger.error(f"❌ Failed to create connection pool: {e}")
             raise
 
-    async def _init_connection(self, conn):
+    async def _init_connection(self, conn: asyncpg.Connection) -> None:
         """Initialize each new connection with performance settings."""
-        # Set application name for pg_stat_activity monitoring
         await conn.execute("SET application_name = 'fraiseql-benchmark';")
-        # Enable query logging (optional, may impact performance)
-        # await conn.execute("SET log_statement = 'all';")
 
-    async def close(self):
+    async def close(self) -> None:
         """Close connection pool."""
         if self.pool:
             logger.info("Closing connection pool...")
@@ -165,7 +173,7 @@ class AsyncDatabase:
             logger.info("✅ Connection pool closed")
             self._print_metrics()
 
-    def _print_metrics(self):
+    def _print_metrics(self) -> None:
         """Print metrics summary at shutdown."""
         summary = self.metrics.get_summary()
         logger.info("📊 Connection Pool Metrics:")
@@ -176,11 +184,8 @@ class AsyncDatabase:
                 logger.info(f"  {key}: {value}")
 
     async def fetch(
-        self,
-        query: str,
-        *args,
-        timeout: Optional[float] = None
-    ) -> List[Dict[str, Any]]:
+        self, query: str, *args, timeout: float | None = None
+    ) -> list[dict[str, Any]]:
         """
         Execute query and return results as list of dicts.
 
@@ -209,11 +214,8 @@ class AsyncDatabase:
             self.metrics.record_wait(wait_time)
 
     async def fetchrow(
-        self,
-        query: str,
-        *args,
-        timeout: Optional[float] = None
-    ) -> Optional[Dict[str, Any]]:
+        self, query: str, *args, timeout: float | None = None
+    ) -> dict[str, Any] | None:
         """
         Execute query and return single row as dict.
 
@@ -240,12 +242,7 @@ class AsyncDatabase:
             self.metrics.record_release()
             self.metrics.record_wait(wait_time)
 
-    async def fetchval(
-        self,
-        query: str,
-        *args,
-        timeout: Optional[float] = None
-    ) -> Any:
+    async def fetchval(self, query: str, *args, timeout: float | None = None) -> Any:
         """
         Execute query and return single scalar value.
 
@@ -271,12 +268,7 @@ class AsyncDatabase:
             self.metrics.record_release()
             self.metrics.record_wait(wait_time)
 
-    async def execute(
-        self,
-        query: str,
-        *args,
-        timeout: Optional[float] = None
-    ) -> str:
+    async def execute(self, query: str, *args, timeout: float | None = None) -> str:
         """
         Execute query without returning results.
 
@@ -302,12 +294,7 @@ class AsyncDatabase:
             self.metrics.record_release()
             self.metrics.record_wait(wait_time)
 
-    async def executemany(
-        self,
-        query: str,
-        args,
-        timeout: Optional[float] = None
-    ) -> None:
+    async def executemany(self, query: str, args, timeout: float | None = None) -> None:
         """
         Execute query multiple times with different parameter sets.
 
@@ -330,6 +317,7 @@ class AsyncDatabase:
             self.metrics.record_release()
             self.metrics.record_wait(wait_time)
 
+    @asynccontextmanager
     async def transaction(self):
         """
         Start a transaction context manager.
@@ -346,26 +334,26 @@ class AsyncDatabase:
             async with conn.transaction():
                 yield conn
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Get current metrics snapshot."""
         return self.metrics.get_summary()
 
-    def get_pool_info(self) -> Dict[str, Any]:
+    def get_pool_info(self) -> dict[str, Any]:
         """Get connection pool information."""
         if not self.pool:
             return {"status": "not_connected"}
 
         return {
             "status": "connected",
-            "min_size": self.pool._minsize,
-            "max_size": self.pool._maxsize,
-            "free_connections": len(self.pool._holders),
-            "size": self.pool._holders.__len__(),
+            "min_size": self.pool.get_min_size(),
+            "max_size": self.pool.get_max_size(),
+            "free_connections": self.pool.get_size(),
+            "size": self.pool.get_size(),
         }
 
 
 # Global instance for shared use
-_db_instance: Optional[AsyncDatabase] = None
+_db_instance: AsyncDatabase | None = None
 
 
 def get_database() -> AsyncDatabase:
@@ -377,9 +365,7 @@ def get_database() -> AsyncDatabase:
 
 
 async def initialize_database(
-    min_size: int = 10,
-    max_size: int = 50,
-    **kwargs
+    min_size: int = 10, max_size: int = 50, **kwargs
 ) -> AsyncDatabase:
     """Initialize and return global database instance."""
     db = get_database()

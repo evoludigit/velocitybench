@@ -1,0 +1,296 @@
+id: fraiseql-query-optimization
+name: "FraiseQL Query Optimization Techniques"
+category: fraiseql
+type: standard
+tags:
+  - fraiseql
+  - optimization
+  - query-planning
+  - explain-analyze
+  - performance
+
+summary:
+  short: "Query optimization through EXPLAIN ANALYZE, index strategy, and query planning"
+  long: |
+    Optimizing GraphQL queries requires understanding PostgreSQL query execution, index strategies for
+    different query patterns, and systematic benchmarking. FraiseQL GraphQL queries compile to SQL,
+    making traditional SQL optimization techniques applicable. This pattern covers EXPLAIN ANALYZE
+    workflow, index selection per query type, and performance monitoring.
+
+problem:
+  description: |
+    Slow GraphQL queries often have obvious SQL fixes:
+    - Missing index causes full table scan
+    - Wrong index type for query pattern
+    - Query planner chooses suboptimal execution plan
+    - N+1 queries drain connection pool
+
+    Developers need systematic approach to identify and fix slow queries.
+
+  symptoms:
+    - name: "Slow GraphQL field"
+      description: "user { posts } takes 500ms (should be <50ms)"
+      detection: "EXPLAIN ANALYZE shows sequential scan"
+
+    - name: "Query planner confusion"
+      description: "Query is fast sometimes, slow other times"
+      detection: "EXPLAIN shows different plans depending on data distribution"
+
+    - name: "Suboptimal index usage"
+      description: "Index exists but query doesn't use it"
+      detection: "EXPLAIN shows SeqScan instead of IndexScan"
+
+  impact: |
+    Slow API responses, poor user experience, wasted infrastructure
+
+solution:
+  principle: "Systematic profiling, strategic indexing, and continuous monitoring"
+
+  components:
+    - name: "EXPLAIN ANALYZE Workflow"
+      type: "Diagnostic tool"
+      purpose: "Understand query execution"
+      workflow: |
+        1. Run query against production-like data
+        2. Use EXPLAIN ANALYZE to see execution plan
+        3. Look for:
+           - Sequential scan (bad) vs index scan (good)
+           - Row counts at each step
+           - Actual vs estimated rows (planner accuracy)
+           - Total execution time
+        4. Add index if needed
+        5. Re-run EXPLAIN ANALYZE to verify improvement
+
+    - name: "Index Strategy by Query Type"
+      type: "Index selection"
+      purpose: "Choose right index for query pattern"
+      strategies:
+        exact_match: |
+          **Query: WHERE email = %s**
+          - Index: B-tree on single column
+          - SQL: CREATE INDEX idx_user_email ON tb_user(email)
+          - Performance: <10ms (vs 100ms without)
+
+        range_query: |
+          **Query: WHERE created_at > %s AND created_at < %s**
+          - Index: B-tree on range column
+          - SQL: CREATE INDEX idx_post_created ON tb_post(created_at)
+          - Performance: <50ms (vs 500ms without)
+
+        like_pattern: |
+          **Query: WHERE title LIKE 'prefix%'**
+          - Index: B-tree (prefix patterns use index)
+          - SQL: CREATE INDEX idx_post_title ON tb_post(title)
+          - Performance: <50ms (vs 200ms without)
+
+        ilike_pattern: |
+          **Query: WHERE LOWER(title) ILIKE 'pattern%'**
+          - Index: Function index on LOWER(title)
+          - SQL: CREATE INDEX idx_post_title_lower ON tb_post(LOWER(title))
+          - Performance: <100ms (vs 2000ms without)
+
+        composite_filter: |
+          **Query: WHERE fk_author = %s AND status = %s**
+          - Index: Composite B-tree (column order matters!)
+          - SQL: CREATE INDEX idx_post_author_status ON tb_post(fk_author, status)
+          - Performance: <50ms (vs 300ms without)
+
+        full_text_search: |
+          **Query: WHERE to_tsvector(content) @@ to_tsquery('search')**
+          - Index: GIN (full-text search index)
+          - SQL: CREATE INDEX idx_post_content ON tb_post USING gin(to_tsvector('english', content))
+          - Performance: <100ms (vs 5000ms without)
+
+    - name: "Query Planner Optimization"
+      type: "Tuning"
+      purpose: "Help planner choose optimal plan"
+      techniques:
+        analyze: |
+          Run ANALYZE before benchmarking:
+          ```sql
+          ANALYZE tb_post;  -- Update planner statistics
+          ```
+
+        cost_weights: |
+          Adjust planner cost parameters if needed:
+          ```sql
+          SET random_page_cost = 1.1;  -- For SSD (default is 4.0 for HDD)
+          ```
+
+        join_order: |
+          Specify join order for complex queries:
+          ```sql
+          -- Hint to planner (using comment, not SQL syntax)
+          SELECT /* JOIN: smaller_table first */
+            *
+          FROM big_table
+          JOIN small_table ON big_table.id = small_table.id
+          ```
+
+    - name: "Performance Monitoring"
+      type: "Operational pattern"
+      purpose: "Track query performance over time"
+      metrics: |
+        - Query count per type (how often executed)
+        - Average execution time (performance baseline)
+        - P95/P99 latencies (tail latency matters)
+        - Index usage statistics (which indexes are used)
+        - Slow query log (queries exceeding threshold)
+
+    - name: "Query Caching"
+      type: "Optimization"
+      purpose: "Reduce redundant queries"
+      approach: |
+        Cache GraphQL query results based on arguments:
+        - First user { id name } query: Hits database
+        - Subsequent identical queries: Served from cache
+        - TTL-based expiration
+
+key_concepts:
+  concept_1: "EXPLAIN ANALYZE is the primary debugging tool"
+  concept_2: "Sequential scan = full table scan = slow (usually)"
+  concept_3: "Index scan = using index = fast (usually)"
+  concept_4: "Index type matters (B-tree vs GIN vs BRIN)"
+  concept_5: "Composite index column order must match query filter order"
+  concept_6: "LIKE 'pattern%' can use index; '%pattern%' cannot"
+  concept_7: "Row count estimates guide planner decisions"
+  concept_8: "Monitor slow_log to find optimization opportunities"
+
+best_practices:
+  - name: "Profile with production-like data"
+    description: "Query performance changes at scale (100 vs 1M records)"
+
+  - name: "Use EXPLAIN ANALYZE, not EXPLAIN"
+    description: "ANALYZE shows actual execution, not just estimates"
+
+  - name: "Add indexes for frequently filtered columns"
+    description: "WHERE, JOIN, ORDER BY columns benefit from indexes"
+
+  - name: "Verify index is actually used"
+    description: "EXPLAIN ANALYZE confirms index scan, not sequential scan"
+
+  - name: "Monitor query performance over time"
+    description: "Catch performance regressions early"
+
+  - name: "Test query optimization before deploying"
+    description: "Benchmark improvement; don't assume it helps"
+
+  - name: "Keep index statistics current"
+    description: "Regular ANALYZE keeps planner informed"
+
+anti_patterns:
+  - name: "Index every column"
+    description: "Over-indexing slows down writes"
+    consequence: "INSERT/UPDATE slower; query benefit unclear"
+    fix: "Index only frequently queried/filtered columns"
+
+  - name: "Wrong index type"
+    description: "B-tree index for full-text search"
+    consequence: "Index not used, full table scan still happens"
+    fix: "Use GIN for full-text, ILIKE with function index"
+
+  - name: "Composite index in wrong column order"
+    description: "CREATE INDEX idx ON table(status, created_at)"
+    consequence: "Can't use index for WHERE created_at = %s"
+    fix: "Match column order to query filter order"
+
+  - name: "No baseline before optimizing"
+    description: "Add index, assume it helps, don't measure"
+    consequence: "May not improve performance, wastes storage"
+    fix: "Benchmark before and after"
+
+examples:
+  example_1:
+    title: "EXPLAIN ANALYZE Workflow"
+    description: "Identify slow query and fix with index"
+    code: |
+      -- Step 1: Find slow query
+      -- user { posts } is slow, let's analyze
+
+      -- Step 2: Get execution plan
+      EXPLAIN ANALYZE
+      SELECT * FROM benchmark.tb_post WHERE fk_author = 1;
+
+      -- Output shows: Seq Scan (bad), 250ms, 50000 rows scanned
+      -- Problem: No index on fk_author
+
+      -- Step 3: Create index
+      CREATE INDEX idx_tb_post_author ON benchmark.tb_post(fk_author);
+
+      -- Step 4: Re-analyze
+      EXPLAIN ANALYZE
+      SELECT * FROM benchmark.tb_post WHERE fk_author = 1;
+
+      -- Output shows: Index Scan (good), 5ms, 1000 rows scanned
+      -- Result: 50× speedup!
+
+  example_2:
+    title: "Composite Index Optimization"
+    description: "Optimize complex filter with composite index"
+    code: |
+      -- Query: Get author's published posts
+      SELECT * FROM benchmark.tb_post
+      WHERE fk_author = 1 AND is_published = true
+      ORDER BY created_at DESC;
+
+      -- Without index: Seq Scan, 500ms
+      -- Create composite index matching filter order
+      CREATE INDEX idx_post_author_published
+      ON benchmark.tb_post(fk_author, is_published, created_at DESC);
+
+      -- With index: Index Scan, 10ms (50× speedup!)
+
+  example_3:
+    title: "Function Index for ILIKE"
+    description: "Optimize case-insensitive search"
+    code: |
+      -- Query: Case-insensitive title search
+      SELECT * FROM benchmark.tb_post
+      WHERE LOWER(title) LIKE LOWER('%python%');
+
+      -- Without index: Seq Scan, 5000ms
+      -- Create function index
+      CREATE INDEX idx_post_title_ilike ON benchmark.tb_post(LOWER(title));
+
+      -- With index: Index Scan, 50ms (100× speedup!)
+
+comparison_matrix:
+  scan_type:
+    seq_scan: "Sequential scan (full table)"
+    index_scan: "Index scan (uses index)"
+    index_only_scan: "Index scan with no heap lookup"
+
+  performance:
+    seq_scan: "Slow (O(n) rows scanned)"
+    index_scan: "Fast (O(log n) with index)"
+    index_only_scan: "Fastest (index has all data)"
+
+  when_used:
+    seq_scan: "No index or query can't use index"
+    index_scan: "Index exists and covers query"
+    index_only_scan: "Index contains all columns needed"
+
+blog_hooks:
+  beginner:
+    focus: "Understanding EXPLAIN and basic optimization"
+    key_points:
+      - "EXPLAIN ANALYZE shows query execution plan"
+      - "Seq Scan = slow (full table scan)"
+      - "Index Scan = fast (uses index)"
+      - "Add index on filtered columns"
+
+  intermediate:
+    focus: "Index strategy for different query types"
+    key_points:
+      - "WHERE = = index on single column"
+      - "WHERE AND = composite index (order matters)"
+      - "WHERE LIKE = B-tree (prefix patterns only)"
+      - "WHERE ILIKE = function index LOWER(column)"
+
+  advanced:
+    focus: "Query planner tuning and monitoring"
+    key_points:
+      - "ANALYZE to update planner statistics"
+      - "Cost weights for different hardware"
+      - "Monitoring slow query log"
+      - "Detecting unused indexes"

@@ -1,0 +1,44 @@
+id: database-compatibility-testing
+name: Database Compatibility Testing
+category: fraiseql
+type: standard
+tags:
+- fraiseql
+- database
+summary:
+  short: Testing multiple targets
+  long: Testing multiple targets
+problem:
+  description: Without database compatibility testing, systems face challenges
+  symptoms:
+  - Issue with testing multiple targets
+  impact: Reduced FraiseQL effectiveness
+solution:
+  description: Implement Database Compatibility Testing effectively
+key_concepts:
+  concept_1: Database Compatibility Testing fundamentals
+  concept_2: Implementation patterns
+  concept_3: Best practices
+implementation_considerations:
+  consideration_1: Requirements gathering
+  consideration_2: Design decisions
+  consideration_3: Implementation approach
+best_practices:
+- name: Plan carefully
+  description: Think through Database Compatibility Testing design
+- name: Test thoroughly
+  description: Validate Database Compatibility Testing works
+- name: Monitor
+  description: Track Database Compatibility Testing performance
+anti_patterns:
+- name: Ignoring pattern
+  consequence: Database Compatibility Testing fails
+- name: Incomplete implementation
+  consequence: Partial benefits only
+blog_hooks:
+  beginner:
+    focus: Introduction to Database Compatibility Testing
+  intermediate:
+    focus: Implementing Database Compatibility Testing
+  advanced:
+    focus: Advanced Database Compatibility Testing techniques

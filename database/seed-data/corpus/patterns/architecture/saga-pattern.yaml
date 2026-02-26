@@ -1,0 +1,287 @@
+id: saga-pattern
+name: "Saga Pattern & Distributed Transactions"
+category: architecture
+type: standard
+tags:
+  - microservices
+  - transactions
+  - distributed-systems
+  - consistency
+
+summary:
+  short: "Managing distributed transactions across multiple services without traditional ACID"
+  long: |
+    The Saga pattern coordinates a series of local transactions across multiple services. Unlike traditional transactions with ACID guarantees, sagas implement eventual consistency by coordinating through compensating transactions. Essential for microservices architectures where distributed ACID transactions are unavailable.
+
+problem:
+  description: "Microservices need to coordinate work across services without distributed two-phase commit (2PC), which is too slow and unreliable"
+  symptoms:
+    - "Order placed but payment fails; no way to cancel order automatically"
+    - "User registration succeeds but email service fails; inconsistent state"
+    - "Complex compensation logic scattered across application"
+    - "Timeout during distributed transaction leaves system in unclear state"
+  impact: "Data inconsistency, manual recovery required, poor user experience, operational complexity"
+
+solution:
+  description: "Implement sagas using either orchestration or choreography patterns"
+  principles:
+    - "Each service manages its own transaction (local ACID)"
+    - "Saga coordinates steps and defines compensations"
+    - "Handle failures gracefully with compensating transactions"
+    - "Make transactions idempotent (safe to retry)"
+
+orchestration_pattern:
+  description: "Central orchestrator coordinates saga steps (like a state machine)"
+  pros:
+    - "Clear, easy to understand saga flow"
+    - "Centralized compensation logic"
+    - "Easy to monitor and debug"
+    - "Simple error handling with if/else logic"
+  cons:
+    - "Central orchestrator becomes bottleneck"
+    - "Orchestrator must know about all services"
+    - "Business logic tightly coupled to orchestrator"
+
+  example: |
+    # Hotel reservation saga (orchestrator)
+    saga ReserveHotel:
+      step 1: Call hotel service - reserve room
+        on success: continue to step 2
+        on failure: compensate with cancel hotel reservation
+
+      step 2: Call payment service - charge credit card
+        on success: continue to step 3
+        on failure: compensate (step 1: cancel reservation)
+
+      step 3: Call notification service - send confirmation
+        on failure: log error but don't fail saga
+        (notification is not critical)
+
+      return success
+
+choreography_pattern:
+  description: "Services listen to events and respond; no central orchestrator"
+  pros:
+    - "Services loosely coupled; easy to add new services"
+    - "No single point of failure in coordination"
+    - "Scalable; no central bottleneck"
+  cons:
+    - "Hard to follow saga flow; distributed logic"
+    - "Difficult to debug; understand full saga from multiple services"
+    - "Circular dependencies possible (A→B→C→A)"
+    - "Hard to implement timeout logic"
+
+  example: |
+    # Hotel reservation saga (choreography)
+    Hotel Service receives ReservationRequested event:
+      - Reserve room
+      - Publish RoomReserved event
+      - Listen for PaymentFailed → cancel reservation → publish ReservationCancelled
+
+    Payment Service receives RoomReserved event:
+      - Attempt payment
+      - Publish PaymentCompleted event
+      - Listen for NotificationFailed → refund payment → publish PaymentFailed
+
+    Notification Service receives PaymentCompleted event:
+      - Send confirmation email
+      - Publish ConfirmationSent event
+      - Listen for EmailFailed → publish NotificationFailed
+
+compensating_transactions:
+  description: "Undo work when saga fails"
+  principles:
+    - "Must be designed for each step"
+    - "May not perfectly undo (e.g., can't undo notification sent)"
+    - "Should be idempotent (safe to retry)"
+
+  examples:
+    - "Payment: reverse charge"
+    - "Reservation: cancel booking"
+    - "Notification: mark as failed (can't undo already sent email)"
+
+idempotency:
+  description: "Saga steps must be safe to execute multiple times"
+  why_important: "Network failures may cause retries; must not double-charge, double-book, etc."
+  implementation:
+    - "Use idempotency keys: request_id + step_number"
+    - "Check if step already executed before executing"
+    - "Return same result if retried"
+
+  example: |
+    def reserve_hotel(reservation_id, hotel_id):
+      idempotency_key = f"{reservation_id}:hotel-reserve"
+
+      # Check if already executed
+      existing = db.query(
+        "SELECT * FROM saga_executions WHERE key = ?",
+        [idempotency_key]
+      )
+      if existing:
+        return existing.result  # Already did this
+
+      # Execute
+      result = hotel_service.reserve(hotel_id)
+
+      # Record execution
+      db.insert('saga_executions', {
+        'key': idempotency_key,
+        'result': result
+      })
+
+      return result
+
+state_machine:
+  description: "Saga progresses through well-defined states"
+  states:
+    - "Started: saga initiated"
+    - "Step1Done, Step2Done, ...: each step completed"
+    - "Compensating: rolling back due to failure"
+    - "Completed: all steps done successfully"
+    - "Failed: saga failed and rolled back"
+
+  transitions: |
+    Started → Step1Done → Step2Done → Completed
+    Started → Step1Done → Step2Failed → Compensating → Failed
+    Step2Done → Step2Failed (rollback after transient failure)
+
+failure_scenarios:
+  transient_failure:
+    description: "Temporary failure; safe to retry"
+    example: "Network timeout, service temporarily down"
+    strategy: "Retry with exponential backoff"
+
+  permanent_failure:
+    description: "Service cannot complete; must compensate"
+    example: "Invalid payment (insufficient funds), booking unavailable"
+    strategy: "Trigger compensation chain"
+
+  timeout_failure:
+    description: "Step takes too long; saga times out"
+    example: "Payment service hangs"
+    strategy: "Timeout and trigger compensation"
+
+  compensation_failure:
+    description: "Compensation itself fails"
+    example: "Cannot cancel already processed payment"
+    strategy: "Manual intervention; record in dead-letter queue"
+
+recovery:
+  description: "Handling saga failures and recovery"
+
+  dead_letter_queue: |
+    # When compensation fails, store in DLQ for manual review
+    saga_dlq:
+      saga_id: "ORDER-123"
+      step: "payment"
+      error: "Cannot refund (payment already settled)"
+      state: "awaiting_manual_intervention"
+
+  retry_strategies: |
+    - Exponential backoff with jitter
+    - Max retry attempts (e.g., 3 times)
+    - Circuit breaker if service repeatedly fails
+
+  monitoring: |
+    - Track saga success/failure rates
+    - Monitor compensation rates
+    - Alert on stuck sagas (no progress for N minutes)
+    - DLQ size and age of oldest failed saga
+
+implementation_frameworks:
+  - name: "Axon Framework"
+    description: "Java-based CQRS and saga framework"
+    supports: "Orchestration pattern"
+
+  - name: "NServiceBus"
+    description: ".NET service bus with saga support"
+    supports: "Choreography pattern"
+
+  - name: "Temporal"
+    description: "Workflow engine for distributed systems"
+    supports: "Both patterns; powerful for complex sagas"
+
+  - name: "AWS Step Functions"
+    description: "Serverless orchestration"
+    supports: "Orchestration; good for cloud-native sagas"
+
+best_practices:
+  - name: "Prefer orchestration when saga logic is complex"
+    description: "Easier to understand and maintain central logic"
+
+  - name: "Prefer choreography when services should be loosely coupled"
+    description: "Better for scalability and independent evolution"
+
+  - name: "Design compensations upfront"
+    description: "Think about failure cases during design, not after"
+
+  - name: "Make all steps idempotent"
+    description: "Retries must be safe"
+
+  - name: "Use unique request IDs"
+    description: "Track saga and steps across retries"
+
+  - name: "Set appropriate timeouts"
+    description: "Long enough for normal operation; short enough for quick failure"
+
+  - name: "Log saga progress"
+    description: "Essential for debugging distributed failures"
+
+  - name: "Monitor DLQ closely"
+    description: "Failed sagas need manual intervention"
+
+anti_patterns:
+  - name: "Non-idempotent steps"
+    description: "Steps that fail differently on retry"
+    consequence: "Double-charging, double-booking on retries"
+
+  - name: "Synchronous sagas"
+    description: "Waiting for all steps to complete in request/response"
+    consequence: "Long request latencies; poor user experience"
+
+  - name: "Uncompensatable steps"
+    description: "Some steps without compensations"
+    consequence: "Partial failures leave system inconsistent"
+
+  - name: "Circular dependencies in choreography"
+    description: "Service A publishes event heard by B, which publishes event heard by A"
+    consequence: "Infinite loops; deadlocks"
+
+comparison:
+  orchestration_vs_choreography:
+    orchestration: "Centralized control, clear flow, harder to scale"
+    choreography: "Distributed control, loose coupling, hard to debug"
+
+  saga_vs_2pc:
+    saga: "Eventual consistency, faster, more resilient"
+    2pc: "Strong consistency, slow, single point of failure"
+
+  saga_vs_event_sourcing:
+    saga: "Coordinates transactions; focuses on coordination"
+    event_sourcing: "Records all changes; focuses on history"
+    together: "Can use event sourcing within saga steps"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      A saga is like coordinating a group project:
+      - Without a coordinator: each person talks to others (choreography)
+      - With a coordinator: one person directs steps (orchestration)
+      - If someone's step fails: others must undo their work (compensating transactions)
+      - If undo fails: human must step in and fix (DLQ)
+
+  intermediate:
+    focus: "Saga implementation decisions"
+    key_points:
+      - "Orchestration vs choreography tradeoffs"
+      - "Idempotency keys and saga state"
+      - "Designing compensating transactions"
+      - "Handling compensation failures"
+
+  advanced:
+    focus: "Large-scale saga patterns"
+    key_points:
+      - "Saga routing and load balancing"
+      - "Long-running sagas and timeouts"
+      - "Combining sagas with event sourcing"
+      - "Monitoring and alerting for stuck sagas"

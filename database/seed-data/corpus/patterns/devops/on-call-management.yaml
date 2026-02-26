@@ -1,0 +1,51 @@
+id: on-call-management
+name: On-Call Management
+category: devops
+type: standard
+tags:
+- devops
+- on_call_management
+summary:
+  short: Handling production incidents
+  long: Handling production incidents. This is a comprehensive pattern that provides
+    guidance on implementation and best practices.
+problem:
+  description: Issues arise without proper on-call management
+  symptoms:
+  - System lacks proper on-call management
+  - Performance or reliability issues
+  - Difficulty scaling the system
+  - Maintenance challenges
+  - Integration problems
+  impact: System reliability and performance degradation
+solution:
+  description: Implement on-call management effectively
+key_concepts:
+  concept_1: Understanding on-call management fundamentals
+  concept_2: Implementing on-call management in your system
+  concept_3: Best practices for on-call management
+implementation_considerations:
+  consideration_1: Understand your specific use case
+  consideration_2: Consider trade-offs and scalability
+  consideration_3: Plan for maintenance and evolution
+best_practices:
+- name: Understand on-call-management
+  description: Learn the fundamentals before implementing
+- name: Plan carefully
+  description: Design for your specific requirements
+- name: Test thoroughly
+  description: Validate your implementation works
+- name: Monitor continuously
+  description: Track performance and issues
+anti_patterns:
+- name: Ignoring the pattern
+  consequence: Systems become unreliable
+- name: Misapplication
+  consequence: Wasted effort and poor results
+blog_hooks:
+  beginner:
+    focus: Introduction to On-Call Management
+  intermediate:
+    focus: Implementing On-Call Management
+  advanced:
+    focus: Advanced On-Call Management techniques

@@ -1,0 +1,28 @@
+id: failover-anti-patterns
+name: Failover Anti Patterns
+category: comprehensive
+type: standard
+tags:
+- failover
+summary:
+  short: Failover Anti Patterns and implementation guidelines
+  long: Complete guide to failover anti patterns
+problem:
+  description: Challenges without proper failover anti patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement failover anti patterns
+key_concepts:
+  concept: Failover Anti Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -12,6 +12,7 @@ Checks:
 import sqlite3
 import sys
 from pathlib import Path
+
 from tabulate import tabulate
 
 try:
@@ -29,12 +30,12 @@ class VariationValidator:
     """Validate all database variations"""
 
     VARIATIONS = [
-        ('xs', 0.5),
-        ('small', 1.0),
-        ('medium', 5.0),
-        ('large', 10.0),
-        ('xlarge', 50.0),
-        ('xxlarge', 100.0),
+        ("xs", 0.5),
+        ("small", 1.0),
+        ("medium", 5.0),
+        ("large", 10.0),
+        ("xlarge", 50.0),
+        ("xxlarge", 100.0),
     ]
 
     def validate_all(self):
@@ -60,15 +61,25 @@ class VariationValidator:
                     all_pass = False
                 results.append(result)
             except Exception as e:
-                results.append([name, f"{percent}%", f"❌ ERROR: {e}", "-", "-", "-", "-"])
+                results.append(
+                    [name, f"{percent}%", f"❌ ERROR: {e}", "-", "-", "-", "-"]
+                )
                 all_pass = False
 
         # Print results table
         print("\n📊 Validation Results:\n")
-        headers = ["Database", "Sample %", "Status", "Users", "Posts", "Comments", "Size"]
+        headers = [
+            "Database",
+            "Sample %",
+            "Status",
+            "Users",
+            "Posts",
+            "Comments",
+            "Size",
+        ]
         try:
             print(tabulate(results, headers=headers, tablefmt="grid"))
-        except:
+        except (NameError, Exception):
             print(headers)
             for row in results:
                 print(row)
@@ -103,7 +114,7 @@ class VariationValidator:
 
         # Get file size
         size_mb = Path(db_path).stat().st_size / (1024 * 1024)
-        size_str = f"{size_mb:.1f}MB" if size_mb < 1024 else f"{size_mb/1024:.1f}GB"
+        size_str = f"{size_mb:.1f}MB" if size_mb < 1024 else f"{size_mb / 1024:.1f}GB"
 
         # Determine status
         if orphan_posts > 0 or orphan_comments > 0:
@@ -121,7 +132,7 @@ class VariationValidator:
             f"{user_count:,}",
             f"{post_count:,}",
             f"{comment_count:,}",
-            size_str
+            size_str,
         ]
 
 

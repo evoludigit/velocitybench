@@ -1,0 +1,28 @@
+id: debugging-configuration
+name: Debugging Configuration
+category: comprehensive
+type: standard
+tags:
+- debugging
+summary:
+  short: Debugging Configuration and implementation guidelines
+  long: Complete guide to debugging configuration
+problem:
+  description: Challenges without proper debugging configuration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement debugging configuration
+key_concepts:
+  concept: Debugging Configuration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

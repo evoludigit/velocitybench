@@ -1,0 +1,28 @@
+id: queuing-conventions
+name: Queuing Conventions
+category: comprehensive
+type: standard
+tags:
+- queuing
+summary:
+  short: Queuing Conventions and implementation guidelines
+  long: Complete guide to queuing conventions
+problem:
+  description: Challenges without proper queuing conventions
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement queuing conventions
+key_concepts:
+  concept: Queuing Conventions
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,28 @@
+id: governance-patterns
+name: Governance Patterns
+category: comprehensive
+type: standard
+tags:
+- governance
+summary:
+  short: Governance Patterns and implementation guidelines
+  long: Complete guide to governance patterns
+problem:
+  description: Challenges without proper governance patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement governance patterns
+key_concepts:
+  concept: Governance Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

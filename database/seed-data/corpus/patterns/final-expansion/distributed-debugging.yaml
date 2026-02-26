@@ -1,0 +1,28 @@
+id: distributed-debugging
+name: Distributed Debugging
+category: comprehensive
+type: standard
+tags:
+- distributed
+summary:
+  short: Distributed Debugging and implementation guidelines
+  long: Complete guide to distributed debugging
+problem:
+  description: Challenges without proper distributed debugging
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement distributed debugging
+key_concepts:
+  concept: Distributed Debugging
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

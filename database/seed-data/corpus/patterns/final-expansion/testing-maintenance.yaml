@@ -1,0 +1,28 @@
+id: testing-maintenance
+name: Testing Maintenance
+category: comprehensive
+type: standard
+tags:
+- testing
+summary:
+  short: Testing Maintenance and implementation guidelines
+  long: Complete guide to testing maintenance
+problem:
+  description: Challenges without proper testing maintenance
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement testing maintenance
+key_concepts:
+  concept: Testing Maintenance
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,28 @@
+id: compliance-integration
+name: Compliance Integration
+category: comprehensive
+type: standard
+tags:
+- compliance
+summary:
+  short: Compliance Integration and implementation guidelines
+  long: Complete guide to compliance integration
+problem:
+  description: Challenges without proper compliance integration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement compliance integration
+key_concepts:
+  concept: Compliance Integration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

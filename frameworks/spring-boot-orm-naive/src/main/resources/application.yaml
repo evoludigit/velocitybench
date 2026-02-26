@@ -8,4 +8,4 @@ spring:
     driver-class-name: org.postgresql.Driver
 
 server:
-  port: 8017
+  port: ${SERVER_PORT:8010}

@@ -1,6 +1,6 @@
 # Multi-stage build for Express REST framework
 # Stage 1: Build the application
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -19,10 +19,10 @@ COPY src/ ./src/
 RUN npm run build
 
 # Stage 2: Runtime image
-FROM node:18-alpine AS runtime
+FROM node:20-alpine AS runtime
 
 # Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init curl
+RUN apk add --no-cache dumb-init
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
@@ -49,7 +49,7 @@ EXPOSE 8005
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-  CMD curl -f http://localhost:8005/health || exit 1
+  CMD node -e "require('http').get('http://localhost:8005/health', r => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"
 
 # Start the application
 ENTRYPOINT ["dumb-init", "--"]

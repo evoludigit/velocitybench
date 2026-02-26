@@ -1,0 +1,28 @@
+id: rest-anti-patterns
+name: Rest Anti Patterns
+category: comprehensive
+type: standard
+tags:
+- rest
+summary:
+  short: Rest Anti Patterns and implementation guidelines
+  long: Complete guide to rest anti patterns
+problem:
+  description: Challenges without proper rest anti patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement rest anti patterns
+key_concepts:
+  concept: Rest Anti Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

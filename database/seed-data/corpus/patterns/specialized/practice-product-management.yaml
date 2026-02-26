@@ -1,0 +1,28 @@
+id: practice-product-management
+name: Product Management Practices
+category: specialized
+type: standard
+tags:
+- practice
+summary:
+  short: Patterns and practices for product management practices
+  long: Comprehensive guide to product management practices
+problem:
+  description: Challenges with product management practices
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement product management practices
+key_concepts:
+  concept: Understanding Product Management Practices
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Product Management Practices
+  intermediate:
+    focus: Implementing Product Management Practices
+  advanced:
+    focus: Advanced Product Management Practices

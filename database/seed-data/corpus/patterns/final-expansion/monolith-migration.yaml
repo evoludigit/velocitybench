@@ -1,0 +1,28 @@
+id: monolith-migration
+name: Monolith Migration
+category: comprehensive
+type: standard
+tags:
+- monolith
+summary:
+  short: Monolith Migration and implementation guidelines
+  long: Complete guide to monolith migration
+problem:
+  description: Challenges without proper monolith migration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement monolith migration
+key_concepts:
+  concept: Monolith Migration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

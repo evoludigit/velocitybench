@@ -1,0 +1,276 @@
+# Conditional Aggregates (FraiseQL)
+# VelocityBench Knowledge Corpus
+
+id: conditional-aggregates
+name: "Conditional Aggregates with FILTER and CASE WHEN"
+category: fraiseql
+type: pattern
+severity: medium
+tags:
+  - fraiseql
+  - analytics
+  - filter-clause
+  - case-when
+  - aggregation
+  - sql
+
+summary:
+  short: "Aggregate with conditions: revenue by payment method, errors by type"
+  long: |
+    Conditional aggregates calculate multiple filtered aggregations in a single query using
+    PostgreSQL FILTER clause or CASE WHEN emulation (MySQL/SQLite/SQL Server). Example:
+    total revenue, credit card revenue, and PayPal revenue in one query. Eliminates need
+    for separate queries or UNION operations.
+
+problem:
+  description: |
+    Calculating multiple filtered aggregates traditionally requires:
+    - Separate queries per condition (multiple round-trips)
+    - UNION of filtered result sets (complex, slow)
+    - Application-side filtering of aggregate results (inefficient)
+    - Subqueries with different WHERE clauses (hard to optimize)
+
+    Conditional aggregates solve this with single-query database-native filtering.
+
+  symptoms:
+    - name: "Multiple queries for filtered aggregates"
+      description: "3 queries to get revenue by payment method"
+      detection: "N+1 pattern for dimensional breakdowns"
+
+    - name: "Complex UNION queries"
+      description: "UNION of SELECT with different WHERE clauses"
+      detection: "Slow queries with multiple table scans"
+
+    - name: "Application-side pivot logic"
+      description: "Fetch all data, calculate breakdowns in code"
+      detection: "Large result sets, pivot logic in application"
+
+solution:
+  principle: "Use FILTER clause (PostgreSQL) or CASE WHEN (others) for conditional aggregation"
+
+  components:
+    - name: "FILTER Clause (PostgreSQL)"
+      type: "SQL syntax"
+      purpose: "Native conditional aggregation: SUM(field) FILTER (WHERE condition)"
+
+    - name: "CASE WHEN Emulation"
+      type: "SQL pattern"
+      purpose: "Cross-database conditional aggregation: SUM(CASE WHEN condition THEN field END)"
+
+    - name: "Multiple Conditions"
+      type: "Query pattern"
+      purpose: "Calculate aggregates for multiple conditions in single query"
+
+implementation:
+  postgresql_filter:
+    graphql: |
+      query {
+        sales_aggregate {
+          count
+          revenue_sum
+          revenue_sum_credit_card: revenue_sum(
+            filter: { payment_method: { _eq: "credit_card" } }
+          )
+          revenue_sum_paypal: revenue_sum(
+            filter: { payment_method: { _eq: "paypal" } }
+          )
+          revenue_sum_cash: revenue_sum(
+            filter: { payment_method: { _eq: "cash" } }
+          )
+        }
+      }
+
+    sql: |
+      SELECT
+          COUNT(*) AS count,
+          SUM(revenue) AS revenue_sum,
+          SUM(revenue) FILTER (WHERE data->>'payment_method' = 'credit_card') AS revenue_sum_credit_card,
+          SUM(revenue) FILTER (WHERE data->>'payment_method' = 'paypal') AS revenue_sum_paypal,
+          SUM(revenue) FILTER (WHERE data->>'payment_method' = 'cash') AS revenue_sum_cash
+      FROM tf_sales;
+
+    benefit: "Single table scan, clean SQL syntax"
+    performance: "~2-3ms for 1M rows"
+
+  mysql_case_when:
+    graphql: "Same as PostgreSQL example above"
+
+    sql: |
+      SELECT
+          COUNT(*) AS count,
+          SUM(revenue) AS revenue_sum,
+          SUM(CASE WHEN JSON_UNQUOTE(JSON_EXTRACT(data, '$.payment_method')) = 'credit_card'
+                   THEN revenue ELSE 0 END) AS revenue_sum_credit_card,
+          SUM(CASE WHEN JSON_UNQUOTE(JSON_EXTRACT(data, '$.payment_method')) = 'paypal'
+                   THEN revenue ELSE 0 END) AS revenue_sum_paypal,
+          SUM(CASE WHEN JSON_UNQUOTE(JSON_EXTRACT(data, '$.payment_method')) = 'cash'
+                   THEN revenue ELSE 0 END) AS revenue_sum_cash
+      FROM tf_sales;
+
+    benefit: "Works on MySQL, SQLite, SQL Server"
+    performance: "~3-5ms for 1M rows (slightly slower than FILTER)"
+
+  count_distinct_conditional:
+    postgresql: |
+      SELECT
+          COUNT(DISTINCT customer_id) AS total_customers,
+          COUNT(DISTINCT customer_id) FILTER (WHERE data->>'region' = 'North America') AS customers_north_america,
+          COUNT(DISTINCT customer_id) FILTER (WHERE data->>'region' = 'Europe') AS customers_europe,
+          COUNT(DISTINCT customer_id) FILTER (WHERE data->>'region' = 'Asia') AS customers_asia
+      FROM tf_sales;
+
+    use_case: "Unique customers by region in single query"
+
+  error_breakdown:
+    postgresql: |
+      SELECT
+          DATE_TRUNC('hour', occurred_at) AS hour,
+          COUNT(*) AS total_requests,
+          COUNT(*) FILTER (WHERE error_count > 0) AS error_requests,
+          SUM(error_count) FILTER (WHERE data->>'error_type' = 'timeout') AS timeout_errors,
+          SUM(error_count) FILTER (WHERE data->>'error_type' = 'validation') AS validation_errors,
+          SUM(error_count) FILTER (WHERE data->>'error_type' = 'auth') AS auth_errors
+      FROM tf_events
+      GROUP BY DATE_TRUNC('hour', occurred_at)
+      ORDER BY hour DESC;
+
+    use_case: "Hourly error breakdown by type for monitoring dashboard"
+
+  conversion_funnel:
+    postgresql: |
+      SELECT
+          data->>'campaign' AS campaign,
+          COUNT(*) FILTER (WHERE data->>'event' = 'view') AS views,
+          COUNT(*) FILTER (WHERE data->>'event' = 'click') AS clicks,
+          COUNT(*) FILTER (WHERE data->>'event' = 'signup') AS signups,
+          COUNT(*) FILTER (WHERE data->>'event' = 'purchase') AS purchases,
+          ROUND(100.0 * COUNT(*) FILTER (WHERE data->>'event' = 'click') /
+                NULLIF(COUNT(*) FILTER (WHERE data->>'event' = 'view'), 0), 2) AS click_rate,
+          ROUND(100.0 * COUNT(*) FILTER (WHERE data->>'event' = 'purchase') /
+                NULLIF(COUNT(*) FILTER (WHERE data->>'event' = 'signup'), 0), 2) AS conversion_rate
+      FROM tf_events
+      GROUP BY data->>'campaign'
+      ORDER BY purchases DESC;
+
+    use_case: "Marketing funnel metrics by campaign"
+
+database_compatibility:
+  postgresql:
+    syntax: "FILTER (WHERE condition)"
+    availability: "PostgreSQL 9.4+"
+    performance: "Native, optimized by query planner"
+    example: "SUM(revenue) FILTER (WHERE status = 'completed')"
+
+  mysql:
+    syntax: "CASE WHEN condition THEN value ELSE 0 END"
+    availability: "All versions"
+    performance: "Slightly slower than native FILTER"
+    example: "SUM(CASE WHEN status = 'completed' THEN revenue ELSE 0 END)"
+
+  sqlite:
+    syntax: "CASE WHEN condition THEN value ELSE 0 END"
+    availability: "All versions"
+    performance: "Emulated with CASE WHEN"
+    example: "SUM(CASE WHEN status = 'completed' THEN revenue ELSE 0 END)"
+
+  sqlserver:
+    syntax: "CASE WHEN condition THEN value ELSE 0 END"
+    availability: "All versions"
+    performance: "Emulated with CASE WHEN"
+    example: "SUM(CASE WHEN status = 'completed' THEN revenue ELSE 0 END)"
+
+best_practices:
+  - name: "Use FILTER on PostgreSQL"
+    description: "Cleaner syntax, better performance"
+    rationale: "Native database feature, optimized query plan"
+
+  - name: "Use CASE WHEN for cross-database compatibility"
+    description: "Works on all databases"
+    rationale: "Portable SQL, consistent behavior"
+
+  - name: "Avoid NULL in ELSE clause"
+    description: "Use ELSE 0 for SUM, ELSE NULL for AVG"
+    rationale: "NULL values excluded from aggregates (affects AVG)"
+
+  - name: "Combine with GROUP BY for breakdowns"
+    description: "Conditional aggregates + dimensional grouping"
+    rationale: "Multi-dimensional pivot tables in single query"
+
+  - name: "Use for ratio calculations"
+    description: "Calculate conversion rates, error rates inline"
+    rationale: "All data in single query, no post-processing needed"
+
+anti_patterns:
+  - name: "Separate queries per condition"
+    consequence: "N+1 queries, multiple table scans"
+    example: "3 queries for revenue by payment method"
+    fix: "Single query with FILTER or CASE WHEN"
+
+  - name: "UNION of filtered queries"
+    consequence: "Complex SQL, multiple table scans"
+    example: "SELECT ... WHERE type='A' UNION SELECT ... WHERE type='B'"
+    fix: "Single SELECT with conditional aggregates"
+
+  - name: "Wrong ELSE clause in CASE WHEN"
+    consequence: "Incorrect averages (NULL vs 0)"
+    example: "AVG(CASE WHEN ... THEN value ELSE 0 END) - wrong!"
+    fix: "AVG(CASE WHEN ... THEN value END) - NULL excluded from AVG"
+
+  - name: "Application-side pivot logic"
+    consequence: "Fetching all data, pivoting in code"
+    example: "GROUP BY payment_method, then pivot in JavaScript"
+    fix: "Conditional aggregates in SQL, return pivoted results"
+
+use_cases:
+  - scenario: "E-commerce: Revenue by payment method"
+    breakdown: "credit_card, paypal, cash, apple_pay"
+    benefit: "Single query for dashboard widget"
+
+  - scenario: "SaaS: Error rate by error type"
+    breakdown: "timeout, validation, auth, server errors"
+    benefit: "Real-time monitoring dashboard"
+
+  - scenario: "Marketing: Conversion funnel by campaign"
+    breakdown: "views, clicks, signups, purchases"
+    benefit: "Campaign performance comparison"
+
+  - scenario: "Analytics: User engagement by device"
+    breakdown: "mobile, desktop, tablet"
+    benefit: "Device-specific metrics in one query"
+
+related_patterns:
+  - id: "aggregation-model"
+    description: "Base aggregate functions with conditional filters"
+
+  - id: "groupby-jsonb-dimensions"
+    description: "Combine conditional aggregates with dimensional grouping"
+
+  - id: "fact-dimension-pattern"
+    description: "Table structure enabling efficient conditional aggregation"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Conditional aggregates are like sorting coins by denomination:
+      - Total coins: COUNT(*)
+      - Pennies: COUNT(*) FILTER (WHERE coin = 'penny')
+      - Nickels: COUNT(*) FILTER (WHERE coin = 'nickel')
+      - Dimes: COUNT(*) FILTER (WHERE coin = 'dime')
+
+      Count everything in one pass, split into buckets as you go!
+
+  intermediate:
+    focus: "PostgreSQL FILTER vs CASE WHEN cross-database pattern"
+    key_points:
+      - "FILTER clause: Clean PostgreSQL syntax"
+      - "CASE WHEN: Cross-database compatibility"
+      - "Single table scan vs multiple queries"
+      - "Combine with GROUP BY for multi-dimensional breakdowns"
+
+  advanced:
+    focus: "Query optimization and complex conditional logic"
+    key_points:
+      - "Query planner optimization for FILTER vs CASE WHEN"
+      - "NULL handling in AVG with conditional aggregates"
+      - "Complex conditions with nested JSONB paths"
+      - "Performance impact of many conditional aggregates (10+)"

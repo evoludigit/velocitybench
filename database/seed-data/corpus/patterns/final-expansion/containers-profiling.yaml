@@ -1,0 +1,28 @@
+id: containers-profiling
+name: Containers Profiling
+category: comprehensive
+type: standard
+tags:
+- containers
+summary:
+  short: Containers Profiling and implementation guidelines
+  long: Complete guide to containers profiling
+problem:
+  description: Challenges without proper containers profiling
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement containers profiling
+key_concepts:
+  concept: Containers Profiling
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

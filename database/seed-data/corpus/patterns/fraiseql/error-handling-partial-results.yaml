@@ -1,0 +1,49 @@
+id: error-handling-partial-results
+name: Error Handling and Partial Results
+category: fraiseql
+type: standard
+tags:
+- execution
+- error-handling
+- resilience
+- robustness
+summary:
+  short: Gracefully handling errors in nested queries with partial result returns
+  long: When errors occur in nested fields, the response can return partial results
+    for successful fields and errors for failed fields.
+problem:
+  description: Single error fails entire query
+  symptoms:
+  - Query fails completely on any error
+  - Can't get any data if one field fails
+  - Difficult error debugging
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Error Handling and Partial Results effectively
+key_concepts:
+  concept_1: Error propagation
+  concept_2: Partial response handling
+  concept_3: Error accumulation
+implementation_considerations:
+  consideration_1: Error context and paths
+  consideration_2: Null vs error semantics
+  consideration_3: Client error handling
+best_practices:
+- name: Partial success
+  description: Return successful fields with errors
+- name: Clear errors
+  description: Include error context and paths
+- name: Graceful degradation
+  description: Get best-effort results
+anti_patterns:
+- name: All-or-nothing
+  consequence: Single error loses all data
+- name: Vague errors
+  consequence: Hard to debug
+blog_hooks:
+  beginner:
+    focus: Introduction to Error Handling and Partial Results
+  intermediate:
+    focus: Implementing Error Handling and Partial Results
+  advanced:
+    focus: Advanced Error Handling and Partial Results techniques

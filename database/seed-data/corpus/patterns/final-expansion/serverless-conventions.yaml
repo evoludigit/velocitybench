@@ -1,0 +1,28 @@
+id: serverless-conventions
+name: Serverless Conventions
+category: comprehensive
+type: standard
+tags:
+- serverless
+summary:
+  short: Serverless Conventions and implementation guidelines
+  long: Complete guide to serverless conventions
+problem:
+  description: Challenges without proper serverless conventions
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement serverless conventions
+key_concepts:
+  concept: Serverless Conventions
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,49 @@
+id: query-performance-optimization
+name: Query Performance Optimization
+category: fraiseql
+type: standard
+tags:
+- execution
+- performance
+- optimization
+- monitoring
+summary:
+  short: Index strategy and query analysis for efficient execution
+  long: Query performance is optimized through index strategy, query analysis, and
+    monitoring to identify and fix performance bottlenecks.
+problem:
+  description: Queries run slowly with no way to optimize
+  symptoms:
+  - Slow query execution
+  - Full table scans
+  - Index misses
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Query Performance Optimization effectively
+key_concepts:
+  concept_1: Query analysis
+  concept_2: Index strategy
+  concept_3: Performance monitoring
+implementation_considerations:
+  consideration_1: Index size and maintenance
+  consideration_2: Query plan analysis
+  consideration_3: Benchmark before/after
+best_practices:
+- name: Analyze queries
+  description: Use EXPLAIN to analyze plan
+- name: Create indexes
+  description: Add indexes for common queries
+- name: Monitor performance
+  description: Track query latencies
+anti_patterns:
+- name: No analysis
+  consequence: Slow queries undetected
+- name: No indexes
+  consequence: Full table scans on large data
+blog_hooks:
+  beginner:
+    focus: Introduction to Query Performance Optimization
+  intermediate:
+    focus: Implementing Query Performance Optimization
+  advanced:
+    focus: Advanced Query Performance Optimization techniques

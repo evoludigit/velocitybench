@@ -1,0 +1,44 @@
+id: cdc-partition-strategy
+name: CDC Partition Strategy
+category: fraiseql
+type: standard
+tags:
+- fraiseql
+- cdc
+summary:
+  short: Partitioning change logs by time
+  long: Partitioning change logs by time
+problem:
+  description: Without cdc partition strategy, systems face challenges
+  symptoms:
+  - Issue with partitioning change logs by time
+  impact: Reduced FraiseQL effectiveness
+solution:
+  description: Implement CDC Partition Strategy effectively
+key_concepts:
+  concept_1: CDC Partition Strategy fundamentals
+  concept_2: Implementation patterns
+  concept_3: Best practices
+implementation_considerations:
+  consideration_1: Requirements gathering
+  consideration_2: Design decisions
+  consideration_3: Implementation approach
+best_practices:
+- name: Plan carefully
+  description: Think through CDC Partition Strategy design
+- name: Test thoroughly
+  description: Validate CDC Partition Strategy works
+- name: Monitor
+  description: Track CDC Partition Strategy performance
+anti_patterns:
+- name: Ignoring pattern
+  consequence: CDC Partition Strategy fails
+- name: Incomplete implementation
+  consequence: Partial benefits only
+blog_hooks:
+  beginner:
+    focus: Introduction to CDC Partition Strategy
+  intermediate:
+    focus: Implementing CDC Partition Strategy
+  advanced:
+    focus: Advanced CDC Partition Strategy techniques

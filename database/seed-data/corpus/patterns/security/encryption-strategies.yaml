@@ -1,0 +1,73 @@
+id: encryption-strategies
+name: "Encryption Strategies: At-Rest and In-Transit"
+category: security
+type: pattern
+tags:
+  - security
+  - encryption
+  - cryptography
+  - data-protection
+
+summary:
+  short: "Encrypting data at rest and in transit to protect sensitive information"
+  long: |
+    Encryption protects data confidentiality. At-rest encryption protects
+    stored data. In-transit encryption protects data during transmission.
+    Both are essential for security.
+
+encryption_types:
+  - name: "Encryption at Rest"
+    description: "Protect stored data"
+    techniques:
+      - "Database encryption"
+      - "Filesystem encryption"
+      - "Object storage encryption"
+  
+  - name: "Encryption in Transit"
+    description: "Protect data during transmission"
+    techniques:
+      - "TLS/SSL"
+      - "VPN"
+      - "Cryptographic protocols"
+
+algorithms:
+  - name: "AES"
+    type: "Symmetric"
+    use: "Fast, bulk encryption"
+  
+  - name: "RSA"
+    type: "Asymmetric"
+    use: "Key exchange, digital signatures"
+  
+  - name: "ECC"
+    type: "Asymmetric"
+    use: "Modern alternative to RSA"
+
+key_management:
+  - "Key generation"
+  - "Key storage"
+  - "Key rotation"
+  - "Key escrow"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Encryption is like locked safes:
+      - At-rest: Safe in your office
+      - In-transit: Armored truck
+      
+      Both protect what's inside.
+
+  intermediate:
+    focus: "Implementing encryption"
+    key_points:
+      - "Choosing algorithms"
+      - "Key management"
+      - "Performance implications"
+
+  advanced:
+    focus: "Cryptographic security"
+    key_points:
+      - "Perfect forward secrecy"
+      - "Quantum resistance"
+      - "Homomorphic encryption"

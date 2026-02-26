@@ -1,0 +1,556 @@
+id: fraiseql-security-patterns
+name: "FraiseQL Security Patterns"
+category: fraiseql
+type: standard
+tags:
+  - fraiseql
+  - security
+  - sql-injection
+  - input-validation
+  - data-integrity
+  - constraints
+
+summary:
+  short: "SQL injection prevention, input validation, and data integrity constraints"
+  long: |
+    FraiseQL's database-centric architecture provides inherent security benefits through
+    parameterized queries and database constraint enforcement. Understanding how FraiseQL
+    prevents SQL injection, handles malicious input, and enforces data integrity is critical
+    for building secure GraphQL APIs. This pattern covers mechanisms, validation strategies,
+    and testing approaches.
+
+problem:
+  description: |
+    GraphQL APIs accept untrusted user input and pass it to databases:
+    - SQL injection attacks through string concatenation
+    - XSS through unvalidated content storage
+    - Invalid data violating schema constraints
+    - Circumventing authorization through FK manipulation
+    - Data corruption through race conditions
+
+    Traditional approaches require manual validation at multiple layers.
+    FraiseQL leverages database features for built-in protection.
+
+  symptoms:
+    - name: "SQL injection vulnerability"
+      description: "Input like alice' OR '1'='1 executes unintended SQL"
+      detection: "Returns all users instead of one"
+
+    - name: "XSS payload storage"
+      description: "Storing <script>alert('xss')</script> allows later execution"
+      detection: "Malicious code executes when data rendered"
+
+    - name: "Constraint violation"
+      description: "Duplicate email creates two accounts"
+      detection: "UNIQUE constraint not enforced"
+
+    - name: "FK bypass"
+      description: "Creating comment with non-existent post_id succeeds"
+      detection: "Orphaned data or data corruption"
+
+  impact: |
+    Data theft, data corruption, denial of service, unauthorized access,
+    compliance violations (GDPR, PCI-DSS)
+
+solution:
+  principle: "Multi-layer security: parameterized queries, database constraints, input validation"
+
+  components:
+    - name: "Parameterized Queries (psycopg3)"
+      type: "SQL injection prevention"
+      purpose: "Separate data from SQL logic"
+      mechanism: |
+        All queries use %s placeholders with separate parameter binding:
+        SELECT * FROM tb_user WHERE email = %s  -- %s is placeholder
+        Database driver handles proper escaping automatically
+        Attacker input is treated as data, never executed as SQL
+      benefit: "100% protection against SQL injection"
+      example: |
+        # SAFE - parameterized
+        cursor.execute("SELECT * FROM tb_user WHERE email = %s", ("alice@example.com",))
+
+        # UNSAFE - string concatenation (NEVER DO THIS)
+        email = "alice@example.com"
+        cursor.execute(f"SELECT * FROM tb_user WHERE email = '{email}'")  # Vulnerable!
+
+    - name: "Database Constraints"
+      type: "Data integrity enforcement"
+      purpose: "Ensure valid state at database layer"
+      constraints:
+        - "UNIQUE (email, username) - prevent duplicates"
+        - "NOT NULL - require essential fields"
+        - "FOREIGN KEY - enforce referential integrity"
+        - "CHECK - validate value ranges/formats"
+      benefit: "Atomically enforces invariants, prevents race conditions"
+      example: |
+        CREATE TABLE tb_user (
+            pk_user SERIAL PRIMARY KEY,
+            id UUID NOT NULL UNIQUE,
+            username VARCHAR(255) NOT NULL UNIQUE,
+            email VARCHAR(255) NOT NULL UNIQUE,
+            bio TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE tb_post (
+            pk_post SERIAL PRIMARY KEY,
+            id UUID NOT NULL UNIQUE,
+            fk_author INTEGER NOT NULL REFERENCES tb_user(pk_user),
+            title VARCHAR(500) NOT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+    - name: "Input Validation in Code"
+      type: "Application-layer defense"
+      purpose: "Reject invalid input before database"
+      strategies:
+        - "Type checking (GraphQL schema enforces types)"
+        - "Length validation (max string length)"
+        - "Format validation (email regex, UUID format)"
+        - "Range validation (numbers, dates)"
+        - "Whitelist validation (enum values)"
+      benefit: "User-friendly error messages, prevent invalid DB writes"
+      example: |
+        @fraiseql.input
+        class CreateUserInput:
+            username: str  # GraphQL enforces string type
+            email: str     # GraphQL enforces string type
+            bio: str | None = None  # Optional, max 500 chars implied
+
+        # GraphQL schema prevents non-string, enforces required fields
+        # Custom validators can add additional rules
+
+    - name: "Authorization Checks"
+      type: "Access control"
+      purpose: "Verify user permission before mutation"
+      strategy: |
+        Validate before INSERT/UPDATE:
+        - User exists and is active
+        - Foreign keys reference valid entities
+        - User owns the entity being modified
+        - User has required role/permission
+      example: |
+        async def create_post_impl(
+            info: GraphQLResolveInfo,
+            author_id: str,
+            input: CreatePostInput,
+        ):
+            # Validate author exists
+            author = await db.find_one("benchmark.tv_user", id=author_id)
+            if not author:
+                return CreatePostError(code="AUTHOR_NOT_FOUND")
+
+            # Validation passed, proceed with insert
+
+    - name: "Error Message Filtering"
+      type: "Information disclosure prevention"
+      purpose: "Avoid leaking sensitive info in error messages"
+      strategy: |
+        Generic user messages: "Invalid input" or "Email already in use"
+        Detailed logs for developers (server-side only)
+        Never reveal: SQL errors, internal paths, database schema
+      example: |
+        try:
+            await db.insert(...)
+        except psycopg.errors.UniqueViolation as e:
+            # SAFE: Generic message to user
+            return CreateUserError(
+                message="Email already in use",
+                code="DUPLICATE_EMAIL"
+            )
+            # Log detailed error server-side for debugging
+
+    - name: "Trinity Pattern for Authorization"
+      type: "FK security"
+      purpose: "Separate internal and external identifiers"
+      mechanism: |
+        pk_* (INTEGER) = Internal FK, hidden from API
+        id (UUID) = External identifier exposed to users
+        fk_* (INTEGER) = Foreign key, always matches pk_*
+
+        Prevents attackers from guessing/using raw integer IDs
+        Breaks simple IDOR (Insecure Direct Object Reference) attacks
+      example: |
+        tb_post table:
+        - pk_post: 1, 2, 3, ... (never exposed)
+        - id: "550e8400-e29b-...", ... (UUID in API)
+        - fk_author: 1, 1, 2, ... (matches pk_user, hidden)
+
+        Attacker cannot: GET /posts/1 (no integer endpoint)
+        Attacker must: use UUID, can only guess 1 in 2^128
+
+key_concepts:
+  concept_1: "Parameterized queries eliminate SQL injection entirely"
+  concept_2: "Database constraints enforce data integrity atomically"
+  concept_3: "Foreign keys prevent orphaned or invalid data"
+  concept_4: "Input validation provides user-friendly error messages"
+  concept_5: "Trinity pattern (pk_/id/fk_) makes ID enumeration infeasible"
+  concept_6: "Validation must happen at schema boundary (GraphQL input types)"
+  concept_7: "Error messages must be generic to prevent info disclosure"
+  concept_8: "Constraints are enforced by database, not application code"
+
+implementation_considerations:
+  consideration_1: "ALWAYS use parameterized queries - never concatenate user input into SQL"
+  consideration_2: "Define UNIQUE constraints on business-key fields (email, username)"
+  consideration_3: "Define FOREIGN KEY constraints on all relations"
+  consideration_4: "Define NOT NULL on required fields"
+  consideration_5: "Use UUIDs for public identifiers, not sequential integers"
+  consideration_6: "Validate input before INSERT/UPDATE but accept database constraints too"
+  consideration_7: "Catch database constraint errors and return user-friendly messages"
+  consideration_8: "Log detailed constraint violations for monitoring"
+  consideration_9: "Use transactions to maintain consistency across multiple writes"
+  consideration_10: "Test security: try injection payloads, constraint violations, FK bypass"
+
+best_practices:
+  - name: "Always parameterize"
+    description: "cursor.execute('WHERE email = %s', (email,)) not f'WHERE email = {email}'"
+
+  - name: "Declare all constraints"
+    description: "UNIQUE, NOT NULL, FOREIGN KEY, CHECK in schema definition"
+
+  - name: "Validate at schema boundary"
+    description: "GraphQL input types provide first-line validation (types, required fields)"
+
+  - name: "Graceful constraint errors"
+    description: "Catch psycopg.errors.UniqueViolation, return user-friendly error message"
+
+  - name: "Trinity pattern for IDs"
+    description: "Use pk_*/id/fk_* pattern: SERIAL PK, UUID public, SERIAL FK"
+
+  - name: "Test security invariants"
+    description: "Write tests: SQL injection payloads, FK violations, constraint checks"
+
+  - name: "Never trust client ID values"
+    description: "Verify fk_author references current user, not arbitrary user"
+
+  - name: "Log security events"
+    description: "Constraint violations, invalid FK, failed auth checks for monitoring"
+
+anti_patterns:
+  - name: "String concatenation in SQL"
+    description: "cursor.execute(f'SELECT * FROM users WHERE email = {email}')"
+    consequence: "SQL injection vulnerability"
+    fix: "Use parameterized: cursor.execute('SELECT * FROM users WHERE email = %s', (email,))"
+
+  - name: "No unique constraints"
+    description: "Table allows duplicate usernames/emails"
+    consequence: "Data corruption, user impersonation"
+    fix: "CREATE UNIQUE INDEX idx_user_email ON tb_user(email)"
+
+  - name: "No foreign key constraints"
+    description: "Comments can reference non-existent posts"
+    consequence: "Orphaned data, referential integrity violated"
+    fix: "fk_post INTEGER REFERENCES tb_post(pk_post)"
+
+  - name: "Sequential integer IDs"
+    description: "User IDs are 1, 2, 3, ... (enumerable)"
+    consequence: "Easy ID enumeration and IDOR attacks"
+    fix: "Use UUID: CREATE UNIQUE INDEX idx_user_id ON tb_user(id)"
+
+  - name: "Detailed error messages"
+    description: "return f'Duplicate key: {db_error}' reveals schema"
+    consequence: "Information disclosure about database structure"
+    fix: "return 'Email already in use' (generic user message)"
+
+  - name: "No transaction isolation"
+    description: "Multiple writes without transaction boundaries"
+    consequence: "Race condition: user and post created/deleted simultaneously"
+    fix: "Wrap multi-entity writes in explicit transaction"
+
+  - name: "Storing unvalidated user input"
+    description: "Store <script>alert('xss')</script> as post content"
+    consequence: "XSS when content is rendered in web frontend"
+    fix: "Escape/sanitize on output, or validate input format"
+
+implementation:
+  title: "Implementing Security in FraiseQL"
+  steps:
+    - number: 1
+      title: "Define schema with constraints"
+      description: |
+        Create tables with constraints:
+        ```sql
+        CREATE TABLE benchmark.tb_user (
+            pk_user SERIAL PRIMARY KEY,
+            id UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+            username VARCHAR(255) NOT NULL UNIQUE,
+            email VARCHAR(255) NOT NULL UNIQUE,
+            full_name VARCHAR(255),
+            bio TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE benchmark.tb_post (
+            pk_post SERIAL PRIMARY KEY,
+            id UUID NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+            fk_author INTEGER NOT NULL REFERENCES benchmark.tb_user(pk_user),
+            title VARCHAR(500) NOT NULL,
+            content TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+
+        -- Indexes for security-critical lookups
+        CREATE INDEX idx_user_email ON benchmark.tb_user(email);
+        CREATE INDEX idx_post_author ON benchmark.tb_post(fk_author);
+        ```
+
+    - number: 2
+      title: "Use parameterized queries always"
+      description: |
+        ```python
+        # CORRECT - parameterized
+        cursor.execute(
+            "SELECT * FROM benchmark.tb_user WHERE email = %s",
+            (user_email,)
+        )
+
+        # WRONG - concatenation
+        cursor.execute(f"SELECT * FROM benchmark.tb_user WHERE email = '{user_email}'")
+        ```
+
+    - number: 3
+      title: "Validate input before INSERT/UPDATE"
+      description: |
+        ```python
+        async def create_user_impl(
+            info: GraphQLResolveInfo,
+            input: CreateUserInput,
+        ):
+            # Validate email format
+            if not is_valid_email(input.email):
+                return CreateUserError(
+                    message="Invalid email format",
+                    code="INVALID_EMAIL"
+                )
+
+            # Check email uniqueness (optional - DB will enforce)
+            existing = await db.find_one("benchmark.tb_user", email=input.email)
+            if existing:
+                return CreateUserError(
+                    message="Email already in use",
+                    code="DUPLICATE_EMAIL"
+                )
+
+            # Insert (constraints enforced by DB)
+            await db.insert("benchmark.tb_user", data={...})
+        ```
+
+    - number: 4
+      title: "Handle constraint violations gracefully"
+      description: |
+        ```python
+        try:
+            await db.insert("benchmark.tb_user", data={...})
+            return CreateUserSuccess(user=user)
+        except psycopg.errors.UniqueViolation as e:
+            if 'email' in str(e):
+                return CreateUserError(
+                    message="Email already in use",
+                    code="DUPLICATE_EMAIL"
+                )
+            elif 'username' in str(e):
+                return CreateUserError(
+                    message="Username already taken",
+                    code="DUPLICATE_USERNAME"
+                )
+        except psycopg.errors.ForeignKeyViolation as e:
+            return CreatePostError(
+                message="Author not found",
+                code="AUTHOR_NOT_FOUND"
+            )
+        ```
+
+    - number: 5
+      title: "Test security patterns"
+      description: |
+        ```python
+        def test_sql_injection_prevention(factory, db):
+            injection_payload = "alice' OR '1'='1"
+            user = factory.create_user(injection_payload, "alice@example.com")
+
+            # Query back - should find only the literal payload, not all users
+            cursor = db.cursor()
+            cursor.execute(
+                "SELECT username FROM benchmark.tb_user WHERE username = %s",
+                (injection_payload,)
+            )
+            result = cursor.fetchone()
+            assert result[0] == injection_payload
+
+        def test_unique_constraint_enforced(factory):
+            factory.create_user("alice", "alice@example.com")
+
+            # Should fail - duplicate email
+            with pytest.raises(Exception):
+                factory.create_user("alice2", "alice@example.com")
+
+        def test_fk_constraint_enforced(factory):
+            # Should fail - non-existent author
+            with pytest.raises(Exception):
+                factory.create_post(999999, "Title", "content")
+        ```
+
+examples:
+  example_1:
+    title: "SQL Injection Prevention Test"
+    description: "Verify malicious SQL is treated as literal string"
+    code: |
+      # From test_security_injection.py
+      def test_sql_injection_basic(factory, db):
+          injection = "alice' OR '1'='1"
+          user = factory.create_user(injection, "alice@example.com")
+
+          cursor = db.cursor()
+          cursor.execute(
+              "SELECT username FROM benchmark.tb_user WHERE username = %s",
+              (injection,)  # Parameterized - safe
+          )
+          result = cursor.fetchone()
+
+          # Result: returns user with literal injection string, not all users
+          assert result[0] == injection
+
+      # Parameterized query treats input as data, never executes as SQL
+
+  example_2:
+    title: "Constraint Violation Handling"
+    description: "Convert DB constraint errors to user-friendly messages"
+    code: |
+      # From test_security_integrity.py
+      def test_unique_email_constraint(factory):
+          factory.create_user("alice", "test@example.com")
+
+          # Should fail - duplicate email
+          with pytest.raises(psycopg.errors.UniqueViolation):
+              factory.create_user("bob", "test@example.com")
+
+      # Application catches and returns:
+      # CreateUserError(
+      #     message="Email already in use",
+      #     code="DUPLICATE_EMAIL"
+      # )
+
+  example_3:
+    title: "Foreign Key Validation"
+    description: "Prevent creation with invalid references"
+    code: |
+      # From test_security_integrity.py
+      def test_fk_constraint_post_author(factory):
+          invalid_author_pk = 999999
+
+          # Should fail - author doesn't exist
+          with pytest.raises(psycopg.errors.ForeignKeyViolation):
+              factory.create_post(invalid_author_pk, "Title", "test", "Content")
+
+      # Trinity Pattern: Use pk_user for internal FK, not exposed UUID
+
+  example_4:
+    title: "XSS Payload Storage"
+    description: "Store HTML/script safely - escaping happens on output"
+    code: |
+      # From test_security_validation.py
+      def test_xss_script_in_post_content(factory, db):
+          xss = "<img src=x onerror=alert('xss')>"
+          user = factory.create_user("author", "author@example.com")
+          post = factory.create_post(user["pk_user"], "Title", "test-xss", xss)
+
+          cursor = db.cursor()
+          cursor.execute(
+              "SELECT content FROM benchmark.tb_post WHERE pk_post = %s",
+              (post["pk_post"],)
+          )
+          result = cursor.fetchone()
+
+          # Content is stored as-is (literal string)
+          assert result[0] == xss
+
+          # Security: Framework escapes when rendering to HTML
+          # If rendered without escaping, would be vulnerable
+
+comparison_matrix:
+  protection_layer:
+    parameterized_queries: "SQL injection"
+    database_constraints: "Data corruption, race conditions"
+    input_validation: "Invalid data, malformed input"
+    trinity_pattern: "ID enumeration, IDOR"
+    error_filtering: "Information disclosure"
+
+  implementation_level:
+    parameterized_queries: "Database driver"
+    database_constraints: "Database schema (CREATE TABLE)"
+    input_validation: "Application code"
+    trinity_pattern: "Schema design"
+    error_filtering: "Application code"
+
+  effectiveness:
+    parameterized_queries: "100% if used consistently"
+    database_constraints: "100% atomically enforced"
+    input_validation: "Depends on implementation"
+    trinity_pattern: "95% (UUID 2^128 guessing)"
+    error_filtering: "Depends on message filtering"
+
+  testability:
+    parameterized_queries: "Supply injection payloads, verify not executed"
+    database_constraints: "Try constraint violations, expect errors"
+    input_validation: "Try invalid data, verify rejected"
+    trinity_pattern: "Try integer ID guessing, verify UUID required"
+    error_filtering: "Verify no SQL errors in response"
+
+recommendation_matrix:
+  - threat: "SQL injection"
+    mitigation: "Parameterized queries (always)"
+    testing: "Supply SQL keywords, verify treated as data"
+
+  - threat: "Data duplication"
+    mitigation: "UNIQUE constraint on business keys"
+    testing: "Try duplicate insert, expect constraint error"
+
+  - threat: "Orphaned data"
+    mitigation: "FOREIGN KEY constraints"
+    testing: "Try insert with invalid FK, expect error"
+
+  - threat: "ID enumeration"
+    mitigation: "UUID public IDs, SERIAL internal IDs (pk_*)"
+    testing: "Try sequential ID guessing, verify UUID required"
+
+  - threat: "Missing required data"
+    mitigation: "NOT NULL constraints, GraphQL required fields"
+    testing: "Try null insert, expect validation error"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Think of security like restaurant hygiene:
+      - Parameterized queries = washing hands (prevents food contamination)
+      - Database constraints = temperature controls (ensures food safety)
+      - Input validation = recipe verification (right ingredients)
+      - Trinity pattern = ID badges (can't impersonate employees)
+
+      Skip any step and something goes wrong!
+
+    focus: "Why database-level security matters"
+    key_points:
+      - "Parameterized queries prevent SQL injection automatically"
+      - "Database enforces constraints atomically (prevents race conditions)"
+      - "UUID public IDs prevent simple guessing attacks"
+      - "FraiseQL handles security at multiple layers"
+
+  intermediate:
+    focus: "Implementing security patterns in FraiseQL"
+    key_points:
+      - "Define UNIQUE/NOT NULL/FOREIGN KEY in schema (CREATE TABLE)"
+      - "Always use parameterized queries (%s placeholders)"
+      - "Catch constraint errors, return user-friendly messages"
+      - "Use Trinity pattern: pk_* (internal), id (public), fk_* (FK)"
+      - "Test security with injection payloads and constraint violations"
+
+  advanced:
+    focus: "Defense-in-depth and monitoring"
+    key_points:
+      - "Multiple security layers: query parameterization, constraints, validation, authorization"
+      - "Constraints are enforced by database, not application (most reliable)"
+      - "Monitor constraint violations for attack patterns"
+      - "Log security events (failed auth, constraint violations, invalid FK)"
+      - "Regular security testing: OWASP top 10, PENETRATION TESTING"
+      - "Schema audit: ensure all PK/FK/UNIQUE constraints defined"

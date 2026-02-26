@@ -1,0 +1,28 @@
+id: governance-gotchas
+name: Governance Gotchas
+category: comprehensive
+type: standard
+tags:
+- governance
+summary:
+  short: Governance Gotchas and implementation guidelines
+  long: Complete guide to governance gotchas
+problem:
+  description: Challenges without proper governance gotchas
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement governance gotchas
+key_concepts:
+  concept: Governance Gotchas
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

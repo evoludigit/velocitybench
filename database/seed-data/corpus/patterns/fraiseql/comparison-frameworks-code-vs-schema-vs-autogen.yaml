@@ -1,0 +1,415 @@
+id: comparison-frameworks-code-vs-schema-vs-autogen
+name: "Framework Comparison: Code-First vs Schema-First vs Auto-Generated GraphQL"
+category: fraiseql
+type: comparison
+tags:
+  - framework-comparison
+  - graphql-architecture
+  - development-strategy
+  - type-safety
+
+summary:
+  short: "Compare three GraphQL development philosophies: code-first, schema-first, and auto-generated"
+  long: |
+    Teams building GraphQL APIs face a fundamental choice: define types in code, define schema in SDL,
+    or auto-generate from database. Each approach leads to different development workflows, type safety
+    guarantees, and operational characteristics. This comparison evaluates all three philosophies,
+    explaining why FraiseQL chose code-first with Python's type system.
+
+problem:
+  description: |
+    GraphQL development methodology affects:
+    - Type safety (how errors are caught)
+    - Schema evolution (how changes are managed)
+    - Developer workflow (what tools matter)
+    - Schema ownership (database, code, or hybrid)
+    - Runtime behavior (what happens at query time)
+
+    Wrong choice creates friction that compounds over time.
+
+comparison:
+  approach_1:
+    name: "Schema-First (SDL-Driven)"
+    philosophy: "Define GraphQL SDL first, implement resolvers to match"
+    frameworks:
+      - "Apollo Server"
+      - "Ariadne"
+      - "GraphQL-Yoga"
+
+    workflow: |
+      1. Define schema in GraphQL SDL (schema.graphql)
+      2. Implement resolvers in TypeScript/JavaScript to match schema
+      3. Run server, SDL is source of truth
+      4. Schema changes: edit SDL, then update resolvers
+
+      Example:
+      ```graphql
+      type Query {
+        user(id: ID!): User
+      }
+
+      type User {
+        id: ID!
+        email: String!
+        posts: [Post!]!
+      }
+      ```
+
+      Then implement resolvers:
+      ```typescript
+      const resolvers = {
+        Query: {
+          user: (_, { id }) => db.getUser(id)
+        },
+        User: {
+          posts: (user) => db.getPosts(user.id)
+        }
+      }
+      ```
+
+    type_safety:
+      description: "Manual: SDL and resolvers must match manually"
+      strength: "Type checkers can validate resolvers against SDL"
+      weakness: "Schema and code drift easily (different files, different languages)"
+
+    schema_evolution:
+      description: "Edit SDL, then update resolvers"
+      strength: "Clear what changed (diff SDL files)"
+      weakness: "Must coordinate schema + code changes (two places)"
+
+    pros:
+      - "Schema is always the source of truth (single place)"
+      - "Works language-agnostic (any language can implement resolvers)"
+      - "Familiar to REST API designers (schema-first mindset)"
+      - "Tools understand SDL (validation, documentation)"
+      - "Non-developers can understand schema (plain text SDL)"
+
+    cons:
+      - "Must keep SDL and code in sync (manual, error-prone)"
+      - "Type drift between schema and resolvers"
+      - "No compiler enforcement (drift discovered at runtime)"
+      - "Schema editing is separate skill (SDL syntax)"
+      - "Change requires two commits (schema + code)"
+
+    best_for: "Teams with strict schema governance, multi-language implementations"
+    developer_experience: "Familiar SDL syntax, but manual coordination is tedious"
+    team_scaling: "Works well across languages, harder within same codebase"
+
+  approach_2:
+    name: "Code-First (Type-Driven)"
+    philosophy: "Define types in code, generate schema from types"
+    frameworks:
+      - "FraiseQL"
+      - "Strawberry"
+      - "Graphene"
+      - "Type-GraphQL"
+
+    workflow: |
+      1. Define types in Python/TypeScript (classes, dataclasses, decorators)
+      2. Framework auto-generates GraphQL schema from types
+      3. Write resolvers next to type definitions
+      4. Type system enforces schema consistency
+
+      Example:
+      ```python
+      @fraiseql.type
+      class User:
+          id: str
+          email: str
+          posts: list[Post]
+
+      @fraiseql.query
+      async def get_user(user_id: str) -> User:
+          return db.get_user(user_id)
+      ```
+
+      Schema auto-generated:
+      ```graphql
+      type User {
+        id: String!
+        email: String!
+        posts: [Post!]!
+      }
+      ```
+
+    type_safety:
+      description: "Compiler enforced: Types in code are the schema"
+      strength: "Type checker ensures schema matches resolvers (same type system)"
+      strength_2: "Refactoring tools work on types (rename, extract)"
+
+    schema_evolution:
+      description: "Update type, schema updates automatically"
+      strength: "Single place to change (one file, one commit)"
+      strength_2: "Type system prevents missing resolver updates"
+
+    pros:
+      - "Types and schema always in sync (enforced by compiler)"
+      - "Refactoring is safe (IDE can rename, move, etc.)"
+      - "Single source of truth (code, not separate SDL)"
+      - "Resolvers co-located with types (easier to find)"
+      - "Type inference works (less boilerplate)"
+      - "Framework handles schema generation (less work)"
+
+    cons:
+      - "Language-specific (Python types, TypeScript types, etc.)"
+      - "Requires understanding code-first framework (learning curve)"
+      - "Schema not readable as plain text (must run to see)"
+      - "Tools less familiar with language-specific patterns"
+      - "Multi-language implementations harder (duplicate type definitions)"
+
+    best_for: "Single-language teams, rapid iteration, type-safety critical"
+    developer_experience: "Faster development, fewer coordination errors"
+    team_scaling: "Scales well within single language, harder cross-language"
+
+  approach_3:
+    name: "Auto-Generated (Database-First)"
+    philosophy: "Database schema is source of truth, generate everything else"
+    frameworks:
+      - "PostGraphile"
+      - "Hasura"
+      - "Supabase"
+
+    workflow: |
+      1. Design database schema (SQL migrations)
+      2. Framework introspects database, auto-generates GraphQL schema
+      3. Add custom resolvers only when needed (mostly optional)
+      4. Schema changes flow from database migrations
+
+      Example (database schema):
+      ```sql
+      CREATE TABLE tb_user (
+        id UUID PRIMARY KEY,
+        email VARCHAR NOT NULL,
+        created_at TIMESTAMP
+      );
+
+      CREATE TABLE tb_post (
+        id UUID PRIMARY KEY,
+        user_id UUID REFERENCES tb_user(id),
+        title VARCHAR NOT NULL
+      );
+      ```
+
+      PostGraphile auto-generates:
+      ```graphql
+      type User {
+        id: UUID!
+        email: String!
+        posts: [Post!]!  # Inferred from FK relationship
+      }
+      ```
+
+    type_safety:
+      description: "Database schema enforced: types derived from DB"
+      strength: "Database constraints are enforced at GraphQL level"
+      weakness: "Can't add application-level type validation (beyond DB)"
+
+    schema_evolution:
+      description: "Update database schema, regenerate GraphQL schema"
+      strength: "Single source of truth (database)"
+      strength_2: "Immediate consistency (introspection always in sync)"
+
+    pros:
+      - "Database is single source of truth (no drift)"
+      - "Schema always current (introspection on startup)"
+      - "Automatic relationship inference (FK → GraphQL relations)"
+      - "Zero boilerplate (no resolver code needed for basic CRUD)"
+      - "Permissions can be DB-level (roles, RLS)"
+      - "Fast to get MVP running (minutes, not hours)"
+
+    cons:
+      - "Limited to database capabilities (can't add app-level logic easily)"
+      - "Custom resolvers harder (must bypass framework for special cases)"
+      - "Schema quality depends on DB design (bad DB design → bad schema)"
+      - "Database-specific (PostgreSQL mostly, limited support for others)"
+      - "Query optimization limited (can't hand-craft JSONB composition)"
+      - "Schema exposure (exposes internal DB structure, RLS needed for security)"
+
+    best_for: "CRUD-heavy applications, rapid prototyping, database-schema-first teams"
+    developer_experience: "Fastest initial setup, harder for custom logic"
+    team_scaling: "Good for dedicated DB teams, harder for feature teams"
+
+  fraiseql_choice:
+    name: "Code-First (Approach 2)"
+    rationale: |
+      FraiseQL chose **code-first with Python's type system** because:
+      1. **Type safety**: Python type hints compile-time enforcement
+      2. **Single source of truth**: Types in code are the schema (no drift)
+      3. **Composition control**: Can hand-craft JSONB, TV tables, query optimization
+      4. **Developer velocity**: Refactoring tools work perfectly (IDE rename, extract)
+      5. **Framework potential**: Can build sophisticated features on top of types
+
+    implementation_philosophy: |
+      FraiseQL's code-first approach:
+      - Types are defined as Python dataclasses with @fraiseql decorators
+      - Resolvers are co-located with types (same file, related concerns)
+      - Schema auto-generated on startup (always in sync)
+      - Framework provides high-level primitives (@success, @error, composition helpers)
+      - Database schema is separate (FraiseQL controls mapping, not the reverse)
+
+      Key insight: Code-first isn't a limitation, it's a feature that enables:
+      - JSONB pre-composition at database level
+      - GraphQL Cascade invalidation (smart query caching)
+      - TV table materialization (database-driven optimization)
+      - Custom resolver logic mixed with auto-generated queries
+
+    assessment_strengths: |
+      ✓ **Type safety**: Python's type system enforces schema consistency
+      ✓ **Single source of truth**: Types are schema (no manual SDL to maintain)
+      ✓ **Composition control**: Hand-craft queries, JSONB composition, TV tables
+      ✓ **Refactoring safety**: IDE tools work perfectly (rename, extract, move)
+      ✓ **Co-location**: Resolvers next to types (easier to understand)
+      ✓ **Framework features**: Cascade invalidation, three-state responses built-in
+      ✓ **Type inference**: Less boilerplate, automatic type narrowing
+
+    assessment_weaknesses: |
+      ✗ **Python-specific**: Types are Python, not shareable (unlike SDL)
+      ✗ **Schema not readable as text**: Must run to see GraphQL schema
+      ✗ **Learning curve**: Requires understanding decorators, Python types
+      ✗ **Multi-language harder**: Can't share exact type definitions with frontend
+      ✗ **Tools less familiar**: Standard GraphQL tools expect SDL (not Python classes)
+      ✗ **Team coordination**: Team must understand Python type system
+
+    why_not_schema_first: |
+      Schema-first (Approach 1) was rejected because:
+      - Requires maintaining SDL manually (duplication with Python types)
+      - Schema and code drift easily (two separate files)
+      - No compiler enforcement (drift discovered at runtime)
+      - Refactoring is harder (must update SDL and code separately)
+      - Can't easily express FraiseQL's JSONB composition in SDL
+
+    why_not_autogenerated: |
+      Auto-generated (Approach 3) was rejected because:
+      - Database becomes rigid (all schema changes require DB migration)
+      - Limited query optimization (can't hand-craft JSONB composition)
+      - Can't express application-level logic (beyond database constraints)
+      - Schema exposes database internals (requires careful RLS design)
+      - Harder for teams that want flexible schema evolution
+
+benchmarks:
+  scenario: "Building a user management API with posts and comments"
+
+  time_to_first_query:
+    schema_first: "30 min (design SDL, implement resolvers)"
+    code_first_fraiseql: "15 min (define types, auto-generate schema)"
+    autogenerated: "5 min (introspect database, no code needed)"
+
+    context: |
+      Auto-generated is fastest for basic CRUD.
+      Code-first is faster than schema-first (no SDL design phase).
+      Code-first complexity increases with custom logic.
+
+  type_safety_strength:
+    schema_first: "Medium (manual validation)"
+    code_first_fraiseql: "High (compiler enforced)"
+    autogenerated: "Medium (limited to DB constraints)"
+
+  schema_evolution_difficulty:
+    schema_first: "High (update SDL + code + coordinate)"
+    code_first_fraiseql: "Low (update type, auto-generated)"
+    autogenerated: "Medium (database migration needed)"
+
+  query_optimization_capability:
+    schema_first: "High (full control, but manual)"
+    code_first_fraiseql: "High (JSONB composition, TV tables)"
+    autogenerated: "Low (limited to database capabilities)"
+
+  team_coordination:
+    schema_first: "Medium (SDL is common language)"
+    code_first_fraiseql: "High (all in Python code)"
+    autogenerated: "Low (no coding required)"
+
+  customization_effort:
+    schema_first: "Low (resolvers are just code)"
+    code_first_fraiseql: "Low (resolvers next to types)"
+    autogenerated: "High (must override framework)"
+
+  refactoring_safety:
+    schema_first: "Low (manual SDL updates needed)"
+    code_first_fraiseql: "High (IDE rename, extract, move)"
+    autogenerated: "Low (database changes are risky)"
+
+decision_matrix:
+  team_familiarity:
+    question: "Is your team familiar with GraphQL SDL?"
+    answer_yes_familiar: "Schema-first may feel comfortable"
+    answer_no_unfamiliar: "Code-first or auto-generated reduce learning"
+
+  language_preference:
+    question: "Single language team or multi-language?"
+    answer_single_language: "Code-first works great (types in one language)"
+    answer_multi_language: "Schema-first better (SDL is language-neutral)"
+
+  query_optimization_needed:
+    question: "Do you need hand-optimized queries (JSONB composition, etc.)?"
+    answer_yes_critical: "Code-first (FraiseQL) gives full control"
+    answer_no_standard_queries: "Auto-generated sufficient"
+
+  schema_stability:
+    question: "Is your database schema stable or evolving?"
+    answer_stable_locked_down: "Auto-generated is fine"
+    answer_evolving_frequent_changes: "Code-first easier (no DB migration phase)"
+
+  custom_business_logic:
+    question: "How much custom business logic (beyond CRUD)?"
+    answer_minimal_crud: "Auto-generated is fastest"
+    answer_complex_custom: "Code-first (can mix custom + auto)"
+
+  type_safety_importance:
+    question: "How important is compile-time type safety?"
+    answer_critical: "Code-first (enforced by compiler)"
+    answer_runtime_ok: "Schema-first or auto-generated acceptable"
+
+trade_off_summary:
+  speed_vs_control: |
+    Auto-generated: Fastest (5 min), zero control over schema
+    Schema-first: Moderate (30 min), full control but manual
+    Code-first (FraiseQL): Fast (15 min), full control via Python types
+
+    **FraiseQL provides both speed and control.**
+
+  consistency_vs_flexibility: |
+    Auto-generated: Maximum consistency (DB is truth), zero flexibility
+    Schema-first: High flexibility, manual consistency work
+    Code-first (FraiseQL): Compiler enforced consistency, flexible schema
+
+    **FraiseQL enforces consistency while allowing flexibility.**
+
+  language_portability_vs_typesafety: |
+    Schema-first: Portable (SDL language-agnostic), medium type safety
+    Code-first (FraiseQL): Less portable (Python types), high type safety
+    Auto-generated: Not portable (DB-specific), medium type safety
+
+    **FraiseQL trades portability for safety within single-language teams.**
+
+recommendations:
+  - "Use schema-first if you have multiple language implementations or SDL-first stakeholders"
+  - "Use auto-generated if CRUD-only API and database is truly the source of truth"
+  - "Use code-first (FraiseQL) for single-language teams wanting full type safety and query control"
+  - "Code-first is best for teams that value refactoring safety and rapid iteration"
+  - "Code-first enables FraiseQL's advanced features (JSONB composition, cascade invalidation)"
+
+blog_hooks:
+  beginner:
+    focus: "Understanding the three GraphQL development approaches"
+    key_points:
+      - "Schema-first: Design schema first, implement resolvers"
+      - "Code-first: Define types, auto-generate schema"
+      - "Auto-generated: Database schema is truth"
+      - "FraiseQL: Code-first with Python types"
+
+  intermediate:
+    focus: "Trade-offs between approaches at team scale"
+    key_points:
+      - "Schema-first works multi-language, harder to keep in sync"
+      - "Code-first is fastest to iterate, works best single-language"
+      - "Auto-generated is fastest to MVP, limited for custom logic"
+      - "Code-first enables advanced optimization (JSONB, TV tables)"
+
+  advanced:
+    focus: "Choosing for production at scale"
+    key_points:
+      - "Type safety: Code-first (compiler enforced)"
+      - "Portability: Schema-first (language agnostic)"
+      - "Speed: Auto-generated (zero code)"
+      - "Flexibility: Code-first (full control over composition)"

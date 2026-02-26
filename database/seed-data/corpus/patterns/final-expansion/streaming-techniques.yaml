@@ -1,0 +1,28 @@
+id: streaming-techniques
+name: Streaming Techniques
+category: comprehensive
+type: standard
+tags:
+- streaming
+summary:
+  short: Streaming Techniques and implementation guidelines
+  long: Complete guide to streaming techniques
+problem:
+  description: Challenges without proper streaming techniques
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement streaming techniques
+key_concepts:
+  concept: Streaming Techniques
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

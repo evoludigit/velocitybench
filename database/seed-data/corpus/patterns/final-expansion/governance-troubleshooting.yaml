@@ -1,0 +1,28 @@
+id: governance-troubleshooting
+name: Governance Troubleshooting
+category: comprehensive
+type: standard
+tags:
+- governance
+summary:
+  short: Governance Troubleshooting and implementation guidelines
+  long: Complete guide to governance troubleshooting
+problem:
+  description: Challenges without proper governance troubleshooting
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement governance troubleshooting
+key_concepts:
+  concept: Governance Troubleshooting
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

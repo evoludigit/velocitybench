@@ -1,0 +1,28 @@
+id: api-best-practices
+name: Api Best Practices
+category: comprehensive
+type: standard
+tags:
+- api
+summary:
+  short: Api Best Practices and implementation guidelines
+  long: Complete guide to api best practices
+problem:
+  description: Challenges without proper api best practices
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement api best practices
+key_concepts:
+  concept: Api Best Practices
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

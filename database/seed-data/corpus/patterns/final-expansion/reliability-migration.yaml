@@ -1,0 +1,28 @@
+id: reliability-migration
+name: Reliability Migration
+category: comprehensive
+type: standard
+tags:
+- reliability
+summary:
+  short: Reliability Migration and implementation guidelines
+  long: Complete guide to reliability migration
+problem:
+  description: Challenges without proper reliability migration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement reliability migration
+key_concepts:
+  concept: Reliability Migration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

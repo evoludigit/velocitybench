@@ -1,0 +1,28 @@
+id: api-patterns
+name: Api Patterns
+category: comprehensive
+type: standard
+tags:
+- api
+summary:
+  short: Api Patterns and implementation guidelines
+  long: Complete guide to api patterns
+problem:
+  description: Challenges without proper api patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement api patterns
+key_concepts:
+  concept: Api Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,28 @@
+id: optimization-guidelines
+name: Optimization Guidelines
+category: comprehensive
+type: standard
+tags:
+- optimization
+summary:
+  short: Optimization Guidelines and implementation guidelines
+  long: Complete guide to optimization guidelines
+problem:
+  description: Challenges without proper optimization guidelines
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement optimization guidelines
+key_concepts:
+  concept: Optimization Guidelines
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

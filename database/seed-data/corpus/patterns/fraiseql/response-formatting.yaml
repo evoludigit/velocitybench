@@ -1,0 +1,49 @@
+id: response-formatting
+name: Response Formatting and Serialization
+category: fraiseql
+type: standard
+tags:
+- execution
+- response-formatting
+- serialization
+- json
+summary:
+  short: Converting database results to JSON GraphQL responses
+  long: Database results are formatted into JSON responses conforming to the GraphQL
+    schema and response structure.
+problem:
+  description: Response format doesn't match schema
+  symptoms:
+  - Invalid JSON in response
+  - Wrong response structure
+  - Type mismatches
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Response Formatting and Serialization effectively
+key_concepts:
+  concept_1: JSON serialization
+  concept_2: Type conversion
+  concept_3: Error formatting
+implementation_considerations:
+  consideration_1: Circular reference handling
+  consideration_2: Large object serialization
+  consideration_3: Special type handling
+best_practices:
+- name: Follow schema
+  description: Serialize according to schema
+- name: Type safety
+  description: Ensure correct types in response
+- name: Error structure
+  description: Format errors consistently
+anti_patterns:
+- name: Ad-hoc serialization
+  consequence: Inconsistent responses
+- name: No type checking
+  description: Invalid types in response
+blog_hooks:
+  beginner:
+    focus: Introduction to Response Formatting and Serialization
+  intermediate:
+    focus: Implementing Response Formatting and Serialization
+  advanced:
+    focus: Advanced Response Formatting and Serialization techniques

@@ -1,0 +1,543 @@
+id: fraiseql-enterprise-mutation-pattern
+name: "FraiseQL Enterprise Mutation Pattern"
+category: fraiseql
+type: standard
+tags:
+  - fraiseql
+  - mutations
+  - error-handling
+  - response-types
+  - enterprise-patterns
+  - idempotency
+
+summary:
+  short: "Three-state mutation responses with auto-injected decorators (Success/Error/NoOp)"
+  long: |
+    FraiseQL's enterprise mutation pattern provides three distinct response types for every mutation:
+    Success (operation completed), Error (operation failed), and NoOp (no changes needed).
+    Using @fraiseql.success, @fraiseql.error, and @fraiseql.noop decorators, the framework
+    auto-injects status, message, and error context. This pattern eliminates null response ambiguity
+    and enables rich error handling at the GraphQL layer with full context about what failed.
+
+problem:
+  description: |
+    Traditional GraphQL mutations return either the mutated entity or null on error, losing context:
+    - Did the operation fail or succeed?
+    - What specifically failed?
+    - What was the partial state before failure?
+    - Should clients retry?
+
+    Enterprise applications need richer mutation responses that communicate status, validation errors,
+    and contextual information for proper error recovery and user feedback.
+
+  symptoms:
+    - name: "Null ambiguity"
+      description: "Null return value could mean 'not found' or 'operation failed'"
+      detection: "Impossible to distinguish error causes from GraphQL alone"
+
+    - name: "Missing error details"
+      description: "No information about what validation failed"
+      detection: "Error messages in server logs, not in GraphQL response"
+
+    - name: "Partial update issues"
+      description: "Update partially succeeds but no way to know what changed"
+      detection: "Clients must re-query to discover actual state"
+
+    - name: "Cascade operation problems"
+      description: "When updating entity triggers related updates, hard to track failures"
+      detection: "Cascaded updates fail silently"
+
+  impact: |
+    Poor error recovery, bad UX (users don't know what went wrong),
+    difficult debugging, impossible to implement optimistic updates
+
+solution:
+  principle: "Every mutation returns exactly one of three types: Success, Error, or NoOp (no operation)"
+
+  components:
+    - name: "@fraiseql.success decorator"
+      type: "Response type"
+      purpose: "Returned when mutation succeeds"
+      auto_inject: |
+        - status: str = "success"
+        - message: str | None (optional)
+        - errors: list[Error] | None = None
+        - id: ID (from database entity_id)
+        - updatedFields: list[str] (from updated_fields)
+      example: |
+        @fraiseql.success
+        class UpdateUserSuccess:
+            status: str = "success"  # Auto-injected
+            message: str | None      # Auto-injected
+            errors: list[Error] | None = None  # Auto-injected
+            user: User               # Custom field
+            cascade: Cascade | None = None
+
+    - name: "@fraiseql.error decorator"
+      type: "Response type"
+      purpose: "Returned when mutation fails"
+      auto_inject: |
+        - status: str = "error"
+        - message: str | None (human-readable error)
+        - errors: list[Error] | None (structured error details)
+        - code: str (machine-readable error code)
+      example: |
+        @fraiseql.error
+        class UpdateUserError:
+            status: str = "error"    # Auto-injected
+            message: str | None      # Auto-injected
+            errors: list[Error] | None  # Auto-injected
+            current_user: User | None = None  # Current state before failed update
+
+    - name: "@fraiseql.noop decorator"
+      type: "Response type"
+      purpose: "Returned when mutation has no effect (idempotent)"
+      auto_inject: |
+        - status: str = "noop"
+        - message: str | None (e.g., 'No fields to update')
+      example: |
+        @fraiseql.noop
+        class UpdateUserNoop:
+            status: str = "noop"     # Auto-injected
+            message: str | None      # Auto-injected
+            # No custom fields needed
+
+    - name: "Cascade operations"
+      type: "Related mutations"
+      purpose: "Update related entities atomically"
+      behavior: |
+        When enable_cascade=True:
+        - All changes included in single transaction
+        - If any cascade fails, entire operation rolls back
+        - Cascade results included in Success/Error response
+      example: "Updating user cascades to invalidate related posts in cache"
+
+    - name: "Input type patterns"
+      type: "Type system"
+      purpose: "Separate input from output types"
+      example: |
+        @fraiseql.input
+        class UpdateUserInput:
+            first_name: str | None = None
+            last_name: str | None = None
+            bio: str | None = None
+
+        # Allows partial updates - any field can be omitted
+
+key_concepts:
+  concept_1: "Three-state response eliminates null ambiguity"
+  concept_2: "@fraiseql.success auto-injects status='success', message, errors"
+  concept_3: "@fraiseql.error auto-injects status='error' with error context"
+  concept_4: "@fraiseql.noop for idempotent no-op operations"
+  concept_5: "Cascade operations update related entities atomically"
+  concept_6: "Input types separate mutation inputs from output entity"
+  concept_7: "Success/Error/NoOp should be mutually exclusive in schema (union type)"
+  concept_8: "Error response includes previous state for debugging"
+
+implementation_considerations:
+  consideration_1: "Every mutation must define Success, Error, and optionally NoOp response types"
+  consideration_2: "Use @fraiseql.input for mutation parameters (separate from output)"
+  consideration_3: "Design error codes (e.g., 'VALIDATION_ERROR', 'NOT_FOUND') for client handling"
+  consideration_4: "Include current state in Error response for rollback/recovery UI"
+  consideration_5: "Use enable_cascade=True for related entity updates"
+  consideration_6: "Return partial state changes in cascade field for optimistic updates"
+  consideration_7: "Implement idempotency: detect no-ops and return NoOp response"
+  consideration_8: "Log error codes and messages for monitoring/alerting"
+  consideration_9: "Message field should be user-friendly; errors field for technical details"
+
+best_practices:
+  - name: "Always define all three response types"
+    description: "Success, Error, and NoOp (even if NoOp has no custom fields)"
+
+  - name: "Use specific error codes"
+    description: "NOT_FOUND, VALIDATION_ERROR, CONFLICT, UNAUTHORIZED (not generic 'error')"
+
+  - name: "Include previous state in Error"
+    description: "Return current_user/current_post in error to enable rollback UI"
+
+  - name: "Make inputs Optional when possible"
+    description: "UpdateUserInput with all optional fields allows partial updates"
+
+  - name: "Detect and return NoOp"
+    description: "If no fields provided or all fields match current, return NoOp not Success"
+
+  - name: "Use cascade for related updates"
+    description: "Updating user might cascade to update related posts/comments"
+
+  - name: "Return full entity from Success"
+    description: "Include nested relationships to avoid client re-query (from composition layer)"
+
+  - name: "Validate before database operation"
+    description: "Check constraints (unique email, valid author_id) before INSERT/UPDATE"
+
+anti_patterns:
+  - name: "Returning null on error"
+    description: "mutation updateUser { user { id } } returns null"
+    consequence: "Client cannot distinguish 'not found' from 'invalid input'"
+    fix: "Return Error response with status='error' and error codes"
+
+  - name: "NoOp response as success"
+    description: "Returning Success when no fields changed"
+    consequence: "Client thinks operation succeeded when nothing happened"
+    fix: "Return NoOp response with status='noop' and explanatory message"
+
+  - name: "Cascade failures rollback silently"
+    description: "Cascade operation fails but Success still returned"
+    consequence: "Related entities not updated but user thinks they are"
+    fix: "Return Error if any cascade operation fails"
+
+  - name: "Error response without context"
+    description: "Error { status: 'error', message: 'Failed' }"
+    consequence: "User cannot understand what went wrong"
+    fix: "Include error codes, fields, and previous state"
+
+  - name: "Required fields in input"
+    description: "@fraiseql.input class UpdateUserInput { first_name: str }"
+    consequence: "Cannot do partial updates; must provide all fields"
+    fix: "Make all input fields optional: first_name: str | None = None"
+
+  - name: "Forgetting to check existence"
+    description: "create_post without verifying author_id exists"
+    consequence: "Foreign key constraint error, not user-friendly error"
+    fix: "Validate before INSERT: 'if not author: return CreatePostError(...)'"
+
+implementation:
+  title: "Implementing Enterprise Mutations in FraiseQL"
+  steps:
+    - number: 1
+      title: "Define Input Type"
+      description: |
+        Create input type with optional fields:
+        ```python
+        @fraiseql.input
+        class UpdateUserInput:
+            first_name: str | None = None
+            last_name: str | None = None
+            bio: str | None = None
+        ```
+
+    - number: 2
+      title: "Define Success Response Type"
+      description: |
+        Define what success looks like:
+        ```python
+        @fraiseql.success
+        class UpdateUserSuccess:
+            user: User  # Updated entity
+            cascade: Cascade | None = None  # Related updates
+            # status, message, errors auto-injected
+        ```
+
+    - number: 3
+      title: "Define Error Response Type"
+      description: |
+        Define error context:
+        ```python
+        @fraiseql.error
+        class UpdateUserError:
+            current_user: User | None = None  # State before failure
+            cascade: Cascade | None = None  # Failed cascades
+            # status, message, errors auto-injected
+        ```
+
+    - number: 4
+      title: "Define NoOp Response Type"
+      description: |
+        Define no-operation case:
+        ```python
+        @fraiseql.noop
+        class UpdateUserNoop:
+            pass  # No custom fields; status='noop', message auto-injected
+        ```
+
+    - number: 5
+      title: "Implement Mutation Function"
+      description: |
+        Implement core logic:
+        ```python
+        async def update_user_impl(
+            info: GraphQLResolveInfo,
+            id: str,
+            input: UpdateUserInput,
+        ) -> UpdateUserSuccess | UpdateUserError | UpdateUserNoop:
+            db = info.context["db"]
+
+            try:
+                # Detect NoOp: no fields to update
+                update_data = {}
+                if input.first_name is not None:
+                    update_data["first_name"] = input.first_name
+                if input.last_name is not None:
+                    update_data["last_name"] = input.last_name
+                if input.bio is not None:
+                    update_data["bio"] = input.bio
+
+                if not update_data:
+                    return UpdateUserNoop()  # No changes
+
+                # Update database
+                await db.update(
+                    "benchmark.tb_user",
+                    where={"id": {"eq": id}},
+                    data=update_data,
+                )
+
+                # Return Success with updated entity from composition layer
+                user = await db.find_one("benchmark.tv_user", id=id)
+                return UpdateUserSuccess(user=user)
+
+            except Exception as e:
+                # Return Error with context
+                current = await db.find_one("benchmark.tv_user", id=id)
+                return UpdateUserError(
+                    message=f"Failed to update user: {str(e)}",
+                    code="UPDATE_FAILED",
+                    current_user=current
+                )
+        ```
+
+    - number: 6
+      title: "Define Mutation Class"
+      description: |
+        Wire up the mutation:
+        ```python
+        @fraiseql.mutation(
+            function="benchmark.update_user",
+            enable_cascade=True,
+        )
+        class UpdateUser:
+            input: UpdateUserInput
+            success: UpdateUserSuccess
+            error: UpdateUserError
+            noop: UpdateUserNoop
+        ```
+
+examples:
+  example_1:
+    title: "Update User Mutation with All Three Response Types"
+    description: "Demonstrates Success, Error, and NoOp responses"
+    code: |
+      # GraphQL Query
+      mutation UpdateUser($id: ID!, $input: UpdateUserInput!) {
+        updateUser(id: $id, input: $input) {
+          __typename
+          ... on UpdateUserSuccess {
+            status      # "success"
+            message
+            user { id username email }
+          }
+          ... on UpdateUserError {
+            status      # "error"
+            message
+            errors { message path }
+            current_user { id username }  # Previous state
+          }
+          ... on UpdateUserNoop {
+            status      # "noop"
+            message     # "No fields to update"
+          }
+        }
+      }
+
+      # Variables - Partial update
+      {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "input": { "bio": "New bio" }
+      }
+
+      # Success Response
+      {
+        "data": {
+          "updateUser": {
+            "__typename": "UpdateUserSuccess",
+            "status": "success",
+            "message": null,
+            "user": {
+              "id": "550e8400-e29b-41d4-a716-446655440000",
+              "username": "alice",
+              "email": "alice@example.com"
+            }
+          }
+        }
+      }
+
+      # Error Response (if update failed)
+      {
+        "data": {
+          "updateUser": {
+            "__typename": "UpdateUserError",
+            "status": "error",
+            "message": "Failed to update user: Duplicate email",
+            "errors": [
+              { "message": "Email already in use", "path": "email" }
+            ],
+            "current_user": {
+              "id": "550e8400-e29b-41d4-a716-446655440000",
+              "username": "alice"
+            }
+          }
+        }
+      }
+
+      # NoOp Response (no fields provided)
+      {
+        "data": {
+          "updateUser": {
+            "__typename": "UpdateUserNoop",
+            "status": "noop",
+            "message": "No fields to update"
+          }
+        }
+      }
+
+  example_2:
+    title: "Create Post Mutation with Validation"
+    description: "Create with author existence check"
+    code: |
+      async def create_post_impl(
+          info: GraphQLResolveInfo,
+          author_id: str,
+          input: CreatePostInput,
+      ) -> CreatePostSuccess | CreatePostError:
+          db = info.context["db"]
+
+          try:
+              # Validate author exists
+              author = await db.find_one("benchmark.tv_user", id=author_id)
+              if not author:
+                  return CreatePostError(
+                      message=f"Author {author_id} not found",
+                      code="AUTHOR_NOT_FOUND",
+                  )
+
+              # Create post
+              result = await db.insert(
+                  "benchmark.tb_post",
+                  data={
+                      "author_id": author_id,
+                      "title": input.title,
+                      "content": input.content,
+                      "status": input.status,
+                  },
+              )
+
+              # Return Success with nested author
+              post = await db.find_one("benchmark.tv_post", id=result["id"])
+              return CreatePostSuccess(post=post)
+
+          except Exception as e:
+              return CreatePostError(
+                  message=f"Failed to create post: {str(e)}",
+                  code="CREATE_ERROR",
+              )
+
+  example_3:
+    title: "Mutation with Cascade Operations"
+    description: "Update user cascades to related entities"
+    code: |
+      @fraiseql.mutation(
+          function="benchmark.update_user",
+          enable_cascade=True,  # Enable cascade for related updates
+      )
+      class UpdateUser:
+          input: UpdateUserInput
+          success: UpdateUserSuccess
+          error: UpdateUserError
+          noop: UpdateUserNoop
+
+      # Cascade behavior:
+      # When updating user.bio, may also:
+      # - Invalidate user's posts in cache
+      # - Update user's display name in comments
+      # - Trigger downstream updates atomically
+
+      # Response includes cascade info:
+      {
+        "updateUser": {
+          "status": "success",
+          "user": { ... },
+          "cascade": {
+            "postsInvalidated": 5,
+            "commentsUpdated": 12
+          }
+        }
+      }
+
+comparison_matrix:
+  response_type:
+    success: "Operation succeeded"
+    error: "Operation failed"
+    noop: "No operation (idempotent)"
+
+  status_value:
+    success: "success"
+    error: "error"
+    noop: "noop"
+
+  includes_entity:
+    success: "Yes - updated entity"
+    error: "Optionally - previous state"
+    noop: "No - no changes"
+
+  use_case:
+    success: "Normal successful mutations"
+    error: "Validation errors, not found, conflicts"
+    noop: "Partial updates with no changes, idempotent operations"
+
+  error_details:
+    success: "None needed"
+    error: "code, message, previous state, validation errors"
+    noop: "Optional explanation message"
+
+recommendation_matrix:
+  - scenario: "Partial user update with optional fields"
+    pattern: "Success/Error/NoOp with optional input"
+    response: "Return NoOp if no fields provided"
+
+  - scenario: "Create entity with FK validation"
+    pattern: "Success/Error (no NoOp)"
+    response: "Return Error if referenced entity not found"
+
+  - scenario: "Update with related cascades"
+    pattern: "Success/Error with cascade info"
+    response: "Include cascade results/failures in response"
+
+  - scenario: "Idempotent mutation (can be called multiple times)"
+    pattern: "Success/NoOp (no Error needed)"
+    response: "Return NoOp if already in desired state"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Think of mutation responses like restaurant ordering:
+      - Success: "Here's your food" (order completed)
+      - Error: "We're out of ingredients" + "Here's what we had before" (failed order)
+      - NoOp: "You didn't ask for anything different" (no order needed)
+
+      Traditional APIs just say "null" = confusing!
+
+    focus: "Understanding why three response types matter"
+    key_points:
+      - "null is ambiguous - could mean error or not found"
+      - "Success/Error/NoOp clearly states what happened"
+      - "Error response includes what WAS before, enabling rollback"
+      - "NoOp handles idempotent operations (safe to retry)"
+
+  intermediate:
+    focus: "Implementing the enterprise mutation pattern"
+    key_points:
+      - "@fraiseql.success/error/noop decorators auto-inject status and message"
+      - "Input types separate from output types (UpdateUserInput vs UpdateUserSuccess)"
+      - "All input fields should be optional for partial updates"
+      - "Error response includes current_state for recovery UI"
+      - "Cascade operations update related entities atomically"
+
+  advanced:
+    focus: "Error recovery, idempotency, and cascade design"
+    key_points:
+      - "Design error codes (NOT_FOUND, VALIDATION_ERROR, CONFLICT) for client handling"
+      - "Implement idempotency detection: detect no-ops before DB write"
+      - "Use cascade for transactional updates to related entities"
+      - "Include error details (field path, validation message) for form validation UI"
+      - "Consider retry logic: NoOp and Error responses indicate retriability"
+      - "Log mutation success/failure metrics for monitoring"

@@ -1,0 +1,28 @@
+id: compliance-techniques
+name: Compliance Techniques
+category: comprehensive
+type: standard
+tags:
+- compliance
+summary:
+  short: Compliance Techniques and implementation guidelines
+  long: Complete guide to compliance techniques
+problem:
+  description: Challenges without proper compliance techniques
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement compliance techniques
+key_concepts:
+  concept: Compliance Techniques
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,28 @@
+id: logging-validation
+name: Logging Validation
+category: comprehensive
+type: standard
+tags:
+- logging
+summary:
+  short: Logging Validation and implementation guidelines
+  long: Complete guide to logging validation
+problem:
+  description: Challenges without proper logging validation
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement logging validation
+key_concepts:
+  concept: Logging Validation
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

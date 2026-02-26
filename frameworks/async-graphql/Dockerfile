@@ -30,7 +30,7 @@ COPY src/ src/
 RUN touch src/main.rs && cargo build --release
 
 # Runtime stage
-FROM alpine:latest
+FROM alpine:3.19
 
 # Set TMPDIR to use /data/tmp for builds to avoid /tmp filling up
 ENV TMPDIR=/data/tmp
@@ -59,7 +59,7 @@ EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8000/health || exit 1
+  CMD wget -qO /dev/null http://localhost:8000/health || exit 1
 
 # Run the application
 CMD ["./async-graphql"]

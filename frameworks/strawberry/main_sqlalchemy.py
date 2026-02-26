@@ -6,22 +6,26 @@ Uses SQLAlchemy async ORM with DataLoader for N+1 prevention.
 
 import os
 from datetime import datetime
-from typing import Optional
 
 import strawberry
 from fastapi import FastAPI
-from sqlalchemy import UUID, Column, DateTime, Text, func, select
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import UUID, Column, DateTime, Integer, Text, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import declarative_base, relationship
 from strawberry.dataloader import DataLoader
 from strawberry.fastapi import BaseContext, GraphQLRouter
 
 # Database configuration
+_db_password = os.getenv("DB_PASSWORD")
+if not _db_password:
+    raise ValueError(
+        "Database password is required. Set DB_PASSWORD environment variable."
+    )
+
 DATABASE_URL = (
     f"postgresql+asyncpg://"
     f"{os.getenv('DB_USER', 'benchmark')}:"
-    f"{os.getenv('DB_PASSWORD', 'benchmark123')}@"
+    f"{_db_password}@"
     f"{os.getenv('DB_HOST', 'postgres')}:"
     f"{os.getenv('DB_PORT', '5432')}/"
     f"{os.getenv('DB_NAME', 'fraiseql_benchmark')}"
@@ -36,13 +40,13 @@ Base = declarative_base()
 
 
 class UserModel(Base):
-    """SQLAlchemy model for benchmark.tv_user"""
+    """SQLAlchemy model for benchmark.tb_user"""
 
-    __tablename__ = "tv_user"
+    __tablename__ = "tb_user"
     __table_args__ = {"schema": "benchmark"}
 
-    pk_user = Column(UUID, primary_key=True)
-    id = Column(Text, unique=True, nullable=False)
+    pk_user = Column(Integer, primary_key=True)
+    id = Column(UUID, unique=True, nullable=False)
     email = Column(Text, unique=True, nullable=False)
     username = Column(Text, unique=True, nullable=False)
     full_name = Column(Text, nullable=True)
@@ -55,7 +59,7 @@ class UserModel(Base):
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     # Relationship to PostModel
-    posts = relationship("PostModel", back_populates="author", foreign_keys=[PostModel.fk_author])
+    posts = relationship("PostModel", back_populates="author", foreign_keys=["PostModel.fk_author"])
 
 
 class PostModel(Base):
@@ -64,9 +68,9 @@ class PostModel(Base):
     __tablename__ = "tb_post"
     __table_args__ = {"schema": "benchmark"}
 
-    pk_post = Column(UUID, primary_key=True)
-    id = Column(Text, unique=True, nullable=False)
-    fk_author = Column(UUID, nullable=False)  # Foreign key to tb_user.pk_user
+    pk_post = Column(Integer, primary_key=True)
+    id = Column(UUID, unique=True, nullable=False)
+    fk_author = Column(Integer, nullable=False)  # Foreign key to tb_user.pk_user
     title = Column(Text, nullable=False)
     content = Column(Text, nullable=True)
     excerpt = Column(Text, nullable=True)
@@ -85,11 +89,11 @@ class CommentModel(Base):
     __tablename__ = "tb_comment"
     __table_args__ = {"schema": "benchmark"}
 
-    pk_comment = Column(UUID, primary_key=True)
-    id = Column(Text, unique=False)
-    fk_post = Column(UUID, nullable=False)  # Foreign key to tb_post.pk_post
-    fk_author = Column(UUID, nullable=False)  # Foreign key to tb_user.pk_user
-    parent_id = Column(UUID, nullable=True)  # For nested comments
+    pk_comment = Column(Integer, primary_key=True)
+    id = Column(UUID, unique=True, nullable=False)
+    fk_post = Column(Integer, nullable=False)  # Foreign key to tb_post.pk_post
+    fk_author = Column(Integer, nullable=False)  # Foreign key to tb_user.pk_user
+    parent_id = Column(Integer, nullable=True)  # For nested comments
     content = Column(Text, nullable=False)
     is_approved = Column(
         Text, nullable=False, default="true"
@@ -116,7 +120,7 @@ async def load_users_batch(keys: list[str], session_maker) -> list[dict | None]:
             user_map[str(user.id)] = {
                 "id": str(user.id),
                 "username": user.username,
-                "fullName": user.first_name,  # Note: keeping JSONB naming for compatibility
+                "fullName": user.full_name,
                 "bio": user.bio,
             }
         return [user_map.get(key) for key in keys]
@@ -186,11 +190,20 @@ async def load_posts_by_author_batch(keys: list[str], session_maker) -> list[lis
 async def load_comments_by_post_batch(keys: list[str], session_maker) -> list[list[dict]]:
     """Batch load comments by post IDs using SQLAlchemy."""
     async with session_maker() as session:
-        # Query comments where post.id is in the keys (JSONB query)
+        # Query comments where post.id is in the keys
+        # First, get the pk_post values for the given post IDs
+        post_stmt = select(PostModel.pk_post).where(PostModel.id.in_(keys))
+        post_result = await session.execute(post_stmt)
+        pk_posts = [row[0] for row in post_result.all()]
+
+        if not pk_posts:
+            return [[] for _ in keys]
+
+        # Now query comments by pk_post values
         stmt = (
             select(CommentModel)
-            .where(func.jsonb_extract_path_text(CommentModel.data, "post", "id").in_(keys))
-            .order_by(func.jsonb_extract_path_text(CommentModel.data, "createdAt").desc())
+            .where(CommentModel.fk_post.in_(pk_posts))
+            .order_by(CommentModel.created_at.desc())
         )
         result = await session.execute(stmt)
         comments = result.scalars().all()
@@ -198,9 +211,20 @@ async def load_comments_by_post_batch(keys: list[str], session_maker) -> list[li
         # Group by post_id
         comments_by_post = {key: [] for key in keys}
         for comment in comments:
-            post_id = comment.data.get("post", {}).get("id")
-            if post_id in comments_by_post:
-                comments_by_post[post_id].append(comment.data)
+            # Find the post ID for this comment's fk_post
+            post_stmt = select(PostModel.id).where(PostModel.pk_post == comment.fk_post)
+            post_result = await session.execute(post_stmt)
+            post_id = post_result.scalar_one_or_none()
+
+            if post_id and str(post_id) in comments_by_post:
+                comments_by_post[str(post_id)].append(
+                    {
+                        "id": str(comment.id),
+                        "content": comment.content,
+                        "author": {"id": str(comment.fk_author)},
+                        "post": {"id": str(post_id)},
+                    }
+                )
 
         return [comments_by_post[key][:50] for key in keys]  # Limit 50 per post
 
@@ -218,7 +242,7 @@ class Comment:
     post_id: str | None = strawberry.field(default=None)
 
     @strawberry.field
-    async def author(self, info) -> Optional["User"]:
+    async def author(self, info) -> "User" | None:
         if not self.author_id:
             return None
         user_data = await info.context.user_loader.load(self.author_id)
@@ -226,14 +250,14 @@ class Comment:
             return User(
                 id=user_data["id"],
                 username=user_data.get("username"),
-                first_name=user_data.get("fullName"),  # Note: JSONB has fullName
+                first_name=user_data.get("fullName"),
                 last_name=None,
                 bio=user_data.get("bio"),
             )
         return None
 
     @strawberry.field
-    async def post(self, info) -> Optional["Post"]:
+    async def post(self, info) -> "Post" | None:
         if not self.post_id:
             return None
         post_data = await info.context.post_loader.load(self.post_id)
@@ -255,7 +279,7 @@ class Post:
     author_id: str | None = strawberry.field(default=None)
 
     @strawberry.field
-    async def author(self, info) -> Optional["User"]:
+    async def author(self, info) -> "User" | None:
         if not self.author_id:
             return None
         user_data = await info.context.user_loader.load(self.author_id)
@@ -325,13 +349,12 @@ class Query:
             user_model = result.scalar_one_or_none()
 
             if user_model:
-                data = user_model.data
                 return User(
-                    id=data["id"],
-                    username=data.get("username"),
-                    first_name=data.get("fullName"),
+                    id=strawberry.ID(user_model.id),
+                    username=user_model.username,
+                    first_name=user_model.full_name,
                     last_name=None,
-                    bio=data.get("bio"),
+                    bio=user_model.bio,
                 )
             return None
 
@@ -345,14 +368,13 @@ class Query:
 
             return [
                 User(
-                    id=data["id"],
-                    username=data.get("username"),
-                    first_name=data.get("fullName"),
+                    id=strawberry.ID(user.id),
+                    username=user.username,
+                    first_name=user.full_name,
                     last_name=None,
-                    bio=data.get("bio"),
+                    bio=user.bio,
                 )
                 for user in users
-                if (data := user.data)
             ]
 
     @strawberry.field
@@ -364,12 +386,11 @@ class Query:
             post_model = result.scalar_one_or_none()
 
             if post_model:
-                data = post_model.data
                 return Post(
-                    id=data["id"],
-                    title=data["title"],
-                    content=data.get("content"),
-                    author_id=data.get("author", {}).get("id"),
+                    id=strawberry.ID(post_model.id),
+                    title=post_model.title,
+                    content=post_model.content,
+                    author_id=strawberry.ID(str(post_model.fk_author)),
                 )
             return None
 
@@ -383,13 +404,12 @@ class Query:
 
             return [
                 Post(
-                    id=data["id"],
-                    title=data["title"],
-                    content=data.get("content"),
-                    author_id=data.get("author", {}).get("id"),
+                    id=strawberry.ID(post.id),
+                    title=post.title,
+                    content=post.content,
+                    author_id=strawberry.ID(str(post.fk_author)),
                 )
                 for post in posts
-                if (data := post.data)
             ]
 
     @strawberry.field
@@ -401,12 +421,11 @@ class Query:
             comment_model = result.scalar_one_or_none()
 
             if comment_model:
-                data = comment_model.data
                 return Comment(
-                    id=data["id"],
-                    content=data["content"],
-                    author_id=data.get("author", {}).get("id"),
-                    post_id=data.get("post", {}).get("id"),
+                    id=strawberry.ID(comment_model.id),
+                    content=comment_model.content,
+                    author_id=strawberry.ID(str(comment_model.fk_author)),
+                    post_id=strawberry.ID(str(comment_model.fk_post)),
                 )
             return None
 
@@ -432,14 +451,12 @@ class Mutation:
             if not user_model:
                 return None
 
-            # Update JSONB data
-            data = user_model.data.copy()
+            # Update user fields
             if bio is not None:
-                data["bio"] = bio
+                user_model.bio = bio
             if first_name is not None:
-                data["fullName"] = first_name
+                user_model.full_name = first_name
 
-            user_model.data = data
             user_model.updated_at = datetime.utcnow()
 
             await session.commit()
@@ -447,11 +464,11 @@ class Mutation:
 
             # Return updated user
             return User(
-                id=data["id"],
-                username=data.get("username"),
-                first_name=data.get("fullName"),
+                id=strawberry.ID(user_model.id),
+                username=user_model.username,
+                first_name=user_model.full_name,
                 last_name=None,
-                bio=data.get("bio"),
+                bio=user_model.bio,
             )
 
 

@@ -1,0 +1,311 @@
+# Database Replication Strategies
+# VelocityBench Knowledge Corpus
+
+id: database-replication
+name: "Database Replication Strategies"
+category: infrastructure
+type: pattern
+severity: high
+tags:
+  - database
+  - replication
+  - high-availability
+  - disaster-recovery
+  - postgresql
+
+summary:
+  short: "Replicate data across servers for high availability and performance"
+  long: |
+    Replication copies database changes to standby servers, enabling high availability,
+    disaster recovery, and read scaling. PostgreSQL offers streaming replication.
+    MySQL has binlog replication. Different replication modes (synchronous, asynchronous)
+    offer different durability/performance trade-offs. Understand replication lag,
+    failover mechanisms, and recovery point objectives.
+
+problem:
+  description: |
+    Single database server creates risks:
+    - Server failure = complete outage
+    - No geographic redundancy
+    - Can't scale read queries
+    - Disaster recovery requires backups (point-in-time)
+    - Backup/restore takes time
+
+  symptoms:
+    - name: "Complete outage on server failure"
+      description: "Server down = application down"
+      detection: "Single point of failure"
+
+    - name: "Replication lag"
+      description: "Standby behind primary"
+      detection: "Stale reads from replica"
+
+    - name: "Data loss on corruption"
+      description: "Corruption propagates to replicas"
+      detection: "Replicas are corrupt too"
+
+solution:
+  principle: "Keep replicas in sync with primary, failover on primary failure"
+
+  components:
+    - name: "Primary (Master)"
+      role: "Receives all writes"
+      purpose: "Source of truth"
+
+    - name: "Replica (Standby)"
+      role: "Receives all changes"
+      purpose: "Failover target, read scaling"
+
+    - name: "Replication Process"
+      role: "Stream changes from primary to replica"
+      purpose: "Keep replica synchronized"
+
+replication_types:
+  - name: "Asynchronous Replication"
+    description: "Primary writes, then sends to replica"
+    lag: "Can be significant (seconds+)"
+    data_loss: "Possible (if primary fails before replica gets changes)"
+    throughput: "Highest"
+    use_case: "Read scaling, disaster recovery (acceptable lag)"
+
+    pros:
+      - "No impact on write latency"
+      - "Higher throughput"
+      - "Replica failure doesn't affect primary"
+
+    cons:
+      - "Data loss possible"
+      - "Stale reads from replica"
+      - "Replication lag during load"
+
+  - name: "Synchronous Replication"
+    description: "Primary waits for replica to receive change"
+    lag: "Minimal (milliseconds)"
+    data_loss: "None (if one replica survives)"
+    throughput: "Lower (waiting for replica)"
+    use_case: "Critical data, must not lose data"
+
+    pros:
+      - "No data loss"
+      - "Replica always in sync"
+
+    cons:
+      - "Higher write latency"
+      - "Replica failure blocks writes"
+      - "Network lag impacts latency"
+
+  - name: "Semi-synchronous"
+    description: "Hybrid: waits for one replica to acknowledge"
+    lag: "Low"
+    data_loss: "Minimal"
+    throughput: "Good balance"
+    use_case: "Balance durability and performance"
+
+    mode: |
+      PRIMARY → REPLICA1 (waits for ack) → REPLICA2 (async)
+      Write completes when REPLICA1 acknowledges
+
+implementation:
+  postgresql_streaming_replication:
+    primary_setup: |
+      # postgresql.conf on primary
+      wal_level = replica              # Enable replication
+      max_wal_senders = 3              # Number of replicas
+      max_replication_slots = 3
+      hot_standby = on
+
+      # pg_hba.conf - allow replica to connect
+      host    replication     all     10.0.0.0/8     md5
+
+      # Restart PostgreSQL
+      sudo systemctl restart postgresql
+
+    replica_setup: |
+      # Stop replica if running
+      sudo systemctl stop postgresql
+
+      # Remove old replica files
+      rm -rf /var/lib/postgresql/15/main
+
+      # Run pg_basebackup to copy primary data
+      pg_basebackup -h primary.example.com \
+        -D /var/lib/postgresql/15/main \
+        -U replicator \
+        --checkpoint=fast \
+        -R
+
+      # Start replica
+      sudo systemctl start postgresql
+
+      # Verify replication is working
+      psql -c "SELECT client_addr, backend_start FROM pg_stat_replication;"
+
+    replication_slots: |
+      # On primary - create replication slot
+      SELECT * FROM pg_create_physical_replication_slot('replica1');
+
+      # Ensures primary keeps WAL until replica connects
+      # Prevents data loss even if replica is down
+
+    monitoring: |
+      # On primary - check replication status
+      SELECT client_addr, backend_start, write_lsn, flush_lsn
+      FROM pg_stat_replication;
+
+      -- write_lsn: How far replica has received
+      -- flush_lsn: How far replica has flushed to disk
+
+  mysql_binlog_replication:
+    primary_setup: |
+      # my.cnf on primary
+      [mysqld]
+      server-id = 1
+      log_bin = mysql-bin
+      binlog_format = ROW  # Or MIXED or STATEMENT
+
+      # Restart MySQL
+      sudo systemctl restart mysql
+
+      # Create replication user
+      CREATE USER 'replicator'@'10.0.0.%' IDENTIFIED BY 'password';
+      GRANT REPLICATION SLAVE ON *.* TO 'replicator'@'10.0.0.%';
+      FLUSH PRIVILEGES;
+
+      # Get binary log position
+      SHOW MASTER STATUS;
+      # Note File and Position
+
+    replica_setup: |
+      # Configure replica
+      CHANGE MASTER TO
+        MASTER_HOST = 'primary.example.com',
+        MASTER_USER = 'replicator',
+        MASTER_PASSWORD = 'password',
+        MASTER_LOG_FILE = 'mysql-bin.000001',
+        MASTER_LOG_POS = 154;
+
+      # Start replication
+      START SLAVE;
+
+      # Check status
+      SHOW SLAVE STATUS\G
+      # Look for Seconds_Behind_Master
+
+failover_strategies:
+  - name: "Manual Failover"
+    steps: |
+      1. Detect primary failure
+      2. Choose replica to promote
+      3. Promote replica to primary
+      4. Update application connection string
+      5. Repoint other replicas
+
+    time: "10-30 minutes"
+    reliability: "Manual, error-prone"
+
+  - name: "Automatic Failover (Patroni, pg_auto_failover)"
+    steps: |
+      1. Health checks detect primary failure
+      2. Consensus system (etcd, Raft) elects new primary
+      3. Replica automatically promoted
+      4. Application redirects via DNS/VIP
+      5. Other replicas adjust replication source
+
+    time: "10-30 seconds"
+    reliability: "Automated, tested"
+
+    postgresql_patroni: |
+      # Patroni manages PostgreSQL HA
+      - Monitors primary/replicas
+      - Automatic failover
+      - Replica lag monitoring
+      - VIP (Virtual IP) for connection routing
+
+      # Application connects to VIP
+      # VIP follows primary automatically
+      psql -h cluster-vip.example.com
+
+high_availability_architectures:
+  - name: "Primary + 1 Replica"
+    pros: ["Simple", "Low cost"]
+    cons: ["No redundancy if both fail", "Limited read scaling"]
+
+  - name: "Primary + 2 Replicas"
+    pros: ["One replica fails, keep running", "Read scale across 2"]
+    cons: ["More expensive"]
+
+  - name: "Primary + Replicas in Different Regions"
+    pros: ["Disaster recovery", "Low latency reads in each region"]
+    cons: ["Complex network setup", "Replication latency across regions"]
+
+  - name: "Primary + Replicas + Backup Server"
+    pros: ["Archival for point-in-time recovery", "PITR independent of replicas"]
+    cons: ["High storage cost"]
+
+monitoring:
+  metrics:
+    - "Replication lag (seconds behind primary)"
+    - "Replica disk space"
+    - "Network latency to replicas"
+    - "WAL queue size on primary"
+    - "Replica crash/restart frequency"
+
+  alerts:
+    - "Replication lag > 5 seconds"
+    - "Replica disk > 90%"
+    - "Replica connection lost"
+    - "WAL retention queue growing"
+
+best_practices:
+  - name: "Monitor replication lag"
+    description: "Know how far behind replicas are"
+    action: |
+      SELECT
+        client_addr,
+        extract(epoch from (now() - pg_last_xact_replay_time())) AS seconds_behind
+      FROM pg_stat_replication;
+
+  - name: "Test failover regularly"
+    description: "Don't discover issues during real failure"
+    action: "Failover test quarterly"
+
+  - name: "Use synchronous replication for critical data"
+    description: "Accept latency for durability"
+    action: |
+      synchronous_commit = remote_apply
+      synchronous_standby_names = 'standby1'
+
+  - name: "Keep replicas in sync"
+    description: "Don't let lag grow too much"
+    action: "Alert if lag > acceptable threshold"
+
+  - name: "Use WAL archiving"
+    description: "Archive WAL for point-in-time recovery"
+    action: |
+      archive_mode = on
+      archive_command = 'cp %p /archive/%f'
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Database replication is like having a backup:
+      - No replication: Only one copy (risky)
+      - Replication: Second copy in sync
+      - Automatic failover: Switch to backup automatically
+      If main breaks, you keep going!
+
+  intermediate:
+    focus: "Setting up replication and understanding lag"
+    key_points:
+      - "Streaming replication setup"
+      - "Replication lag monitoring"
+      - "Synchronous vs asynchronous trade-offs"
+      - "Manual and automatic failover"
+
+  advanced:
+    focus: "High availability architectures and failover automation"
+    key_points:
+      - "Multi-region replication"
+      - "Cascading replicas"
+      - "WAL archiving and PITR"
+      - "Patroni and pg_auto_failover"

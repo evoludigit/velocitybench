@@ -1,0 +1,28 @@
+id: availability-testing
+name: Availability Testing
+category: comprehensive
+type: standard
+tags:
+- availability
+summary:
+  short: Availability Testing and implementation guidelines
+  long: Complete guide to availability testing
+problem:
+  description: Challenges without proper availability testing
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement availability testing
+key_concepts:
+  concept: Availability Testing
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

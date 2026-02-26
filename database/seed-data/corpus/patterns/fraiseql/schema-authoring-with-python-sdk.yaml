@@ -1,0 +1,50 @@
+id: schema-authoring-with-python-sdk
+name: Schema Authoring with Python SDK
+category: fraiseql
+type: standard
+tags:
+- compilation
+- python
+- schema-authoring
+- sdks
+summary:
+  short: Using Python decorators to define GraphQL schemas
+  long: The Python SDK provides decorator-based schema authoring for GraphQL types,
+    allowing developers to define schemas directly in Python code with type hints
+    and validation.
+problem:
+  description: Manual schema writing is error-prone and hard to maintain
+  symptoms:
+  - Schema validation errors caught at runtime
+  - Type mismatches between Python and GraphQL
+  - Difficulty enforcing schema conventions
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Schema Authoring with Python SDK effectively
+key_concepts:
+  concept_1: Python SDK decorator fundamentals
+  concept_2: Type binding and field mapping
+  concept_3: Validation at definition time
+implementation_considerations:
+  consideration_1: Python version compatibility
+  consideration_2: Type hint completeness
+  consideration_3: IDE integration and autocomplete
+best_practices:
+- name: Use type hints
+  description: Always add type hints to fields
+- name: Validate early
+  description: Enable schema validation during definition
+- name: Document fields
+  description: Add descriptions to all fields
+anti_patterns:
+- name: Incomplete type hints
+  consequence: Loss of compile-time validation
+- name: Missing field validation
+  consequence: Runtime errors in compilation
+blog_hooks:
+  beginner:
+    focus: Introduction to Schema Authoring with Python SDK
+  intermediate:
+    focus: Implementing Schema Authoring with Python SDK
+  advanced:
+    focus: Advanced Schema Authoring with Python SDK techniques

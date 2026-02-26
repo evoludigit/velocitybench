@@ -1,0 +1,28 @@
+id: streaming-integration
+name: Streaming Integration
+category: comprehensive
+type: standard
+tags:
+- streaming
+summary:
+  short: Streaming Integration and implementation guidelines
+  long: Complete guide to streaming integration
+problem:
+  description: Challenges without proper streaming integration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement streaming integration
+key_concepts:
+  concept: Streaming Integration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

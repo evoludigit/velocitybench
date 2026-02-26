@@ -1,0 +1,58 @@
+id: opentelemetry-tracing
+name: OpenTelemetry Tracing
+category: fraiseql
+type: standard
+tags:
+- observability
+- tracing
+- opentelemetry
+- distributed
+- debugging
+summary:
+  short: Distributed tracing with OTLP, Jaeger, and Zipkin exporters
+  long: FraiseQL integrates OpenTelemetry for distributed tracing with support for
+    OTLP, Jaeger, and Zipkin exporters, providing detailed span instrumentation across
+    query execution phases with proper context propagation.
+problem:
+  description: No visibility into query execution breakdown
+  symptoms:
+  - Can't identify slow phases
+  - No distributed request tracking
+  - Unclear database query timing
+  - Missing context across services
+  impact: Difficult performance debugging and root cause analysis
+solution:
+  description: Implement OpenTelemetry Tracing effectively
+key_concepts:
+  concept_1: Span creation per execution phase
+  concept_2: Context propagation across services
+  concept_3: Trace sampling strategies
+  concept_4: Exporter configuration (OTLP/Jaeger/Zipkin)
+implementation_considerations:
+  consideration_1: Span overhead and sampling
+  consideration_2: Trace context injection
+  consideration_3: Exporter performance
+  consideration_4: Span attribute cardinality
+best_practices:
+- name: Span per phase
+  description: Create spans for each execution phase
+- name: Sample strategically
+  description: Sample based on latency or error
+- name: Include SQL
+  description: Add SQL queries as span attributes
+- name: Propagate context
+  description: Pass trace context to downstream services
+anti_patterns:
+- name: No sampling
+  consequence: Overwhelming trace volume
+- name: Missing context
+  consequence: Broken distributed traces
+- name: Too many spans
+  consequence: Excessive overhead
+blog_hooks:
+  beginner:
+    focus: Introduction to OpenTelemetry Tracing
+  intermediate:
+    focus: Implementing distributed tracing with exporters
+  advanced:
+    focus: Advanced sampling strategies and trace analysis

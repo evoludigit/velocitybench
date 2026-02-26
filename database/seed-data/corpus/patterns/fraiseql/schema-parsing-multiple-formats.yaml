@@ -1,0 +1,49 @@
+id: schema-parsing-multiple-formats
+name: Schema Parsing from Multiple Formats
+category: fraiseql
+type: standard
+tags:
+- compilation
+- parsing
+- formats
+- multi-language
+summary:
+  short: Implementing parsers for Python, YAML, GraphQL SDL, and TypeScript schemas
+  long: The compilation pipeline includes parsers for multiple schema formats, translating
+    each to the intermediate representation for database-agnostic compilation.
+problem:
+  description: Limited to single schema format
+  symptoms:
+  - Teams restricted to one language
+  - Difficulty integrating existing schemas
+  - Inflexible tooling integration
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Schema Parsing from Multiple Formats effectively
+key_concepts:
+  concept_1: Parser architecture patterns
+  concept_2: Format-specific parsing logic
+  concept_3: Error recovery in parsing
+implementation_considerations:
+  consideration_1: Parser complexity per format
+  consideration_2: Performance of parsing
+  consideration_3: Maintaining format parity
+best_practices:
+- name: Parser tests
+  description: Test each format extensively
+- name: Error messages
+  description: Clear feedback for parse errors
+- name: Performance
+  description: Parse schemas quickly
+anti_patterns:
+- name: Single parser
+  consequence: Limited format support
+- name: Incomplete parsing
+  consequence: Features lost in translation
+blog_hooks:
+  beginner:
+    focus: Introduction to Schema Parsing from Multiple Formats
+  intermediate:
+    focus: Implementing Schema Parsing from Multiple Formats
+  advanced:
+    focus: Advanced Schema Parsing from Multiple Formats techniques

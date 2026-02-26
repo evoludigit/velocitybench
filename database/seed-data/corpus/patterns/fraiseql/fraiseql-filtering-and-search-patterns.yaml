@@ -1,0 +1,430 @@
+id: fraiseql-filtering-and-search-patterns
+name: "FraiseQL Filtering and Search Patterns"
+category: fraiseql
+type: standard
+tags:
+  - fraiseql
+  - filtering
+  - search
+  - where-clause
+  - performance
+  - query-optimization
+
+summary:
+  short: "WHERE clause patterns for exact match, pattern matching, ranges, and complex filters"
+  long: |
+    FraiseQL supports comprehensive filtering via WHERE clauses with multiple operators:
+    exact match (=), pattern matching (LIKE, ILIKE), range queries (>, <, BETWEEN),
+    list membership (IN, ANY), and complex boolean combinations (AND, OR).
+    Each filter type has specific performance characteristics and use cases.
+    Proper index strategy is critical for filter performance.
+
+problem:
+  description: |
+    GraphQL queries often need to filter results by various criteria:
+    - Find user by email
+    - Search posts by title (case-insensitive)
+    - Filter comments in date range
+    - Find posts by author AND title pattern
+    - List users with multiple OR conditions
+
+    Without proper filtering patterns, queries become inefficient or impossible to express.
+    Filter performance directly impacts user experience for search/discovery features.
+
+  symptoms:
+    - name: "No filtering capability"
+      description: "GraphQL schema missing filter input types"
+      detection: "Query results cannot be narrowed by criteria"
+
+    - name: "Slow filters"
+      description: "Filters take 100ms+ when they should be <50ms"
+      detection: "Missing indexes on filtered fields"
+
+    - name: "Complex filter logic"
+      description: "Difficult to express multi-condition filters in GraphQL"
+      detection: "Need for client-side post-filtering"
+
+  impact: "Inability to efficiently query subsets of data; poor search UX; database load from full scans"
+
+solution:
+  principle: "Database-driven filtering with parameterized queries and proper indexing"
+
+  components:
+    - name: "Exact Match Filter"
+      type: "Basic operator"
+      purpose: "WHERE field = value"
+      performance: "<10ms (indexed)"
+      example: "Find user by email: WHERE email = %s"
+
+    - name: "LIKE Pattern Match"
+      type: "Wildcard operator"
+      purpose: "WHERE field LIKE pattern"
+      performance: "<100ms (requires LIKE index)"
+      example: "Find emails by domain: WHERE email LIKE '%@company.com'"
+
+    - name: "ILIKE Case-Insensitive"
+      type: "Pattern operator"
+      purpose: "WHERE field ILIKE pattern (PostgreSQL)"
+      performance: "<100ms (case-insensitive index)"
+      example: "Search posts by title: WHERE title ILIKE '%python%'"
+
+    - name: "Range Filters"
+      type: "Comparison operators"
+      purpose: "WHERE field > value AND field < value"
+      performance: "<50ms (range index)"
+      example: "Posts in date range: WHERE created_at > %s AND created_at < %s"
+
+    - name: "IN/ANY List Membership"
+      type: "Set operator"
+      purpose: "WHERE field IN (list) or WHERE field = ANY(array)"
+      performance: "<50ms (indexed, batch lookup)"
+      example: "Find posts by multiple authors: WHERE fk_author = ANY(%s)"
+
+    - name: "Multiple AND Conditions"
+      type: "Boolean operator"
+      purpose: "WHERE condition1 AND condition2 AND condition3"
+      performance: "<50ms (multi-column index)"
+      example: "Find posts: WHERE fk_author = %s AND title ILIKE %s AND status = %s"
+
+    - name: "Multiple OR Conditions"
+      type: "Boolean operator"
+      purpose: "WHERE condition1 OR condition2 OR condition3"
+      performance: "<100ms (multiple indexes, query planner optimization)"
+      example: "Find users by email OR username: WHERE email = %s OR username = %s"
+
+key_concepts:
+  concept_1: "Parameterized queries prevent SQL injection while enabling dynamic filters"
+  concept_2: "Index strategy must match filter patterns (exact, LIKE, range)"
+  concept_3: "AND conditions are faster than OR (can use multi-column indexes)"
+  concept_4: "LIKE patterns starting with wildcard (* LIKE '%...' *) cannot use indexes efficiently"
+  concept_5: "PostgreSQL ILIKE for case-insensitive matching; MySQL use LOWER() + LIKE"
+  concept_6: "ANY/IN operators enable batch filtering without N+1"
+  concept_7: "Complex filters (3+ conditions) benefit from query planning/optimization"
+
+implementation_considerations:
+  consideration_1: "Always use parameterized queries (?) to prevent SQL injection"
+  consideration_2: "Index filtered fields: CREATE INDEX idx_user_email ON tb_user(email)"
+  consideration_3: "For LIKE filters, consider: prefix patterns (indexed) vs suffix/contains (full scan)"
+  consideration_4: "Multi-column indexes for AND conditions: CREATE INDEX idx_post_author_status ON tb_post(fk_author, status)"
+  consideration_5: "ILIKE requires case-insensitive index in PostgreSQL: CREATE INDEX idx_post_title_ilike ON tb_post(LOWER(title))"
+  consideration_6: "Date range filters need: CREATE INDEX idx_post_created ON tb_post(created_at)"
+  consideration_7: "Monitor slow queries (EXPLAIN ANALYZE) to identify missing indexes"
+  consideration_8: "Pagination with LIMIT/OFFSET must pair with ORDER BY for consistent results"
+
+best_practices:
+  - name: "Exact match for unique fields"
+    description: "Use = for email, username, UUID lookups (fastest, <10ms)"
+
+  - name: "ILIKE for text search"
+    description: "Use ILIKE with lowercase index for case-insensitive search"
+
+  - name: "Range filters with indexes"
+    description: "Use > < BETWEEN for dates/numbers with range index"
+
+  - name: "Batch ANY over multiple queries"
+    description: "Use WHERE fk_author = ANY(array) instead of loop with individual queries"
+
+  - name: "AND before OR"
+    description: "Structure filters as (A AND B) OR (A AND C) to enable multi-column indexes"
+
+  - name: "Avoid leading wildcard"
+    description: "Prefer 'Python%' over '%Python' or '%Python%' (first doesn't require full scan)"
+
+  - name: "Index selection in queries"
+    description: "Most selective condition first: WHERE status = 'active' AND email LIKE ... (status index first)"
+
+  - name: "Pagination with filter"
+    description: "Always add ORDER BY with LIMIT: ORDER BY created_at DESC LIMIT 10 OFFSET 0"
+
+anti_patterns:
+  - name: "Leading wildcard LIKE"
+    description: "WHERE title LIKE '%postgres%' - full table scan, slow"
+    consequence: "O(n) scan instead of O(log n) index lookup"
+    fix: "Use full-text search index or ILIKE with prefix pattern"
+
+  - name: "OR with unindexed fields"
+    description: "WHERE field1 = %s OR field2 = %s (field2 not indexed)"
+    consequence: "One index scan + one full scan"
+    fix: "Index both fields OR restructure to use indexed AND"
+
+  - name: "Complex nested OR"
+    description: "(A AND B) OR (C AND D) OR (E AND F) without multi-column indexes"
+    consequence: "Query planner may revert to full scan"
+    fix: "Create indexes matching each OR branch"
+
+  - name: "Substring search on non-indexed field"
+    description: "WHERE content ILIKE '%keyword%' on unindexed JSONB field"
+    consequence: "Full table scan for every search"
+    fix: "Create GIN index: CREATE INDEX idx_content ON tb_post USING GIN(content)"
+
+  - name: "Case-sensitive equals on text"
+    description: "WHERE email = %s instead of LOWER(email) = LOWER(%s)"
+    consequence: "Case mismatch failures"
+    fix: "Always normalize case or use ILIKE"
+
+implementation:
+  title: "Implementing Filters in FraiseQL"
+  steps:
+    - number: 1
+      title: "Define index strategy"
+      description: |
+        For each entity, plan indexes:
+        ```sql
+        -- Exact match filters
+        CREATE INDEX idx_user_email ON benchmark.tb_user(email);
+        CREATE INDEX idx_user_username ON benchmark.tb_user(username);
+
+        -- Case-insensitive text search
+        CREATE INDEX idx_post_title_ilike ON benchmark.tb_post(LOWER(title));
+
+        -- Range filters
+        CREATE INDEX idx_post_created ON benchmark.tb_post(created_at);
+
+        -- Combined AND filters
+        CREATE INDEX idx_post_author_status ON benchmark.tb_post(fk_author, status);
+        ```
+
+    - number: 2
+      title: "Build filter clauses"
+      description: |
+        Construct WHERE clauses with proper parameters:
+        ```sql
+        -- Exact match
+        SELECT * FROM benchmark.tb_user WHERE email = %s;
+
+        -- Pattern matching
+        SELECT * FROM benchmark.tb_post WHERE title ILIKE %s;
+
+        -- Range
+        SELECT * FROM benchmark.tb_post
+        WHERE created_at > %s AND created_at < %s;
+
+        -- Multiple conditions
+        SELECT * FROM benchmark.tb_post
+        WHERE fk_author = %s AND status = %s AND created_at > %s;
+
+        -- Batch lookup
+        SELECT * FROM benchmark.tb_post
+        WHERE fk_author = ANY(%s) ORDER BY created_at DESC;
+        ```
+
+    - number: 3
+      title: "Optimize with query planner"
+      description: |
+        Analyze query performance:
+        ```sql
+        EXPLAIN ANALYZE
+        SELECT * FROM benchmark.tb_post
+        WHERE fk_author = %s AND title ILIKE %s;
+
+        -- Should show index scan, not sequential scan
+        -- If sequential scan, missing or unused index
+        ```
+
+examples:
+  example_1:
+    title: "Exact Match - Find User by Email"
+    description: "Fast email lookup with unique index"
+    code: |
+      -- Index
+      CREATE INDEX idx_user_email ON benchmark.tb_user(email);
+
+      -- Query (from test_perf_filtered_queries.py)
+      SELECT id, username, email FROM benchmark.tb_user
+      WHERE email = %s;
+
+      -- Performance: <10ms
+      -- Trinity Pattern: Returns UUID id, not pk_user
+
+  example_2:
+    title: "Case-Insensitive Search - Posts by Title"
+    description: "Search posts ignoring case"
+    code: |
+      -- Index for ILIKE
+      CREATE INDEX idx_post_title_ilike ON benchmark.tb_post(LOWER(title));
+
+      -- Query (from test_perf_filtered_queries.py)
+      SELECT id, title FROM benchmark.tb_post
+      WHERE title ILIKE %s
+      ORDER BY created_at DESC;
+
+      -- Performance: <100ms for 100+ posts
+      -- Use %python% for substring search
+
+  example_3:
+    title: "Multiple AND Conditions - Complex Filter"
+    description: "Find posts by author AND title AND status"
+    code: |
+      -- Multi-column index
+      CREATE INDEX idx_post_author_status
+      ON benchmark.tb_post(fk_author, status);
+
+      -- Query (from test_perf_filtered_queries.py)
+      SELECT id, title FROM benchmark.tb_post
+      WHERE fk_author = %s
+        AND title ILIKE %s
+        AND status = %s
+      ORDER BY created_at DESC LIMIT 10;
+
+      -- Performance: <50ms
+      -- Trinity Pattern: Use pk_user for fk_author FK, return id UUID
+
+  example_4:
+    title: "Date Range Filter - Posts in Timeframe"
+    description: "Find posts created between dates"
+    code: |
+      -- Range index
+      CREATE INDEX idx_post_created ON benchmark.tb_post(created_at);
+
+      -- Query (from test_perf_filtered_queries.py)
+      SELECT id, title, created_at FROM benchmark.tb_post
+      WHERE created_at > %s
+        AND created_at < %s
+      ORDER BY created_at DESC;
+
+      -- Performance: <100ms
+      -- Bind parameters: (start_date, end_date)
+
+  example_5:
+    title: "Batch Lookup - Posts by Multiple Authors"
+    description: "Find posts from any of several authors using ANY"
+    code: |
+      -- Index
+      CREATE INDEX idx_post_author ON benchmark.tb_post(fk_author);
+
+      -- Query (from test_perf_complex_nested.py)
+      SELECT pk_post, id, title FROM benchmark.tb_post
+      WHERE fk_author = ANY(%s)
+      ORDER BY created_at DESC;
+
+      -- Performance: <50ms for many authors
+      -- Bind parameter: array of pk_user values
+      -- Avoids N+1 compared to individual queries
+
+comparison_matrix:
+  operator:
+    exact: "field = value"
+    like: "field LIKE pattern"
+    ilike: "field ILIKE pattern"
+    range_gt: "field > value"
+    range_between: "field BETWEEN v1 AND v2"
+    any: "field = ANY(array)"
+
+  performance_ms:
+    exact: "<10"
+    like: "<100"
+    ilike: "<100"
+    range_gt: "<50"
+    range_between: "<50"
+    any: "<50"
+
+  index_type:
+    exact: "B-tree"
+    like: "B-tree (prefix only)"
+    ilike: "B-tree on LOWER() or pg_trgm"
+    range_gt: "B-tree range"
+    range_between: "B-tree range"
+    any: "B-tree"
+
+  use_case:
+    exact: "Unique field lookup"
+    like: "Prefix search"
+    ilike: "Case-insensitive search"
+    range_gt: "Time-based queries"
+    range_between: "Date ranges"
+    any: "Batch multi-value lookup"
+
+  indexability:
+    exact: "Fully indexable"
+    like: "Partial (no leading %)"
+    ilike: "Partial (requires special index)"
+    range_gt: "Fully indexable"
+    range_between: "Fully indexable"
+    any: "Fully indexable"
+
+performance_benchmarks:
+  benchmark_1:
+    title: "Exact Match vs LIKE vs ILIKE"
+    dataset: "1000 users"
+    results: |
+      Exact match (email = %s):        8ms (indexed)
+      LIKE (email LIKE '%@example%'):   45ms (index not used fully)
+      ILIKE (email ILIKE '%EXAMPLE%'):  52ms (requires special index)
+
+  benchmark_2:
+    title: "AND Conditions with Multi-Column Index"
+    dataset: "5000 posts, 50 authors"
+    results: |
+      Single condition (fk_author = %s):           12ms
+      Two conditions (author + status):            18ms (multi-index)
+      Three conditions (author + status + date):   24ms (multi-index)
+
+  benchmark_3:
+    title: "OR Conditions Performance Degradation"
+    dataset: "5000 posts"
+    results: |
+      Single OR (username = %s OR email = %s):    22ms
+      Three OR (username OR email OR id):          65ms (query plan complexity)
+      Many OR (5+ conditions):                     200+ms (full scan)
+
+recommendation_matrix:
+  - scenario: "Search by email (unique field)"
+    operator: "= (exact)"
+    index: "B-tree on email"
+    expected_latency: "<10ms"
+
+  - scenario: "Find posts by title substring"
+    operator: "ILIKE"
+    index: "B-tree on LOWER(title)"
+    expected_latency: "<100ms"
+
+  - scenario: "Posts created in date range"
+    operator: "BETWEEN"
+    index: "B-tree on created_at"
+    expected_latency: "<50ms"
+
+  - scenario: "Posts by any of N authors"
+    operator: "= ANY"
+    index: "B-tree on fk_author"
+    expected_latency: "<50ms"
+
+  - scenario: "Complex: author AND status AND date"
+    operator: "AND with multiple conditions"
+    index: "Multi-column (fk_author, status, created_at)"
+    expected_latency: "<50ms"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Think of filters like library card catalog:
+      - Exact match ("find book by ISBN") = instant lookup in card catalog index
+      - LIKE search ("find books starting with 'Python'") = browse alphabet section
+      - Complex filter ("Python books published 2020-2025") = multiple indexes combined
+
+      Without indexes, you must read every card = slow!
+
+    focus: "Basic WHERE clause operators and why indexes matter"
+    key_points:
+      - "Exact match (=) is fastest when indexed"
+      - "LIKE with leading % requires full scan"
+      - "Multiple AND conditions can share one multi-column index"
+      - "Always use parameterized queries (not string concatenation)"
+
+  intermediate:
+    focus: "Index strategy for different filter patterns"
+    key_points:
+      - "Different operators need different indexes (B-tree, GIN, BRIN)"
+      - "Multi-column indexes enable efficient AND conditions"
+      - "EXPLAIN ANALYZE shows whether index is actually being used"
+      - "ILIKE on case-insensitive requires special index handling"
+      - "Query planner chooses index; some complex queries revert to full scan"
+
+  advanced:
+    focus: "Query optimization and index design for GraphQL filters"
+    key_points:
+      - "Design indexes based on GraphQL filter schema, not just database needs"
+      - "Monitor slow queries with EXPLAIN ANALYZE and create missing indexes"
+      - "Use pgBadger or pg_stat_statements to find hot queries"
+      - "Denormalization (materialized view) for expensive filter combinations"
+      - "Composite indexes reduce I/O but increase write costs"
+      - "PostgreSQL-specific: gin_trgm_ops for full-text LIKE, trigram similarity"

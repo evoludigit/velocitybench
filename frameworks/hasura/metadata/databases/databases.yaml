@@ -1,0 +1,16 @@
+# Hasura database configuration for VelocityBench
+- name: default
+  kind: postgres
+  configuration:
+    connection_info:
+      use_prepared_statements: true
+      database_url:
+        from_env: HASURA_GRAPHQL_DATABASE_URL
+      isolation_level: read-committed
+      pool_settings:
+        max_connections: 50
+        idle_timeout: 180
+        retries: 1
+        pool_timeout: 360
+        connection_lifetime: 600
+  tables: "!include default/tables/tables.yaml"

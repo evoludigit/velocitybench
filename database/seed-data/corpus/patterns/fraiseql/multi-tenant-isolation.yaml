@@ -1,0 +1,58 @@
+id: multi-tenant-isolation
+name: Multi-Tenant Isolation
+category: fraiseql
+type: standard
+tags:
+- security
+- multi-tenancy
+- isolation
+- scalability
+- architecture
+summary:
+  short: Tenant-scoped queries with data isolation and performance at scale
+  long: FraiseQL provides multi-tenant data isolation using tenant_id columns with
+    compile-time query injection, Row-Level Security policies, separate schema per
+    tenant options, and tenant-aware caching for secure and performant multi-tenancy.
+problem:
+  description: Tenant data leakage and poor isolation
+  symptoms:
+  - Cross-tenant data visible
+  - Manual tenant filtering error-prone
+  - No defense in depth
+  - Poor performance with many tenants
+  impact: Security breaches and compliance violations
+solution:
+  description: Implement Multi-Tenant Isolation effectively
+key_concepts:
+  concept_1: Automatic tenant_id injection in queries
+  concept_2: Row-Level Security (RLS) policies
+  concept_3: Tenant-aware cache keys
+  concept_4: Optional schema-per-tenant
+implementation_considerations:
+  consideration_1: Tenant identification from context
+  consideration_2: RLS performance overhead
+  consideration_3: Cross-tenant queries for admins
+  consideration_4: Tenant migration and data export
+best_practices:
+- name: Automatic injection
+  description: Compile-time tenant_id WHERE clauses
+- name: RLS for defense
+  description: Database-level isolation with RLS
+- name: Tenant cache keys
+  description: Include tenant_id in all cache keys
+- name: Audit cross-tenant
+  description: Log any cross-tenant queries
+anti_patterns:
+- name: Manual filtering
+  consequence: Easy to forget tenant filter
+- name: No RLS
+  consequence: Single layer of defense
+- name: Shared cache
+  consequence: Cross-tenant data leakage
+blog_hooks:
+  beginner:
+    focus: Introduction to Multi-Tenant Isolation
+  intermediate:
+    focus: Implementing tenant-scoped queries with RLS
+  advanced:
+    focus: Advanced schema-per-tenant and performance optimization

@@ -1,0 +1,31 @@
+id: domain-fintech
+name: Fintech Domain Patterns
+category: general
+type: standard
+tags:
+- domain
+summary:
+  short: Best practices for fintech domain patterns
+  long: Comprehensive guide to fintech domain patterns. This pattern covers implementation
+    details, best practices, and common pitfalls.
+problem:
+  description: Issues without proper fintech domain patterns
+  symptoms:
+  - Performance issues
+  - Reliability problems
+  - Scalability challenges
+  impact: System degradation
+solution:
+  description: Implement fintech domain patterns effectively
+key_concepts:
+  concept: Understanding fintech domain patterns
+best_practices:
+- name: Best practice 1
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Introduction to Fintech Domain Patterns
+  intermediate:
+    focus: Implementing Fintech Domain Patterns
+  advanced:
+    focus: Advanced Fintech Domain Patterns

@@ -1,0 +1,28 @@
+id: debugging-techniques
+name: Debugging Techniques
+category: comprehensive
+type: standard
+tags:
+- debugging
+summary:
+  short: Debugging Techniques and implementation guidelines
+  long: Complete guide to debugging techniques
+problem:
+  description: Challenges without proper debugging techniques
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement debugging techniques
+key_concepts:
+  concept: Debugging Techniques
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

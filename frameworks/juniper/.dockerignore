@@ -1,0 +1,23 @@
+# Build artifacts
+target/
+Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test files
+tests/
+*_test.rs
+
+# Misc
+*.md
+*.log
+.env*
+database/
+
+# Git
+.git
+.gitignore

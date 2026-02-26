@@ -1,0 +1,28 @@
+id: databases-verification
+name: Databases Verification
+category: comprehensive
+type: standard
+tags:
+- databases
+summary:
+  short: Databases Verification and implementation guidelines
+  long: Complete guide to databases verification
+problem:
+  description: Challenges without proper databases verification
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement databases verification
+key_concepts:
+  concept: Databases Verification
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

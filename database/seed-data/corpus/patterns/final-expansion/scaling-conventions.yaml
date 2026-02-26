@@ -1,0 +1,28 @@
+id: scaling-conventions
+name: Scaling Conventions
+category: comprehensive
+type: standard
+tags:
+- scaling
+summary:
+  short: Scaling Conventions and implementation guidelines
+  long: Complete guide to scaling conventions
+problem:
+  description: Challenges without proper scaling conventions
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement scaling conventions
+key_concepts:
+  concept: Scaling Conventions
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

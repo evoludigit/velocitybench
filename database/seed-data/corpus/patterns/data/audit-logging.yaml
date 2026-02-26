@@ -1,0 +1,353 @@
+# Audit Logging
+# VelocityBench Knowledge Corpus
+
+id: audit-logging
+name: "Audit Logging Patterns"
+category: data
+type: pattern
+severity: high
+tags:
+  - audit
+  - logging
+  - compliance
+  - security
+  - database
+
+summary:
+  short: "Track who did what, when, and what changed"
+  long: |
+    Audit logging records a history of actions and changes in your system. It captures
+    who performed an action, what they did, when it happened, and the before/after state
+    of affected data. Essential for compliance (SOC2, HIPAA, GDPR), security investigation,
+    debugging production issues, and building undo/history features.
+
+problem:
+  description: |
+    Without audit logging, you can't answer critical questions:
+    - Who deleted that record and when?
+    - What did the data look like before the change?
+    - What actions did a user take before they reported a bug?
+    - Are there suspicious access patterns we should investigate?
+    - Can we prove regulatory compliance?
+
+  symptoms:
+    - name: "No investigation capability"
+      description: "Can't determine what happened or who did it"
+      detection: "Incident response takes too long, can't root-cause"
+
+    - name: "Compliance failures"
+      description: "Auditors ask for logs that don't exist"
+      detection: "Failed audits, compliance violations"
+
+    - name: "No accountability"
+      description: "Users deny actions with no proof either way"
+      detection: "Disputes about who did what"
+
+solution:
+  principle: "Log immutably - who, what, when, before, after"
+
+  components:
+    - name: "Audit Trail"
+      type: "table"
+      purpose: "Immutable record of all changes"
+
+    - name: "Before/After Snapshots"
+      type: "data"
+      purpose: "What the data looked like before and after"
+
+    - name: "Context Capture"
+      type: "middleware"
+      purpose: "Automatically capture user, IP, timestamp"
+
+audit_levels:
+  - name: "Action Log"
+    description: "Who did what action when"
+    captures: ["user_id", "action", "resource_type", "resource_id", "timestamp"]
+    use_case: "Activity feeds, basic compliance"
+
+  - name: "Change Log"
+    description: "What fields changed and their values"
+    captures: ["old_value", "new_value", "changed_fields"]
+    use_case: "Data history, debugging, undo functionality"
+
+  - name: "Full Audit Trail"
+    description: "Complete before/after snapshots"
+    captures: ["full_old_record", "full_new_record", "request_context"]
+    use_case: "Compliance, forensics, legal"
+
+implementation:
+  database_triggers:
+    postgresql: |
+      -- Create audit table
+      CREATE TABLE audit_log (
+          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          table_name TEXT NOT NULL,
+          record_id UUID NOT NULL,
+          action TEXT NOT NULL,  -- INSERT, UPDATE, DELETE
+          old_data JSONB,
+          new_data JSONB,
+          changed_fields TEXT[],
+          user_id UUID,
+          ip_address INET,
+          user_agent TEXT,
+          timestamp TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- Create index for efficient queries
+      CREATE INDEX idx_audit_log_table_record ON audit_log (table_name, record_id);
+      CREATE INDEX idx_audit_log_user ON audit_log (user_id);
+      CREATE INDEX idx_audit_log_timestamp ON audit_log (timestamp);
+
+      -- Generic audit trigger function
+      CREATE OR REPLACE FUNCTION audit_trigger_func()
+      RETURNS TRIGGER AS $$
+      DECLARE
+          old_data JSONB;
+          new_data JSONB;
+          changed TEXT[];
+          user_id UUID;
+      BEGIN
+          -- Get user_id from session variable (set by application)
+          user_id := current_setting('app.current_user_id', true)::UUID;
+
+          IF TG_OP = 'DELETE' THEN
+              old_data := to_jsonb(OLD);
+              new_data := NULL;
+          ELSIF TG_OP = 'UPDATE' THEN
+              old_data := to_jsonb(OLD);
+              new_data := to_jsonb(NEW);
+              -- Find changed fields
+              SELECT array_agg(key) INTO changed
+              FROM jsonb_each(old_data) o
+              FULL OUTER JOIN jsonb_each(new_data) n USING (key)
+              WHERE o.value IS DISTINCT FROM n.value;
+          ELSE  -- INSERT
+              old_data := NULL;
+              new_data := to_jsonb(NEW);
+          END IF;
+
+          INSERT INTO audit_log (
+              table_name, record_id, action,
+              old_data, new_data, changed_fields,
+              user_id
+          ) VALUES (
+              TG_TABLE_NAME, COALESCE(NEW.id, OLD.id), TG_OP,
+              old_data, new_data, changed,
+              user_id
+          );
+
+          RETURN COALESCE(NEW, OLD);
+      END;
+      $$ LANGUAGE plpgsql;
+
+      -- Apply trigger to tables
+      CREATE TRIGGER audit_users
+          AFTER INSERT OR UPDATE OR DELETE ON users
+          FOR EACH ROW EXECUTE FUNCTION audit_trigger_func();
+
+      CREATE TRIGGER audit_orders
+          AFTER INSERT OR UPDATE OR DELETE ON orders
+          FOR EACH ROW EXECUTE FUNCTION audit_trigger_func();
+
+  application_level:
+    python_decorator: |
+      from functools import wraps
+      from datetime import datetime
+      import json
+
+      def audit_action(action_type: str, resource_type: str):
+          """Decorator to audit actions."""
+          def decorator(func):
+              @wraps(func)
+              async def wrapper(*args, **kwargs):
+                  # Get context from request
+                  request = kwargs.get('request')
+                  user_id = getattr(request.state, 'user_id', None)
+
+                  # Capture before state if updating
+                  resource_id = kwargs.get('resource_id') or kwargs.get('id')
+                  old_data = None
+                  if resource_id and action_type in ('UPDATE', 'DELETE'):
+                      old_data = await get_resource_data(resource_type, resource_id)
+
+                  # Execute the action
+                  result = await func(*args, **kwargs)
+
+                  # Capture after state
+                  new_data = None
+                  if action_type in ('INSERT', 'UPDATE'):
+                      if hasattr(result, 'dict'):
+                          new_data = result.dict()
+                      elif isinstance(result, dict):
+                          new_data = result
+
+                  # Write audit log
+                  await write_audit_log(
+                      action=action_type,
+                      resource_type=resource_type,
+                      resource_id=resource_id or (result.id if hasattr(result, 'id') else None),
+                      old_data=old_data,
+                      new_data=new_data,
+                      user_id=user_id,
+                      ip_address=request.client.host if request else None,
+                      timestamp=datetime.utcnow()
+                  )
+
+                  return result
+              return wrapper
+          return decorator
+
+      # Usage
+      @router.post("/users")
+      @audit_action("INSERT", "user")
+      async def create_user(user: UserCreate, request: Request):
+          return await user_service.create(user)
+
+      @router.put("/users/{user_id}")
+      @audit_action("UPDATE", "user")
+      async def update_user(user_id: str, user: UserUpdate, request: Request):
+          return await user_service.update(user_id, user)
+
+    sqlalchemy_events: |
+      from sqlalchemy import event
+      from sqlalchemy.orm import Session
+      import json
+
+      class AuditMixin:
+          """Mixin for auditable models."""
+
+          @staticmethod
+          def get_changes(instance):
+              """Get changed attributes and their old/new values."""
+              changes = {}
+              for attr in instance.__mapper__.column_attrs:
+                  hist = attr.get_history(instance, True)
+                  if hist.has_changes():
+                      changes[attr.key] = {
+                          'old': hist.deleted[0] if hist.deleted else None,
+                          'new': hist.added[0] if hist.added else None
+                      }
+              return changes
+
+      @event.listens_for(Session, 'before_flush')
+      def before_flush(session, flush_context, instances):
+          """Capture changes before they're committed."""
+          for instance in session.new:
+              if isinstance(instance, AuditMixin):
+                  session.info.setdefault('audit_inserts', []).append({
+                      'type': type(instance).__name__,
+                      'id': instance.id,
+                      'data': instance.to_dict()
+                  })
+
+          for instance in session.dirty:
+              if isinstance(instance, AuditMixin):
+                  session.info.setdefault('audit_updates', []).append({
+                      'type': type(instance).__name__,
+                      'id': instance.id,
+                      'changes': AuditMixin.get_changes(instance)
+                  })
+
+          for instance in session.deleted:
+              if isinstance(instance, AuditMixin):
+                  session.info.setdefault('audit_deletes', []).append({
+                      'type': type(instance).__name__,
+                      'id': instance.id,
+                      'data': instance.to_dict()
+                  })
+
+      @event.listens_for(Session, 'after_commit')
+      def after_commit(session):
+          """Write audit logs after successful commit."""
+          for item in session.info.pop('audit_inserts', []):
+              write_audit('INSERT', item)
+          for item in session.info.pop('audit_updates', []):
+              write_audit('UPDATE', item)
+          for item in session.info.pop('audit_deletes', []):
+              write_audit('DELETE', item)
+
+  querying_audit_logs:
+    postgresql: |
+      -- Get history of a specific record
+      SELECT action, changed_fields, old_data, new_data, user_id, timestamp
+      FROM audit_log
+      WHERE table_name = 'orders' AND record_id = '123e4567-e89b-12d3-a456-426614174000'
+      ORDER BY timestamp DESC;
+
+      -- Find all changes by a specific user
+      SELECT table_name, record_id, action, timestamp
+      FROM audit_log
+      WHERE user_id = 'user-id-here'
+      AND timestamp > NOW() - INTERVAL '7 days'
+      ORDER BY timestamp DESC;
+
+      -- Find deleted records
+      SELECT record_id, old_data, user_id, timestamp
+      FROM audit_log
+      WHERE table_name = 'users'
+      AND action = 'DELETE'
+      AND timestamp > NOW() - INTERVAL '30 days';
+
+      -- Reconstruct record at point in time
+      WITH ordered_changes AS (
+          SELECT *,
+              ROW_NUMBER() OVER (PARTITION BY record_id ORDER BY timestamp DESC) as rn
+          FROM audit_log
+          WHERE table_name = 'users'
+          AND record_id = 'some-id'
+          AND timestamp <= '2024-01-15 10:00:00'
+      )
+      SELECT COALESCE(new_data, old_data) as record_state
+      FROM ordered_changes
+      WHERE rn = 1;
+
+best_practices:
+  - name: "Make audit logs immutable"
+    description: "Never allow updates or deletes to audit logs"
+    example: |
+      -- Prevent modifications to audit_log
+      REVOKE UPDATE, DELETE ON audit_log FROM app_user;
+      -- Only INSERT and SELECT allowed
+
+  - name: "Capture context automatically"
+    description: "Don't rely on developers to pass context"
+    example: |
+      # Middleware captures context
+      @app.middleware("http")
+      async def capture_audit_context(request, call_next):
+          request.state.user_id = get_user_from_token(request)
+          request.state.ip_address = request.client.host
+          request.state.timestamp = datetime.utcnow()
+          return await call_next(request)
+
+  - name: "Separate storage for audit logs"
+    description: "Keep audit logs in separate database or table"
+    reasons:
+      - "Don't impact production query performance"
+      - "Different retention policies"
+      - "Separate access controls"
+      - "Can use append-only storage"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Audit logging is like a security camera for your data:
+      - No audit: "Someone changed the price, but we don't know who or when"
+      - With audit: "Alice changed the price from $10 to $5 at 3:42 PM yesterday"
+      You can rewind and see exactly what happened!
+
+  intermediate:
+    focus: "Implementing audit logging with triggers and decorators"
+    key_points:
+      - "Database triggers vs application-level logging"
+      - "Capturing before and after states"
+      - "Querying audit history efficiently"
+      - "Building audit context automatically"
+
+  advanced:
+    focus: "Compliance, performance, and advanced patterns"
+    key_points:
+      - "Event sourcing as audit log"
+      - "Immutable append-only storage"
+      - "Audit log sharding and retention"
+      - "Compliance reporting (SOC2, HIPAA)"

@@ -21,7 +21,7 @@ public class User {
     @Column(name = "pk_user")
     private Integer pkUser;
 
-    @Column(name = "id")
+    @Column(name = "id", columnDefinition = "uuid")
     private String id;
 
     @Column(name = "username")

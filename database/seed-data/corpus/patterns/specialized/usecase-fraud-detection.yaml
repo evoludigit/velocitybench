@@ -1,0 +1,28 @@
+id: usecase-fraud-detection
+name: Fraud Detection Patterns
+category: specialized
+type: standard
+tags:
+- usecase
+summary:
+  short: Patterns and practices for fraud detection patterns
+  long: Comprehensive guide to fraud detection patterns
+problem:
+  description: Challenges with fraud detection patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement fraud detection patterns
+key_concepts:
+  concept: Understanding Fraud Detection Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Fraud Detection Patterns
+  intermediate:
+    focus: Implementing Fraud Detection Patterns
+  advanced:
+    focus: Advanced Fraud Detection Patterns

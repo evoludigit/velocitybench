@@ -1,0 +1,73 @@
+id: data-warehousing
+name: "Data Warehouse Architecture and Best Practices"
+category: data
+type: pattern
+tags:
+  - data
+  - warehousing
+  - analytics
+  - olap
+
+summary:
+  short: "Designing data warehouses for analytical queries at scale"
+  long: |
+    Data warehouses are optimized for analytical queries on historical data.
+    Unlike operational databases (OLTP), warehouses prioritize query performance
+    over write performance, enabling complex analytical workloads.
+
+warehouse_components:
+  - name: "Data Ingestion"
+    description: "Extract, load, transform data from sources"
+  
+  - name: "Staging Area"
+    description: "Temporary storage during ETL"
+  
+  - name: "Data Warehouse"
+    description: "Optimized storage for analytics"
+  
+  - name: "Data Marts"
+    description: "Specialized subsets for departments"
+
+schema_designs:
+  - name: "Star Schema"
+    description: "Central fact table with dimension tables"
+    advantage: "Simple, fast queries"
+  
+  - name: "Snowflake Schema"
+    description: "Normalized dimensions"
+    advantage: "Less storage, more complex queries"
+
+etl_process:
+  - "Extract from sources"
+  - "Transform and validate"
+  - "Load into warehouse"
+  - "Aggregate and summarize"
+  - "Update dimensions"
+
+modern_approaches:
+  - "Cloud data warehouses (Snowflake, BigQuery)"
+  - "Lakehouse (Iceberg, Delta)"
+  - "Streaming ingest"
+  - "Real-time OLAP"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Data warehouses are like libraries:
+      - Cataloging system: Metadata
+      - Organization: Star schema
+      - Fast lookup: Indexes
+
+  intermediate:
+    focus: "Designing warehouse schemas"
+    key_points:
+      - "Star vs snowflake schema"
+      - "Dimension design"
+      - "Fact tables"
+
+  advanced:
+    focus: "Enterprise data warehouse"
+    key_points:
+      - "Incremental loading"
+      - "Slowly changing dimensions"
+      - "Fact table optimization"

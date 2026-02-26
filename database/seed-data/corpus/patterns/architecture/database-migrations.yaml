@@ -1,0 +1,226 @@
+# Database Migration Patterns
+# VelocityBench Knowledge Corpus
+
+id: database-migrations
+name: "Database Migration Strategies"
+category: architecture
+type: pattern
+tags:
+  - database
+  - migrations
+  - schema
+  - deployment
+  - zero-downtime
+
+summary:
+  short: "Safely evolve database schemas without downtime or data loss"
+  long: |
+    Database migrations are version-controlled changes to your database schema.
+    Done right, they enable safe, reversible schema evolution. Done wrong, they
+    cause downtime, data loss, and deployment failures. Key patterns include
+    expand-contract migrations, online schema changes, and blue-green deployments.
+
+problem:
+  description: |
+    Applications evolve, and so must their databases. Adding columns, changing types,
+    creating indexes, and restructuring tables are common needs. But schema changes
+    on production databases are risky - they can lock tables, corrupt data, or cause
+    application errors if not coordinated with code deployments.
+
+  symptoms:
+    - name: "Deployment downtime"
+      description: "Schema changes require maintenance windows"
+      detection: "Deployments blocked on database changes"
+
+    - name: "Table locks"
+      description: "ALTER TABLE blocks all queries"
+      detection: "Application timeouts during migrations"
+
+    - name: "Failed rollbacks"
+      description: "Can't revert a bad migration"
+      detection: "Data loss or corruption after rollback attempt"
+
+solution:
+  principle: "Make small, reversible changes; separate deploy from migrate"
+
+  components:
+    - name: "Migration Files"
+      type: "versioning"
+      purpose: "Track schema changes in version control"
+
+    - name: "Migration Runner"
+      type: "tooling"
+      purpose: "Apply migrations in order, track state"
+
+    - name: "Expand-Contract Pattern"
+      type: "strategy"
+      purpose: "Make breaking changes without downtime"
+
+migration_patterns:
+  - name: "Expand-Contract (Parallel Change)"
+    description: "Add new, migrate data, remove old"
+    phases:
+      - "Expand: Add new column/table alongside old"
+      - "Migrate: Copy/transform data to new structure"
+      - "Code: Update application to use new structure"
+      - "Contract: Remove old column/table"
+    example: |
+      -- Phase 1: Expand (add new column)
+      ALTER TABLE users ADD COLUMN full_name VARCHAR(255);
+
+      -- Phase 2: Migrate data
+      UPDATE users SET full_name = first_name || ' ' || last_name;
+
+      -- Phase 3: Deploy code that uses full_name
+
+      -- Phase 4: Contract (remove old columns)
+      ALTER TABLE users DROP COLUMN first_name;
+      ALTER TABLE users DROP COLUMN last_name;
+
+  - name: "Online Schema Change"
+    description: "Modify large tables without locking"
+    tools:
+      - "pt-online-schema-change (Percona)"
+      - "gh-ost (GitHub)"
+      - "pg_repack (PostgreSQL)"
+    how_it_works: |
+      1. Create shadow table with new schema
+      2. Copy existing data in batches
+      3. Capture changes via triggers/binlog
+      4. Atomic swap when caught up
+    example: |
+      # Using gh-ost for MySQL
+      gh-ost \
+        --host=localhost \
+        --database=mydb \
+        --table=users \
+        --alter="ADD COLUMN phone VARCHAR(20)" \
+        --execute
+
+      # Using pg_repack for PostgreSQL (removes bloat + can add columns)
+      pg_repack -d mydb -t users
+
+  - name: "Blue-Green Database"
+    description: "Maintain two database versions, switch traffic"
+    best_for: "Major schema overhauls"
+    complexity: "High"
+    steps:
+      - "Clone database to 'green' environment"
+      - "Apply migrations to green"
+      - "Sync data from blue to green"
+      - "Switch traffic to green"
+      - "Keep blue for rollback"
+
+  - name: "Feature Flags for Migrations"
+    description: "Decouple code deployment from schema activation"
+    example: |
+      # Code handles both old and new schema
+      def get_user_name(user):
+          if feature_flags.is_enabled("use_full_name"):
+              return user.full_name
+          else:
+              return f"{user.first_name} {user.last_name}"
+
+safe_operations:
+  postgresql:
+    safe:
+      - "CREATE INDEX CONCURRENTLY"
+      - "ADD COLUMN (without default, nullable)"
+      - "DROP COLUMN (if not used)"
+      - "CREATE TABLE"
+      - "ADD CONSTRAINT ... NOT VALID"
+    dangerous:
+      - "ADD COLUMN with DEFAULT (< PG11)"
+      - "ALTER COLUMN TYPE"
+      - "CREATE INDEX (without CONCURRENTLY)"
+      - "ADD CONSTRAINT (with validation)"
+
+  mysql:
+    safe:
+      - "ADD COLUMN (InnoDB online DDL)"
+      - "DROP COLUMN"
+      - "CREATE INDEX (online)"
+    dangerous:
+      - "MODIFY COLUMN (type change)"
+      - "ADD FOREIGN KEY"
+
+migration_tools:
+  - name: "Alembic"
+    language: "Python"
+    example: |
+      # alembic/versions/001_add_users.py
+      def upgrade():
+          op.create_table(
+              'users',
+              sa.Column('id', sa.Integer(), primary_key=True),
+              sa.Column('email', sa.String(255), nullable=False),
+          )
+
+      def downgrade():
+          op.drop_table('users')
+
+  - name: "Flyway"
+    language: "Java/SQL"
+    example: |
+      -- V1__Create_users.sql
+      CREATE TABLE users (
+          id SERIAL PRIMARY KEY,
+          email VARCHAR(255) NOT NULL
+      );
+
+  - name: "Prisma Migrate"
+    language: "TypeScript"
+    example: |
+      // schema.prisma
+      model User {
+        id    Int     @id @default(autoincrement())
+        email String  @unique
+      }
+
+      // Generate migration
+      // npx prisma migrate dev --name add_users
+
+  - name: "Rails Migrations"
+    language: "Ruby"
+    example: |
+      class CreateUsers < ActiveRecord::Migration[7.0]
+        def change
+          create_table :users do |t|
+            t.string :email, null: false
+            t.timestamps
+          end
+        end
+      end
+
+best_practices:
+  - "One change per migration (atomic, reversible)"
+  - "Test migrations on production-size data"
+  - "Use CONCURRENTLY for index creation"
+  - "Set statement_timeout for safety"
+  - "Never modify applied migrations"
+  - "Include both up and down migrations"
+  - "Run migrations before deploying new code"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Database migrations are like renovating a house while people live in it:
+      - Bad: Tear down the kitchen, rebuild it (everyone starves)
+      - Good: Build new kitchen in garage, move appliances one by one, demolish old kitchen
+      The expand-contract pattern keeps the house functional throughout!
+
+  intermediate:
+    focus: "Zero-downtime migration patterns"
+    key_points:
+      - "Expand-contract for column changes"
+      - "CONCURRENTLY for index creation"
+      - "Separating deploy from migrate"
+      - "Handling failed migrations"
+
+  advanced:
+    focus: "Large-scale migrations and tooling"
+    key_points:
+      - "Online schema change tools (gh-ost, pt-osc)"
+      - "Blue-green database deployments"
+      - "Sharded database migrations"
+      - "Data backfill strategies"

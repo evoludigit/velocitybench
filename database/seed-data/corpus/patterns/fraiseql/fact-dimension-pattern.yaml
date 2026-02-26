@@ -1,0 +1,264 @@
+# Fact-Dimension Pattern (FraiseQL)
+# VelocityBench Knowledge Corpus
+
+id: fact-dimension-pattern
+name: "Fact-Dimension Pattern in FraiseQL"
+category: fraiseql
+type: pattern
+severity: high
+tags:
+  - fraiseql
+  - analytics
+  - schema-design
+  - performance
+  - jsonb
+  - postgresql
+
+summary:
+  short: "No-joins analytics with measures as SQL columns and dimensions in JSONB"
+  long: |
+    FraiseQL's fact table pattern stores measures (numeric data for aggregation) as dedicated
+    SQL columns for 10-100x faster aggregation, while dimensions (grouping attributes) live in
+    a JSONB column for flexibility. Optional denormalized filter columns provide fast WHERE
+    filtering. Critical principle: No joins - all dimensional data must be denormalized at ETL time.
+
+problem:
+  description: |
+    Traditional analytics architectures use star schemas with fact-dimension table joins,
+    which create performance bottlenecks:
+    - Multiple joins slow down queries
+    - Query optimizer struggles with complex join graphs
+    - Dimensional data changes require CASCADE updates
+    - JSONB-only storage is 10-100x slower for aggregation
+
+    FraiseQL eliminates joins entirely by denormalizing dimensions into each fact record.
+
+  symptoms:
+    - name: "Slow aggregation queries"
+      description: "Multi-second queries for simple SUM/AVG operations"
+      detection: "High query latency for analytical workloads"
+
+    - name: "Complex join plans"
+      description: "Query plans with 5+ joins for dimensional queries"
+      detection: "EXPLAIN shows nested loop joins, hash joins"
+
+    - name: "Storage vs query tradeoff"
+      description: "Storing all data in JSONB simplifies schema but kills aggregation performance"
+      detection: "JSONB extraction in aggregates takes 10-100x longer"
+
+solution:
+  principle: "One record = one immutable fact with measures as SQL columns, dimensions as JSONB"
+
+  components:
+    - name: "Measure Columns"
+      type: "SQL columns"
+      purpose: "Numeric columns (INT, BIGINT, DECIMAL, FLOAT) for 10-100x faster aggregation"
+
+    - name: "Dimensions Column"
+      type: "JSONB column (data)"
+      purpose: "Flexible grouping attributes denormalized at ETL time"
+
+    - name: "Filter Columns"
+      type: "Indexed SQL columns"
+      purpose: "Denormalized foreign keys (UUID, VARCHAR) for fast WHERE filtering"
+
+    - name: "Primary Key"
+      type: "UUID or BIGSERIAL"
+      purpose: "Unique identifier for each fact record"
+
+implementation:
+  table_structure:
+    postgresql: |
+      -- Fact table: Sales transactions
+      CREATE TABLE tf_sales (
+          -- Primary key
+          id BIGSERIAL PRIMARY KEY,
+
+          -- Measures (SQL columns for fast aggregation)
+          revenue DECIMAL(10,2) NOT NULL,
+          quantity INT NOT NULL,
+          cost DECIMAL(10,2) NOT NULL,
+          discount DECIMAL(10,2) DEFAULT 0,
+
+          -- Dimensions (JSONB for flexible grouping)
+          data JSONB NOT NULL,
+          -- Example data content:
+          -- {
+          --   "category": "Electronics",
+          --   "region": "North America",
+          --   "product_name": "Laptop Pro",
+          --   "customer_segment": "Enterprise",
+          --   "sales_channel": "Online"
+          -- }
+
+          -- Denormalized filters (indexed SQL columns for fast WHERE)
+          customer_id UUID NOT NULL,
+          product_id UUID NOT NULL,
+          occurred_at TIMESTAMPTZ NOT NULL,
+          status VARCHAR(50) NOT NULL,
+
+          -- Timestamps
+          created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- Indexes for fast filtering
+      CREATE INDEX idx_sales_customer ON tf_sales(customer_id);
+      CREATE INDEX idx_sales_product ON tf_sales(product_id);
+      CREATE INDEX idx_sales_occurred ON tf_sales(occurred_at);
+      CREATE INDEX idx_sales_status ON tf_sales(status);
+
+      -- GIN index for JSONB dimensions (PostgreSQL)
+      CREATE INDEX idx_sales_data_gin ON tf_sales USING GIN(data);
+
+      -- Composite index for common query pattern
+      CREATE INDEX idx_sales_customer_occurred
+          ON tf_sales(customer_id, occurred_at DESC);
+
+  naming_conventions:
+    description: |
+      FraiseQL uses table prefixes to identify table types:
+      - `tf_*` - Fact tables (raw transactional data)
+      - `ta_*` - Aggregate tables (pre-computed rollups, same structure as fact tables)
+
+      Note: No `td_*` dimension tables - dimensions are denormalized into JSONB!
+
+  graphql_query:
+    example: |
+      # Query: Revenue by category and region
+      query {
+        sales_aggregate(
+          groupBy: {
+            category: true,
+            region: true
+          }
+        ) {
+          category
+          region
+          revenue_sum
+          quantity_sum
+          count
+        }
+      }
+
+  sql_execution:
+    postgresql: |
+      -- Generated SQL for above GraphQL query
+      SELECT
+          data->>'category' AS category,
+          data->>'region' AS region,
+          SUM(revenue) AS revenue_sum,
+          SUM(quantity) AS quantity_sum,
+          COUNT(*) AS count
+      FROM tf_sales
+      GROUP BY data->>'category', data->>'region';
+
+performance_characteristics:
+  - name: "Measures: 10-100x faster as SQL columns"
+    description: "PostgreSQL can aggregate numeric SQL columns directly without JSONB extraction"
+    benchmark: "1M rows: SUM(revenue) ~2ms (SQL column) vs ~50-200ms (JSONB)"
+
+  - name: "Dimensions: Flexible but slower"
+    description: "JSONB extraction for GROUP BY adds overhead, but GIN indexes help"
+    benchmark: "GROUP BY on JSONB: ~1-3ms with GIN index, ~100ms+ without"
+
+  - name: "Filter columns: Fast WHERE filtering"
+    description: "Denormalized foreign keys with B-tree indexes enable sub-millisecond WHERE"
+    benchmark: "WHERE customer_id = X: ~0.05ms with index, ~500ms full scan"
+
+  - name: "No joins: Consistent performance"
+    description: "Query performance scales linearly with fact table size, no join complexity"
+    benchmark: "10M rows: Same query plan as 1M rows, just more rows to scan"
+
+best_practices:
+  - name: "Denormalize at ETL time"
+    description: "All dimensional data must be embedded in JSONB during data ingestion"
+    rationale: "No joins means no foreign key lookups - dimension values must be present"
+
+  - name: "Use SQL columns for aggregation targets"
+    description: "Store numeric measures as DECIMAL/INT/BIGINT, not in JSONB"
+    rationale: "10-100x performance improvement for SUM/AVG/COUNT operations"
+
+  - name: "Add filter columns for frequent WHERE conditions"
+    description: "Denormalize commonly-filtered foreign keys as indexed SQL columns"
+    rationale: "B-tree indexes provide fast equality and range filtering"
+
+  - name: "Use GIN index for JSONB dimensions"
+    description: "CREATE INDEX ... USING GIN(data) for PostgreSQL JSONB grouping"
+    rationale: "Speeds up GROUP BY on JSONB paths from 100ms+ to 1-3ms"
+
+  - name: "Keep fact tables immutable"
+    description: "Insert-only fact tables, never UPDATE/DELETE"
+    rationale: "Enables append-only optimizations, simplifies replication"
+
+anti_patterns:
+  - name: "Storing measures in JSONB"
+    consequence: "10-100x slower aggregation, defeats purpose of fact table pattern"
+    example: "data->>'revenue' instead of revenue SQL column"
+
+  - name: "Joining fact tables"
+    consequence: "Violates no-joins principle, kills performance"
+    example: "JOIN tf_sales s ON d.id = s.dimension_id (dimension tables don't exist!)"
+
+  - name: "Mutable fact records"
+    consequence: "Breaks append-only assumption, complicates replication"
+    example: "UPDATE tf_sales SET revenue = ... (use INSERT instead)"
+
+  - name: "Missing indexes on filter columns"
+    consequence: "WHERE clauses trigger full table scans"
+    example: "No index on customer_id causes 500ms+ queries"
+
+use_cases:
+  - scenario: "E-commerce analytics"
+    application: "Sales by product category, region, customer segment"
+    measures: "revenue, quantity, cost, profit margin"
+    dimensions: "category, region, product_name, customer_segment, channel"
+    filters: "customer_id, product_id, occurred_at, status"
+
+  - scenario: "SaaS metrics"
+    application: "API usage, feature adoption, error rates by customer"
+    measures: "request_count, error_count, duration_ms, response_size"
+    dimensions: "endpoint, version, feature, client_type"
+    filters: "customer_id, api_key_id, occurred_at, status_code"
+
+  - scenario: "Time-series monitoring"
+    application: "Server metrics aggregated by host, service, environment"
+    measures: "cpu_usage, memory_usage, request_rate, error_rate"
+    dimensions: "host, service, environment, datacenter, instance_type"
+    filters: "host_id, service_id, occurred_at, severity"
+
+related_patterns:
+  - id: "aggregation-model"
+    description: "How FraiseQL compiles GROUP BY and aggregation functions"
+
+  - id: "temporal-bucketing"
+    description: "Time-series grouping with DATE_TRUNC and similar functions"
+
+  - id: "aggregate-table-strategy"
+    description: "Pre-computed rollups (ta_* tables) for faster queries"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Think of a fact table like a receipt log:
+      - Each row = one purchase (immutable fact)
+      - Amounts (revenue, quantity) = SQL columns (fast to sum up)
+      - Details (category, store name) = JSON notes (flexible but slower to search)
+      - Customer ID = SQL column (fast to filter "show me John's purchases")
+
+      No need to look up customer/product tables - all info is on the receipt!
+
+  intermediate:
+    focus: "Performance tradeoffs and indexing strategy"
+    key_points:
+      - "Measures as SQL columns: 10-100x faster aggregation"
+      - "Dimensions in JSONB: Flexible grouping with GIN indexes"
+      - "Filter columns: Fast WHERE with B-tree indexes"
+      - "No joins: Denormalize everything at ETL time"
+
+  advanced:
+    focus: "Schema design and optimization for billion-row fact tables"
+    key_points:
+      - "Partitioning strategy for time-series fact tables"
+      - "Composite indexes for multi-column WHERE + GROUP BY"
+      - "JSONB vs SQL columns: When to use each"
+      - "Aggregate tables (ta_*) for pre-computed rollups"

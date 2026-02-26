@@ -1,0 +1,28 @@
+id: audit-verification
+name: Audit Verification
+category: comprehensive
+type: standard
+tags:
+- audit
+summary:
+  short: Audit Verification and implementation guidelines
+  long: Complete guide to audit verification
+problem:
+  description: Challenges without proper audit verification
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement audit verification
+key_concepts:
+  concept: Audit Verification
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

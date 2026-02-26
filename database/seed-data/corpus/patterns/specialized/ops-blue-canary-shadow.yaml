@@ -1,0 +1,28 @@
+id: ops-blue-canary-shadow
+name: Blue Canary Shadow Patterns
+category: specialized
+type: standard
+tags:
+- ops
+summary:
+  short: Patterns and practices for blue canary shadow patterns
+  long: Comprehensive guide to blue canary shadow patterns
+problem:
+  description: Challenges with blue canary shadow patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement blue canary shadow patterns
+key_concepts:
+  concept: Understanding Blue Canary Shadow Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Blue Canary Shadow Patterns
+  intermediate:
+    focus: Implementing Blue Canary Shadow Patterns
+  advanced:
+    focus: Advanced Blue Canary Shadow Patterns

@@ -1,0 +1,28 @@
+id: optimization-conventions
+name: Optimization Conventions
+category: comprehensive
+type: standard
+tags:
+- optimization
+summary:
+  short: Optimization Conventions and implementation guidelines
+  long: Complete guide to optimization conventions
+problem:
+  description: Challenges without proper optimization conventions
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement optimization conventions
+key_concepts:
+  concept: Optimization Conventions
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

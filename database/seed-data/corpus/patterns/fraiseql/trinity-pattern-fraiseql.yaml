@@ -1,0 +1,50 @@
+id: trinity-pattern-fraiseql
+name: Trinity Pattern in FraiseQL
+category: fraiseql
+type: standard
+tags:
+- schema
+- naming
+- conventions
+- primary-keys
+- trinity-pattern
+summary:
+  short: Primary key strategy with pk_*, id UUID, and identifier columns
+  long: The Trinity Pattern combines INTEGER primary key (pk_*), UUID public identifier
+    (id), and human-readable identifier (identifier) for flexible entity identification.
+problem:
+  description: Entity identification strategy unclear
+  symptoms:
+  - No efficient way to identify entities
+  - Missing human-readable identifiers
+  - Confusion between internal and public IDs
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Trinity Pattern in FraiseQL effectively
+key_concepts:
+  concept_1: Trinity Pattern structure
+  concept_2: Primary key usage
+  concept_3: Public ID strategy
+implementation_considerations:
+  consideration_1: Index strategy for IDs
+  consideration_2: UUID vs sequential trade-offs
+  consideration_3: Identifier uniqueness constraints
+best_practices:
+- name: Follow convention
+  description: Use pk_*, id, identifier pattern
+- name: Index all IDs
+  description: Create indexes on all ID columns
+- name: Document purpose
+  description: Explain which ID to use when
+anti_patterns:
+- name: Single ID column
+  consequence: Inflexible and problematic
+- name: Inconsistent naming
+  consequence: Confusion about IDs
+blog_hooks:
+  beginner:
+    focus: Introduction to Trinity Pattern in FraiseQL
+  intermediate:
+    focus: Implementing Trinity Pattern in FraiseQL
+  advanced:
+    focus: Advanced Trinity Pattern in FraiseQL techniques

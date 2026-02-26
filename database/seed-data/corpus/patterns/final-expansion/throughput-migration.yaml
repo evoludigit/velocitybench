@@ -1,0 +1,28 @@
+id: throughput-migration
+name: Throughput Migration
+category: comprehensive
+type: standard
+tags:
+- throughput
+summary:
+  short: Throughput Migration and implementation guidelines
+  long: Complete guide to throughput migration
+problem:
+  description: Challenges without proper throughput migration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement throughput migration
+key_concepts:
+  concept: Throughput Migration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

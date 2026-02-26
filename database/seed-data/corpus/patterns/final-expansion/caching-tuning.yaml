@@ -1,0 +1,28 @@
+id: caching-tuning
+name: Caching Tuning
+category: comprehensive
+type: standard
+tags:
+- caching
+summary:
+  short: Caching Tuning and implementation guidelines
+  long: Complete guide to caching tuning
+problem:
+  description: Challenges without proper caching tuning
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement caching tuning
+key_concepts:
+  concept: Caching Tuning
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

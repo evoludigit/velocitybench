@@ -1,0 +1,28 @@
+id: messaging-validation
+name: Messaging Validation
+category: comprehensive
+type: standard
+tags:
+- messaging
+summary:
+  short: Messaging Validation and implementation guidelines
+  long: Complete guide to messaging validation
+problem:
+  description: Challenges without proper messaging validation
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement messaging validation
+key_concepts:
+  concept: Messaging Validation
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

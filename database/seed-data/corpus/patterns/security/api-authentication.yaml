@@ -1,0 +1,236 @@
+# API Authentication Patterns
+# VelocityBench Knowledge Corpus
+
+id: api-authentication
+name: "API Authentication Patterns"
+category: security
+type: pattern
+tags:
+  - security
+  - authentication
+  - jwt
+  - oauth
+  - api-keys
+
+summary:
+  short: "Methods for verifying identity in API requests"
+  long: |
+    API authentication verifies who is making a request. Common approaches include
+    API keys (simple but limited), JWT tokens (stateless and scalable), OAuth 2.0
+    (delegated authorization), and session-based auth (stateful). Each has tradeoffs
+    in security, scalability, and complexity.
+
+problem:
+  description: |
+    APIs need to verify callers before granting access to resources. Without
+    authentication, anyone can access your data. The challenge is balancing
+    security with developer experience and performance.
+
+  symptoms:
+    - name: "Unauthorized access"
+      description: "Unknown clients accessing protected resources"
+      detection: "Missing or invalid credentials in requests"
+
+    - name: "Token sprawl"
+      description: "Too many tokens with unclear permissions"
+      detection: "Can't revoke access, unclear who has access"
+
+    - name: "Session scalability issues"
+      description: "Session store becoming bottleneck"
+      detection: "Latency increases with user count"
+
+authentication_methods:
+  - name: "API Keys"
+    description: "Simple string tokens passed in header or query"
+    security_level: "Basic"
+    example: |
+      # In header (preferred)
+      curl -H "X-API-Key: sk_live_abc123" https://api.example.com/users
+
+      # In query (not recommended - logged in URLs)
+      curl https://api.example.com/users?api_key=sk_live_abc123
+    pros:
+      - "Simple to implement"
+      - "Easy for developers to use"
+      - "Good for server-to-server"
+    cons:
+      - "No expiration (unless manually rotated)"
+      - "No user context"
+      - "Easy to leak (logs, URLs)"
+    best_for: "Server-to-server APIs, public APIs with rate limits"
+    implementation: |
+      # Python FastAPI
+      from fastapi import Security, HTTPException
+      from fastapi.security import APIKeyHeader
+
+      api_key_header = APIKeyHeader(name="X-API-Key")
+
+      async def verify_api_key(api_key: str = Security(api_key_header)):
+          if api_key not in valid_api_keys:
+              raise HTTPException(status_code=403, detail="Invalid API key")
+          return api_key
+
+  - name: "JWT (JSON Web Tokens)"
+    description: "Self-contained tokens with encoded claims"
+    security_level: "Medium-High"
+    structure: |
+      Header.Payload.Signature
+
+      # Header
+      {"alg": "HS256", "typ": "JWT"}
+
+      # Payload (claims)
+      {
+        "sub": "user123",
+        "name": "John Doe",
+        "iat": 1516239022,
+        "exp": 1516242622,
+        "roles": ["user", "admin"]
+      }
+
+      # Signature
+      HMACSHA256(base64(header) + "." + base64(payload), secret)
+    pros:
+      - "Stateless (no server-side storage)"
+      - "Contains user info (claims)"
+      - "Can be verified without DB"
+      - "Cross-domain friendly"
+    cons:
+      - "Can't be revoked (until expiry)"
+      - "Size grows with claims"
+      - "Must handle refresh tokens"
+    best_for: "Microservices, SPAs, mobile apps"
+    implementation: |
+      # Python with PyJWT
+      import jwt
+      from datetime import datetime, timedelta
+
+      SECRET = "your-secret-key"
+
+      def create_token(user_id: str) -> str:
+          payload = {
+              "sub": user_id,
+              "iat": datetime.utcnow(),
+              "exp": datetime.utcnow() + timedelta(hours=1),
+          }
+          return jwt.encode(payload, SECRET, algorithm="HS256")
+
+      def verify_token(token: str) -> dict:
+          try:
+              return jwt.decode(token, SECRET, algorithms=["HS256"])
+          except jwt.ExpiredSignatureError:
+              raise Exception("Token expired")
+          except jwt.InvalidTokenError:
+              raise Exception("Invalid token")
+
+  - name: "OAuth 2.0"
+    description: "Delegated authorization framework"
+    security_level: "High"
+    flows:
+      - name: "Authorization Code"
+        for: "Web apps with backend"
+        flow: |
+          1. User clicks "Login with Google"
+          2. Redirect to Google with client_id, redirect_uri
+          3. User authenticates with Google
+          4. Google redirects back with authorization code
+          5. Backend exchanges code for access token
+          6. Backend uses access token to get user info
+
+      - name: "PKCE (Proof Key for Code Exchange)"
+        for: "SPAs, mobile apps (no client secret)"
+        addition: "Code verifier/challenge prevents interception"
+
+      - name: "Client Credentials"
+        for: "Server-to-server (no user involved)"
+        flow: |
+          1. Service sends client_id + client_secret
+          2. Auth server returns access token
+    pros:
+      - "Industry standard"
+      - "Delegated authorization (3rd party login)"
+      - "Scoped permissions"
+      - "Token refresh built-in"
+    cons:
+      - "Complex to implement"
+      - "Multiple flows to understand"
+      - "Requires auth server"
+    best_for: "Third-party integrations, enterprise apps"
+
+  - name: "Session-Based Authentication"
+    description: "Server stores session, client has session ID"
+    security_level: "Medium"
+    flow: |
+      1. User submits username/password
+      2. Server validates, creates session in store
+      3. Server sends session ID in cookie
+      4. Client sends cookie with each request
+      5. Server looks up session to verify
+    pros:
+      - "Simple mental model"
+      - "Easy to revoke (delete session)"
+      - "Full server control"
+    cons:
+      - "Stateful (session store needed)"
+      - "Horizontal scaling complexity"
+      - "Not suitable for mobile/APIs"
+    best_for: "Traditional web apps, admin panels"
+    implementation: |
+      # Express.js with session
+      const session = require('express-session');
+      const RedisStore = require('connect-redis').default;
+
+      app.use(session({
+        store: new RedisStore({ client: redisClient }),
+        secret: 'keyboard cat',
+        resave: false,
+        saveUninitialized: false,
+        cookie: { secure: true, httpOnly: true, maxAge: 3600000 }
+      }));
+
+token_best_practices:
+  - "Use short-lived access tokens (15 min - 1 hour)"
+  - "Implement refresh token rotation"
+  - "Store tokens securely (httpOnly cookies, secure storage)"
+  - "Use HTTPS everywhere"
+  - "Validate token signature and expiration"
+  - "Include only necessary claims in JWT"
+  - "Implement token revocation for sensitive operations"
+
+common_mistakes:
+  - name: "Storing JWTs in localStorage"
+    risk: "XSS can steal tokens"
+    fix: "Use httpOnly cookies"
+
+  - name: "Long-lived tokens without refresh"
+    risk: "Compromised token has extended access"
+    fix: "Short access tokens + refresh tokens"
+
+  - name: "API keys in client-side code"
+    risk: "Anyone can extract and use them"
+    fix: "Proxy through backend, use OAuth for clients"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Authentication methods are like building access:
+      - API Key: A keycard (works but no ID, anyone can use if stolen)
+      - JWT: A temporary badge with your photo and permissions
+      - OAuth: Getting a visitor pass from reception after ID check
+      - Session: Sign-in sheet at front desk (they remember you're here)
+
+  intermediate:
+    focus: "Choosing the right authentication method"
+    key_points:
+      - "When to use JWT vs sessions"
+      - "OAuth 2.0 flows explained"
+      - "Token storage and security"
+      - "Refresh token strategies"
+
+  advanced:
+    focus: "Enterprise authentication patterns"
+    key_points:
+      - "Token revocation strategies"
+      - "Multi-tenant authentication"
+      - "Zero-trust architecture"
+      - "PASETO as JWT alternative"

@@ -1,0 +1,64 @@
+id: fraiseql-anti-patterns
+name: FraiseQL Anti-Patterns
+category: fraiseql
+type: standard
+tags:
+- best-practices
+- anti-patterns
+- gotchas
+- mistakes
+- pitfalls
+summary:
+  short: Common pitfalls in compiled, database-centric GraphQL
+  long: FraiseQL's compiled, database-centric approach introduces specific anti-patterns
+    to avoid including using resolvers for data fetching, runtime authorization checks,
+    view duplication, N+1 through poor view design, and resolver side effects.
+problem:
+  description: Traditional GraphQL patterns don't apply to FraiseQL
+  symptoms:
+  - Trying to use resolvers for data fetching
+  - Runtime authorization instead of declarative
+  - Duplicating views for similar projections
+  - Poor view design causes N+1 problems
+  - Side effects in stored procedures
+  impact: Poor performance and architecture violations
+solution:
+  description: Learn and avoid FraiseQL-specific anti-patterns
+key_concepts:
+  concept_1: No resolvers - use views and SQL composition
+  concept_2: Declarative auth - compile-time rules only
+  concept_3: View composition - reuse base views
+  concept_4: Single SQL queries - eliminate N+1 at design
+  concept_5: Pure functions - no side effects in queries
+implementation_considerations:
+  consideration_1: Migration from resolver-based systems
+  consideration_2: Team training on database-centric approach
+  consideration_3: Code review for anti-patterns
+  consideration_4: Architectural decision documentation
+best_practices:
+- name: Never use resolvers
+  description: All data fetching via views and SQL
+- name: Declare authorization
+  description: Compile-time rules, not runtime checks
+- name: Compose views
+  description: Build complex views from base views
+- name: Design for single query
+  description: Think SQL composition not N+1
+anti_patterns:
+- name: Resolver data fetching
+  consequence: Defeats compiled approach
+- name: Runtime authorization
+  consequence: Bypassable security
+- name: View duplication
+  consequence: Maintenance burden
+- name: N+1 in views
+  consequence: Poor performance
+- name: Side effects
+  consequence: Unpredictable behavior
+blog_hooks:
+  beginner:
+    focus: Introduction to FraiseQL Anti-Patterns
+  intermediate:
+    focus: Recognizing and avoiding common mistakes
+  advanced:
+    focus: Advanced architectural patterns and migration strategies

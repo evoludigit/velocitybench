@@ -1,0 +1,43 @@
+[run]
+# Coverage configuration for VelocityBench
+branch = True
+source =
+    database
+    frameworks
+    tests
+
+omit =
+    */tests/*
+    */test_*.py
+    setup.py
+    */venv/*
+    */.venv/*
+
+[report]
+# Minimum coverage thresholds
+fail_under = 70
+precision = 2
+
+# Exclude certain patterns from coverage
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @abstractmethod
+    @abc.abstractmethod
+    except ImportError:
+    except ModuleNotFoundError:
+    if sys.version_info
+    @overload
+
+# Ignore specific files
+ignore_errors = True
+
+[html]
+directory = htmlcov
+
+[xml]
+output = coverage.xml

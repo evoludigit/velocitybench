@@ -1,0 +1,28 @@
+id: cloud-configuration
+name: Cloud Configuration
+category: comprehensive
+type: standard
+tags:
+- cloud
+summary:
+  short: Cloud Configuration and implementation guidelines
+  long: Complete guide to cloud configuration
+problem:
+  description: Challenges without proper cloud configuration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement cloud configuration
+key_concepts:
+  concept: Cloud Configuration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

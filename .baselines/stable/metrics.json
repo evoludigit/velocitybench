@@ -1,0 +1,29 @@
+{
+  "name": "stable",
+  "frameworks": {
+    "fastapi-rest": {
+      "response_time_p50": 12.5,
+      "response_time_p95": 45.2,
+      "response_time_p99": 78.3,
+      "response_time_mean": 18.7,
+      "throughput_rps": 850.2,
+      "error_rate_percent": 0.1
+    },
+    "flask-rest": {
+      "response_time_p50": 15.3,
+      "response_time_p95": 52.1,
+      "response_time_p99": 89.4,
+      "response_time_mean": 21.2,
+      "throughput_rps": 720.5,
+      "error_rate_percent": 0.2
+    },
+    "strawberry-graphql": {
+      "response_time_p50": 18.2,
+      "response_time_p95": 58.7,
+      "response_time_p99": 95.1,
+      "response_time_mean": 24.5,
+      "throughput_rps": 650.3,
+      "error_rate_percent": 0.15
+    }
+  }
+}

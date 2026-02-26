@@ -1,0 +1,28 @@
+id: streaming-verification
+name: Streaming Verification
+category: comprehensive
+type: standard
+tags:
+- streaming
+summary:
+  short: Streaming Verification and implementation guidelines
+  long: Complete guide to streaming verification
+problem:
+  description: Challenges without proper streaming verification
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement streaming verification
+key_concepts:
+  concept: Streaming Verification
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

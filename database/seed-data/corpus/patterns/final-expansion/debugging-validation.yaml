@@ -1,0 +1,28 @@
+id: debugging-validation
+name: Debugging Validation
+category: comprehensive
+type: standard
+tags:
+- debugging
+summary:
+  short: Debugging Validation and implementation guidelines
+  long: Complete guide to debugging validation
+problem:
+  description: Challenges without proper debugging validation
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement debugging validation
+key_concepts:
+  concept: Debugging Validation
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

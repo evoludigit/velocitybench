@@ -1,0 +1,28 @@
+id: databases-maintenance
+name: Databases Maintenance
+category: comprehensive
+type: standard
+tags:
+- databases
+summary:
+  short: Databases Maintenance and implementation guidelines
+  long: Complete guide to databases maintenance
+problem:
+  description: Challenges without proper databases maintenance
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement databases maintenance
+key_concepts:
+  concept: Databases Maintenance
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

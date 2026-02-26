@@ -1,0 +1,28 @@
+id: containers-gotchas
+name: Containers Gotchas
+category: comprehensive
+type: standard
+tags:
+- containers
+summary:
+  short: Containers Gotchas and implementation guidelines
+  long: Complete guide to containers gotchas
+problem:
+  description: Challenges without proper containers gotchas
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement containers gotchas
+key_concepts:
+  concept: Containers Gotchas
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

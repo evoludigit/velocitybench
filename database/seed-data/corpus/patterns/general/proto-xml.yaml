@@ -1,0 +1,31 @@
+id: proto-xml
+name: XML Protocol Patterns
+category: general
+type: standard
+tags:
+- proto
+summary:
+  short: Best practices for xml protocol patterns
+  long: Comprehensive guide to xml protocol patterns. This pattern covers implementation
+    details, best practices, and common pitfalls.
+problem:
+  description: Issues without proper xml protocol patterns
+  symptoms:
+  - Performance issues
+  - Reliability problems
+  - Scalability challenges
+  impact: System degradation
+solution:
+  description: Implement xml protocol patterns effectively
+key_concepts:
+  concept: Understanding xml protocol patterns
+best_practices:
+- name: Best practice 1
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Introduction to XML Protocol Patterns
+  intermediate:
+    focus: Implementing XML Protocol Patterns
+  advanced:
+    focus: Advanced XML Protocol Patterns

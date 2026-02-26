@@ -1,0 +1,28 @@
+id: availability-optimization
+name: Availability Optimization
+category: comprehensive
+type: standard
+tags:
+- availability
+summary:
+  short: Availability Optimization and implementation guidelines
+  long: Complete guide to availability optimization
+problem:
+  description: Challenges without proper availability optimization
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement availability optimization
+key_concepts:
+  concept: Availability Optimization
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

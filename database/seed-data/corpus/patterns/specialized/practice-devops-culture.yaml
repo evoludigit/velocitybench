@@ -1,0 +1,28 @@
+id: practice-devops-culture
+name: Devops Culture Practices
+category: specialized
+type: standard
+tags:
+- practice
+summary:
+  short: Patterns and practices for devops culture practices
+  long: Comprehensive guide to devops culture practices
+problem:
+  description: Challenges with devops culture practices
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement devops culture practices
+key_concepts:
+  concept: Understanding Devops Culture Practices
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Devops Culture Practices
+  intermediate:
+    focus: Implementing Devops Culture Practices
+  advanced:
+    focus: Advanced Devops Culture Practices

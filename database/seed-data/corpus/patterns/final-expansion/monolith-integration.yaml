@@ -1,0 +1,28 @@
+id: monolith-integration
+name: Monolith Integration
+category: comprehensive
+type: standard
+tags:
+- monolith
+summary:
+  short: Monolith Integration and implementation guidelines
+  long: Complete guide to monolith integration
+problem:
+  description: Challenges without proper monolith integration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement monolith integration
+key_concepts:
+  concept: Monolith Integration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

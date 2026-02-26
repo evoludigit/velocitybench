@@ -23,8 +23,8 @@ public class UserService {
         this.userRepository = userRepository;
     }
 
-    public Optional<UserDTO> getUserById(String id) {
-        return userRepository.findById(id)
+    public Optional<UserDTO> getUserById(String uuid) {
+        return userRepository.findByUuid(uuid)
                 .map(this::toDTO);
     }
 

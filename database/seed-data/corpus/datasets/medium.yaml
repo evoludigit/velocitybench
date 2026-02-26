@@ -1,0 +1,166 @@
+# Medium Dataset Configuration
+# Performance-visible dataset for meaningful benchmarking
+
+id: medium
+name: "Medium"
+description: "Dataset sized to reveal performance characteristics and N+1 problems"
+
+# ============================================================
+# COUNTS
+# ============================================================
+counts:
+  users: 10000
+  posts: 50000
+  comments: 200000
+  categories: 20
+  post_categories: 75000     # ~1.5 categories per post
+  user_follows: 100000       # ~10 follows per user
+  post_likes: 500000         # ~10 likes per post
+  user_profiles: 10000       # 1:1 with users
+
+# ============================================================
+# DISTRIBUTIONS
+# ============================================================
+distributions:
+  posts_per_user:
+    type: normal
+    mean: 5
+    std: 3
+    min: 0
+    max: 50
+    description: "Most users have 2-8 posts, power users up to 50"
+
+  comments_per_post:
+    type: exponential
+    lambda: 4
+    min: 0
+    max: 500
+    description: "Long tail - most posts have few comments, some have hundreds"
+
+  nested_comment_probability: 0.20
+  description: "20% of comments are threaded replies"
+
+  followers_distribution:
+    type: power_law
+    alpha: 2.0
+    description: "Realistic social graph - few users have many followers"
+
+# ============================================================
+# PERFORMANCE EXPECTATIONS
+# ============================================================
+performance_expectations:
+  load_time: "30-60 seconds"
+  database_size: "500 MB - 1 GB"
+
+  query_times:
+    simple_lookup: "<5ms"
+    user_with_posts: "10-30ms"
+    nested_3_levels: "50-200ms"
+    n_plus_one_bad: "500-2000ms"
+    n_plus_one_fixed: "20-50ms"
+    full_table_scan: "500ms-2s"
+
+  visibility:
+    n_plus_one_visible: true
+    caching_benefit_visible: true
+    connection_pooling_visible: true
+    index_importance_visible: true
+
+  notes: |
+    Medium dataset is designed to:
+    - Make N+1 problems painfully obvious
+    - Show caching benefits clearly
+    - Reveal missing index problems
+    - Be representative of a real startup (10K users)
+
+# ============================================================
+# N+1 DEMONSTRATION
+# ============================================================
+n_plus_one_demo:
+  description: |
+    With 10K users and 50K posts, N+1 problems become visible:
+
+  example_bad:
+    query: "Fetch 100 posts with authors"
+    queries_executed: 101
+    time: "500-1000ms"
+    explanation: "1 query for posts + 100 queries for authors"
+
+  example_good:
+    query: "Fetch 100 posts with authors (eager loaded)"
+    queries_executed: 1
+    time: "20-50ms"
+    explanation: "Single JOIN query"
+
+  comparison: |
+    At medium scale, the difference is:
+    - Bad: 500-1000ms (user notices delay)
+    - Good: 20-50ms (feels instant)
+    - Ratio: 20-50x improvement
+
+# ============================================================
+# USE CASES
+# ============================================================
+use_cases:
+  - name: "Performance benchmarking"
+    description: "Compare framework performance with visible differences"
+
+  - name: "N+1 detection"
+    description: "Make query problems obvious during development"
+
+  - name: "Cache testing"
+    description: "Demonstrate meaningful cache hit benefits"
+
+  - name: "Startup simulation"
+    description: "Realistic data for a successful early-stage product"
+
+  - name: "Load testing"
+    description: "Stress test with concurrent requests"
+
+# ============================================================
+# REALISTIC DATA PATTERNS
+# ============================================================
+data_patterns:
+  user_activity:
+    active_daily: 10%     # 1,000 users
+    active_weekly: 30%    # 3,000 users
+    active_monthly: 50%   # 5,000 users
+    dormant: 10%          # 1,000 users
+
+  post_engagement:
+    high_engagement: 5%   # 2,500 posts with 50+ comments
+    medium_engagement: 20% # 10,000 posts with 10-50 comments
+    low_engagement: 50%   # 25,000 posts with 1-10 comments
+    no_engagement: 25%    # 12,500 posts with 0 comments
+
+  social_graph:
+    influencers: 1%       # 100 users with 500+ followers
+    regular: 80%          # 8,000 users with 5-50 followers
+    lurkers: 19%          # 1,900 users with 0-5 followers
+
+# ============================================================
+# BLOG HOOKS
+# ============================================================
+blog_hooks:
+  when_to_use: |
+    Use Medium dataset when:
+    - Comparing framework performance
+    - Demonstrating N+1 problems and solutions
+    - Testing caching strategies
+    - Validating query optimization
+    - Running CI/CD benchmarks
+
+  what_to_measure: |
+    Key metrics to track:
+    - Query count per request
+    - p50/p95/p99 response times
+    - Database connection usage
+    - Memory consumption
+    - Cache hit rates
+
+  expected_discoveries: |
+    At medium scale, you'll discover:
+    - Which queries trigger N+1
+    - Where indexes are missing
+    - Which endpoints need caching
+    - Connection pool sizing requirements

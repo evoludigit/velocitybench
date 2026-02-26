@@ -1,0 +1,341 @@
+id: load-balancing
+name: "Load Balancing Strategies & Algorithms"
+category: reliability
+type: standard
+tags:
+  - load-balancing
+  - reliability
+  - scaling
+  - infrastructure
+
+summary:
+  short: "Distributing traffic across multiple servers to improve performance and availability"
+  long: |
+    Load balancing distributes client requests across multiple servers to prevent any single server from becoming a bottleneck. Different algorithms optimize for different goals: round-robin for simplicity, least-connections for fairness, weighted distribution for heterogeneous servers.
+
+problem:
+  description: "Single server becomes bottleneck; traffic exceeds capacity; some users experience slow/failed requests"
+  symptoms:
+    - "Server CPU/memory maxed out; requests timeout"
+    - "Cannot handle traffic spikes"
+    - "Some users get poor performance; others are fine"
+    - "No way to do server maintenance without downtime"
+  impact: "Poor user experience, lost revenue, unavailable service"
+
+solution:
+  description: "Distribute load across multiple servers using load balancing"
+
+load_balancing_layers:
+  dns_level:
+    description: "Multiple IPs returned for single domain name"
+    example: |
+      @ IN A 192.168.1.1
+      @ IN A 192.168.1.2
+      @ IN A 192.168.1.3
+
+      # Client resolves domain; gets one of the IPs randomly
+
+    pros: "Simple; no special infrastructure"
+    cons: "DNS caching means not truly dynamic; no health checks"
+
+  hardware_load_balancer:
+    description: "Dedicated hardware appliance (F5, Citrix)"
+    example: |
+      Client → Load Balancer (hardware) → [Server 1, Server 2, Server 3]
+
+    pros: "High performance; advanced features"
+    cons: "Expensive; requires vendor knowledge"
+
+  software_load_balancer:
+    description: "Software running on server (Nginx, HAProxy)"
+    example: |
+      Client → Nginx (reverse proxy) → [Server 1, Server 2, Server 3]
+
+    pros: "Flexible; customizable; open-source options"
+    cons: "Load balancer itself can be bottleneck"
+
+  application_level:
+    description: "Client-side or application logic chooses server"
+    example: |
+      # Client: round-robin through list of servers
+      servers = ['server1.com', 'server2.com', 'server3.com']
+      chosen = servers[request_count % len(servers)]
+
+algorithms:
+  round_robin:
+    description: "Distribute requests equally, cycling through servers"
+    method: |
+      Request 1 → Server 1
+      Request 2 → Server 2
+      Request 3 → Server 3
+      Request 4 → Server 1 (cycle)
+
+    pros:
+      - "Simple to implement"
+      - "Fair distribution"
+      - "Works for stateless services"
+
+    cons:
+      - "Ignores server capacity"
+      - "One slow server affects all"
+      - "Doesn't account for in-flight requests"
+
+    use_case: "Homogeneous servers, stateless services"
+
+  least_connections:
+    description: "Route to server with fewest active connections"
+    method: |
+      Server 1: 5 connections
+      Server 2: 2 connections  ← Route here
+      Server 3: 8 connections
+
+    pros:
+      - "Accounts for request completion time"
+      - "Better than round-robin for long requests"
+      - "Adapts to varying request durations"
+
+    cons:
+      - "Requires connection tracking"
+      - "Per-connection cost overhead"
+
+    use_case: "Variable request durations (long-poll, streaming)"
+
+  weighted_round_robin:
+    description: "Distribute based on server capacity or speed"
+    method: |
+      Server 1 (weight 3): 60% of traffic
+      Server 2 (weight 2): 40% of traffic
+      Server 3 (weight 1): 20% of traffic
+
+    example: |
+      # Newer, faster server gets more traffic
+      # Older, slower server gets less
+
+    pros:
+      - "Accounts for server differences"
+      - "Can gracefully decommission servers"
+
+    cons:
+      - "Requires manual weight tuning"
+      - "Needs monitoring to adjust weights"
+
+    use_case: "Heterogeneous servers with varying capacity"
+
+  least_loaded:
+    description: "Route to server with lowest CPU/memory usage"
+    method: |
+      Server 1: 45% CPU
+      Server 2: 20% CPU  ← Route here
+      Server 3: 60% CPU
+
+    pros:
+      - "Balances actual server load"
+      - "Prevents overload of fast servers"
+
+    cons:
+      - "Requires continuous metric collection"
+      - "Metrics may lag (out of date)"
+      - "Highest overhead"
+
+    use_case: "CPU-intensive workloads; varied request costs"
+
+  ip_hash:
+    description: "Same user always goes to same server (sticky)"
+    method: |
+      hash(client_ip) % num_servers = server_index
+      User from 192.168.1.100 always goes to Server 2
+
+    pros:
+      - "Session affinity without explicit tracking"
+      - "Useful for stateful applications"
+
+    cons:
+      - "Uneven distribution if few clients"
+      - "Affects cache efficiency across servers"
+      - "Requires consistent hash for scaling"
+
+    use_case: "Stateful services (sessions, caches)"
+
+consistent_hashing:
+    description: "Hash-based routing that handles server changes gracefully"
+    problem_with_modulo: |
+      With 3 servers: hash(key) % 3 = server
+      Add 4th server: hash(key) % 4 changes everything
+      All cache entries invalidated; cache misses spike
+
+    solution: |
+      # Consistent hash ring
+      - Map servers on ring
+      - Map cache keys on same ring
+      - Key goes to nearest server clockwise
+      - Adding server: only affects subset of keys
+
+    pros:
+      - "Minimal disruption when servers added/removed"
+      - "Better for distributed caches"
+
+    cons:
+      - "More complex to implement"
+      - "Still some uneven distribution possible"
+
+    use_case: "Distributed caches, highly available systems"
+
+health_checks:
+    description: "Verify server is healthy before routing traffic"
+    active_health_check: |
+      # Load balancer periodically tests server
+      GET /health HTTP/1.1
+      Response: 200 OK
+      → Server is healthy, route traffic
+
+    passive_health_check: |
+      # Monitor requests to server
+      If 3 consecutive requests fail: mark unhealthy
+      If request succeeds: mark healthy again
+
+    failure_detection: |
+      - Connection refused: server down
+      - Response timeout: server slow
+      - 5xx response: server error
+      - Custom endpoint: application health
+
+    recovery: |
+      Unhealthy servers taken out of rotation
+      Periodically recheck to bring back online
+
+session_persistence:
+  problem: |
+    User logs in to Server 1 (session stored in memory)
+    Next request routed to Server 2 (no session)
+    User sees "not logged in" error
+
+  solution_sticky_sessions: |
+    Route same user to same server always
+    - IP hash
+    - Cookie-based routing
+    - URL routing
+
+    downside: |
+      If server dies, user's session is lost
+      Cannot easily upgrade/replace servers
+
+  solution_shared_session_store: |
+    All servers access same session storage (Redis, database)
+    Any server can handle any request
+    Session not tied to specific server
+
+    benefit: |
+      Server failures don't lose sessions
+      Can scale independently
+      Better for rolling deployments
+
+  solution_stateless: |
+    No session on server or shared store
+    Client carries session token (JWT, signed cookie)
+    Server verifies token on each request
+
+    benefit: |
+      Most scalable
+      No session loss on server failure
+      Server-side scaling trivial
+
+traffic_distribution:
+  blue_green_deployment: |
+    # Route traffic between two environments
+    Blue: current version (100%)
+    Green: new version (0%)
+
+    # Switch percentage gradually
+    Blue: 95%, Green: 5%
+    Blue: 50%, Green: 50%
+    Blue: 0%, Green: 100%
+
+  canary_deployment: |
+    # Route small % to new version
+    Stable: 95%
+    Canary: 5%
+
+    # Monitor metrics
+    If canary error rate > threshold: rollback
+    Else gradually increase canary percentage
+
+monitoring_and_alerts:
+  metrics: |
+    - Request count per server
+    - Response time per server
+    - Error rate per server
+    - Connection count per server
+    - Server CPU/memory
+
+  alerts: |
+    - Server health check fails
+    - Server response time > threshold
+    - Server error rate > threshold
+    - All servers at capacity
+
+best_practices:
+  - name: "Use health checks"
+    description: "Detect failures quickly; remove unhealthy servers"
+
+  - name: "Choose algorithm based on use case"
+    description: "Simple case: round-robin; stateful: sticky; varied load: least-connections"
+
+  - name: "Plan for server failure"
+    description: "Load balancer must handle server going down"
+
+  - name: "Make servers stateless when possible"
+    description: "Eliminates session affinity complexity"
+
+  - name: "Monitor load distribution"
+    description: "Verify traffic is actually balanced"
+
+  - name: "Have fallback servers"
+    description: "Prevent complete outage if all primary servers fail"
+
+  - name: "Scale load balancer itself"
+    description: "Load balancer can become bottleneck"
+
+  - name: "Test failover"
+    description: "Verify system works if load balancer fails"
+
+anti_patterns:
+  - name: "Load balancer as single point of failure"
+    consequence: "All traffic lost if load balancer dies"
+    fix: "Load balancer redundancy (active/passive or active/active)"
+
+  - name: "No health checks"
+    consequence: "Traffic routes to dead servers; users see errors"
+    fix: "Implement active health checks"
+
+  - name: "Sticky sessions without shared state"
+    consequence: "Server failure loses all sessions"
+    fix: "Use shared session store or stateless sessions"
+
+  - name: "Uneven distribution"
+    consequence: "Some servers overloaded; others idle"
+    fix: "Use weighted or least-connections algorithm"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Load balancing is like a restaurant with multiple cashiers:
+      - One cashier: long lines, slow service
+      - Multiple cashiers: short lines, fast service
+      - Smart dispatcher: sends customers to shortest line (least-connections)
+      - If cashier is slow: send to faster one (weighted)
+
+  intermediate:
+    focus: "Load balancing algorithms"
+    key_points:
+      - "Round-robin vs least-connections vs weighted"
+      - "Session affinity and shared state"
+      - "Health checks and failure detection"
+      - "Canary and blue-green deployments"
+
+  advanced:
+    focus: "Complex load balancing scenarios"
+    key_points:
+      - "Consistent hashing for distributed systems"
+      - "Load balancer redundancy"
+      - "Geographic load balancing"
+      - "Overload protection and backpressure"

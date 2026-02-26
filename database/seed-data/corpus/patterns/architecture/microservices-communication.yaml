@@ -1,0 +1,217 @@
+# Microservices Communication Patterns
+# VelocityBench Knowledge Corpus
+
+id: microservices-communication
+name: "Microservices Communication Patterns"
+category: architecture
+type: pattern
+tags:
+  - microservices
+  - api
+  - messaging
+  - events
+  - grpc
+
+summary:
+  short: "How microservices communicate: sync vs async, REST vs gRPC vs messaging"
+  long: |
+    Microservices need to communicate with each other. The two main approaches are
+    synchronous (request-response) and asynchronous (events/messaging). Synchronous
+    is simpler but creates coupling; async is more resilient but more complex.
+    Understanding these patterns is essential for distributed system design.
+
+communication_styles:
+  - name: "Synchronous (Request-Response)"
+    description: "Service A calls Service B and waits for response"
+    protocols:
+      - "REST/HTTP"
+      - "gRPC"
+      - "GraphQL"
+    pros:
+      - "Simple to understand"
+      - "Immediate response"
+      - "Easy to debug"
+    cons:
+      - "Tight temporal coupling"
+      - "Cascading failures"
+      - "Latency accumulates"
+    patterns:
+      - name: "Direct Service-to-Service"
+        description: "Services call each other directly"
+        diagram: |
+          Service A → Service B → Service C
+        issues: "Coupling, discovery needed"
+
+      - name: "API Gateway"
+        description: "Single entry point routes to services"
+        diagram: |
+          Client → Gateway → Service A
+                          → Service B
+        benefits: "Centralized auth, routing, rate limiting"
+
+  - name: "Asynchronous (Event-Driven)"
+    description: "Services communicate via messages/events"
+    technologies:
+      - "RabbitMQ"
+      - "Apache Kafka"
+      - "AWS SQS/SNS"
+      - "Redis Pub/Sub"
+    pros:
+      - "Loose coupling"
+      - "Resilient to failures"
+      - "Scalable"
+    cons:
+      - "Eventual consistency"
+      - "Harder to debug"
+      - "Message ordering challenges"
+    patterns:
+      - name: "Pub/Sub (Publish-Subscribe)"
+        description: "Publishers emit events, subscribers listen"
+        diagram: |
+          Order Service → [Order Created Event] → Inventory Service
+                                                → Notification Service
+                                                → Analytics Service
+
+      - name: "Message Queue"
+        description: "Point-to-point message delivery"
+        diagram: |
+          Producer → [Queue] → Consumer
+        use_case: "Work distribution, job processing"
+
+      - name: "Event Sourcing"
+        description: "Store events as source of truth"
+        diagram: |
+          Command → Event Store → [Events] → Projections
+        use_case: "Audit logs, temporal queries"
+
+sync_protocols:
+  - name: "REST"
+    description: "HTTP + JSON, resource-oriented"
+    when_to_use:
+      - "Public APIs"
+      - "Browser clients"
+      - "Simple CRUD operations"
+    example: |
+      GET /api/users/123
+      POST /api/orders { "user_id": 123, "items": [...] }
+
+  - name: "gRPC"
+    description: "Protocol Buffers + HTTP/2, typed contracts"
+    when_to_use:
+      - "Internal service-to-service"
+      - "High throughput requirements"
+      - "Streaming data"
+    example: |
+      // user.proto
+      service UserService {
+        rpc GetUser(GetUserRequest) returns (User);
+        rpc ListUsers(ListUsersRequest) returns (stream User);
+      }
+
+  - name: "GraphQL"
+    description: "Query language, client specifies data needs"
+    when_to_use:
+      - "Frontend-backend communication"
+      - "Aggregating multiple services"
+      - "Mobile apps (bandwidth optimization)"
+
+async_patterns:
+  - name: "Choreography"
+    description: "Services react to events independently"
+    diagram: |
+      Order Created → Inventory reserves stock
+                   → Payment processes charge
+                   → Notification sends email
+    pros: "Loose coupling, services are independent"
+    cons: "Hard to track overall flow, eventual consistency"
+
+  - name: "Orchestration"
+    description: "Central coordinator manages workflow"
+    diagram: |
+      Order Orchestrator:
+        1. Call Inventory.reserve()
+        2. Call Payment.charge()
+        3. Call Notification.send()
+    pros: "Clear flow, easier to manage"
+    cons: "Orchestrator is single point of failure"
+
+  - name: "Saga Pattern"
+    description: "Distributed transaction as sequence of local transactions"
+    types:
+      - name: "Choreography Saga"
+        flow: |
+          Order Service → emits OrderCreated
+          Inventory Service → listens, reserves, emits StockReserved
+          Payment Service → listens, charges, emits PaymentProcessed
+          On failure: Each service emits compensating event
+
+      - name: "Orchestration Saga"
+        flow: |
+          Saga Orchestrator:
+            1. Create Order
+            2. Reserve Inventory (rollback: release)
+            3. Process Payment (rollback: refund)
+            4. Confirm Order
+
+resilience_patterns:
+  - name: "Circuit Breaker"
+    description: "Stop calling failing service temporarily"
+    states: ["Closed", "Open", "Half-Open"]
+    example: |
+      const breaker = new CircuitBreaker(callService, {
+        failureThreshold: 5,
+        resetTimeout: 30000
+      });
+
+      try {
+        await breaker.fire(request);
+      } catch (e) {
+        // Circuit open - use fallback
+      }
+
+  - name: "Retry with Backoff"
+    description: "Retry failed requests with increasing delays"
+    example: |
+      async function retryWithBackoff(fn, maxRetries = 3) {
+        for (let i = 0; i < maxRetries; i++) {
+          try {
+            return await fn();
+          } catch (e) {
+            await sleep(Math.pow(2, i) * 1000); // 1s, 2s, 4s
+          }
+        }
+        throw new Error('Max retries exceeded');
+      }
+
+  - name: "Bulkhead"
+    description: "Isolate failures to prevent cascade"
+    example: "Separate thread pools for different services"
+
+  - name: "Timeout"
+    description: "Set maximum wait time for responses"
+    best_practice: "Always set timeouts on external calls"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Microservice communication is like office communication:
+      - Sync (REST/gRPC): Phone call - you wait for an answer
+      - Async (Events): Email - send and continue working, they reply when ready
+      - Message Queue: Inbox tray - tasks pile up, processed when available
+      - Pub/Sub: Company newsletter - sent once, everyone who's subscribed reads it
+
+  intermediate:
+    focus: "Choosing sync vs async communication"
+    key_points:
+      - "When to use REST vs gRPC"
+      - "Event-driven architecture basics"
+      - "Handling eventual consistency"
+      - "Service discovery patterns"
+
+  advanced:
+    focus: "Resilient distributed communication"
+    key_points:
+      - "Saga pattern for distributed transactions"
+      - "Circuit breaker implementation"
+      - "Event sourcing and CQRS"
+      - "Distributed tracing"

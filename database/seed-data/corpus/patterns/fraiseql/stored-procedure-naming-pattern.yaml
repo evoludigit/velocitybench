@@ -1,0 +1,49 @@
+id: stored-procedure-naming-pattern
+name: Stored Procedure Naming (fn_*)
+category: fraiseql
+type: standard
+tags:
+- schema
+- naming
+- conventions
+- stored-procedures
+summary:
+  short: Prefixing stored procedures with fn_* for mutation actions
+  long: Stored procedures implementing mutation actions are prefixed with fn_* to
+    indicate they are functions, not views.
+problem:
+  description: Function vs view distinction unclear
+  symptoms:
+  - Hard to find mutation logic
+  - Confusion about what's callable
+  - No clear procedure naming
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Stored Procedure Naming (fn_*) effectively
+key_concepts:
+  concept_1: Procedure naming convention
+  concept_2: Action pattern
+  concept_3: Procedure discovery
+implementation_considerations:
+  consideration_1: Naming clarity
+  consideration_2: Action verb usage
+  consideration_3: Function variants
+best_practices:
+- name: Use fn_* prefix
+  description: Prefix mutation procedures with fn_
+- name: Action verbs
+  description: Use clear action verbs (create, update, delete)
+- name: Discover easily
+  description: Make procedures easy to find
+anti_patterns:
+- name: No prefix
+  consequence: Procedures hard to find
+- name: Vague names
+  consequence: Unclear what procedures do
+blog_hooks:
+  beginner:
+    focus: Introduction to Stored Procedure Naming (fn_*)
+  intermediate:
+    focus: Implementing Stored Procedure Naming (fn_*)
+  advanced:
+    focus: Advanced Stored Procedure Naming (fn_*) techniques

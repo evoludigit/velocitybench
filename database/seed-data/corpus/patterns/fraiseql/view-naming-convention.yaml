@@ -1,0 +1,49 @@
+id: view-naming-convention
+name: View Naming Convention (v_*, tv_*, mv_*, av_*)
+category: fraiseql
+type: standard
+tags:
+- schema
+- naming
+- conventions
+- views
+summary:
+  short: Prefixing views with v_*, tv_*, mv_*, av_* to indicate view type
+  long: 'Views are prefixed to indicate their type: v_* for base views, tv_* for table-backed
+    views, mv_* for materialized views, av_* for arrow (columnar) views.'
+problem:
+  description: View purpose and type unclear
+  symptoms:
+  - Hard to understand view semantics
+  - Don't know if view is materialized
+  - Unclear what data view contains
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement View Naming Convention (v_*, tv_*, mv_*, av_*) effectively
+key_concepts:
+  concept_1: View type taxonomy
+  concept_2: Naming convention mapping
+  concept_3: Convention usage
+implementation_considerations:
+  consideration_1: View performance characteristics
+  consideration_2: Materialization strategy
+  consideration_3: Column projection
+best_practices:
+- name: Use prefixes
+  description: Prefix views with type indicator
+- name: Be consistent
+  description: Always use same prefix for type
+- name: Document types
+  description: Explain what each prefix means
+anti_patterns:
+- name: No prefixes
+  consequence: View type unclear
+- name: Inconsistent prefixes
+  consequence: Confusion about view types
+blog_hooks:
+  beginner:
+    focus: Introduction to View Naming Convention (v_*, tv_*, mv_*, av_*)
+  intermediate:
+    focus: Implementing View Naming Convention (v_*, tv_*, mv_*, av_*)
+  advanced:
+    focus: Advanced View Naming Convention (v_*, tv_*, mv_*, av_*) techniques

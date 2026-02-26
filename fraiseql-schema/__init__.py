@@ -1,0 +1,1 @@
+"""FraiseQL Schema Package."""

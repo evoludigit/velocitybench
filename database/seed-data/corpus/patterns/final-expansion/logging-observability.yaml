@@ -1,0 +1,28 @@
+id: logging-observability
+name: Logging Observability
+category: comprehensive
+type: standard
+tags:
+- logging
+summary:
+  short: Logging Observability and implementation guidelines
+  long: Complete guide to logging observability
+problem:
+  description: Challenges without proper logging observability
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement logging observability
+key_concepts:
+  concept: Logging Observability
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

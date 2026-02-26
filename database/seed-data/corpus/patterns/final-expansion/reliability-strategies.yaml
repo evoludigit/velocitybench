@@ -1,0 +1,28 @@
+id: reliability-strategies
+name: Reliability Strategies
+category: comprehensive
+type: standard
+tags:
+- reliability
+summary:
+  short: Reliability Strategies and implementation guidelines
+  long: Complete guide to reliability strategies
+problem:
+  description: Challenges without proper reliability strategies
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement reliability strategies
+key_concepts:
+  concept: Reliability Strategies
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

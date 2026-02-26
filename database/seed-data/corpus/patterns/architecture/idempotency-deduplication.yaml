@@ -1,0 +1,136 @@
+id: idempotency-deduplication
+name: "Idempotency & Deduplication"
+category: architecture
+type: pattern
+tags:
+  - api
+  - reliability
+  - idempotency
+  - retry
+  - distributed-systems
+
+summary:
+  short: "Ensuring safe retries and preventing duplicate operations in distributed systems"
+  long: |
+    Network failures force clients to retry requests, but naive retries can cause duplicate operations (charging twice, posting twice). Idempotency makes operations safe to retry without side effects. Deduplication catches and prevents duplicates when idempotency isn't possible.
+
+problem:
+  description: "Network failures cause clients to retry, risking duplicate operations and data corruption"
+  symptoms:
+    - name: "Duplicate charges"
+      description: "Payment processed twice due to retry"
+    - name: "Duplicate posts"
+      description: "Content posted multiple times"
+    - name: "Race conditions"
+      description: "Two requests with same data create two records"
+    - name: "User frustration"
+      description: "Retries cause unpredictable side effects"
+
+solution:
+  approach: "Make operations idempotent using idempotency keys; deduplicate requests server-side"
+  key_points:
+    - "Require idempotency keys on mutation endpoints"
+    - "Store completed requests to detect duplicates"
+    - "Design operations to be idempotent (safe to repeat)"
+    - "Return same response for duplicate requests"
+    - "Clean up completed request records after retention period"
+
+idempotency_keys:
+  definition: "Client-generated unique identifier for a request, allowing server to detect retries"
+
+  format: "UUID or hash(request_body + timestamp + client_id)"
+  lifetime: "Associated with request from creation until success or permanent failure"
+  scope: "Per-endpoint or per-client"
+
+  implementation:
+    header: "Idempotency-Key: 550e8400-e29b-41d4-a716-446655440000"
+    storage: "Redis with TTL or database record"
+    lookup: "Check if Idempotency-Key already processed before handling request"
+
+idempotency_patterns:
+  - name: "Idempotent Operations by Design"
+    description: "Operations naturally safe to repeat (e.g., PUT, DELETE)"
+    example: "PUT /users/123 { name: 'Bob' } - idempotent, safe to retry"
+    cost: "Design work upfront"
+
+  - name: "Idempotency Keys + State Machine"
+    description: "Use state machine to track request progress"
+    example: "POST /payments with idempotency key"
+    states: ["pending", "processing", "completed", "failed"]
+    cost: "Moderate complexity"
+
+  - name: "Request Deduplication"
+    description: "Store completed requests, return cached response for duplicates"
+    example: "Store request_id → response_body mapping"
+    cost: "Storage and lookup overhead"
+
+  - name: "Distributed Ledger"
+    description: "Immutable log of operations for audit trail"
+    example: "Blockchain or event log append"
+    cost: "High: requires consensus"
+
+deduplication_storage:
+  - name: "In-Memory Cache (Redis)"
+    retention: "Minutes to hours"
+    cost: "Fast, limited capacity"
+    use_case: "High-volume APIs, short retention"
+
+  - name: "Relational Database"
+    retention: "Hours to days"
+    cost: "Durable, moderate performance"
+    use_case: "Critical operations, longer retention"
+
+  - name: "Distributed Cache"
+    retention: "Same as Redis, but replicated"
+    cost: "High availability, eventual consistency"
+    use_case: "Multi-region systems"
+
+  - name: "Append-Only Log"
+    retention: "Permanent"
+    cost: "Highest storage, perfect audit trail"
+    use_case: "Financial systems, compliance"
+
+cleanup_strategies:
+  - "Soft expiration: mark as stale after TTL, hard-delete after 30 days"
+  - "Tiered storage: cache in Redis, archive to database after 1 day"
+  - "Partitioned logs: delete entire partitions of old requests"
+  - "Monitoring: alert if deduplication cache grows unexpectedly"
+
+idempotence_guarantees:
+  - name: "Exactly-Once Semantics"
+    description: "Operation executes exactly once despite retries"
+    requirements: ["Idempotency keys", "Deduplication storage"]
+    cost: "Storage overhead, complexity"
+
+  - name: "At-Least-Once Semantics"
+    description: "Operation executes >= 1 time"
+    requirements: ["Retry logic", "Idempotent design or dedup"]
+    cost: "Moderate, most common"
+
+  - name: "At-Most-Once Semantics"
+    description: "Operation executes <= 1 time"
+    requirements: ["Careful request handling", "No retries"]
+    cost: "Low, but poor user experience"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Idempotency is like pressing an elevator button:
+      - Without idempotency: Each press adds another floor stop (duplicate work)
+      - With idempotency: Multiple presses = same destination (no duplicates)
+
+      Safe to press multiple times; same outcome every time.
+
+  intermediate:
+    focus: "Implementing idempotent APIs"
+    key_points:
+      - "Idempotency key design and lifecycle"
+      - "State machines for request tracking"
+      - "Deduplication storage strategies"
+
+  advanced:
+    focus: "Exactly-once semantics at scale"
+    key_points:
+      - "Distributed deduplication across regions"
+      - "Consensus algorithms for mutation ordering"
+      - "Balancing correctness vs performance"

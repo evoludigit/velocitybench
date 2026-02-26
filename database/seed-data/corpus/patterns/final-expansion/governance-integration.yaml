@@ -1,0 +1,28 @@
+id: governance-integration
+name: Governance Integration
+category: comprehensive
+type: standard
+tags:
+- governance
+summary:
+  short: Governance Integration and implementation guidelines
+  long: Complete guide to governance integration
+problem:
+  description: Challenges without proper governance integration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement governance integration
+key_concepts:
+  concept: Governance Integration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,156 @@
+id: bulk-operations
+name: "Bulk Operations & Batch APIs"
+category: architecture
+type: pattern
+tags:
+  - api
+  - performance
+  - bulk
+  - batch
+  - scalability
+
+summary:
+  short: "Efficiently handling batch operations without overwhelming resources"
+  long: |
+    Bulk operations (inserting 1000s of records, updating many objects) require special handling to avoid resource exhaustion. Batch APIs balance throughput with server stability by accepting multiple items per request and processing them efficiently.
+
+problem:
+  description: "Handling many small operations individually is slow; bulk requests risk overwhelming server"
+  symptoms:
+    - name: "Slow bulk uploads"
+      description: "Uploading 1000 items one-by-one takes minutes"
+    - name: "Server overload"
+      description: "Receiving 1000 concurrent requests causes resource exhaustion"
+    - name: "Transaction overhead"
+      description: "Each individual operation has setup/teardown costs"
+    - name: "Network latency"
+      description: "Round-trip time dominates for high-volume operations"
+
+solution:
+  approach: "Provide bulk/batch endpoints that accept arrays and process efficiently with configurable limits"
+  key_points:
+    - "Accept multiple items per request (array parameter)"
+    - "Set reasonable batch size limits (e.g., 1000 items max)"
+    - "Process in single transaction when possible"
+    - "Provide detailed error feedback per item"
+    - "Consider async processing for large batches"
+
+batch_api_patterns:
+  - name: "Synchronous Bulk Insert"
+    endpoint: "POST /api/users/bulk"
+    payload: |
+      {
+        "items": [
+          { "name": "Alice", "email": "alice@example.com" },
+          { "name": "Bob", "email": "bob@example.com" }
+        ]
+      }
+    response: "Array of created items with IDs"
+    latency: "Synchronous (100ms - 10s)"
+    use_case: "Small batches (< 1000 items)"
+
+  - name: "Asynchronous Bulk Operation"
+    endpoint: "POST /api/imports"
+    payload: "Large file upload or streaming data"
+    response: "Import job ID; client polls for progress"
+    latency: "Minutes to hours"
+    use_case: "Large batches (1000+ items), heavy processing"
+
+  - name: "Streaming Bulk Operations"
+    protocol: "HTTP/2 Server-Sent Events (SSE) or WebSocket"
+    flow: "Client streams items; server sends results back"
+    latency: "Real-time feedback as items process"
+    use_case: "Real-time bulk operations with feedback"
+
+batch_size_limits:
+  - name: "Request Size"
+    limit: "10MB payload max"
+    rationale: "Prevent memory exhaustion, parsing overhead"
+    example: "1000 items × 10KB each = 10MB max"
+
+  - name: "Item Count"
+    limit: "1000 items per request"
+    rationale: "Balance throughput vs database constraints"
+    example: "10K items = 10 requests of 1K each"
+
+  - name: "Processing Time"
+    limit: "30 second timeout"
+    rationale: "HTTP timeout; long operations should be async"
+    example: "Bulk validation timeout after 30s"
+
+  - name: "Concurrent Requests"
+    limit: "10 concurrent bulk requests per client"
+    rationale: "Prevent resource hoarding"
+    example: "Client A limited to 10 parallel imports"
+
+error_handling:
+  - name: "Fail-Fast"
+    behavior: "Stop on first error, return error immediately"
+    tradeoff: "Simple, but client doesn't know impact"
+    use_case: "Validation errors (bad schema, unauthorized)"
+
+  - name: "Partial Success"
+    behavior: "Process all items, report success/failure per item"
+    tradeoff: "Requires cleanup on failure, but complete feedback"
+    use_case: "Data import, bulk updates"
+    response: |
+      {
+        "total": 100,
+        "success": 98,
+        "failed": 2,
+        "errors": [
+          { "index": 5, "error": "Duplicate email" },
+          { "index": 47, "error": "Invalid format" }
+        ]
+      }
+
+  - name: "Transaction Rollback"
+    behavior: "Atomicity: all succeed or all fail"
+    tradeoff: "Clean state, but can lose work if one item fails"
+    use_case: "Financial transactions, inventory updates"
+
+optimization_strategies:
+  - "Batch database operations: 1 INSERT with VALUES() vs N INSERTs"
+  - "Bulk insert performance: 1000 rows/s vs 1 row/s"
+  - "Index deferred: disable during bulk insert, rebuild after"
+  - "Connection pooling: reuse connections for repeated queries"
+  - "Compression: GZIP payloads to reduce bandwidth"
+  - "Parallel processing: process independent batches in parallel"
+
+async_bulk_patterns:
+  - name: "Job Queue"
+    tool: "Celery, Bull, Sidekiq"
+    flow: "Accept request → queue job → return job_id → client polls"
+    monitoring: "Track progress, estimate completion time"
+
+  - name: "Webhook Notifications"
+    flow: "Process async → call client's webhook when done"
+    reliability: "Retry webhook if client unreachable"
+
+  - name: "Event Stream"
+    tool: "Kafka, RabbitMQ"
+    flow: "Publish items to stream; separate consumers process"
+    scaling: "Scale consumers independently"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Bulk operations are like grocery shopping:
+      - Without bulk: Buy 1 apple at a time (slow)
+      - With bulk: Buy 100 apples at once (efficient)
+
+      One trip is better than 100 trips; same destination, different scale.
+
+  intermediate:
+    focus: "Designing batch APIs"
+    key_points:
+      - "Batch size limits and rationale"
+      - "Error handling strategies (fail-fast vs partial success)"
+      - "Async processing for large batches"
+
+  advanced:
+    focus: "High-performance bulk processing"
+    key_points:
+      - "Database-level bulk optimization"
+      - "Distributed processing and load balancing"
+      - "Exactly-once semantics in async processing"

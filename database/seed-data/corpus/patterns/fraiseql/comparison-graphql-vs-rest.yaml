@@ -1,0 +1,477 @@
+id: comparison-graphql-vs-rest
+name: "Architectural Comparison: GraphQL vs REST API Design"
+category: fraiseql
+type: comparison
+tags:
+  - framework-comparison
+  - api-architecture
+  - graphql
+  - rest
+  - design-patterns
+
+summary:
+  short: "Compare GraphQL and REST as fundamental API architecture choices"
+  long: |
+    Teams building APIs face a fundamental choice: REST (familiar, simple, proven) or GraphQL
+    (flexible, type-safe, precise). This comparison evaluates both approaches with real-world trade-offs.
+    Neither is universally better; the choice depends on data fetching patterns, team knowledge, and
+    client complexity. FraiseQL is a GraphQL framework, so this comparison explains when GraphQL
+    is the right choice and when REST might be better.
+
+problem:
+  description: |
+    API design is critical because:
+    - Client complexity: How much work is client-side?
+    - Bandwidth efficiency: Overfetching vs precise queries
+    - Type safety: How strong are guarantees?
+    - Developer experience: Learning curve, tooling, documentation
+    - Operational complexity: Caching, versioning, monitoring
+    - Team expertise: What do developers know?
+
+comparison:
+  approach_1:
+    name: "REST (Representational State Transfer)"
+    philosophy: "Resources accessed via URLs, HTTP verbs define operations, JSON responses"
+
+    workflow: |
+      REST API design:
+      1. Model resources as nouns (users, posts, comments)
+      2. Create endpoints for each resource
+      3. Use HTTP verbs (GET, POST, PUT, DELETE) for operations
+      4. Client fetches what it needs via multiple requests
+
+      Example REST API:
+      ```
+      GET    /users                    # List users
+      GET    /users/:id                # Get user
+      POST   /users                    # Create user
+      PUT    /users/:id                # Update user
+      DELETE /users/:id                # Delete user
+
+      GET    /users/:id/posts          # Get user's posts
+      GET    /posts/:id                # Get post
+      GET    /posts/:id/comments       # Get post's comments
+      ```
+
+      Client usage:
+      ```javascript
+      // Get user
+      const user = await fetch('/users/123');
+
+      // Get user's posts
+      const posts = await fetch('/users/123/posts');
+
+      // Get first post's comments
+      const comments = await fetch('/posts/456/comments?page=1&limit=10');
+      ```
+
+    architecture: "Multiple endpoints (one per resource type)"
+    query_flexibility: "Low (endpoint defines what you get)"
+    data_fetching: "Multi-request (client coordinates multiple calls)"
+
+    pros:
+      - "Simple to understand (HTTP + JSON is familiar)"
+      - "Easy to build (CRUD endpoints, straightforward)"
+      - "Well-understood caching (HTTP caches work naturally)"
+      - "Browser-friendly (GET requests work in browser)"
+      - "Familiar to most developers (decades of REST APIs)"
+      - "Tooling mature (Postman, curl, standard HTTP tools)"
+      - "Stateless (each request is independent)"
+
+    cons:
+      - "Overfetching (endpoint returns all fields, not just what's needed)"
+      - "Underfetching (must fetch related data via separate requests)"
+      - "N+1 problem (get user, then get their posts, then comments)"
+      - "No type safety in response (JSON can have any shape)"
+      - "Versioning nightmare (need /v1/, /v2/ as API evolves)"
+      - "Client dependency (when to fetch what is client's problem)"
+      - "Bandwidth waste (overfetching on mobile is expensive)"
+
+    best_for: "Simple CRUD APIs, public APIs with stable contract, teams new to APIs"
+    developer_experience: "Familiar but repetitive (lots of HTTP boilerplate)"
+    scaling_challenges: "Overfetching waste, N+1 coordination"
+
+  approach_2:
+    name: "GraphQL (Query Language for APIs)"
+    philosophy: "Single endpoint, queries define what data you get, strongly typed schema"
+
+    workflow: |
+      GraphQL API design:
+      1. Define schema (types, relationships, queries, mutations)
+      2. Implement resolvers (code to fetch data)
+      3. Client sends query requesting exactly what it needs
+      4. Server responds with exactly that (no more, no less)
+
+      Example GraphQL schema:
+      ```graphql
+      type User {
+        id: ID!
+        email: String!
+        posts: [Post!]!
+      }
+
+      type Post {
+        id: ID!
+        title: String!
+        user: User!
+        comments: [Comment!]!
+      }
+
+      type Query {
+        user(id: ID!): User
+        post(id: ID!): Post
+      }
+      ```
+
+      Client usage (single query):
+      ```graphql
+      query GetUserWithPosts($userId: ID!) {
+        user(id: $userId) {
+          id
+          email
+          posts {
+            id
+            title
+            comments {
+              id
+              text
+            }
+          }
+        }
+      }
+      ```
+
+      Response matches query exactly:
+      ```json
+      {
+        "data": {
+          "user": {
+            "id": "123",
+            "email": "alice@example.com",
+            "posts": [
+              {
+                "id": "456",
+                "title": "First Post",
+                "comments": [...]
+              }
+            ]
+          }
+        }
+      }
+      ```
+
+    architecture: "Single endpoint, query-driven responses"
+    query_flexibility: "High (client requests exactly what it needs)"
+    data_fetching: "Single request (all related data in one query)"
+
+    pros:
+      - "No overfetching (client requests only what it needs)"
+      - "No underfetching (can request nested relationships)"
+      - "Single request (get user + posts + comments in one call)"
+      - "Type-safe schema (schema is source of truth)"
+      - "No versioning needed (schema is additive, clients choose fields)"
+      - "Excellent developer experience (GraphiQL explores schema)"
+      - "Efficient queries (JSONB composition prevents N+1)"
+
+    cons:
+      - "Steeper learning curve (GraphQL syntax, schema design)"
+      - "Complex to implement (resolvers, batching, N+1 prevention)"
+      - "Query complexity limits needed (prevent expensive queries)"
+      - "HTTP caching harder (single endpoint, POST requests)"
+      - "Monitoring more complex (need to inspect queries)"
+      - "Security tricky (query complexity attacks, introspection)"
+      - "Team dependency (GraphQL knowledge required)"
+
+    best_for: "Flexible APIs, mobile clients (bandwidth matters), multiple client types"
+    developer_experience: "Steeper initially, powerful once learned"
+    scaling_challenges: "Query complexity, N+1 prevention, distributed tracing"
+
+  approach_3:
+    name: "gRPC (High-Performance RPC)"
+    philosophy: "Binary protocol, strong typing, streaming, low latency"
+
+    workflow: |
+      gRPC design:
+      1. Define services in .proto files (Protocol Buffers)
+      2. Compile to language-specific code
+      3. Client calls methods on service stub
+      4. Binary serialization (not JSON)
+
+      Example gRPC definition:
+      ```protobuf
+      service UserService {
+        rpc GetUser(GetUserRequest) returns (User) {}
+        rpc ListPosts(ListPostsRequest) returns (stream Post) {}
+      }
+
+      message GetUserRequest {
+        string user_id = 1;
+      }
+
+      message User {
+        string id = 1;
+        string email = 2;
+        repeated Post posts = 3;
+      }
+      ```
+
+      Client usage:
+      ```go
+      client := NewUserServiceClient(conn)
+      user, err := client.GetUser(ctx, &GetUserRequest{UserId: "123"})
+
+      // Or streaming
+      stream, _ := client.ListPosts(ctx, &ListPostsRequest{UserId: "123"})
+      for {
+        post, err := stream.Recv()
+        // ...
+      }
+      ```
+
+    architecture: "RPC-style, method calls on services"
+    query_flexibility: "Medium (defined methods, not query-driven)"
+    data_fetching: "Single method call, can stream results"
+
+    pros:
+      - "Extremely fast (binary protocol, minimal overhead)"
+      - "Strongly typed (type-safe by design)"
+      - "Efficient bandwidth (binary serialization)"
+      - "Streaming support (bidirectional real-time)"
+      - "Code generation (automatic client/server stubs)"
+      - "Excellent for microservices (service-to-service)"
+
+    cons:
+      - "Not browser-friendly (gRPC-Web needed for browsers)"
+      - "Steeper learning curve (Protocol Buffers, gRPC concepts)"
+      - "Tool ecosystem smaller (less debugging, monitoring tools)"
+      - "Versioning complex (proto evolution is tricky)"
+      - "Not suitable for public APIs (requires code generation)"
+      - "Mobile less common (though gRPC-Web exists)"
+
+    best_for: "Microservices, real-time streaming, internal APIs, performance-critical"
+    developer_experience: "High ceremony, powerful once set up"
+    scaling_challenges: "Protocol Buffers evolution, load balancing, monitoring"
+
+  fraiseql_choice:
+    name: "GraphQL (Code-First Implementation)"
+    rationale: |
+      FraiseQL chose **GraphQL** because:
+      1. **Type safety**: Schema enforced at compile time (Python types)
+      2. **Query flexibility**: Clients request exactly what they need
+      3. **Single endpoint**: Simpler operations, better caching via query composition
+      4. **Schema as documentation**: GraphQL introspection is self-documenting
+      5. **Modern clients**: Mobile and web clients benefit from precise fetching
+
+    implementation_philosophy: |
+      FraiseQL's GraphQL approach:
+      - Code-first schema (Python types, not SDL)
+      - Query optimization built-in (JSONB composition, cascade invalidation)
+      - Three-state responses (@success, @error, @noop)
+      - Type-safe error handling
+      - Streaming results (memory efficient)
+
+      Key insight: GraphQL isn't just about flexibility, it's about:
+      - Type safety (catch errors at compile time)
+      - Performance (precise fetching + composition)
+      - Developer experience (single query, self-documenting)
+
+    assessment_strengths: |
+      ✓ **Type safety**: Python types enforce schema (no drift)
+      ✓ **Single request**: Get all needed data in one query
+      ✓ **No overfetching**: Client specifies exact fields
+      ✓ **Flexible**: Schema additive (no versioning needed)
+      ✓ **Developer experience**: GraphiQL, introspection
+      ✓ **Optimization**: JSONB composition prevents N+1
+      ✓ **Cascade invalidation**: Smart caching based on field changes
+      ✓ **Streaming**: Memory efficient for large result sets
+
+    assessment_weaknesses: |
+      ✗ **Learning curve**: GraphQL syntax, schema design not obvious
+      ✗ **Implementation complexity**: Resolvers, batching, caching harder
+      ✗ **Security**: Query complexity attacks, introspection exposure
+      ✗ **Monitoring**: Single endpoint harder to monitor than REST
+      ✗ **Caching**: HTTP caching less effective (POST, single endpoint)
+      ✗ **Public APIs**: Less familiar to REST-only developers
+      ✗ **Team dependency**: Team must understand GraphQL concepts
+
+    when_to_choose_graphql: |
+      Choose GraphQL when:
+      - **Multiple client types**: Different mobile/web/desktop needs
+      - **Bandwidth matters**: Mobile clients care about data size
+      - **API flexibility needed**: Clients want different field combinations
+      - **Type safety critical**: Want compile-time schema validation
+      - **Team knows GraphQL**: Already have expertise
+      - **Real-time is important**: Subscriptions, live updates
+      - **Single endpoint is better**: Caching, monitoring at application level
+
+    when_rest_is_better: |
+      Choose REST when:
+      - **CRUD-only**: Simple read-update-delete operations
+      - **Public API**: Developers familiar with REST, not GraphQL
+      - **HTTP caching critical**: Need standard HTTP caching
+      - **Simple endpoints**: Each resource has obvious operations
+      - **Team new to APIs**: REST is simpler to learn
+      - **Streaming not needed**: Standard request-response is fine
+      - **Microservices**: Consider gRPC instead
+
+    when_grpc_is_better: |
+      Choose gRPC when:
+      - **Microservices communication**: Service-to-service is primary
+      - **Performance critical**: Need minimal latency/bandwidth
+      - **Streaming needed**: Bidirectional real-time required
+      - **Typed clients**: Type-safe code generation valuable
+      - **Not public API**: Can require gRPC client libraries
+
+benchmarks:
+  scenario: "Get user, their posts, and comments on posts"
+
+  network_requests:
+    rest_naive:
+      requests: "4 (user + posts + comments per post)"
+      total_latency: "40ms (user) + 30ms (posts) + 100ms (comments × N)"
+
+    rest_optimized:
+      requests: "2 (user + posts with embedded comments)"
+      total_latency: "40ms (user) + 60ms (posts+comments)"
+
+    graphql:
+      requests: "1 (single query, server handles composition)"
+      total_latency: "45ms (optimized query, JSONB composition)"
+
+    grpc:
+      requests: "1 (single RPC call)"
+      total_latency: "8ms (binary protocol, low overhead)"
+
+  data_transfer:
+    rest_full_response: "50 KB (overfetching, all fields)"
+    rest_selective: "20 KB (only needed fields, multiple requests)"
+    graphql: "18 KB (exact fields in single request)"
+    grpc: "12 KB (binary, no JSON overhead)"
+
+  developer_productivity:
+    rest: "Fast initially (simple CRUD), slows at complexity"
+    graphql: "Slower initially (schema design), scales to complexity"
+    grpc: "High ceremony upfront (proto files), fast once compiled"
+
+  type_safety:
+    rest: "None (JSON is untyped, client must validate)"
+    graphql: "High (schema enforced, no drift possible)"
+    grpc: "Very high (binary typed, code generation)"
+
+  caching:
+    rest_get: "Excellent (standard HTTP caching works)"
+    rest_post: "Poor (can't cache POST requests)"
+    graphql: "Hard (single endpoint, POST requests)"
+    grpc: "N/A (not designed for HTTP caching)"
+
+decision_matrix:
+  client_types:
+    question: "How many different client types do you have?"
+    answer_one_type: "REST is simpler (familiar pattern)"
+    answer_multiple_types: "GraphQL (each client gets what it needs)"
+
+  api_complexity:
+    question: "How complex are data relationships?"
+    answer_simple_crud: "REST (simple endpoints)"
+    answer_complex_nested: "GraphQL (single query for all)"
+
+  bandwidth_sensitivity:
+    question: "Is bandwidth important (mobile, low-bandwidth)?"
+    answer_critical: "GraphQL or gRPC (no overfetching)"
+    answer_acceptable: "REST is fine"
+
+  team_expertise:
+    question: "What does your team know?"
+    answer_rest_expert: "REST (leverage expertise)"
+    answer_graphql_expert: "GraphQL (leverage expertise)"
+    answer_building_microservices: "gRPC (internal communication)"
+
+  public_vs_internal:
+    question: "Is this a public API or internal?"
+    answer_public: "REST (developers know it)"
+    answer_internal: "GraphQL or gRPC (optimized for your clients)"
+
+  latency_requirements:
+    question: "What are latency requirements?"
+    answer_low_latency_critical: "gRPC (binary, minimal overhead)"
+    answer_moderate_latency: "GraphQL (optimized queries)"
+    answer_latency_not_critical: "REST (simplicity valued)"
+
+trade_off_summary:
+  simplicity_vs_flexibility: |
+    REST: Simple (familiar), inflexible (endpoint defines response)
+    GraphQL: Complex (learning curve), flexible (client defines response)
+
+    **GraphQL is simpler long-term (no versioning, no overfetching).**
+
+  performance_vs_familiarity: |
+    REST: Familiar, overfetches (bandwidth waste)
+    GraphQL: Less familiar, optimized (precise fetching)
+    gRPC: Unfamiliar, fastest (binary protocol)
+
+    **GraphQL good middle ground (familiar enough + optimized).**
+
+  http_caching_vs_application_control: |
+    REST: HTTP caching works naturally (but overfetches)
+    GraphQL: Single endpoint (HTTP caching harder, control application-level)
+
+    **REST caching is transparent, GraphQL requires explicit caching.**
+
+  implementation_speed_vs_scaling: |
+    REST: Fast to build (simple CRUD), slows when scaling (N+1, overfetching)
+    GraphQL: Slower to build (schema design), scales (composition, type safety)
+
+    **GraphQL amortizes learning cost as project grows.**
+
+recommendations:
+  - "Use REST for public APIs where developers expect it (simple contracts)"
+  - "Use GraphQL for internal APIs and mobile clients (flexibility matters)"
+  - "Use GraphQL for multiple client types (mobile/web/desktop have different needs)"
+  - "Use GraphQL if type safety and schema documentation are priorities"
+  - "Use gRPC for microservices communication (internal, performance-critical)"
+  - "Don't choose based on trend; choose based on your actual needs"
+  - "Start simple (REST), migrate to GraphQL if complexity grows"
+
+cost_analysis:
+  rest:
+    development_speed: "Fast initially (simple CRUD)"
+    maintenance_speed: "Slows with complexity (N+1, versioning)"
+    optimization_cost: "High (add caching layers, field selection)"
+    team_cost: "Low (REST familiar to most)"
+
+  graphql:
+    development_speed: "Moderate (schema design upfront)"
+    maintenance_speed: "Fast (schema is additive, no versioning)"
+    optimization_cost: "Medium (composition, batching)"
+    team_cost: "Medium (GraphQL knowledge needed)"
+
+  grpc:
+    development_speed: "Slow (proto definitions, code generation)"
+    maintenance_speed: "Fast (type-safe evolution)"
+    optimization_cost: "Low (optimized by design)"
+    team_cost: "High (gRPC expertise required)"
+
+blog_hooks:
+  beginner:
+    focus: "Understanding REST vs GraphQL fundamentals"
+    key_points:
+      - "REST: Multiple endpoints, HTTP verbs, familiar"
+      - "GraphQL: Single endpoint, queries, flexible"
+      - "gRPC: High-performance RPC, binary protocol"
+      - "Choose based on your clients, not the trend"
+
+  intermediate:
+    focus: "Trade-offs in real applications"
+    key_points:
+      - "REST: Fast initially, slows with complexity (N+1)"
+      - "GraphQL: Slower build, but no overfetching"
+      - "REST caching is easier (HTTP standards)"
+      - "GraphQL needs application-level caching"
+
+  advanced:
+    focus: "When each architecture is optimal"
+    key_points:
+      - "REST for public APIs (developer familiarity)"
+      - "GraphQL for internal/mobile (flexibility, bandwidth)"
+      - "gRPC for microservices (performance, streaming)"
+      - "FraiseQL: GraphQL with database optimization built-in"

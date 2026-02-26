@@ -1,0 +1,306 @@
+# Input Validation
+# VelocityBench Knowledge Corpus
+
+id: input-validation
+name: "Input Validation Patterns"
+category: security
+type: pattern
+severity: critical
+tags:
+  - security
+  - validation
+  - api
+  - injection
+  - sanitization
+
+summary:
+  short: "Validate and sanitize all user input to prevent attacks"
+  long: |
+    Input validation is the first line of defense against injection attacks, data
+    corruption, and application crashes. Every piece of data from external sources
+    (users, APIs, files) should be validated against expected format, type, length,
+    and allowed values. Validation should happen at system boundaries before data
+    enters business logic or storage.
+
+problem:
+  description: |
+    Trusting user input leads to critical vulnerabilities:
+    - SQL injection through unvalidated query parameters
+    - XSS through unsanitized HTML content
+    - Command injection through shell-executed strings
+    - Buffer overflows from oversized inputs
+    - Logic errors from unexpected data formats
+
+  symptoms:
+    - name: "SQL Injection vulnerabilities"
+      description: "Attackers can read/modify database"
+      detection: "SQL errors in logs, data anomalies"
+
+    - name: "XSS attacks"
+      description: "Malicious scripts execute in browser"
+      detection: "Reports of account hijacking, defacement"
+
+    - name: "Application crashes"
+      description: "Unexpected input causes exceptions"
+      detection: "500 errors from parsing failures"
+
+solution:
+  principle: "Never trust user input - validate, sanitize, parameterize"
+
+  strategies:
+    - name: "Whitelist Validation"
+      description: "Accept only known-good input"
+      priority: "Preferred"
+
+    - name: "Blacklist Validation"
+      description: "Reject known-bad input"
+      priority: "Fallback only"
+
+    - name: "Input Sanitization"
+      description: "Clean input to remove dangerous content"
+      priority: "After validation"
+
+    - name: "Parameterized Queries"
+      description: "Separate code from data"
+      priority: "Always for SQL"
+
+implementation:
+  schema_validation:
+    python_pydantic: |
+      from pydantic import BaseModel, Field, validator, EmailStr
+      from typing import Optional
+      import re
+
+      class UserCreate(BaseModel):
+          """Validate user creation input."""
+
+          username: str = Field(
+              ...,
+              min_length=3,
+              max_length=50,
+              pattern=r'^[a-zA-Z0-9_-]+$'
+          )
+          email: EmailStr
+          password: str = Field(..., min_length=8, max_length=128)
+          age: Optional[int] = Field(None, ge=13, le=120)
+
+          @validator('username')
+          def username_not_reserved(cls, v):
+              reserved = ['admin', 'root', 'system', 'api']
+              if v.lower() in reserved:
+                  raise ValueError(f'Username "{v}" is reserved')
+              return v
+
+          @validator('password')
+          def password_complexity(cls, v):
+              if not re.search(r'[A-Z]', v):
+                  raise ValueError('Password must contain uppercase letter')
+              if not re.search(r'[a-z]', v):
+                  raise ValueError('Password must contain lowercase letter')
+              if not re.search(r'\d', v):
+                  raise ValueError('Password must contain digit')
+              return v
+
+      # Usage in FastAPI
+      @app.post("/users")
+      async def create_user(user: UserCreate):
+          # Input is already validated by Pydantic
+          return await user_service.create(user)
+
+    javascript_zod: |
+      import { z } from 'zod';
+
+      const userCreateSchema = z.object({
+        username: z.string()
+          .min(3)
+          .max(50)
+          .regex(/^[a-zA-Z0-9_-]+$/, 'Invalid characters')
+          .refine(val => !['admin', 'root'].includes(val.toLowerCase()), {
+            message: 'Username is reserved'
+          }),
+        email: z.string().email(),
+        password: z.string()
+          .min(8)
+          .max(128)
+          .regex(/[A-Z]/, 'Must contain uppercase')
+          .regex(/[a-z]/, 'Must contain lowercase')
+          .regex(/\d/, 'Must contain digit'),
+        age: z.number().int().min(13).max(120).optional()
+      });
+
+      // Usage in Express
+      app.post('/users', async (req, res) => {
+        const result = userCreateSchema.safeParse(req.body);
+
+        if (!result.success) {
+          return res.status(400).json({
+            error: 'Validation failed',
+            details: result.error.issues
+          });
+        }
+
+        const user = await userService.create(result.data);
+        res.json(user);
+      });
+
+  sql_injection_prevention:
+    parameterized_queries: |
+      # WRONG - SQL Injection vulnerable
+      def get_user_vulnerable(username: str):
+          query = f"SELECT * FROM users WHERE username = '{username}'"
+          return db.execute(query)
+
+      # Attack: username = "'; DROP TABLE users; --"
+      # Results in: SELECT * FROM users WHERE username = ''; DROP TABLE users; --'
+
+      # CORRECT - Parameterized query
+      def get_user_safe(username: str):
+          query = "SELECT * FROM users WHERE username = $1"
+          return db.execute(query, (username,))
+
+      # The $1 is replaced safely - no injection possible
+
+    orm_example: |
+      # SQLAlchemy - parameters handled automatically
+      def search_users(search_term: str):
+          # Safe - SQLAlchemy escapes the parameter
+          return session.query(User).filter(
+              User.name.contains(search_term)
+          ).all()
+
+      # Still vulnerable if using raw SQL incorrectly:
+      # BAD: session.execute(f"SELECT * FROM users WHERE name LIKE '%{search_term}%'")
+      # GOOD: session.execute(text("SELECT * FROM users WHERE name LIKE :term"), {"term": f"%{search_term}%"})
+
+  xss_prevention:
+    output_encoding: |
+      # Always encode output based on context
+
+      # HTML context - encode HTML entities
+      from markupsafe import escape
+
+      def render_comment(comment: str) -> str:
+          return f"<div class='comment'>{escape(comment)}</div>"
+
+      # JavaScript context - JSON encode
+      import json
+
+      def render_js_data(data: dict) -> str:
+          safe_json = json.dumps(data)  # Handles escaping
+          return f"<script>const data = {safe_json};</script>"
+
+      # URL context - URL encode
+      from urllib.parse import quote
+
+      def make_search_url(query: str) -> str:
+          return f"/search?q={quote(query)}"
+
+    content_security_policy: |
+      # Set CSP header to prevent XSS
+      @app.middleware("http")
+      async def add_security_headers(request, call_next):
+          response = await call_next(request)
+          response.headers["Content-Security-Policy"] = (
+              "default-src 'self'; "
+              "script-src 'self'; "
+              "style-src 'self' 'unsafe-inline'; "
+              "img-src 'self' data: https:; "
+          )
+          return response
+
+  common_validations:
+    python: |
+      import re
+      from typing import Optional
+      from ipaddress import ip_address, IPv4Address
+      from urllib.parse import urlparse
+
+      def validate_email(email: str) -> bool:
+          """Validate email format."""
+          pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+          return bool(re.match(pattern, email)) and len(email) <= 254
+
+      def validate_url(url: str, allowed_schemes: list = ['https']) -> bool:
+          """Validate URL format and scheme."""
+          try:
+              parsed = urlparse(url)
+              return (
+                  parsed.scheme in allowed_schemes and
+                  bool(parsed.netloc) and
+                  len(url) <= 2048
+              )
+          except Exception:
+              return False
+
+      def validate_ip(ip: str) -> Optional[IPv4Address]:
+          """Validate IP address."""
+          try:
+              addr = ip_address(ip)
+              # Reject private/loopback to prevent SSRF
+              if addr.is_private or addr.is_loopback:
+                  return None
+              return addr
+          except ValueError:
+              return None
+
+      def validate_uuid(value: str) -> bool:
+          """Validate UUID format."""
+          pattern = r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+          return bool(re.match(pattern, value.lower()))
+
+      def sanitize_filename(filename: str) -> str:
+          """Remove dangerous characters from filename."""
+          # Remove path separators and null bytes
+          filename = filename.replace('/', '').replace('\\', '').replace('\x00', '')
+          # Remove leading dots (hidden files)
+          filename = filename.lstrip('.')
+          # Limit length
+          return filename[:255] if filename else 'unnamed'
+
+best_practices:
+  - name: "Validate at the boundary"
+    description: "Validate as soon as data enters your system"
+    example: |
+      # In API endpoint, not deep in business logic
+      @app.post("/orders")
+      async def create_order(order: OrderCreate):  # Validates here
+          return await order_service.create(order)  # Already clean
+
+  - name: "Fail closed"
+    description: "Reject unexpected input rather than trying to clean it"
+    example: |
+      # Reject invalid input, don't try to fix it
+      if not is_valid_product_id(product_id):
+          raise HTTPException(400, "Invalid product ID format")
+
+  - name: "Defense in depth"
+    description: "Multiple layers of validation"
+    example: |
+      # Layer 1: Client-side (UX, not security)
+      # Layer 2: API validation (Pydantic/Zod)
+      # Layer 3: Database constraints
+      # Layer 4: Output encoding
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Input validation is like airport security:
+      - Without validation: Let anyone through with anything
+      - With validation: Check ID, scan bags, verify tickets
+      One unchecked bag can bring down the whole plane (your app)!
+
+  intermediate:
+    focus: "Schema validation and common vulnerability prevention"
+    key_points:
+      - "Using Pydantic/Zod for structured validation"
+      - "SQL injection prevention with parameterized queries"
+      - "XSS prevention with output encoding"
+      - "SSRF prevention with URL/IP validation"
+
+  advanced:
+    focus: "Security-in-depth and edge cases"
+    key_points:
+      - "Unicode normalization attacks"
+      - "JSON parsing vulnerabilities"
+      - "ReDoS (Regular Expression Denial of Service)"
+      - "Content-Type validation and MIME sniffing"

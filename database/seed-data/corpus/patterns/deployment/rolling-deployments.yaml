@@ -1,0 +1,304 @@
+id: rolling-deployments
+name: "Rolling Deployments & Zero-Downtime Updates"
+category: deployment
+type: standard
+tags:
+  - deployment
+  - zero-downtime
+  - availability
+  - kubernetes
+
+summary:
+  short: "Deploying new versions without service interruption using gradual rollout strategies"
+  long: |
+    Rolling deployments gradually replace old instances with new ones, ensuring users continue accessing the service during deployment. This pattern is essential for high-availability systems where downtime is unacceptable.
+
+problem:
+  description: "Deploying new code often requires restarting services, causing downtime and poor user experience"
+  symptoms:
+    - "Deployment causes service unavailable errors for some users"
+    - "No way to quickly rollback if new version has bugs"
+    - "Database migrations block deployment"
+    - "Service startup time during deployment is unpredictable"
+  impact: "Service unavailability, poor user experience, operational risk"
+
+solution:
+  description: "Replace instances gradually while health checks ensure readiness"
+
+gradient_replace:
+  description: "Progressive instance replacement"
+  strategy: |
+    1. Start V1 instances handling 100% traffic
+    2. Add one V2 instance, route minimal traffic to it
+    3. Gradually increase traffic to V2 as it handles requests
+    4. Once V2 at 100%, remove all V1 instances
+    5. If errors detected at any point, abort and revert
+
+  timeline: |
+    Time 0:  V1: 4 instances (100% traffic)
+    Time 1:  V1: 4, V2: 1 (5% traffic to V2)
+    Time 2:  V1: 3, V2: 2 (50% traffic to V2)
+    Time 3:  V1: 2, V2: 3 (75% traffic to V2)
+    Time 4:  V1: 1, V2: 4 (100% traffic to V2)
+    Time 5:  V1: 0, V2: 4 (complete)
+
+  benefits:
+    - "Issues in V2 detected with small user impact"
+    - "Quick rollback: send traffic back to V1"
+    - "Old instances available for quick recovery"
+
+health_checks:
+  description: "Critical for rolling deployment safety"
+
+  startup_probe:
+    purpose: "Is application ready to serve traffic after starting?"
+    example: |
+      startupProbe:
+        httpGet:
+          path: /health/startup
+          port: 8080
+        failureThreshold: 30
+        periodSeconds: 10
+    failure_handling: "If fails 30 times, kill and restart"
+
+  readiness_probe:
+    purpose: "Is application currently able to serve traffic?"
+    example: |
+      readinessProbe:
+        httpGet:
+          path: /health/ready
+          port: 8080
+        initialDelaySeconds: 5
+        periodSeconds: 5
+    failure_handling: "If fails, remove from load balancer but keep running"
+
+  liveness_probe:
+    purpose: "Is application still alive, or deadlocked?"
+    example: |
+      livenessProbe:
+        httpGet:
+          path: /health/live
+          port: 8080
+        periodSeconds: 10
+    failure_handling: "If fails, restart container"
+
+deployment_strategies:
+  kubernetes_rolling:
+    description: "Kubernetes native rolling update"
+    configuration: |
+      apiVersion: apps/v1
+      kind: Deployment
+      spec:
+        strategy:
+          type: RollingUpdate
+          rollingUpdate:
+            maxSurge: 1        # Allow 1 extra pod temporarily
+            maxUnavailable: 0  # Zero pods can be unavailable
+        template:
+          spec:
+            startupProbe:
+              httpGet:
+                path: /health
+              failureThreshold: 30
+            readinessProbe:
+              httpGet:
+                path: /ready
+
+  traffic_based_rolling:
+    description: "Using service mesh for traffic-based rolling"
+    how_it_works: |
+      1. Deploy V2 instances
+      2. Service mesh gradually shifts traffic (V1: 100% → 50% → 0%)
+      3. Monitor metrics (error rate, latency)
+      4. If issues, traffic returns to V1 automatically
+    advantage: "More control than Kubernetes rolling"
+
+gradual_rollout_phases:
+  phase_1_canary:
+    description: "Route small % to new version"
+    percentage: "1-5% of traffic"
+    duration: "15-30 minutes"
+    monitoring: "Error rate, latency, CPU, memory"
+    success_criteria: "Error rate < 0.1%, latency p99 < 500ms"
+    action_on_fail: "Immediate rollback to V1"
+
+  phase_2_early_adoption:
+    description: "Increase to early-adopter segment"
+    percentage: "10-25%"
+    duration: "30-60 minutes"
+    monitoring: "Same + user feedback"
+    success_criteria: "No critical issues reported"
+
+  phase_3_majority:
+    description: "Route majority to V2"
+    percentage: "50-75%"
+    duration: "until stable"
+    monitoring: "Comprehensive monitoring"
+
+  phase_4_completion:
+    description: "All traffic to V2"
+    percentage: "100%"
+    action: "Remove V1 instances after stability window"
+
+database_migrations:
+  challenge: |
+    Rolling deployments with database schema changes require special handling
+    - V1 code expects old schema
+    - V2 code expects new schema
+    - Cannot change schema atomically with code deployment
+    - During rolling update, both versions run simultaneously
+
+  solution_forward_compatible:
+    description: "Make V2 code work with both old and new schema"
+    example: |
+      -- Migrate in phases:
+      -- Phase 1: Add new column (V1 still doesn't read it)
+      ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT false;
+
+      -- Phase 2: Deploy V2 (reads email_verified, handles both cases)
+      -- code: if user.email_verified is null: set to false
+
+      -- Phase 3: Backfill old data (populate null values)
+      UPDATE users SET email_verified = false WHERE email_verified IS NULL;
+
+      -- Phase 4: Remove default, add constraint if needed
+      ALTER TABLE users ALTER COLUMN email_verified SET NOT NULL;
+
+  steps:
+    1: "Add new column/table"
+    2: "Deploy code that handles both old/new schema"
+    3: "Backfill data"
+    4: "Remove old column (in next deployment)"
+
+monitoring_during_rollout:
+  metrics_to_watch:
+    - "Error rate (should not increase)"
+    - "Latency p50/p95/p99 (watch for regressions)"
+    - "CPU/memory usage (identify resource leaks)"
+    - "Queue depth (if using async processing)"
+    - "Database connection pool (ensure no exhaustion)"
+
+  alerting:
+    rules:
+      - "Error rate increase > 1%: abort rollout"
+      - "Latency p99 increase > 50%: abort rollout"
+      - "Memory increase > 200MB per pod: investigate"
+
+  automatic_rollback:
+    trigger: "Error rate exceeds threshold for 2 minutes"
+    action: "Immediately return traffic to V1"
+    manual_override: "Can pause automatic rollback for investigation"
+
+connection_draining:
+  description: "Gracefully shutting down old instances"
+  process: |
+    1. Mark instance as 'terminating' (readiness probe fails)
+    2. Load balancer removes it (no new connections)
+    3. Wait for in-flight requests to complete (connection drain timeout)
+    4. Force kill remaining connections
+    5. Terminate instance
+
+  configuration: |
+    # Kubernetes termination grace period
+    terminationGracePeriodSeconds: 30
+
+    # Graceful shutdown handler
+    lifecycle:
+      preStop:
+        exec:
+          command: ["/bin/sh", "-c", "sleep 15"]
+
+rollback_strategies:
+  immediate_rollback:
+    when: "Critical bug detected immediately"
+    how: "Route traffic back to V1; keep V2 running for inspection"
+    recovery_time: "< 1 minute"
+
+  progressive_rollback:
+    when: "Gradual issue detected"
+    how: "Reverse traffic percentage (V2: 50% → 25% → 0%)"
+    advantage: "Safer; not abrupt"
+
+  code_rollback_vs_instance_rollback:
+    code_rollback: "Revert deployed code to previous version"
+    instance_rollback: "Shift traffic back to running V1 instances"
+    preferred: "Instance rollback (faster)"
+
+testing_before_deployment:
+  smoke_tests: "Critical paths work (login, payment)"
+  integration_tests: "Services communicate correctly"
+  canary_environment: "Deploy to test cluster first"
+  synthetic_monitoring: "Automated user journey tests"
+
+coordination_with_team:
+  communication: "Notify team before starting rollout"
+  monitoring: "Dedicated person watching metrics"
+  escalation: "Quick escalation path if issues arise"
+  change_log: "Document what changed in this version"
+
+best_practices:
+  - name: "Define health checks upfront"
+    description: "Startups/readiness/liveness should be well-defined"
+
+  - name: "Test rollout in staging"
+    description: "Catch issues in staging before production"
+
+  - name: "Use progressive phases"
+    description: "Start small; expand gradually as confidence grows"
+
+  - name: "Automate rollback"
+    description: "Detect failures and rollback automatically"
+
+  - name: "Monitor during deployment"
+    description: "Have someone watching metrics during rollout"
+
+  - name: "Plan database migrations separately"
+    description: "Migrations and code deploy often need different schedules"
+
+  - name: "Keep old instances running during rollout"
+    description: "Quick rollback if needed"
+
+  - name: "Test in production-like environment"
+    description: "Staging doesn't always catch production issues"
+
+anti_patterns:
+  - name: "No health checks"
+    description: "Load balancer sends traffic to unhealthy instances"
+    consequence: "Users get errors immediately after deployment"
+
+  - name: "Deployment without monitoring"
+    description: "Deploy and hope; no one watching"
+    consequence: "Issues go undetected; slow manual recovery"
+
+  - name: "Incompatible database changes"
+    description: "Deploy code that breaks with old database schema"
+    consequence: "Cannot rollback safely; production incident"
+
+  - name: "Long startup times"
+    description: "New instances take minutes to be ready"
+    consequence: "Slow deployments; long window of degradation"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Rolling deployment is like replacing people in a relay race:
+      - Don't stop the race to swap runners (causes loss)
+      - Gradually bring in new runner as old runner slows
+      - If new runner isn't fast: put old runner back
+      - Complete swap happens mid-race without losing ground
+
+  intermediate:
+    focus: "Rolling deployment mechanics"
+    key_points:
+      - "Health check types and their purposes"
+      - "Progressive traffic shifting"
+      - "Database migration strategies for rolling updates"
+      - "Monitoring and automatic rollback"
+
+  advanced:
+    focus: "Complex rolling deployment scenarios"
+    key_points:
+      - "Multi-region rolling deployments"
+      - "Feature flags and rollout coordination"
+      - "Canary deployments with traffic mesh"
+      - "Long-running transaction handling during rollout"

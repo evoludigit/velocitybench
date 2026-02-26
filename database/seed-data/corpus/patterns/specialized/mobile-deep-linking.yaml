@@ -1,0 +1,28 @@
+id: mobile-deep-linking
+name: Deep Linking Patterns
+category: specialized
+type: standard
+tags:
+- mobile
+summary:
+  short: Patterns and practices for deep linking patterns
+  long: Comprehensive guide to deep linking patterns
+problem:
+  description: Challenges with deep linking patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement deep linking patterns
+key_concepts:
+  concept: Understanding Deep Linking Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Deep Linking Patterns
+  intermediate:
+    focus: Implementing Deep Linking Patterns
+  advanced:
+    focus: Advanced Deep Linking Patterns

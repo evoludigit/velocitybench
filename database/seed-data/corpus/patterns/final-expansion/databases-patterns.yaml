@@ -1,0 +1,28 @@
+id: databases-patterns
+name: Databases Patterns
+category: comprehensive
+type: standard
+tags:
+- databases
+summary:
+  short: Databases Patterns and implementation guidelines
+  long: Complete guide to databases patterns
+problem:
+  description: Challenges without proper databases patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement databases patterns
+key_concepts:
+  concept: Databases Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

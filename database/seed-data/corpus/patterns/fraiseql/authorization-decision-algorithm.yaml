@@ -1,0 +1,49 @@
+id: authorization-decision-algorithm
+name: Authorization Decision Algorithm
+category: fraiseql
+type: standard
+tags:
+- execution
+- authorization
+- algorithms
+- security
+summary:
+  short: Evaluating compiled rules for role, claim, and custom checks
+  long: The decision algorithm evaluates compiled authorization rules, checking role
+    requirements, JWT claims, and custom conditions to allow or deny access.
+problem:
+  description: Authorization logic is ad-hoc and inconsistent
+  symptoms:
+  - Some authorization rules don't work
+  - Inconsistent decisions across similar scenarios
+  - Difficult to add new auth rules
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Authorization Decision Algorithm effectively
+key_concepts:
+  concept_1: Rule types (role, claim, custom)
+  concept_2: Evaluation order
+  concept_3: Decision outcomes
+implementation_considerations:
+  consideration_1: Short-circuit evaluation
+  consideration_2: Error handling in evaluation
+  consideration_3: Caching decisions
+best_practices:
+- name: Clear rules
+  description: Make rules explicit and readable
+- name: Consistent evaluation
+  description: Always use same algorithm
+- name: Test all rules
+  description: Verify each rule works correctly
+anti_patterns:
+- name: Unclear rules
+  consequence: Unpredictable authorization
+- name: Ad-hoc evaluation
+  consequence: Inconsistent results
+blog_hooks:
+  beginner:
+    focus: Introduction to Authorization Decision Algorithm
+  intermediate:
+    focus: Implementing Authorization Decision Algorithm
+  advanced:
+    focus: Advanced Authorization Decision Algorithm techniques

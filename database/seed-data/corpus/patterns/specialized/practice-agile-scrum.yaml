@@ -1,0 +1,28 @@
+id: practice-agile-scrum
+name: Agile Scrum Practices
+category: specialized
+type: standard
+tags:
+- practice
+summary:
+  short: Patterns and practices for agile scrum practices
+  long: Comprehensive guide to agile scrum practices
+problem:
+  description: Challenges with agile scrum practices
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement agile scrum practices
+key_concepts:
+  concept: Understanding Agile Scrum Practices
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Agile Scrum Practices
+  intermediate:
+    focus: Implementing Agile Scrum Practices
+  advanced:
+    focus: Advanced Agile Scrum Practices

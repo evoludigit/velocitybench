@@ -1,0 +1,517 @@
+id: fraiseql-federation-schema-metadata
+name: "FraiseQL Federation Schema Metadata and schema.json Generation"
+category: fraiseql
+type: standard
+tags:
+  - fraiseql
+  - federation
+  - schema-metadata
+  - schema-json
+  - apollo-spec
+
+summary:
+  short: "Generate and manage federation metadata in schema.json format for Apollo Federation"
+  long: |
+    Federation schemas must export federation metadata (keys, external fields, requires/provides)
+    in schema.json format for Apollo Router/Gateway compatibility. FraiseQL generates federation
+    metadata at both type and field levels, including @key definitions, @extends markers, external
+    field lists, and field-level directives. Understanding schema metadata structure is critical
+    for federation interoperability and Apollo compatibility.
+
+problem:
+  description: |
+    Apollo Federation requires schema metadata in standard format:
+    - type-level: keys, extend flag, external fields
+    - field-level: external flag, requires, provides directives
+    - schema-level: federation enabled, version
+    - validators: Metadata must match Apollo Federation v2 spec
+
+    Without proper schema.json generation, federation services can't communicate
+    with Apollo Router or composition tools.
+
+  symptoms:
+    - name: "Apollo Router can't read schema"
+      description: "Missing federation metadata in schema.json"
+      detection: "Router fails to understand federated types"
+
+    - name: "Field resolution errors"
+      description: "Router doesn't know field is @requires"
+      consequence: "Field resolution fails at gateway level"
+
+    - name: "Composition validation fails"
+      description: "Schema.json doesn't match Apollo spec"
+      consequence: "Apollo tools reject schema"
+
+    - name: "Type conflict undetected"
+      description: "Metadata doesn't show field types"
+      consequence: "Silent type inconsistencies"
+
+  impact: |
+    Federation interoperability failures, Apollo Router incompatibility, schema composition errors
+
+solution:
+  principle: "Generate Apollo Federation v2-compliant schema metadata"
+
+  components:
+    - name: "Schema-Level Federation Metadata"
+      type: "Root configuration"
+      purpose: "Declare federation enabled and version"
+      structure: |
+        schema.json root level:
+        ```json
+        {
+          "federation": {
+            "enabled": true,
+            "version": "v2"
+          },
+          "types": [ ... ]
+        }
+        ```
+
+        Semantics:
+        - federation.enabled: true = this schema supports federation
+        - federation.version: "v2" = Apollo Federation v2 compliant
+        - If no @key decorators: federation.enabled = false
+
+    - name: "Type-Level Federation Metadata"
+      type: "Type configuration"
+      purpose: "Mark federation keys, extensions, external fields"
+      structure: |
+        Each type in schema.json includes federation section:
+        ```json
+        {
+          "name": "User",
+          "federation": {
+            "keys": [{"fields": ["id"]}],
+            "extend": false,
+            "external_fields": [],
+            "shareable_fields": []
+          },
+          "fields": [ ... ]
+        }
+        ```
+
+        Fields:
+        - keys: List of @key definitions (field names)
+        - extend: true if @extends, false if authoritative
+        - external_fields: Fields owned by other services
+        - shareable_fields: Fields resolvable in multiple services
+
+    - name: "Composite Key Metadata"
+      type: "Multi-field keys"
+      purpose: "Support multi-field federation keys"
+      example: |
+        For Account with @key("tenant_id") @key("id"):
+        ```json
+        "federation": {
+          "keys": [
+            {"fields": ["tenant_id"]},
+            {"fields": ["id"]}
+          ]
+        }
+        ```
+
+        Represents composite key (tenant_id, id)
+        Apollo Router uses all key fields for reference resolution
+
+    - name: "Field-Level Federation Metadata"
+      type: "Field directives"
+      purpose: "Mark field-level federation directives"
+      structure: |
+        Each field includes federation metadata:
+        ```json
+        {
+          "name": "email",
+          "federation": {
+            "external": false,
+            "requires": null,
+            "provides": null,
+            "shareable": false
+          }
+        }
+        ```
+
+        Field directives:
+        - external: true = field owned by another service
+        - requires: "field_name" = depends on this field
+        - provides: ["Type.field"] = provides data to other services
+        - shareable: true = can be resolved by multiple services
+
+    - name: "External Field Metadata"
+      type: "Field ownership"
+      purpose: "Track which fields are external (owned elsewhere)"
+      example: |
+        Orders service extending User:
+        ```json
+        {
+          "name": "User",
+          "federation": {
+            "extend": true,
+            "external_fields": ["id", "email"]
+          },
+          "fields": [
+            {
+              "name": "id",
+              "federation": {"external": true}
+            },
+            {
+              "name": "email",
+              "federation": {"external": true}
+            },
+            {
+              "name": "orders",
+              "federation": {"external": false}
+            }
+          ]
+        }
+        ```
+
+    - name: "@requires Field Metadata"
+      type: "Field dependencies"
+      purpose: "Document field resolution dependencies"
+      example: |
+        Account service with computed field:
+        ```json
+        {
+          "name": "email_domain",
+          "federation": {
+            "requires": "email"
+          }
+        }
+        ```
+
+        Semantics: email_domain @requires("email")
+        Apollo Router: Fetch email first, then resolve email_domain
+
+    - name: "@provides Field Metadata"
+      type: "Inter-service resolution"
+      purpose: "Mark fields that provide data to other services"
+      example: |
+        Orders service providing email to Account:
+        ```json
+        {
+          "name": "email",
+          "federation": {
+            "provides": ["Account.email_domain"]
+          }
+        }
+        ```
+
+        Semantics: email field @provides("Account.email_domain")
+        Apollo Router: Orders service can supply email_domain to Account
+
+    - name: "@shareable Field Metadata"
+      type: "Multi-service resolution"
+      purpose: "Mark fields resolvable in multiple services"
+      example: |
+        Product resolvable in both Products and Catalog:
+        ```json
+        {
+          "name": "name",
+          "federation": {
+            "shareable": true
+          }
+        }
+        ```
+
+        Semantics: name field marked @shareable
+        Apollo Router: Can resolve from either service
+
+    - name: "Schema Metadata Validation"
+      type: "Compliance checking"
+      purpose: "Ensure schema.json matches Apollo Federation spec"
+      validation: |
+        During schema.json generation, validate:
+        1. All @key fields exist in type
+        2. All @external fields listed in external_fields
+        3. All @requires paths reference valid fields
+        4. All @provides targets are valid
+        5. Metadata matches type definitions
+        6. No conflicting directives
+
+        Errors are reported with line numbers and suggestions.
+
+    - name: "Type Mapping to Metadata"
+      type: "Generation process"
+      purpose: "Convert FraiseQL type definitions to schema.json"
+      process: |
+        For each @fraiseql.type:
+        1. Extract @key decorators → keys array
+        2. Check @extends → extend flag
+        3. Find @external() fields → external_fields list
+        4. Extract field directives (@requires, @provides)
+        5. Mark @shareable fields
+        6. Generate schema.json for each field
+        7. Combine into type metadata
+        8. Add to schema.json types array
+
+    - name: "Mixed Federation and Local Types"
+      type: "Schema composition"
+      purpose: "Handle both federation and non-federation types"
+      example: |
+        Schema with mixed types:
+        ```json
+        {
+          "federation": {
+            "enabled": true,
+            "version": "v2"
+          },
+          "types": [
+            {
+              "name": "User",
+              "federation": {
+                "keys": [{"fields": ["id"]}],
+                "extend": false
+              }
+            },
+            {
+              "name": "Internal",
+              "federation": {
+                "keys": [],
+                "extend": false
+              }
+            }
+          ]
+        }
+        ```
+
+        User is federation-aware (@key present)
+        Internal is local-only (no @key, not federated)
+
+key_concepts:
+  concept_1: "schema.json includes federation metadata at type and field levels"
+  concept_2: "Type-level metadata: keys, extend, external_fields"
+  concept_3: "Field-level metadata: external, requires, provides, shareable"
+  concept_4: "Composite keys represented as multiple key definitions"
+  concept_5: "External fields track ownership across services"
+  concept_6: "Requires/provides document field resolution dependencies"
+  concept_7: "Schema metadata must conform to Apollo Federation v2 spec"
+  concept_8: "Validation ensures metadata consistency"
+
+best_practices:
+  - name: "Generate schema.json for all federation schemas"
+    description: "Enable Apollo Router/Gateway compatibility"
+
+  - name: "Validate schema.json against Apollo spec"
+    description: "Ensure compliance before publishing"
+
+  - name: "Document federation metadata"
+    description: "Explain keys, external fields, dependencies"
+
+  - name: "Keep external field lists accurate"
+    description: "Ensure composition validators can rely on metadata"
+
+  - name: "Use consistent field names"
+    description: "Avoid confusion with camelCase vs snake_case"
+
+  - name: "Test schema.json parsing"
+    description: "Verify Apollo tools can read schema"
+
+  - name: "Include all field-level directives"
+    description: "Completeness ensures correct resolution"
+
+  - name: "Version schema.json"
+    description: "Track changes for backward compatibility"
+
+anti_patterns:
+  - name: "Missing federation root"
+    description: "No federation section in schema.json"
+    consequence: "Apollo Router doesn't recognize federation"
+    fix: "Add federation.enabled and federation.version"
+
+  - name: "Incomplete external_fields list"
+    description: "Type extends but external_fields empty"
+    consequence: "Composition assumes fields are local"
+    fix: "List all external fields accurately"
+
+  - name: "Missing field-level metadata"
+    description: "Fields lack federation directives"
+    consequence: "Router doesn't know about @requires/@provides"
+    fix: "Include federation metadata on all fields"
+
+  - name: "Invalid requires paths"
+    description: "@requires references non-existent field"
+    consequence: "Validation fails"
+    fix: "Ensure referenced fields exist"
+
+  - name: "Duplicate @key definitions"
+    description: "Multiple @key decorators with same fields"
+    consequence: "Ambiguous schema"
+    fix: "Use single @key or composite keys"
+
+examples:
+  example_1:
+    title: "Simple Federation Type"
+    description: "User type with single @key"
+    code: |
+      # FraiseQL definition
+      @fraiseql.type
+      @key("id")
+      class User:
+          id: ID
+          email: str
+          name: str
+
+      # Generated schema.json
+      {
+        "name": "User",
+        "federation": {
+          "keys": [{"fields": ["id"]}],
+          "extend": false,
+          "external_fields": []
+        },
+        "fields": [
+          {
+            "name": "id",
+            "type": "ID!",
+            "federation": {
+              "external": false,
+              "requires": null,
+              "provides": null
+            }
+          },
+          {
+            "name": "email",
+            "type": "String!",
+            "federation": {
+              "external": false,
+              "requires": null,
+              "provides": null
+            }
+          }
+        ]
+      }
+
+  example_2:
+    title: "Extended Type with External Fields"
+    description: "Orders service extending User"
+    code: |
+      # FraiseQL definition
+      @fraiseql.type
+      @extends
+      @key("id")
+      class User:
+          id: ID = external()
+          email: str = external()
+          orders: list[Order]
+
+      # Generated schema.json
+      {
+        "name": "User",
+        "federation": {
+          "keys": [{"fields": ["id"]}],
+          "extend": true,
+          "external_fields": ["id", "email"]
+        },
+        "fields": [
+          {
+            "name": "id",
+            "federation": {"external": true}
+          },
+          {
+            "name": "email",
+            "federation": {"external": true}
+          },
+          {
+            "name": "orders",
+            "federation": {"external": false}
+          }
+        ]
+      }
+
+  example_3:
+    title: "Field with @requires"
+    description: "Computed field with dependency"
+    code: |
+      # FraiseQL definition
+      @fraiseql.type
+      @extends
+      @key("id")
+      class User:
+          id: ID = external()
+          email: str = external()
+          email_domain: str = requires("email")
+
+      # Generated schema.json field metadata
+      {
+        "name": "email_domain",
+        "type": "String!",
+        "federation": {
+          "external": false,
+          "requires": "email",
+          "provides": null
+        }
+      }
+
+  example_4:
+    title: "Composite Key Type"
+    description: "Multi-tenant Account with composite key"
+    code: |
+      # FraiseQL definition
+      @fraiseql.type
+      @key("tenant_id")
+      @key("id")
+      class Account:
+          tenant_id: ID
+          id: ID
+          name: str
+
+      # Generated schema.json
+      {
+        "name": "Account",
+        "federation": {
+          "keys": [
+            {"fields": ["tenant_id"]},
+            {"fields": ["id"]}
+          ],
+          "extend": false,
+          "external_fields": []
+        },
+        "fields": [...]
+      }
+
+comparison_matrix:
+  aspect:
+    metadata_generated: "schema.json includes federation metadata"
+    metadata_missing: "No federation metadata in schema.json"
+
+  apollo_compatibility:
+    metadata_generated: "Full compatibility with Apollo Router"
+    metadata_missing: "Router can't understand federation"
+
+  field_resolution:
+    metadata_generated: "Router knows dependencies (@requires)"
+    metadata_missing: "Router guesses, may fail"
+
+  composition:
+    metadata_generated: "Apollo composition validates metadata"
+    metadata_missing: "Composition may fail silently"
+
+  debugging:
+    metadata_generated: "Clear error messages in composition"
+    metadata_missing: "Cryptic errors or runtime failures"
+
+blog_hooks:
+  beginner:
+    focus: "Understanding federation schema metadata"
+    key_points:
+      - "schema.json must include federation metadata"
+      - "@key fields listed in schema metadata"
+      - "External fields tracked for extensions"
+      - "Field directives documented in metadata"
+
+  intermediate:
+    focus: "Generating and validating schema.json"
+    key_points:
+      - "Type-level keys, extend, external_fields"
+      - "Field-level external, requires, provides"
+      - "Composite keys as multiple key definitions"
+      - "Mixed federation and local types"
+
+  advanced:
+    focus: "Schema metadata compliance and optimization"
+    key_points:
+      - "Apollo Federation v2 spec compliance"
+      - "Metadata validation algorithms"
+      - "Composite type mapping to metadata"
+      - "Performance implications of metadata size"

@@ -1,0 +1,28 @@
+id: authorization-tuning
+name: Authorization Tuning
+category: comprehensive
+type: standard
+tags:
+- authorization
+summary:
+  short: Authorization Tuning and implementation guidelines
+  long: Complete guide to authorization tuning
+problem:
+  description: Challenges without proper authorization tuning
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement authorization tuning
+key_concepts:
+  concept: Authorization Tuning
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

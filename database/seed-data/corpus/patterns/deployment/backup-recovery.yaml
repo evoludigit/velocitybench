@@ -1,0 +1,301 @@
+id: backup-recovery
+name: "Backup & Disaster Recovery Strategies"
+category: deployment
+type: standard
+tags:
+  - backup
+  - disaster-recovery
+  - resilience
+  - data-protection
+
+summary:
+  short: "Protecting data through regular backups and enabling recovery from failures"
+  long: |
+    Disaster recovery ensures business continuity when systems fail. Backup strategies include full backups, incremental backups, and replication. Recovery strategies determine RTO (Recovery Time Objective) and RPO (Recovery Point Objective) - how quickly you can recover and how much data loss is acceptable.
+
+problem:
+  description: "Data loss due to hardware failure, corruption, accidental deletion, or security breaches"
+  symptoms:
+    - "Hard drive fails; entire database lost"
+    - "Accidental DELETE statement wipes customer data"
+    - "Ransomware encrypts database files"
+    - "Application bug corrupts data; no way to restore"
+    - "Data center destroyed; all replicas gone"
+  impact: "Business-critical data loss, regulatory violations, customer trust erosion, legal liability"
+
+solution:
+  description: "Implement multi-layered backup and recovery strategy"
+
+backup_strategies:
+  full_backup:
+    description: "Copy entire database to storage"
+    method: |
+      Full Backup
+      Day 1: Backup entire DB (10GB) → 3 hours
+      Day 2: Backup entire DB (10GB) → 3 hours
+      Day 3: Backup entire DB (10GB) → 3 hours
+
+    pros:
+      - "Complete copy; no dependencies"
+      - "Easy to restore (just copy back)"
+      - "No restore complexity"
+
+    cons:
+      - "Large storage needed (3 × 10GB = 30GB)"
+      - "Slow (3 hours per backup)"
+      - "More I/O impact on production"
+
+    use_case: "Small databases, weekly full backups"
+
+  incremental_backup:
+    description: "Backup only changes since last backup"
+    method: |
+      Day 1: Full Backup (10GB) → 3 hours
+      Day 2: Incremental (only changes: 2GB) → 30 min
+      Day 3: Incremental (only changes: 1.5GB) → 20 min
+
+      Storage: 10GB + 2GB + 1.5GB = 13.5GB (vs 30GB full)
+
+    pros:
+      - "Much smaller storage (40% of full approach)"
+      - "Faster backups (30 min vs 3 hours)"
+      - "Less production impact"
+
+    cons:
+      - "Restore requires multiple backups"
+      - "If one incremental is corrupted, chain breaks"
+      - "More complex restore process"
+
+    restore_example: |
+      # Restore requires full backup + all incrementals
+      1. Restore full backup from Day 1
+      2. Apply incremental from Day 2
+      3. Apply incremental from Day 3
+      # Takes longer than full restore, but backup was faster
+
+    use_case: "Large databases, daily backups"
+
+  differential_backup:
+    description: "Backup changes since last full backup"
+    method: |
+      Day 1: Full Backup (10GB) → 3 hours
+      Day 2: Differential (changes since Day 1: 2GB) → 30 min
+      Day 3: Differential (changes since Day 1: 3.5GB) → 45 min
+
+      Storage: 10GB + 2GB + 3.5GB = 15.5GB
+
+    pros:
+      - "Simpler restore (full + one differential)"
+      - "Faster restore than incremental"
+      - "Still much smaller than full backups"
+
+    cons:
+      - "Larger than incremental"
+      - "Each differential grows as time from full increases"
+
+    use_case: "Balance between speed and storage"
+
+  continuous_replication:
+    description: "Real-time replication to standby systems"
+    method: |
+      Production DB → Continuous replication → Standby DB (real-time)
+
+      RPO: 0 (no data loss)
+      RTO: Seconds (failover is quick)
+
+    pros:
+      - "Zero data loss (RPO = 0)"
+      - "Fast failover (seconds)"
+      - "Standby can serve reads (reduce load)"
+
+    cons:
+      - "Expensive (double infrastructure)"
+      - "Replication lag possible under high load"
+      - "Synchronization complexity"
+
+    use_case: "Critical systems where data loss is unacceptable"
+
+recovery_metrics:
+  rto_recovery_time_objective:
+    definition: "Maximum acceptable downtime until system is operational"
+    examples: |
+      - 5 minutes RTO: Failover to standby (automatic)
+      - 1 hour RTO: Restore from hourly backup
+      - 24 hours RTO: Restore from daily backup
+
+    implications: |
+      - Lower RTO requires more infrastructure (replicas, standby servers)
+      - Higher RTO (24 hours) means lower cost but longer outage
+
+  rpo_recovery_point_objective:
+    definition: "Maximum acceptable data loss (how fresh must backups be)"
+    examples: |
+      - 0 seconds RPO: Continuous replication (real-time)
+      - 5 minutes RPO: Every 5 minutes backup
+      - 1 hour RPO: Hourly backups
+      - 24 hours RPO: Daily backups
+
+    implications: |
+      - Lower RPO requires frequent backups (more storage, more CPU)
+      - 0 RPO requires replication (expensive)
+      - Balance cost vs acceptable data loss
+
+  rto_vs_rpo_matrix: |
+    |          | RTO 5min | RTO 1hr | RTO 24hr |
+    |----------|----------|---------|----------|
+    | RPO 0    | Replication | Replication | Replication |
+    | RPO 5min | Frequent backups + standby | Frequent backups | Frequent backups |
+    | RPO 1hr  | Replication | Hourly backups | Hourly backups |
+    | RPO 24hr | Daily backups + manual | Daily backups | Daily backups |
+
+backup_implementation:
+  postgresql_example: |
+    # Full backup
+    pg_dump --format=tar --file=backup.tar mydb
+
+    # Restore
+    pg_restore --dbname=mydb backup.tar
+
+    # Continuous backup (WAL archiving)
+    # Enable in postgresql.conf:
+    # wal_level = replica
+    # archive_mode = on
+    # archive_command = 'cp %p /backups/wal/%f'
+
+  mysql_example: |
+    # Full backup
+    mysqldump --all-databases > full_backup.sql
+
+    # Restore
+    mysql < full_backup.sql
+
+    # Binary log backups (incremental)
+    # Enable in my.cnf:
+    # log_bin = mysql-bin
+    # expire_logs_days = 7
+
+  aws_s3_strategy: |
+    # Backup to cloud storage
+    1. Daily full backup to S3
+    2. Hourly incremental to S3
+    3. Cross-region replication
+    4. Lifecycle policy: delete after 90 days
+
+    Cost: ~$0.023/GB/month for storage
+    Safe: 11 nines durability (99.999999999%)
+
+testing_backups:
+  restore_procedures: |
+    def test_restore_from_backup():
+      # 1. Create backup
+      backup_file = create_backup()
+
+      # 2. Corrupt production data
+      db.execute("UPDATE users SET email = 'corrupted'")
+
+      # 3. Restore
+      restore_from_backup(backup_file)
+
+      # 4. Verify
+      user = db.query("SELECT * FROM users LIMIT 1")
+      assert user.email != 'corrupted'  # Restored
+
+    # Test regularly (monthly)
+
+  backup_integrity: |
+    def test_backup_integrity():
+      backup = create_backup()
+
+      # Calculate checksum
+      original_hash = hash_database()
+
+      # Restore and verify
+      restore_from_backup(backup)
+      restored_hash = hash_database()
+
+      assert original_hash == restored_hash
+
+common_mistakes:
+  - name: "Backups that nobody tests"
+    problem: "Backup fails silently; restore never works when needed"
+    solution: "Test restore monthly on non-production environment"
+
+  - name: "Backups on same storage as production"
+    problem: "Ransomware encrypts both production and backups"
+    solution: "Store backups on separate, air-gapped storage"
+
+  - name: "No geo-redundancy"
+    problem: "Data center fire destroys everything"
+    solution: "Replicate or backup to different geographic region"
+
+  - name: "Backups too old"
+    problem: "30-day-old backup; lost last month of data"
+    solution: "Set RPO based on business requirements"
+
+  - name: "Untested recovery procedures"
+    problem: "When disaster strikes, recovery steps don't work"
+    solution: "Document and test recovery procedures quarterly"
+
+best_practices:
+  - name: "Implement 3-2-1 backup rule"
+    description: "3 copies of data, 2 different media types, 1 offsite"
+
+  - name: "Automate backup process"
+    description: "No manual backups; should be fully automated"
+
+  - name: "Monitor backup success"
+    description: "Alert if backup fails, not just if restore fails"
+
+  - name: "Test restore procedures"
+    description: "Quarterly restore tests to verify backups work"
+
+  - name: "Encrypt backups"
+    description: "Backups are sensitive; encrypt in transit and at rest"
+
+  - name: "Document recovery procedures"
+    description: "Clear step-by-step guides for restoring data"
+
+  - name: "Implement immutable backups"
+    description: "Prevent deletion or modification of backups (ransomware protection)"
+
+  - name: "Plan for compliance"
+    description: "GDPR (right to be forgotten), HIPAA (audit trails)"
+
+anti_patterns:
+  - name: "Taking backups during peak hours"
+    consequence: "Production performance degraded; users experience slowness"
+    fix: "Schedule backups during off-peak hours"
+
+  - name: "Keeping backups forever"
+    consequence: "Storage costs grow unbounded"
+    fix: "Implement retention policies (e.g., delete after 90 days)"
+
+  - name: "Storing encryption keys with backups"
+    consequence: "If backup is stolen, data is exposed"
+    fix: "Store encryption keys separately from backups"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Backups are like insurance for your data:
+      - Full backup: Like home insurance (covers everything)
+      - Incremental: Like paying less if you keep up maintenance
+      - Replication: Like having a second home ready to move into
+
+      You need insurance before something breaks!
+
+  intermediate:
+    focus: "Backup strategy implementation"
+    key_points:
+      - "Full vs incremental vs differential backups"
+      - "RTO and RPO metrics"
+      - "Testing restore procedures"
+      - "Encryption and security of backups"
+
+  advanced:
+    focus: "Large-scale disaster recovery"
+    key_points:
+      - "Cross-region replication"
+      - "Immutable backups for ransomware protection"
+      - "Point-in-time recovery"
+      - "Multi-region failover strategies"

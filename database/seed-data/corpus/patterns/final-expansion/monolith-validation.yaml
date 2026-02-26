@@ -1,0 +1,28 @@
+id: monolith-validation
+name: Monolith Validation
+category: comprehensive
+type: standard
+tags:
+- monolith
+summary:
+  short: Monolith Validation and implementation guidelines
+  long: Complete guide to monolith validation
+problem:
+  description: Challenges without proper monolith validation
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement monolith validation
+key_concepts:
+  concept: Monolith Validation
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

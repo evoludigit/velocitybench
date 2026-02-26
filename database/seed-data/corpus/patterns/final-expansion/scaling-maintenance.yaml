@@ -1,0 +1,28 @@
+id: scaling-maintenance
+name: Scaling Maintenance
+category: comprehensive
+type: standard
+tags:
+- scaling
+summary:
+  short: Scaling Maintenance and implementation guidelines
+  long: Complete guide to scaling maintenance
+problem:
+  description: Challenges without proper scaling maintenance
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement scaling maintenance
+key_concepts:
+  concept: Scaling Maintenance
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

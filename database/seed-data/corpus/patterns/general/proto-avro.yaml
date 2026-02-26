@@ -1,0 +1,31 @@
+id: proto-avro
+name: AVRO Protocol Patterns
+category: general
+type: standard
+tags:
+- proto
+summary:
+  short: Best practices for avro protocol patterns
+  long: Comprehensive guide to avro protocol patterns. This pattern covers implementation
+    details, best practices, and common pitfalls.
+problem:
+  description: Issues without proper avro protocol patterns
+  symptoms:
+  - Performance issues
+  - Reliability problems
+  - Scalability challenges
+  impact: System degradation
+solution:
+  description: Implement avro protocol patterns effectively
+key_concepts:
+  concept: Understanding avro protocol patterns
+best_practices:
+- name: Best practice 1
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Introduction to AVRO Protocol Patterns
+  intermediate:
+    focus: Implementing AVRO Protocol Patterns
+  advanced:
+    focus: Advanced AVRO Protocol Patterns

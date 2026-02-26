@@ -1,0 +1,28 @@
+id: serverless-observability
+name: Serverless Observability
+category: comprehensive
+type: standard
+tags:
+- serverless
+summary:
+  short: Serverless Observability and implementation guidelines
+  long: Complete guide to serverless observability
+problem:
+  description: Challenges without proper serverless observability
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement serverless observability
+key_concepts:
+  concept: Serverless Observability
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

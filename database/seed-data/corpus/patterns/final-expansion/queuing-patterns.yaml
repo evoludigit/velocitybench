@@ -1,0 +1,28 @@
+id: queuing-patterns
+name: Queuing Patterns
+category: comprehensive
+type: standard
+tags:
+- queuing
+summary:
+  short: Queuing Patterns and implementation guidelines
+  long: Complete guide to queuing patterns
+problem:
+  description: Challenges without proper queuing patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement queuing patterns
+key_concepts:
+  concept: Queuing Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

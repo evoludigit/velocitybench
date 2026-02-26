@@ -1,0 +1,28 @@
+id: hybrid-monitoring
+name: Hybrid Monitoring
+category: comprehensive
+type: standard
+tags:
+- hybrid
+summary:
+  short: Hybrid Monitoring and implementation guidelines
+  long: Complete guide to hybrid monitoring
+problem:
+  description: Challenges without proper hybrid monitoring
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement hybrid monitoring
+key_concepts:
+  concept: Hybrid Monitoring
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

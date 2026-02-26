@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Summarize Phase 7 workload test results from JMeter output.
+Summarize workload test results from JMeter output.
 """
 
 import json
@@ -107,7 +107,7 @@ def generate_summary(results_dir, framework):
         json.dump(summary, f, indent=2)
 
     # Print summary to console
-    print("\n=== Phase 7 Workload Summary ===")
+    print("\n=== Workload Summary ===")
     print(f"Framework: {framework}")
     print(f"Results directory: {results_path}")
     print(f"Generated: {summary['timestamp']}\n")

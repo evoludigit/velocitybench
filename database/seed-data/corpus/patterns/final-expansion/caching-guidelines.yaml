@@ -1,0 +1,28 @@
+id: caching-guidelines
+name: Caching Guidelines
+category: comprehensive
+type: standard
+tags:
+- caching
+summary:
+  short: Caching Guidelines and implementation guidelines
+  long: Complete guide to caching guidelines
+problem:
+  description: Challenges without proper caching guidelines
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement caching guidelines
+key_concepts:
+  concept: Caching Guidelines
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

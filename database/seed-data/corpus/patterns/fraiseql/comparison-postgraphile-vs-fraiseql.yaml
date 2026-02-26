@@ -1,0 +1,376 @@
+id: comparison-postgraphile-vs-fraiseql
+name: "Framework Comparison: PostGraphile vs FraiseQL (Database-First vs Code-First)"
+category: fraiseql
+type: comparison
+tags:
+  - framework-comparison
+  - graphql-architecture
+  - postgresql
+  - query-optimization
+
+summary:
+  short: "Compare PostGraphile (auto-generated from PostgreSQL) vs FraiseQL (code-first with hand-optimized queries)"
+  long: |
+    Both PostGraphile and FraiseQL build on PostgreSQL but represent opposite philosophies.
+    PostGraphile generates schema by introspecting the database - maximal automation, minimal code.
+    FraiseQL generates schema from Python types and provides hand-crafted query optimization.
+    This comparison helps teams choose between zero-code speed and controlled optimization.
+
+problem:
+  description: |
+    Teams building GraphQL on PostgreSQL face a choice:
+    - PostGraphile: Database schema is everything, generate GraphQL automatically
+    - FraiseQL: Python types control schema, hand-optimize queries with JSONB, TV tables
+
+    Trade-off: Speed to MVP vs query optimization at scale
+
+comparison:
+  approach_1:
+    name: "PostGraphile (Database-First)"
+    philosophy: "PostgreSQL database schema is the source of truth, GraphQL schema auto-generated"
+
+    workflow: |
+      1. Design PostgreSQL schema (tables, relationships, constraints)
+      2. Start PostGraphile server (introspects database)
+      3. GraphQL schema auto-generated from database
+      4. Relations inferred from foreign keys
+      5. Optional: Add custom resolvers for business logic
+
+      Example database:
+      ```sql
+      CREATE TABLE tb_user (
+        id UUID PRIMARY KEY,
+        email VARCHAR UNIQUE NOT NULL,
+        name VARCHAR NOT NULL
+      );
+
+      CREATE TABLE tb_post (
+        id UUID PRIMARY KEY,
+        user_id UUID NOT NULL REFERENCES tb_user(id),
+        title VARCHAR NOT NULL,
+        created_at TIMESTAMP
+      );
+      ```
+
+      PostGraphile generates:
+      ```graphql
+      type Query {
+        user(id: UUID!): User
+        users(first: Int, after: String): [User!]!
+        post(id: UUID!): Post
+      }
+
+      type User {
+        id: UUID!
+        email: String!
+        name: String!
+        posts: [Post!]!  # Inferred from FK
+      }
+
+      type Post {
+        id: UUID!
+        title: String!
+        user: User!  # Inferred from FK
+      }
+      ```
+
+    schema_ownership: "Database (schema is introspected, read-only from GraphQL)"
+    query_control: "Limited (framework decides how to fetch related data)"
+    resolver_code: "Minimal for CRUD (mostly configuration, not code)"
+
+    pros:
+      - "Zero schema boilerplate (auto-generated from database)"
+      - "Database is single source of truth (no drift)"
+      - "Fast to MVP (run server, get GraphQL API immediately)"
+      - "Relationships automatic (foreign keys become fields)"
+      - "Permissions database-level (Row-Level Security works)"
+      - "Schema always current (introspection on startup)"
+      - "Familiar for database-first teams (think in SQL)"
+
+    cons:
+      - "Query optimization limited (can't hand-craft queries)"
+      - "N+1 problem unsolved (framework fetches related data naively)"
+      - "Can't pre-compose (JSONB composition not possible)"
+      - "Custom business logic is harder (must add resolvers, bypass framework)"
+      - "Schema exposes database structure (requires careful security)"
+      - "Scaling limited (each query is 1:1 with database)"
+      - "Vendor locked (PostgreSQL specific, doesn't work with MySQL, etc.)"
+
+    best_for: "CRUD-heavy APIs, rapid prototyping, database-first organizations"
+    developer_experience: "Minimal coding, maximum automation"
+    scaling_potential: "Good for MVP, limited for query optimization"
+
+  approach_2:
+    name: "FraiseQL (Code-First with Optimization)"
+    philosophy: "Python types define schema, hand-craft optimization with JSONB and TV tables"
+
+    workflow: |
+      1. Define Python types (classes, fields, relationships)
+      2. FraiseQL generates GraphQL schema from types
+      3. Write custom queries optimized with JSONB composition
+      4. Use TV tables (materialized views) for complex aggregations
+      5. Schema changes = update Python type
+
+      Example code:
+      ```python
+      @fraiseql.type
+      class User:
+          id: str
+          email: str
+          name: str
+          posts: list[Post]  # Not auto-inferred, explicitly defined
+
+      @fraiseql.type
+      class Post:
+          id: str
+          title: str
+          user: User
+
+      @fraiseql.query
+      async def get_user(user_id: str) -> User:
+          # Hand-optimized query with JSONB composition
+          result = await db.query_one("""
+            SELECT
+              u.id,
+              u.email,
+              u.name,
+              jsonb_agg(jsonb_build_object(
+                'id', p.id,
+                'title', p.title
+              )) as posts
+            FROM tb_user u
+            LEFT JOIN tb_post p ON p.user_id = u.id
+            WHERE u.id = %s
+            GROUP BY u.id
+          """, user_id)
+          return User(
+            id=result['id'],
+            email=result['email'],
+            name=result['name'],
+            posts=[Post(**p) for p in result['posts']]
+          )
+      ```
+
+    schema_ownership: "Python code (types are schema source)"
+    query_control: "Full (hand-craft every query with SQL or framework helpers)"
+    resolver_code: "Significant (all queries explicitly written)"
+
+    pros:
+      - "Query optimization under control (hand-craft with JSONB, TV tables)"
+      - "N+1 prevention at database level (compose in SQL, not Python)"
+      - "Pre-composition with JSONB (fetch one, reshape in database)"
+      - "Type safety enforced (Python type system, not manually)"
+      - "Cascade invalidation (smart query caching, not blind TTL)"
+      - "TV tables for complex aggregations (materialized views)"
+      - "Refactoring safe (IDE can rename, extract, move)"
+      - "Custom business logic natural (it's just Python)"
+
+    cons:
+      - "More boilerplate (write queries explicitly, not auto-generated)"
+      - "Database schema separate (types and database can drift)"
+      - "Learning curve higher (must understand SQL optimization)"
+      - "Team coordination (must discuss schema changes)"
+      - "Not truly database-first (database is implementation detail)"
+      - "More code to maintain (queries live in application)"
+      - "Type/database mismatch possible (no introspection)"
+
+    best_for: "Query optimization critical, custom business logic, team values control"
+    developer_experience: "More control, more responsibility"
+    scaling_potential: "Excellent (JSONB composition, TV tables, cascade invalidation)"
+
+  fraiseql_choice:
+    name: "Code-First with Hand-Optimized Queries"
+    rationale: |
+      FraiseQL chose **code-first with explicit query optimization** because:
+      1. **Query control**: Can hand-craft with JSONB composition, TV tables
+      2. **Performance at scale**: N+1 prevented at database level, not patched in app
+      3. **Type safety**: Python types enforce consistency without manual SDL
+      4. **Advanced features**: Cascade invalidation, three-state responses, streaming
+      5. **Explicit over implicit**: Query behavior is visible (not auto-generated magic)
+
+    implementation_philosophy: |
+      FraiseQL's philosophy:
+      - Types are Python classes with @fraiseql decorators
+      - Queries are explicitly written (not auto-generated)
+      - Optimization uses JSONB composition, not N+1 + DataLoader
+      - TV tables (materialized views) for complex aggregations
+      - PostgreSQL streaming driver (memory efficient)
+      - Cascade invalidation (smart caching based on field changes)
+
+      Key insight: Explicit queries aren't a burden, they're a feature:
+      - Query author sees exactly what's happening
+      - Performance predictable (one database query visible)
+      - Easy to optimize (EXPLAIN ANALYZE on the actual query)
+      - No surprise N+1s (would require many queries in code)
+      - Custom logic naturally expressed
+
+    assessment_strengths: |
+      ✓ **Query control**: Hand-craft with JSONB, TV tables for optimal performance
+      ✓ **Type safety**: Python types enforced (no schema/code drift)
+      ✓ **Performance**: N+1 solved at database level (one query, shaped in DB)
+      ✓ **Scaling**: Handles billions of rows (keyset pagination, streaming)
+      ✓ **Customization**: Explicit queries allow arbitrary business logic
+      ✓ **Observability**: EXPLAIN ANALYZE works (see actual query cost)
+      ✓ **Caching**: Cascade invalidation beats blind TTL (85-90% hit rate)
+      ✓ **Refactoring**: IDE tools work (rename, extract, move safely)
+
+    assessment_weaknesses: |
+      ✗ **More code**: Write queries explicitly (not auto-generated)
+      ✗ **Learning curve**: Must understand SQL optimization, JSONB composition
+      ✗ **Database drift**: Types and database separate (discipline required)
+      ✗ **Change coordination**: Schema changes need planning
+      ✗ **Team dependency**: Requires team knowledge of SQL/optimization
+      ✗ **Not truly database-first**: Database is implementation, not definition
+      ✗ **Heavier upfront**: More code before first query runs
+
+    when_to_choose_fraiseql: |
+      Choose FraiseQL when:
+      - **Performance critical**: Need hand-optimized queries at scale
+      - **Complex queries**: Business logic requires custom SQL/JSONB
+      - **Type safety important**: Want compiler-enforced consistency
+      - **Team knows SQL**: Team comfortable writing SQL queries
+      - **Advanced features needed**: Cascade invalidation, streaming, composition
+      - **Scaling anticipated**: Plan to handle millions/billions of rows
+
+    when_postgraphile_is_better: |
+      Choose PostGraphile when:
+      - **CRUD-only**: Mostly read-update-delete operations
+      - **Speed to MVP critical**: Need working API in hours
+      - **Team new to GraphQL**: Introspection is easier to understand
+      - **Database-first mindset**: Team thinks in SQL schema, not application types
+      - **Permissioning is key**: PostgreSQL RLS (Row-Level Security) is important
+      - **Zero custom logic**: No business logic beyond database constraints
+
+benchmarks:
+  scenario: "User API with posts, comments, and aggregations"
+
+  time_to_first_query:
+    postgraphile: "5-10 minutes (start server, introspect, query)"
+    fraiseql: "30-45 minutes (define types, write queries, compose)"
+
+  time_to_optimize_for_scale:
+    postgraphile: "Very high (discover N+1, patch with DataLoader, hope it works)"
+    fraiseql: "Low (already optimized with JSONB composition)"
+
+  query_latency_at_scale:
+    postgraphile_naive: "150-300ms (N+1 query problem)"
+    postgraphile_with_dataloader: "80-120ms (after batching)"
+    fraiseql: "35-45ms (JSONB composition in database)"
+
+  developer_velocity_initial:
+    postgraphile: "Very high (zero code required)"
+    fraiseql: "Medium (write types and queries)"
+
+  developer_velocity_maintaining:
+    postgraphile: "Medium (patches for N+1, DataLoader tuning)"
+    fraiseql: "High (type system catches bugs, changes visible)"
+
+  type_safety:
+    postgraphile: "Medium (inferred from database, can still drift)"
+    fraiseql: "High (Python type system enforced)"
+
+  customization_difficulty:
+    postgraphile: "High (resolve, override, work around)"
+    fraiseql: "Low (explicit code, easy to customize)"
+
+decision_matrix:
+  api_complexity:
+    question: "How complex is your API?"
+    answer_simple_crud: "PostGraphile (zero code for CRUD)"
+    answer_complex_queries: "FraiseQL (hand-optimize complex cases)"
+
+  team_sql_knowledge:
+    question: "Is your team comfortable with SQL?"
+    answer_strong_sql: "FraiseQL (can optimize queries)"
+    answer_weak_sql: "PostGraphile (framework handles SQL)"
+
+  query_optimization_needed:
+    question: "Do you anticipate query optimization needs?"
+    answer_likely_yes: "FraiseQL (control from day one)"
+    answer_unlikely_no: "PostGraphile (defer until needed)"
+
+  schema_flexibility:
+    question: "Will schema change frequently?"
+    answer_stable_schema: "PostGraphile (introspection adapts)"
+    answer_evolving_schema: "FraiseQL (code-first easier to change)"
+
+  time_to_market:
+    question: "How urgent is getting to market?"
+    answer_very_urgent_days: "PostGraphile (minutes to MVP)"
+    answer_normal_weeks: "FraiseQL (better long-term trajectory)"
+
+  permission_model:
+    question: "Do you need row-level security (RLS)?"
+    answer_yes_rls_important: "PostGraphile (RLS is first-class)"
+    answer_no_simpler_auth: "FraiseQL (handle auth in application)"
+
+trade_off_summary:
+  speed_vs_optimization: |
+    PostGraphile: 5 min to MVP, optimization becomes a separate problem
+    FraiseQL: 45 min to MVP, optimization already built-in
+
+    **FraiseQL trades upfront speed for long-term optimization.**
+
+  automation_vs_control: |
+    PostGraphile: Maximum automation (database → GraphQL)
+    FraiseQL: Maximum control (code defines everything)
+
+    **FraiseQL chooses control so optimization is always possible.**
+
+  database_first_vs_code_first: |
+    PostGraphile: Database changes propagate immediately (live introspection)
+    FraiseQL: Code changes are explicit (full control over schema)
+
+    **FraiseQL's explicit model prevents surprise schema changes.**
+
+  team_burden: |
+    PostGraphile: Framework handles complexity, team handles N+1 patches
+    FraiseQL: Team writes queries, queries are obvious and optimizable
+
+    **FraiseQL moves burden from later (debugging) to earlier (writing queries).**
+
+recommendations:
+  - "Use PostGraphile if CRUD-only and database-schema-first is natural for your org"
+  - "Use FraiseQL if query optimization and type safety are important"
+  - "PostGraphile is better for starting (faster to MVP)"
+  - "FraiseQL is better for scaling (optimization built-in)"
+  - "FraiseQL's code-first means you can always see what queries run"
+  - "PostGraphile's introspection means changes are automatic but unpredictable"
+
+cost_analysis:
+  postgraphile:
+    initial_velocity: "Very high (5 min setup)"
+    scaling_velocity: "Decreases (N+1 discovery and fixes)"
+    optimization_cost: "High (DataLoader tuning, query analysis)"
+    team_knowledge: "Moderate (SQL, GraphQL basics)"
+
+  fraiseql:
+    initial_velocity: "Moderate (45 min setup, write queries)"
+    scaling_velocity: "Consistent (already optimized)"
+    optimization_cost: "Low (queries already hand-optimized)"
+    team_knowledge: "High (SQL optimization, JSONB, Python types)"
+
+blog_hooks:
+  beginner:
+    focus: "Understanding database-first vs code-first"
+    key_points:
+      - "PostGraphile: Database schema is truth, GraphQL auto-generated"
+      - "FraiseQL: Python types are truth, hand-optimize queries"
+      - "PostGraphile faster to start, FraiseQL better to scale"
+      - "Both use PostgreSQL, opposite philosophies"
+
+  intermediate:
+    focus: "Trade-offs in practice at growing scale"
+    key_points:
+      - "PostGraphile: Discover N+1 at scale, patch with DataLoader"
+      - "FraiseQL: N+1 prevented via JSONB composition from day one"
+      - "PostGraphile schema driven by database (introspection)"
+      - "FraiseQL schema driven by code (types)"
+
+  advanced:
+    focus: "Choosing architecture for production at scale"
+    key_points:
+      - "PostGraphile: Simplicity beats optimization initially"
+      - "FraiseQL: Optimization control from day one"
+      - "PostGraphile: Good for schema-driven orgs (DB teams own schema)"
+      - "FraiseQL: Good for feature-team orgs (application owns optimization)"

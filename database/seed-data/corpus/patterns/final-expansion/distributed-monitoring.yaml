@@ -1,0 +1,28 @@
+id: distributed-monitoring
+name: Distributed Monitoring
+category: comprehensive
+type: standard
+tags:
+- distributed
+summary:
+  short: Distributed Monitoring and implementation guidelines
+  long: Complete guide to distributed monitoring
+problem:
+  description: Challenges without proper distributed monitoring
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement distributed monitoring
+key_concepts:
+  concept: Distributed Monitoring
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

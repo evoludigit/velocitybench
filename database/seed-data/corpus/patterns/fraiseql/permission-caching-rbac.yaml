@@ -1,0 +1,58 @@
+id: permission-caching-rbac
+name: Permission Caching RBAC
+category: fraiseql
+type: standard
+tags:
+- security
+- authorization
+- rbac
+- caching
+- performance
+summary:
+  short: Three-layer permission cache for sub-millisecond RBAC checks
+  long: FraiseQL implements three-layer permission caching (request-level < 0.3ms,
+    UNLOGGED tables, hierarchical role cache with domain versioning) to achieve sub-millisecond
+    permission checks at enterprise scale without sacrificing security.
+problem:
+  description: Database permission checks add significant latency to every operation
+  symptoms:
+  - Slow authorization checks (10-50ms per check)
+  - Database bottleneck on permission queries
+  - Can't scale to thousands of permission checks
+  - Permission changes not reflected quickly
+  impact: Poor query performance and authorization bottlenecks
+solution:
+  description: Implement Permission Caching RBAC effectively
+key_concepts:
+  concept_1: L1 request-scoped permission cache
+  concept_2: L2 PostgreSQL UNLOGGED permission tables
+  concept_3: L3 hierarchical role cache with versioning
+  concept_4: Domain versioning for automatic invalidation
+implementation_considerations:
+  consideration_1: Cache invalidation on permission changes
+  consideration_2: Domain versioning strategy
+  consideration_3: Permission inheritance in hierarchies
+  consideration_4: Multi-tenant permission isolation
+best_practices:
+- name: Request-level cache
+  description: Cache permission results for request duration
+- name: Domain versioning
+  description: Increment version on permission changes
+- name: Hierarchical roles
+  description: Cache role hierarchies separately
+- name: Monitor cache hits
+  description: Track L1/L2/L3 hit rates
+anti_patterns:
+- name: No caching
+  consequence: Database becomes permission check bottleneck
+- name: Long-lived cache
+  consequence: Stale permissions after changes
+- name: No versioning
+  consequence: Complex invalidation logic
+blog_hooks:
+  beginner:
+    focus: Introduction to Permission Caching RBAC
+  intermediate:
+    focus: Implementing three-layer permission cache
+  advanced:
+    focus: Advanced domain versioning and hierarchical role optimization

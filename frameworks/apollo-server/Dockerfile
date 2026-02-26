@@ -13,6 +13,6 @@ COPY src ./src
 RUN npm run build
 RUN npm prune --production
 
-EXPOSE 4001 4002
+EXPOSE 4002
 
 CMD ["node", "dist/index.js"]

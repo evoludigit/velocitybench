@@ -1,0 +1,100 @@
+id: evolution-of-monitoring
+name: "Evolution of Monitoring and Observability"
+category: history
+type: timeline
+tags:
+  - monitoring
+  - observability
+  - history
+  - devops
+  - operations
+
+summary:
+  short: "From basic system monitoring to modern observability platforms"
+  long: |
+    Monitoring evolved from simple threshold alerts to comprehensive observability.
+    Modern observability combines metrics, logs, and traces to understand complex
+    distributed systems. The journey reflects growing system complexity.
+
+timeline:
+  - year: 1990s
+    title: "Nagios and System Monitoring"
+    description: "Simple threshold-based alerting for servers"
+    approach: "Is the service up or down?"
+    tools: ["Nagios", "Zabbix"]
+  
+  - year: 2008
+    title: "Graphite: Time Series Database"
+    description: "Store and visualize metrics over time"
+    innovation: "Trend analysis, not just alerts"
+  
+  - year: 2012
+    title: "ELK Stack Emerges"
+    description: "Elasticsearch, Logstash, Kibana for log aggregation"
+    impact: "Centralized log analysis for debugging"
+  
+  - year: 2013
+    title: "Prometheus Time Series Database"
+    description: "Pull-based metrics collection for cloud"
+    advantage: "Simple yet powerful metrics"
+  
+  - year: 2015
+    title: "Observability Concept"
+    description: "Three pillars: metrics, logs, traces"
+    paradigm: "From monitoring to understanding"
+  
+  - year: 2015
+    title: "Distributed Tracing"
+    description: "Jaeger, Zipkin for request tracing"
+    benefit: "Understand requests across services"
+  
+  - year: 2019
+    title: "CloudNative Observability"
+    description: "Observability built into cloud platforms"
+    examples: ["AWS CloudWatch", "Google Cloud Trace", "Azure Monitor"]
+  
+  - year: 2020
+    title: "AIOps Emerges"
+    description: "AI-driven anomaly detection and remediation"
+    vision: "Self-healing systems"
+
+three_pillars:
+  - name: "Metrics"
+    description: "Quantitative measurements over time"
+    example: "CPU, memory, requests per second"
+  
+  - name: "Logs"
+    description: "Detailed event records"
+    example: "Application logs, access logs"
+  
+  - name: "Traces"
+    description: "Request flow across services"
+    example: "Distributed transaction tracking"
+
+modern_stack:
+  - "Prometheus or Datadog (metrics)"
+  - "ELK or Splunk (logs)"
+  - "Jaeger or DataDog (traces)"
+  - "AlertManager or PagerDuty (alerting)"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Observability is like doctor's examination:
+      - Metrics: Vital signs (heart rate, temperature)
+      - Logs: Medical history and complaints
+      - Traces: Detailed diagnosis of what happened
+
+  intermediate:
+    focus: "Building observability"
+    key_points:
+      - "Choosing the right tools"
+      - "Designing dashboards"
+      - "Alert strategies"
+
+  advanced:
+    focus: "Enterprise observability"
+    key_points:
+      - "High cardinality metrics"
+      - "Trace sampling"
+      - "Cost optimization"

@@ -1,0 +1,28 @@
+id: throughput-observability
+name: Throughput Observability
+category: comprehensive
+type: standard
+tags:
+- throughput
+summary:
+  short: Throughput Observability and implementation guidelines
+  long: Complete guide to throughput observability
+problem:
+  description: Challenges without proper throughput observability
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement throughput observability
+key_concepts:
+  concept: Throughput Observability
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

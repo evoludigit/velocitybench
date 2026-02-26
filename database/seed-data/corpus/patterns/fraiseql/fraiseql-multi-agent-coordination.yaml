@@ -1,0 +1,297 @@
+id: fraiseql-multi-agent-coordination
+name: "FraiseQL Multi-Agent Coordination with Confiture"
+category: fraiseql
+type: standard
+tags:
+  - fraiseql
+  - confiture
+  - multi-agent
+  - coordination
+  - conflict-detection
+
+summary:
+  short: "Coordinating multiple AI agents or developers working on FraiseQL schema changes"
+  long: |
+    When multiple agents (Claude, GPT, or developers) work on the same FraiseQL schema in parallel,
+    conflicts can occur (both modify the same table). Confiture provides automatic conflict detection
+    and coordination, allowing agents to register intent, check for conflicts, and resolve coordination
+    issues systematically. This enables safe parallel development and AI-assisted schema evolution.
+
+problem:
+  description: |
+    Multi-agent development creates coordination challenges:
+    - Agent A: "I'm adding posts table"
+    - Agent B: "I'm also adding posts table" (conflict!)
+    - Or: Both modify users table differently
+
+    Without coordination, agents waste time on conflicts.
+
+  symptoms:
+    - name: "Schema merge conflicts"
+      description: "Both agents add column to same table"
+      detection: "Git merge conflict in DDL files"
+
+    - name: "Duplicate work"
+      description: "Agent B doesn't know Agent A is working on it"
+      detection: "Same feature implemented twice"
+
+    - name: "Wasted effort"
+      description: "Agent B's work rejected due to Agent A's change"
+      detection: "Time wasted on conflicting implementation"
+
+  impact: |
+    Wasted agent effort, merge conflicts, coordination overhead
+
+solution:
+  principle: "Pre-flight conflict detection + explicit coordination"
+
+  components:
+    - name: "Agent Registration"
+      type: "Coordination mechanism"
+      purpose: "Declare intent before starting work"
+      pattern: |
+        Agent A: "I'm working on posts table for 2 hours"
+        Confiture: "OK, registered. No conflicts detected."
+
+        Agent B: "I want to work on posts table"
+        Confiture: "⚠️ Conflict: Agent A already working on posts"
+        Agent B: "OK, I'll work on comments instead"
+
+      commands: |
+        # CLI-based registration
+        confiture coordinate register \
+          --agent-id claude-posts-feature \
+          --feature-name blog_posts \
+          --tables-affected users,posts \
+          --risk-level medium \
+          --duration 2h
+
+        # Pre-flight check
+        confiture coordinate check \
+          --agent-id gpt-comments-feature \
+          --tables-affected posts,comments
+
+    - name: "Conflict Detection"
+      type: "Automatic detection"
+      purpose: "Identify conflicts before work starts"
+      detection: |
+        - Table conflicts (both modify same table)
+        - Column conflicts (both add same column)
+        - Type conflicts (different types for same column)
+        - Constraint conflicts (contradictory constraints)
+
+      resolution: |
+        Confiture lists conflicts and suggests:
+        - Sequential order (Agent A first, then B)
+        - Different objects (Agent A: posts, Agent B: comments)
+        - Merge strategy (both contribute to same schema)
+
+    - name: "Intent Registry"
+      type: "Data structure"
+      purpose: "Track active work and prevent conflicts"
+      fields: |
+        {
+          agent_id: "claude-payments",
+          feature_name: "stripe_integration",
+          tables_affected: ["users", "orders"],
+          status: "in_progress",
+          risk_level: "high",
+          duration: "4h",
+          conflict_count: 0,
+          created_at: "2025-01-29T10:00:00Z"
+        }
+
+    - name: "Conflict Resolution Strategies"
+      type: "Coordination patterns"
+      purpose: "Handle different conflict types"
+      strategies:
+        sequential: |
+          **Sequential** (do one after another):
+          - Agent A completes (1 hour)
+          - Agent B reviews, merges (30 minutes)
+          - Agent C continues (1 hour)
+          - Ensures no conflicts, slower progress
+
+        merge: |
+          **Merge** (combine changes):
+          - Both agents modify different columns same table
+          - Merge both sets of columns in final schema
+          - Requires schema coordination
+
+        parallel: |
+          **Parallel** (independent objects):
+          - Agent A: posts table
+          - Agent B: comments table
+          - Agent C: tags table
+          - All work simultaneously on different tables
+
+        adaptive: |
+          **Adaptive** (choose strategy dynamically):
+          - Check conflict severity
+          - Suggest sequential for high-risk
+          - Allow parallel for independent changes
+
+    - name: "Workflow States"
+      type: "State machine"
+      purpose: "Track agent work progress"
+      states: |
+        pending → in_progress → review → resolved → completed
+
+        pending: Agent registered, waiting approval
+        in_progress: Agent actively working
+        review: Work ready for merge/verification
+        resolved: Conflicts handled, merged
+        completed: Work done, closed
+
+    - name: "Concurrent Development"
+      type: "Pattern"
+      purpose: "Multiple agents on different schema aspects"
+      example: |
+        Agent A (Claude):
+        - Working on: user authentication (users table)
+        - Tables: users, auth_tokens
+        - Duration: 2 hours
+
+        Agent B (GPT):
+        - Working on: blog posts (posts, comments tables)
+        - Tables: posts, comments, tags
+        - Duration: 3 hours
+
+        Agent C (Local LLM):
+        - Working on: notifications (notifications table)
+        - Tables: notifications, notification_preferences
+        - Duration: 1 hour
+
+        ✓ No conflicts (different tables), can work in parallel
+
+key_concepts:
+  concept_1: "Pre-flight registration prevents conflicts"
+  concept_2: "Automatic conflict detection before work starts"
+  concept_3: "Intent registry tracks active development"
+  concept_4: "Sequential/merge/parallel strategies for different situations"
+  concept_5: "Risk levels guide conflict resolution approach"
+  concept_6: "Coordination metadata enables future analysis"
+  concept_7: "Agents coordinate without direct communication"
+  concept_8: "Safe parallel development through explicit coordination"
+
+best_practices:
+  - name: "Register before starting work"
+    description: "Declare intent, get pre-flight conflict check"
+
+  - name: "Use appropriate risk level"
+    description: "High-risk changes get sequential, low-risk get parallel"
+
+  - name: "Check for conflicts regularly"
+    description: "If new agent joins, check compatibility"
+
+  - name: "Document coordination decisions"
+    description: "Why sequential vs parallel, merged strategy"
+
+  - name: "Set reasonable duration"
+    description: "Duration helps prevent stale registrations"
+
+  - name: "Update status as progress"
+    description: "Move through states: pending → in_progress → review → resolved"
+
+  - name: "Resolve conflicts explicitly"
+    description: "Don't let conflicts pile up, resolve during development"
+
+anti_patterns:
+  - name: "No pre-flight check"
+    description: "Agent starts work without checking conflicts"
+    consequence: "Work conflicts with other agent"
+    fix: "Always call confiture coordinate check first"
+
+  - name: "Ignoring conflict warnings"
+    description: "Conflict detected, but agent proceeds anyway"
+    consequence: "Merge conflict later"
+    fix: "Coordinate with conflicting agent to resolve"
+
+  - name: "Stale registrations"
+    description: "Agent registers 5-hour task but finishes in 30 minutes"
+    consequence: "Confiture thinks work still in progress"
+    fix: "Update status or set accurate duration"
+
+  - name: "No collaboration"
+    description: "Agents don't coordinate, both work on same table"
+    consequence: "Merge conflicts"
+    fix: "Use confiture coordination before starting"
+
+examples:
+  example_1:
+    title: "Pre-Flight Conflict Check"
+    description: "Check for conflicts before starting work"
+    code: |
+      # Agent A: Register work
+      $ confiture coordinate register \
+          --agent-id claude-auth \
+          --feature-name oauth2 \
+          --tables-affected users,auth_tokens \
+          --risk-level high
+
+      # Agent B: Check for conflicts
+      $ confiture coordinate check \
+          --agent-id gpt-payments \
+          --tables-affected users,payments
+
+      # Output:
+      # ⚠️ Conflict detected!
+      # - users table: claude-auth is already working on it
+      # Suggested: Work on different aspect of payments
+
+  example_2:
+    title: "Parallel Development"
+    description: "Multiple agents work on different tables simultaneously"
+    code: |
+      # All safe to work in parallel
+      Agent A: users table (auth features)
+      Agent B: posts table (blog features)
+      Agent C: notifications table (alerts)
+
+      $ confiture coordinate list-intents
+      # Output:
+      # - claude-auth: users (high-risk, 3h)
+      # - gpt-blog: posts (medium-risk, 2h)
+      # - llm-notifications: notifications (low-risk, 1h)
+      # ✓ No conflicts detected, all can proceed
+
+comparison_matrix:
+  conflict_type:
+    no_conflict: "Different tables"
+    low_conflict: "Same table, different columns"
+    high_conflict: "Same table, same column"
+
+  resolution_strategy:
+    no_conflict: "Parallel (safe)"
+    low_conflict: "Merge (coordinate)"
+    high_conflict: "Sequential (one then other)"
+
+  agent_coordination:
+    no_conflict: "No coordination needed"
+    low_conflict: "Light coordination (schema alignment)"
+    high_conflict: "Heavy coordination (joint design)"
+
+blog_hooks:
+  beginner:
+    focus: "Understanding multi-agent coordination"
+    key_points:
+      - "Register intent before starting work"
+      - "Confiture checks for conflicts"
+      - "No conflicts: work in parallel"
+      - "Conflicts: coordinate or sequence"
+
+  intermediate:
+    focus: "Coordination strategies"
+    key_points:
+      - "Sequential: one agent finishes, then next"
+      - "Parallel: different tables, simultaneous work"
+      - "Merge: coordinate on same table"
+      - "Risk levels guide strategy choice"
+
+  advanced:
+    focus: "Complex coordination scenarios"
+    key_points:
+      - "Partial overlaps (needs careful merge)"
+      - "Dependency chains (A then B then C)"
+      - "Dynamic coordination (agents join/leave)"
+      - "Conflict resolution protocols"

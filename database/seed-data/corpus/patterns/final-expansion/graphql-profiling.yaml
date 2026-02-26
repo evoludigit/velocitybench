@@ -1,0 +1,28 @@
+id: graphql-profiling
+name: Graphql Profiling
+category: comprehensive
+type: standard
+tags:
+- graphql
+summary:
+  short: Graphql Profiling and implementation guidelines
+  long: Complete guide to graphql profiling
+problem:
+  description: Challenges without proper graphql profiling
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement graphql profiling
+key_concepts:
+  concept: Graphql Profiling
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

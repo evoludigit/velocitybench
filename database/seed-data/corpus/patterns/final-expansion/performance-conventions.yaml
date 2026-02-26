@@ -1,0 +1,28 @@
+id: performance-conventions
+name: Performance Conventions
+category: comprehensive
+type: standard
+tags:
+- performance
+summary:
+  short: Performance Conventions and implementation guidelines
+  long: Complete guide to performance conventions
+problem:
+  description: Challenges without proper performance conventions
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement performance conventions
+key_concepts:
+  concept: Performance Conventions
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

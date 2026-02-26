@@ -1,0 +1,28 @@
+id: cloud-debugging
+name: Cloud Debugging
+category: comprehensive
+type: standard
+tags:
+- cloud
+summary:
+  short: Cloud Debugging and implementation guidelines
+  long: Complete guide to cloud debugging
+problem:
+  description: Challenges without proper cloud debugging
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement cloud debugging
+key_concepts:
+  concept: Cloud Debugging
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

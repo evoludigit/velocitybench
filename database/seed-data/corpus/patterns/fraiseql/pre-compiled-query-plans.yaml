@@ -1,0 +1,58 @@
+id: pre-compiled-query-plans
+name: Pre-Compiled Query Plans
+category: fraiseql
+type: standard
+tags:
+- compilation
+- performance
+- query-planning
+- optimization
+- caching
+summary:
+  short: Pre-compiling query execution plans at schema compile-time for deterministic performance
+  long: FraiseQL compiles GraphQL queries into SQL execution plans at schema compile-time
+    rather than runtime, ensuring predictable query performance and eliminating the
+    need for runtime query planning.
+problem:
+  description: Runtime query planning adds latency and unpredictable performance
+  symptoms:
+  - First query is slower than subsequent ones
+  - Query performance varies across executions
+  - Runtime planning overhead on every request
+  - Difficult to predict query cost
+  impact: Inconsistent query latency and resource utilization
+solution:
+  description: Implement Pre-Compiled Query Plans effectively
+key_concepts:
+  concept_1: Compile-time SQL generation from GraphQL
+  concept_2: Query plan caching by query fingerprint
+  concept_3: Plan invalidation on schema changes
+  concept_4: Static query cost analysis
+implementation_considerations:
+  consideration_1: Plan cache storage and size limits
+  consideration_2: Parameter binding for dynamic values
+  consideration_3: Plan versioning across schema updates
+  consideration_4: Database-specific plan optimization
+best_practices:
+- name: Cache by fingerprint
+  description: Use query AST hash as cache key
+- name: Invalidate on schema change
+  description: Clear plan cache when schema updates
+- name: Static cost analysis
+  description: Estimate query cost at compile-time
+- name: Prepared statements
+  description: Use database prepared statements for plans
+anti_patterns:
+- name: Runtime planning
+  consequence: Unpredictable performance and latency spikes
+- name: No plan cache
+  consequence: Repeated planning overhead
+- name: Stale plans
+  consequence: Using outdated plans after schema changes
+blog_hooks:
+  beginner:
+    focus: Introduction to Pre-Compiled Query Plans
+  intermediate:
+    focus: Implementing query plan caching and invalidation
+  advanced:
+    focus: Advanced plan optimization and cost-based query rejection

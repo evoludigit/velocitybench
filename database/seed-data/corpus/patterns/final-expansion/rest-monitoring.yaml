@@ -1,0 +1,28 @@
+id: rest-monitoring
+name: Rest Monitoring
+category: comprehensive
+type: standard
+tags:
+- rest
+summary:
+  short: Rest Monitoring and implementation guidelines
+  long: Complete guide to rest monitoring
+problem:
+  description: Challenges without proper rest monitoring
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement rest monitoring
+key_concepts:
+  concept: Rest Monitoring
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

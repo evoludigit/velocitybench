@@ -1,0 +1,28 @@
+id: ops-traffic-shifting
+name: Traffic Shifting Patterns
+category: specialized
+type: standard
+tags:
+- ops
+summary:
+  short: Patterns and practices for traffic shifting patterns
+  long: Comprehensive guide to traffic shifting patterns
+problem:
+  description: Challenges with traffic shifting patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement traffic shifting patterns
+key_concepts:
+  concept: Understanding Traffic Shifting Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Traffic Shifting Patterns
+  intermediate:
+    focus: Implementing Traffic Shifting Patterns
+  advanced:
+    focus: Advanced Traffic Shifting Patterns

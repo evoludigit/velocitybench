@@ -1,0 +1,28 @@
+id: consistency-migration
+name: Consistency Migration
+category: comprehensive
+type: standard
+tags:
+- consistency
+summary:
+  short: Consistency Migration and implementation guidelines
+  long: Complete guide to consistency migration
+problem:
+  description: Challenges without proper consistency migration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement consistency migration
+key_concepts:
+  concept: Consistency Migration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

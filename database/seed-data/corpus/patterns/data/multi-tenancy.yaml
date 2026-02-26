@@ -1,0 +1,341 @@
+# Multi-Tenancy Patterns
+# VelocityBench Knowledge Corpus
+
+id: multi-tenancy
+name: "Multi-Tenancy Database Patterns"
+category: data
+type: pattern
+severity: high
+tags:
+  - multi-tenancy
+  - saas
+  - database
+  - architecture
+  - isolation
+
+summary:
+  short: "Serve multiple customers from a single application instance"
+  long: |
+    Multi-tenancy allows a single application to serve multiple customers (tenants)
+    while keeping their data isolated. There are three main approaches: shared database
+    with tenant_id column, schema-per-tenant, and database-per-tenant. Each has tradeoffs
+    between isolation, cost, complexity, and customization ability.
+
+problem:
+  description: |
+    Running separate infrastructure per customer doesn't scale:
+    - Operational overhead multiplies with customer count
+    - Resource utilization is poor (many small underused instances)
+    - Feature deployment requires updating many instances
+    - Costs grow linearly instead of sub-linearly
+
+  symptoms:
+    - name: "Operational burden"
+      description: "Managing hundreds of separate deployments"
+      detection: "Long deployment times, inconsistent versions"
+
+    - name: "Cost inefficiency"
+      description: "Each tenant has dedicated underutilized resources"
+      detection: "High infrastructure cost per tenant"
+
+    - name: "Data leakage risk"
+      description: "One tenant seeing another's data"
+      detection: "Security incidents, bug reports of wrong data"
+
+solution:
+  principle: "Share infrastructure, isolate data"
+
+  strategies:
+    - name: "Shared Database, Shared Schema"
+      isolation: "Row-level (tenant_id column)"
+      complexity: "Low"
+      customization: "Limited"
+
+    - name: "Shared Database, Separate Schemas"
+      isolation: "Schema-level"
+      complexity: "Medium"
+      customization: "Medium"
+
+    - name: "Separate Databases"
+      isolation: "Database-level"
+      complexity: "High"
+      customization: "Full"
+
+implementation:
+  shared_schema:
+    description: "All tenants in same tables, filtered by tenant_id"
+    schema: |
+      -- Add tenant_id to all tables
+      CREATE TABLE organizations (
+          id UUID PRIMARY KEY,
+          name TEXT NOT NULL,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE users (
+          id UUID PRIMARY KEY,
+          tenant_id UUID NOT NULL REFERENCES organizations(id),
+          email TEXT NOT NULL,
+          name TEXT NOT NULL,
+          UNIQUE(tenant_id, email)  -- Email unique per tenant
+      );
+
+      CREATE TABLE orders (
+          id UUID PRIMARY KEY,
+          tenant_id UUID NOT NULL REFERENCES organizations(id),
+          user_id UUID NOT NULL REFERENCES users(id),
+          total DECIMAL NOT NULL,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      -- Index on tenant_id for every table (critical!)
+      CREATE INDEX idx_users_tenant ON users(tenant_id);
+      CREATE INDEX idx_orders_tenant ON orders(tenant_id);
+
+    row_level_security: |
+      -- PostgreSQL Row Level Security
+      ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+      ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+
+      -- Policy: users can only see their tenant's data
+      CREATE POLICY tenant_isolation ON users
+          USING (tenant_id = current_setting('app.current_tenant_id')::UUID);
+
+      CREATE POLICY tenant_isolation ON orders
+          USING (tenant_id = current_setting('app.current_tenant_id')::UUID);
+
+      -- Set tenant context in application
+      -- SET app.current_tenant_id = 'tenant-uuid';
+
+    python_middleware: |
+      from fastapi import Request, Depends
+      from contextvars import ContextVar
+
+      # Context variable for current tenant
+      current_tenant: ContextVar[str] = ContextVar('current_tenant')
+
+      async def tenant_middleware(request: Request, call_next):
+          # Extract tenant from subdomain, header, or token
+          tenant_id = extract_tenant(request)
+          current_tenant.set(tenant_id)
+
+          # Set PostgreSQL session variable for RLS
+          async with get_db_connection() as conn:
+              await conn.execute(
+                  f"SET app.current_tenant_id = '{tenant_id}'"
+              )
+
+          return await call_next(request)
+
+      def extract_tenant(request: Request) -> str:
+          # Option 1: From subdomain (acme.app.com)
+          host = request.headers.get('host', '')
+          if '.' in host:
+              subdomain = host.split('.')[0]
+              return get_tenant_id_by_subdomain(subdomain)
+
+          # Option 2: From header
+          if 'X-Tenant-ID' in request.headers:
+              return request.headers['X-Tenant-ID']
+
+          # Option 3: From JWT token
+          token = request.headers.get('Authorization', '').replace('Bearer ', '')
+          claims = decode_jwt(token)
+          return claims.get('tenant_id')
+
+    query_pattern: |
+      from sqlalchemy.orm import Session
+
+      class TenantAwareQuery:
+          """Automatically filter queries by tenant."""
+
+          def __init__(self, session: Session, model):
+              self.session = session
+              self.model = model
+              self.tenant_id = current_tenant.get()
+
+          def all(self):
+              return self.session.query(self.model)\
+                  .filter(self.model.tenant_id == self.tenant_id)\
+                  .all()
+
+          def get(self, id):
+              return self.session.query(self.model)\
+                  .filter(
+                      self.model.id == id,
+                      self.model.tenant_id == self.tenant_id
+                  ).first()
+
+      # Usage
+      users = TenantAwareQuery(session, User).all()
+      order = TenantAwareQuery(session, Order).get(order_id)
+
+  schema_per_tenant:
+    description: "Each tenant has their own PostgreSQL schema"
+    setup: |
+      -- Create schema for new tenant
+      CREATE SCHEMA tenant_acme;
+
+      -- Create tables in tenant schema
+      CREATE TABLE tenant_acme.users (
+          id UUID PRIMARY KEY,
+          email TEXT UNIQUE NOT NULL,
+          name TEXT NOT NULL
+      );
+
+      CREATE TABLE tenant_acme.orders (
+          id UUID PRIMARY KEY,
+          user_id UUID REFERENCES tenant_acme.users(id),
+          total DECIMAL NOT NULL
+      );
+
+    python_implementation: |
+      from sqlalchemy import create_engine, event
+      from sqlalchemy.orm import sessionmaker
+
+      def get_tenant_session(tenant_id: str) -> Session:
+          """Get session configured for specific tenant schema."""
+          schema_name = f"tenant_{tenant_id}"
+
+          engine = create_engine(DATABASE_URL)
+
+          @event.listens_for(engine, "connect")
+          def set_search_path(dbapi_conn, connection_record):
+              cursor = dbapi_conn.cursor()
+              cursor.execute(f"SET search_path TO {schema_name}, public")
+              cursor.close()
+
+          Session = sessionmaker(bind=engine)
+          return Session()
+
+      # Or using connection-level search_path
+      async def execute_in_tenant_schema(tenant_id: str, query: str):
+          schema_name = f"tenant_{tenant_id}"
+          async with get_connection() as conn:
+              await conn.execute(f"SET search_path TO {schema_name}")
+              return await conn.fetch(query)
+
+    migrations: |
+      # Run migrations for all tenant schemas
+      def migrate_all_tenants():
+          tenants = get_all_tenants()
+          for tenant in tenants:
+              schema = f"tenant_{tenant.id}"
+              with engine.connect() as conn:
+                  conn.execute(f"SET search_path TO {schema}")
+                  # Run Alembic migrations
+                  alembic.command.upgrade(alembic_cfg, "head")
+
+  database_per_tenant:
+    description: "Each tenant has their own database"
+    connection_routing: |
+      from functools import lru_cache
+
+      @lru_cache(maxsize=100)
+      def get_tenant_connection_string(tenant_id: str) -> str:
+          """Get database URL for tenant."""
+          tenant = get_tenant(tenant_id)
+          return tenant.database_url
+
+      class TenantDatabaseRouter:
+          """Route database connections to tenant databases."""
+
+          def __init__(self):
+              self.pools: dict[str, Pool] = {}
+
+          async def get_connection(self, tenant_id: str):
+              if tenant_id not in self.pools:
+                  url = get_tenant_connection_string(tenant_id)
+                  self.pools[tenant_id] = await create_pool(url)
+
+              return await self.pools[tenant_id].acquire()
+
+      router = TenantDatabaseRouter()
+
+      # Usage
+      async with router.get_connection(tenant_id) as conn:
+          users = await conn.fetch("SELECT * FROM users")
+
+comparison:
+  table: |
+    | Aspect              | Shared Schema | Schema per Tenant | DB per Tenant |
+    |---------------------|---------------|-------------------|---------------|
+    | Data Isolation      | Low (app)     | Medium (DB)       | High          |
+    | Customization       | None          | Some              | Full          |
+    | Operational Cost    | Low           | Medium            | High          |
+    | Scaling             | Easy          | Medium            | Complex       |
+    | Tenant Onboarding   | Instant       | Minutes           | Minutes-Hours |
+    | Migrations          | One migration | N migrations      | N migrations  |
+    | Resource Efficiency | Best          | Good              | Poor          |
+    | Backup/Restore      | All together  | Per schema        | Per tenant    |
+
+  when_to_use:
+    shared_schema:
+      - "Most SaaS applications"
+      - "Tenants have similar needs"
+      - "Need to onboard quickly"
+      - "Resource efficiency matters"
+
+    schema_per_tenant:
+      - "Moderate isolation requirements"
+      - "Some per-tenant customization"
+      - "Still want some resource sharing"
+
+    database_per_tenant:
+      - "Strict compliance requirements"
+      - "Tenants need full customization"
+      - "Data residency requirements"
+      - "Enterprise customers willing to pay"
+
+best_practices:
+  - name: "Always index tenant_id"
+    example: |
+      -- Every query will filter by tenant_id
+      -- Without index, full table scans
+      CREATE INDEX idx_orders_tenant ON orders(tenant_id);
+      CREATE INDEX idx_orders_tenant_date ON orders(tenant_id, created_at);
+
+  - name: "Never trust client-provided tenant_id"
+    example: |
+      # BAD: Trust header from client
+      tenant_id = request.headers['X-Tenant-ID']
+
+      # GOOD: Extract from authenticated token
+      tenant_id = request.state.user.tenant_id
+
+  - name: "Test tenant isolation explicitly"
+    example: |
+      def test_tenant_isolation():
+          # Create data in tenant A
+          with tenant_context('tenant_a'):
+              order = create_order(...)
+
+          # Verify invisible from tenant B
+          with tenant_context('tenant_b'):
+              orders = get_all_orders()
+              assert order.id not in [o.id for o in orders]
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Multi-tenancy is like an apartment building:
+      - Separate buildings (DB per tenant): Each customer has their own building
+      - Separate apartments (Schema per tenant): Same building, separate units
+      - Shared space with lockers (Shared schema): Everyone shares space, has own locker
+      Most businesses start with the apartment building approach!
+
+  intermediate:
+    focus: "Implementing row-level security and tenant context"
+    key_points:
+      - "PostgreSQL RLS for automatic filtering"
+      - "Tenant context via middleware"
+      - "Safe tenant extraction from auth tokens"
+      - "Testing tenant isolation"
+
+  advanced:
+    focus: "Scaling and complex multi-tenant architectures"
+    key_points:
+      - "Tenant-aware connection pooling"
+      - "Cross-tenant queries and analytics"
+      - "Tenant onboarding and offboarding automation"
+      - "Hybrid approaches (small tenants shared, large separate)"

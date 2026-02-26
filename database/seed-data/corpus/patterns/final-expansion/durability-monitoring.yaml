@@ -1,0 +1,28 @@
+id: durability-monitoring
+name: Durability Monitoring
+category: comprehensive
+type: standard
+tags:
+- durability
+summary:
+  short: Durability Monitoring and implementation guidelines
+  long: Complete guide to durability monitoring
+problem:
+  description: Challenges without proper durability monitoring
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement durability monitoring
+key_concepts:
+  concept: Durability Monitoring
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

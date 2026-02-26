@@ -1,0 +1,28 @@
+id: monolith-debugging
+name: Monolith Debugging
+category: comprehensive
+type: standard
+tags:
+- monolith
+summary:
+  short: Monolith Debugging and implementation guidelines
+  long: Complete guide to monolith debugging
+problem:
+  description: Challenges without proper monolith debugging
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement monolith debugging
+key_concepts:
+  concept: Monolith Debugging
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

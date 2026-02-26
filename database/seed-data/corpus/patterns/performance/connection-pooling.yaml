@@ -1,0 +1,163 @@
+# Connection Pooling Pattern
+# VelocityBench Knowledge Corpus
+
+id: connection-pooling
+name: "Database Connection Pooling"
+category: performance
+type: pattern
+severity: high
+tags:
+  - database
+  - performance
+  - connections
+  - pooling
+  - pgbouncer
+
+summary:
+  short: "Reuse database connections to reduce overhead and improve throughput"
+  long: |
+    Connection pooling maintains a cache of database connections that can be reused
+    across multiple requests. Creating a new database connection is expensive
+    (TCP handshake, authentication, SSL negotiation), taking 20-100ms. With pooling,
+    connections are borrowed from a pool and returned after use, reducing connection
+    overhead to near-zero and enabling much higher throughput.
+
+problem:
+  description: |
+    Every database query requires a connection. Without pooling, each request creates
+    a new connection, uses it briefly, then closes it. This causes:
+    - High latency from repeated connection establishment
+    - Connection storms under load (all requests trying to connect simultaneously)
+    - Resource exhaustion (max_connections limit hit)
+    - Wasted server resources managing short-lived connections
+
+  symptoms:
+    - name: "Connection timeouts"
+      description: "Requests fail with 'too many connections' or timeout errors"
+      detection: "Monitor PostgreSQL max_connections vs active connections"
+
+    - name: "High p99 latency"
+      description: "Occasional requests take 50-100ms longer than median"
+      detection: "Check if slow requests correlate with new connection establishment"
+
+    - name: "Connection storms"
+      description: "Spike in connections during traffic bursts"
+      detection: "Monitor connection count during peak load"
+
+solution:
+  principle: "Maintain a pool of pre-established connections; borrow and return instead of create and destroy"
+
+  components:
+    - name: "Connection Pool"
+      type: "infrastructure"
+      purpose: "Maintains idle connections ready for use"
+
+    - name: "Pool Manager"
+      type: "logic"
+      purpose: "Handles borrow/return, validates connections, manages pool size"
+
+    - name: "Health Checker"
+      type: "monitoring"
+      purpose: "Validates connections are still alive, removes stale ones"
+
+implementation:
+  pgbouncer: |
+    # /etc/pgbouncer/pgbouncer.ini
+    [databases]
+    mydb = host=localhost port=5432 dbname=mydb
+
+    [pgbouncer]
+    listen_addr = 127.0.0.1
+    listen_port = 6432
+    auth_type = md5
+    auth_file = /etc/pgbouncer/userlist.txt
+
+    # Pool settings
+    pool_mode = transaction  # or session, statement
+    default_pool_size = 20
+    max_client_conn = 1000
+    min_pool_size = 5
+    reserve_pool_size = 5
+
+  nodejs: |
+    import { Pool } from 'pg';
+
+    const pool = new Pool({
+      host: 'localhost',
+      port: 5432,
+      database: 'mydb',
+      user: 'app',
+      password: 'secret',
+      max: 20,           // Max connections in pool
+      min: 5,            // Min connections to maintain
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000,
+    });
+
+    // Use pool for queries
+    const result = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
+
+  python: |
+    import psycopg_pool
+
+    pool = psycopg_pool.ConnectionPool(
+        conninfo="host=localhost dbname=mydb user=app",
+        min_size=5,
+        max_size=20,
+        timeout=30,
+    )
+
+    async with pool.connection() as conn:
+        result = await conn.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+
+pool_modes:
+  - name: "Session pooling"
+    description: "Connection assigned for entire client session"
+    best_for: "Apps using session features (prepared statements, temp tables)"
+    overhead: "Low pooling benefit"
+
+  - name: "Transaction pooling"
+    description: "Connection assigned per transaction"
+    best_for: "Most web applications"
+    overhead: "Best balance of safety and efficiency"
+
+  - name: "Statement pooling"
+    description: "Connection assigned per statement"
+    best_for: "Simple read-heavy workloads"
+    overhead: "Highest efficiency, but breaks transactions"
+
+metrics:
+  - name: "Pool utilization"
+    formula: "active_connections / pool_size"
+    healthy: "< 80%"
+
+  - name: "Wait time"
+    description: "Time spent waiting for available connection"
+    healthy: "< 10ms p99"
+
+  - name: "Connection reuse"
+    formula: "queries / connections_created"
+    healthy: "> 100 (100+ queries per connection)"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Think of a hotel shuttle service:
+      - Without pooling: Buy a new car for each guest, scrap it after one trip
+      - With pooling: Maintain a fleet of shuttles, guests borrow and return them
+      The shuttle service (pool) is much more efficient!
+
+  intermediate:
+    focus: "Pool sizing and configuration"
+    key_points:
+      - "Calculate pool size: connections = (core_count * 2) + spindle_count"
+      - "Monitor pool utilization to right-size"
+      - "Transaction pooling vs session pooling tradeoffs"
+
+  advanced:
+    focus: "Multi-region pooling and PgBouncer tuning"
+    key_points:
+      - "Connection routing for read replicas"
+      - "PgBouncer clustering for HA"
+      - "Prepared statement compatibility"
+      - "Connection multiplexing patterns"

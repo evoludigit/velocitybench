@@ -1,0 +1,28 @@
+id: monolith-tuning
+name: Monolith Tuning
+category: comprehensive
+type: standard
+tags:
+- monolith
+summary:
+  short: Monolith Tuning and implementation guidelines
+  long: Complete guide to monolith tuning
+problem:
+  description: Challenges without proper monolith tuning
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement monolith tuning
+key_concepts:
+  concept: Monolith Tuning
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

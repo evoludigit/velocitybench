@@ -1,0 +1,205 @@
+# Query Optimization Patterns
+# VelocityBench Knowledge Corpus
+
+id: query-optimization
+name: "SQL Query Optimization"
+category: performance
+type: pattern
+severity: high
+tags:
+  - database
+  - performance
+  - sql
+  - postgresql
+  - optimization
+  - explain
+
+summary:
+  short: "Techniques to make SQL queries faster and more efficient"
+  long: |
+    Query optimization is the art of writing SQL that executes efficiently. This involves
+    understanding how the database query planner works, using EXPLAIN to analyze query plans,
+    and applying patterns like proper JOINs, avoiding SELECT *, using CTEs wisely, and
+    leveraging database-specific features. A well-optimized query can be 100-1000x faster
+    than a naive implementation.
+
+problem:
+  description: |
+    Poorly written queries can bring a database to its knees. Common issues include:
+    selecting unnecessary columns, missing indexes, inefficient JOINs, suboptimal
+    WHERE clause ordering, and not leveraging database features. These problems
+    compound as data grows, turning fast queries into slow ones.
+
+  symptoms:
+    - name: "Query timeouts"
+      description: "Queries exceeding timeout limits under load"
+      detection: "Monitor slow query log, pg_stat_statements"
+
+    - name: "High memory usage"
+      description: "Queries consuming excessive RAM"
+      detection: "EXPLAIN shows large sort/hash operations"
+
+    - name: "Table locks"
+      description: "Long-running queries blocking other operations"
+      detection: "pg_stat_activity shows blocked queries"
+
+solution:
+  principle: "Minimize data scanned, leverage indexes, let the database do the work"
+
+  components:
+    - name: "EXPLAIN ANALYZE"
+      type: "tool"
+      purpose: "Understand query execution plan and actual timings"
+
+    - name: "Index utilization"
+      type: "technique"
+      purpose: "Ensure queries use available indexes"
+
+    - name: "Query rewriting"
+      type: "technique"
+      purpose: "Restructure queries for better plans"
+
+optimization_techniques:
+  - name: "Use EXPLAIN ANALYZE"
+    description: "Always start by understanding the current query plan"
+    example: |
+      EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)
+      SELECT u.*, COUNT(o.id) as order_count
+      FROM users u
+      LEFT JOIN orders o ON o.user_id = u.id
+      WHERE u.status = 'active'
+      GROUP BY u.id;
+
+      -- Look for:
+      -- - Seq Scan on large tables (missing index)
+      -- - High "actual rows" vs "rows" (bad estimates)
+      -- - Sort operations (consider index for ORDER BY)
+      -- - Nested Loop with many iterations (N+1 pattern)
+
+  - name: "Avoid SELECT *"
+    description: "Select only needed columns"
+    bad: |
+      SELECT * FROM users WHERE id = 1;
+    good: |
+      SELECT id, name, email FROM users WHERE id = 1;
+    reason: "Reduces I/O, enables index-only scans, avoids schema surprises"
+
+  - name: "Push filters down"
+    description: "Filter as early as possible in the query"
+    bad: |
+      SELECT * FROM (
+        SELECT u.*, o.total
+        FROM users u
+        JOIN orders o ON o.user_id = u.id
+      ) sub
+      WHERE sub.status = 'active';
+    good: |
+      SELECT u.*, o.total
+      FROM users u
+      JOIN orders o ON o.user_id = u.id
+      WHERE u.status = 'active';
+
+  - name: "Use EXISTS instead of IN for subqueries"
+    description: "EXISTS can short-circuit, IN materializes entire subquery"
+    bad: |
+      SELECT * FROM users
+      WHERE id IN (SELECT user_id FROM orders WHERE total > 1000);
+    good: |
+      SELECT * FROM users u
+      WHERE EXISTS (
+        SELECT 1 FROM orders o
+        WHERE o.user_id = u.id AND o.total > 1000
+      );
+
+  - name: "Batch operations"
+    description: "Combine multiple operations into one"
+    bad: |
+      -- 100 separate queries
+      UPDATE users SET last_seen = NOW() WHERE id = 1;
+      UPDATE users SET last_seen = NOW() WHERE id = 2;
+      ...
+    good: |
+      -- Single query with VALUES
+      UPDATE users SET last_seen = NOW()
+      WHERE id = ANY(ARRAY[1, 2, 3, ...]);
+
+      -- Or use UNNEST for complex updates
+      UPDATE users u
+      SET balance = v.new_balance
+      FROM (SELECT * FROM UNNEST($1::int[], $2::numeric[]) AS t(id, new_balance)) v
+      WHERE u.id = v.id;
+
+  - name: "Use proper JOIN types"
+    description: "Choose the right JOIN for your needs"
+    example: |
+      -- INNER JOIN: Only matching rows (most restrictive)
+      SELECT u.*, o.id FROM users u
+      INNER JOIN orders o ON o.user_id = u.id;
+
+      -- LEFT JOIN: All left rows, matching right rows (for optional relations)
+      SELECT u.*, o.id FROM users u
+      LEFT JOIN orders o ON o.user_id = u.id;
+
+      -- Use JOIN conditions, not WHERE for outer joins
+      -- BAD: LEFT JOIN becomes INNER JOIN
+      SELECT u.*, o.id FROM users u
+      LEFT JOIN orders o ON o.user_id = u.id
+      WHERE o.status = 'pending';  -- Filters out NULL rows!
+
+      -- GOOD: Filter in JOIN condition
+      SELECT u.*, o.id FROM users u
+      LEFT JOIN orders o ON o.user_id = u.id AND o.status = 'pending';
+
+  - name: "Leverage CTEs wisely"
+    description: "CTEs can help or hurt depending on usage"
+    example: |
+      -- PostgreSQL 12+: CTEs are inlined by default (good!)
+      WITH active_users AS (
+        SELECT * FROM users WHERE status = 'active'
+      )
+      SELECT * FROM active_users WHERE created_at > '2024-01-01';
+
+      -- Force materialization when needed (prevents repeated execution)
+      WITH active_users AS MATERIALIZED (
+        SELECT * FROM users WHERE status = 'active'
+      )
+      SELECT * FROM active_users a1
+      JOIN active_users a2 ON a1.referred_by = a2.id;
+
+  - name: "Use window functions"
+    description: "Avoid self-joins and subqueries with window functions"
+    bad: |
+      -- Subquery for each row
+      SELECT u.*,
+        (SELECT COUNT(*) FROM orders WHERE user_id = u.id) as order_count
+      FROM users u;
+    good: |
+      -- Window function (single scan)
+      SELECT u.*, COUNT(o.id) OVER (PARTITION BY u.id) as order_count
+      FROM users u
+      LEFT JOIN orders o ON o.user_id = u.id;
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Query optimization is like giving directions:
+      - Bad: "Go to every street in the city, check if it's Main St, then find house #42"
+      - Good: "Go directly to Main St, find house #42"
+      EXPLAIN shows you which "directions" the database is following.
+
+  intermediate:
+    focus: "Reading EXPLAIN output and common optimizations"
+    key_points:
+      - "Understanding Seq Scan vs Index Scan vs Index Only Scan"
+      - "Identifying N+1 patterns in query plans"
+      - "Using EXPLAIN BUFFERS to understand I/O"
+      - "Common query rewrites that improve performance"
+
+  advanced:
+    focus: "Advanced optimization and query planner tuning"
+    key_points:
+      - "Statistics and ANALYZE"
+      - "Custom planner settings (work_mem, effective_cache_size)"
+      - "Parallel query execution"
+      - "JIT compilation"
+      - "Partitioning strategies"

@@ -1,0 +1,502 @@
+id: fraiseql-type-system-patterns
+name: "FraiseQL Type System Patterns"
+category: fraiseql
+type: standard
+tags:
+  - fraiseql
+  - type-system
+  - graphql-schema
+  - decorators
+  - type-mapping
+
+summary:
+  short: "Type definitions with @fraiseql.type, @fraiseql.input decorators and database field mapping"
+  long: |
+    FraiseQL's type system maps Python dataclasses to database views using decorators.
+    Types can be queries (@fraiseql.type), inputs (@fraiseql.input for mutations), or
+    response types (@fraiseql.success/@fraiseql.error for mutation results).
+    Field mapping handles snake_case → camelCase conversion, optional fields, nested objects,
+    and type validation at the GraphQL schema boundary.
+
+problem:
+  description: |
+    GraphQL schema design requires careful thought about types, fields, and relationships:
+    - How to expose database views as GraphQL types?
+    - How to handle optional fields (nullable vs required)?
+    - How to map snake_case database fields to camelCase GraphQL names?
+    - How to distinguish input types (mutations) from output types (queries)?
+    - How to represent nested relationships in type definitions?
+
+  symptoms:
+    - name: "Type mismatch errors"
+      description: "Database returns string but GraphQL expects Int"
+      detection: "Deserialization failures on query"
+
+    - name: "Missing field mapping"
+      description: "Database field 'first_name' appears in GraphQL as 'firstName'"
+      detection: "Manual field mapping code required"
+
+    - name: "Confusion between input and output types"
+      description: "Mutation input includes computed fields (id, createdAt)"
+      consequence: "User sends createdAt, expecting it to be used (but it's ignored)"
+
+  impact: |
+    Schema errors, type mismatches, confusing API design, manual field mapping complexity
+
+solution:
+  principle: "Declarative type definitions with decorators; automatic schema generation and field mapping"
+
+  components:
+    - name: "@fraiseql.type decorator"
+      type: "Query output type"
+      purpose: "Define GraphQL object type for read operations"
+      parameters:
+        sql_source: "Database view to query from (e.g., 'benchmark.tv_user')"
+      features:
+        - "Automatic schema generation from class fields"
+        - "Field name mapping (snake_case ↔ camelCase)"
+        - "Type validation (str, int, UUID, bool, optional)"
+        - "Nested object support (dataclass composition)"
+      example: |
+        @fraiseql.type(sql_source="benchmark.tv_user")
+        class User:
+            id: UUID                      # UUID type (exposed from tv_user.data)
+            username: str                 # String (required)
+            email: str | None = None      # Optional field
+            first_name: str | None = None # snake_case → firstName in GraphQL
+            bio: str | None = None
+            created_at: str               # timestamp as string
+
+    - name: "@fraiseql.input decorator"
+      type: "Mutation input type"
+      purpose: "Define input object type for mutation parameters"
+      features:
+        - "Separate from output types (UpdateUserInput vs User)"
+        - "All fields should be optional (for partial updates)"
+        - "No computed fields (id, createdAt)"
+        - "Automatic GraphQL input type generation"
+      example: |
+        @fraiseql.input
+        class UpdateUserInput:
+            first_name: str | None = None   # All optional
+            last_name: str | None = None
+            bio: str | None = None
+            # Never include: id, created_at, updated_at
+
+    - name: "@fraiseql.success decorator"
+      type: "Mutation success response"
+      purpose: "Define successful mutation result type"
+      auto_inject:
+        - "status: str = 'success'"
+        - "message: str | None"
+        - "errors: list[Error] | None = None"
+      custom_fields:
+        - "Entity object (user, post, etc.)"
+        - "Cascade info (related updates)"
+      example: |
+        @fraiseql.success
+        class UpdateUserSuccess:
+            user: User              # Updated entity
+            cascade: Cascade | None = None
+            # status, message, errors auto-injected
+
+    - name: "@fraiseql.error decorator"
+      type: "Mutation error response"
+      purpose: "Define failed mutation result type"
+      auto_inject:
+        - "status: str = 'error'"
+        - "message: str | None"
+        - "errors: list[Error] | None"
+        - "code: str (error code)"
+      custom_fields:
+        - "Previous state (for rollback UI)"
+        - "Conflicting data"
+        - "Cascade failures"
+      example: |
+        @fraiseql.error
+        class UpdateUserError:
+            current_user: User | None = None  # State before failure
+            cascade: Cascade | None = None
+            # status, message, errors auto-injected
+
+    - name: "Field Type Mapping"
+      type: "Schema feature"
+      purpose: "Automatic type conversion database → GraphQL"
+      mappings: |
+        Python Type              → GraphQL Type
+        str                      → String
+        int                      → Int
+        float                    → Float
+        bool                     → Boolean
+        UUID                     → ID
+        str | None               → String! (nullable)
+        int | None               → Int (nullable)
+        list[str]               → [String!]!
+        CustomType              → Object (nested)
+
+    - name: "Nested Object Composition"
+      type: "Relationship support"
+      purpose: "Include nested objects in type definitions"
+      pattern: |
+        @fraiseql.type(sql_source="benchmark.tv_post")
+        class Post:
+            id: UUID
+            title: str
+            author: User  # Nested User object (composed in tv_post JSONB)
+            created_at: str
+      mechanism: "author field automatically deserialized from tv_post.data.author JSONB"
+
+key_concepts:
+  concept_1: "@fraiseql.type for read operations, @fraiseql.input for mutation inputs"
+  concept_2: "Input types separate from output types (UpdateUserInput vs UpdateUserSuccess)"
+  concept_3: "All input fields should be optional (X | None = None)"
+  concept_4: "Field names use snake_case in code; auto-converted to camelCase in GraphQL"
+  concept_5: "Nested objects composed at database layer (JSONB deserialized to dataclass)"
+  concept_6: "@fraiseql.success/@fraiseql.error auto-inject status, message, errors"
+  concept_7: "UUID type mapped to GraphQL ID scalar"
+  concept_8: "Type validation at schema boundary prevents invalid data entry"
+
+implementation_considerations:
+  consideration_1: "Define separate input and output types (UpdateUserInput vs User)"
+  consideration_2: "Make all mutation input fields optional (enable partial updates)"
+  consideration_3: "Never include computed fields in input types (id, created_at)"
+  consideration_4: "Use UUID type for public entity IDs (not SERIAL)"
+  consideration_5: "Define nested types before parent (Post includes User)"
+  consideration_6: "Use | None for optional fields instead of Optional[X]"
+  consideration_7: "Map snake_case Python names; auto-convert to camelCase GraphQL"
+  consideration_8: "Test type serialization/deserialization with nested objects"
+  consideration_9: "Provide meaningful type documentation strings"
+  consideration_10: "Keep input types flat (no deep nesting of create/update inputs)"
+
+best_practices:
+  - name: "Separate input from output"
+    description: "UpdateUserInput for mutation params; UpdateUserSuccess for result"
+
+  - name: "Make inputs optional"
+    description: "first_name: str | None = None allows partial updates"
+
+  - name: "Use UUID for public IDs"
+    description: "id: UUID in @fraiseql.type (not SERIAL integers)"
+
+  - name: "No computed fields in input"
+    description: "Don't include id, created_at, updated_at in @fraiseql.input"
+
+  - name: "Explicit field documentation"
+    description: "Document field purpose: 'User email (unique per account)'"
+
+  - name: "Order types by dependency"
+    description: "Define User before Post (Post includes User field)"
+
+  - name: "Use precise types"
+    description: "Use UUID not str; bool not int; explicit enums for status"
+
+  - name: "Test nested deserialization"
+    description: "Verify nested objects deserialize correctly from JSONB"
+
+anti_patterns:
+  - name: "Reusing output type for input"
+    description: "@fraiseql.input class User (with id, createdAt fields)"
+    consequence: "User can send id, expecting it to be used (ignored)"
+    fix: "Separate types: UpdateUserInput (no id) vs User (has id)"
+
+  - name: "Required input fields"
+    description: "@fraiseql.input class UpdateUserInput { bio: str }"
+    consequence: "Cannot do partial updates; must provide all fields"
+    fix: "Make fields optional: bio: str | None = None"
+
+  - name: "Computed fields in input"
+    description: "@fraiseql.input { id: UUID, createdAt: str }"
+    consequence: "Client might expect these to be updated (they won't be)"
+    fix: "Only include writable fields in inputs"
+
+  - name: "Using str for IDs"
+    description: "@fraiseql.type { id: str }"
+    consequence: "No validation that id is valid UUID"
+    fix: "Use UUID type: id: UUID"
+
+  - name: "Optional fields using Optional[X]"
+    description: "from typing import Optional; field: Optional[str]"
+    consequence: "Old style; harder to read"
+    fix: "Use modern Python: field: str | None = None"
+
+  - name: "Deep nesting in input"
+    description: "@fraiseql.input { author: { name: str }, tags: [str] }"
+    consequence: "Complex nested input structure"
+    fix: "Flat inputs: authorId, tagIds (ids, not nested objects)"
+
+implementation:
+  title: "Implementing Type System Patterns"
+  steps:
+    - number: 1
+      title: "Define output types"
+      description: |
+        ```python
+        @fraiseql.type(sql_source="benchmark.tv_user")
+        class User:
+            id: UUID
+            username: str
+            email: str
+            first_name: str | None = None
+            last_name: str | None = None
+            bio: str | None = None
+            created_at: str
+
+        @fraiseql.type(sql_source="benchmark.tv_post")
+        class Post:
+            id: UUID
+            title: str
+            content: str | None = None
+            author: User  # Nested object
+            created_at: str
+        ```
+
+    - number: 2
+      title: "Define input types"
+      description: |
+        ```python
+        @fraiseql.input
+        class UpdateUserInput:
+            first_name: str | None = None
+            last_name: str | None = None
+            bio: str | None = None
+            # NO id, created_at, updated_at
+
+        @fraiseql.input
+        class CreatePostInput:
+            title: str
+            content: str | None = None
+            # NO id, author_id included in mutation params
+        ```
+
+    - number: 3
+      title: "Define response types"
+      description: |
+        ```python
+        @fraiseql.success
+        class UpdateUserSuccess:
+            user: User
+            cascade: Cascade | None = None
+            # status, message, errors auto-injected
+
+        @fraiseql.error
+        class UpdateUserError:
+            current_user: User | None = None
+            cascade: Cascade | None = None
+            # status, message, errors auto-injected
+        ```
+
+    - number: 4
+      title: "Wire up mutation"
+      description: |
+        ```python
+        async def update_user_impl(
+            info: GraphQLResolveInfo,
+            id: str,
+            input: UpdateUserInput,  # Input type
+        ) -> UpdateUserSuccess | UpdateUserError | UpdateUserNoop:
+            # Implementation...
+            return UpdateUserSuccess(user=updated_user)
+
+        @fraiseql.mutation(function="benchmark.update_user")
+        class UpdateUser:
+            input: UpdateUserInput
+            success: UpdateUserSuccess
+            error: UpdateUserError
+            noop: UpdateUserNoop
+        ```
+
+    - number: 5
+      title: "Test type serialization"
+      description: |
+        ```python
+        def test_user_type_serialization(factory):
+            user = factory.create_user('alice', 'alice@example.com')
+
+            # Deserialize from JSONB
+            db_user = await db.find_one("benchmark.tv_user", id=user['id'])
+
+            # Verify types
+            assert isinstance(db_user.id, UUID)
+            assert isinstance(db_user.username, str)
+            assert db_user.bio is None or isinstance(db_user.bio, str)
+
+        def test_nested_type_composition(factory):
+            user = factory.create_user('alice', 'alice@example.com')
+            post = factory.create_post(user['pk_user'], 'Title', 'content')
+
+            # Fetch post with nested author
+            db_post = await db.find_one("benchmark.tv_post", id=post['id'])
+
+            # Verify nested object
+            assert isinstance(db_post.author, User)
+            assert db_post.author.id == user['id']
+        ```
+
+examples:
+  example_1:
+    title: "Complete Type Definition Example"
+    description: "Output, input, and response types for user operations"
+    code: |
+      # Output type (queries)
+      @fraiseql.type(sql_source="benchmark.tv_user")
+      class User:
+          id: UUID
+          username: str
+          email: str
+          first_name: str | None = None
+          bio: str | None = None
+          created_at: str
+          updated_at: str
+
+      # Input type (mutation parameters)
+      @fraiseql.input
+      class UpdateUserInput:
+          first_name: str | None = None
+          bio: str | None = None
+
+      # Response types
+      @fraiseql.success
+      class UpdateUserSuccess:
+          user: User
+
+      @fraiseql.error
+      class UpdateUserError:
+          current_user: User | None = None
+
+      # Mutation
+      @fraiseql.mutation(function="benchmark.update_user")
+      class UpdateUser:
+          input: UpdateUserInput
+          success: UpdateUserSuccess
+          error: UpdateUserError
+
+  example_2:
+    title: "Nested Type Composition"
+    description: "Post with nested User object"
+    code: |
+      @fraiseql.type(sql_source="benchmark.tv_user")
+      class User:
+          id: UUID
+          username: str
+          email: str
+
+      @fraiseql.type(sql_source="benchmark.tv_post")
+      class Post:
+          id: UUID
+          title: str
+          author: User  # Pre-composed in tv_post JSONB
+          created_at: str
+
+      # GraphQL query
+      query GetPost($id: ID!) {
+        post(id: $id) {
+          id
+          title
+          author {
+            id
+            username
+          }
+        }
+      }
+
+      # Response includes nested author
+      {
+        "data": {
+          "post": {
+            "id": "550e8400-...",
+            "title": "My Post",
+            "author": {
+              "id": "550e8400-...",
+              "username": "alice"
+            }
+          }
+        }
+      }
+
+comparison_matrix:
+  decorator:
+    type: "Read operations"
+    input: "Mutation parameters"
+    success: "Successful mutation result"
+    error: "Failed mutation result"
+    noop: "No-op mutation result"
+
+  auto_inject:
+    type: "None (explicit fields only)"
+    input: "None"
+    success: "status, message, errors"
+    error: "status, message, errors, code"
+    noop: "status, message"
+
+  use_case:
+    type: "Query resolvers"
+    input: "Mutation inputs (partial)"
+    success: "Mutation success response"
+    error: "Mutation error response"
+    noop: "Mutation no-op (idempotent)"
+
+  fields_required:
+    type: "Explicitly defined"
+    input: "All optional (for partial)"
+    success: "Entity + custom fields"
+    error: "Previous state + custom"
+    noop: "None (auto-injected only)"
+
+  sql_source:
+    type: "Required (database view)"
+    input: "None (no DB mapping)"
+    success: "None (embedded type)"
+    error: "None (embedded type)"
+    noop: "None (no fields)"
+
+recommendation_matrix:
+  - feature: "Public entity ID"
+    type: "id: UUID"
+    reasoning: "Not enumerable; matches Trinity pattern"
+
+  - feature: "Optional fields"
+    type: "str | None = None"
+    reasoning: "Enables partial updates without null-coalescing"
+
+  - feature: "Nested relationships"
+    type: "author: User (composed at DB)"
+    reasoning: "Pre-fetched in JSONB; eliminates N+1"
+
+  - feature: "Mutation input"
+    type: "@fraiseql.input with all optional"
+    reasoning: "Separate from output; enables partial updates"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Types are like templates:
+      - @fraiseql.type = template for reading data
+      - @fraiseql.input = template for sending data to mutations
+      - @fraiseql.success/@fraiseql.error = templates for results
+
+      Different templates for reading vs writing = clarity!
+
+    focus: "Understanding type decorators and field mapping"
+    key_points:
+      - "@fraiseql.type for query outputs"
+      - "@fraiseql.input for mutation inputs"
+      - "Input fields should be optional"
+      - "Field names automatically snake_case ↔ camelCase"
+
+  intermediate:
+    focus: "Type design patterns for GraphQL APIs"
+    key_points:
+      - "Separate input types (UpdateUserInput) from output (User)"
+      - "All input fields optional: field: str | None = None"
+      - "Never include computed fields in inputs (id, createdAt)"
+      - "Nested objects compose at database layer (JSONB)"
+      - "@fraiseql.success/@fraiseql.error auto-inject status, message"
+
+  advanced:
+    focus: "Advanced type patterns and optimization"
+    key_points:
+      - "Type validation at schema boundary prevents invalid data"
+      - "Nested type deserialization from JSONB happens automatically"
+      - "Union types for mutation responses (Success | Error | NoOp)"
+      - "Keep input types flat (no deep nesting)"
+      - "Document field purposes in docstrings"

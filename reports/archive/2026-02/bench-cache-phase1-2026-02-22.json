@@ -1,0 +1,74 @@
+[
+  {
+    "framework": "fraiseql-tv",
+    "query": "Q1",
+    "rps": 2147.8,
+    "p50_ms": 16.23,
+    "p95_ms": 39.15,
+    "p99_ms": 49.97,
+    "requests": 42957,
+    "errors": 0,
+    "skipped": false,
+    "skip_reason": ""
+  },
+  {
+    "framework": "fraiseql-tv",
+    "query": "Q2",
+    "rps": 1634.8,
+    "p50_ms": 23.89,
+    "p95_ms": 48.43,
+    "p99_ms": 59.73,
+    "requests": 32696,
+    "errors": 0,
+    "skipped": false,
+    "skip_reason": ""
+  },
+  {
+    "framework": "fraiseql-tv",
+    "query": "Q2b",
+    "rps": 1705.0,
+    "p50_ms": 21.55,
+    "p95_ms": 48.63,
+    "p99_ms": 60.48,
+    "requests": 34101,
+    "errors": 0,
+    "skipped": false,
+    "skip_reason": ""
+  },
+  {
+    "framework": "fraiseql-tv-nocache",
+    "query": "Q1",
+    "rps": 3122.0,
+    "p50_ms": 10.26,
+    "p95_ms": 30.49,
+    "p99_ms": 44.48,
+    "requests": 62440,
+    "errors": 0,
+    "skipped": false,
+    "skip_reason": ""
+  },
+  {
+    "framework": "fraiseql-tv-nocache",
+    "query": "Q2",
+    "rps": 2801.8,
+    "p50_ms": 11.57,
+    "p95_ms": 32.96,
+    "p99_ms": 45.99,
+    "requests": 56035,
+    "errors": 0,
+    "skipped": false,
+    "skip_reason": ""
+  },
+  {
+    "framework": "fraiseql-tv-nocache",
+    "query": "Q2b",
+    "rps": 3498.2,
+    "p50_ms": 9.82,
+    "p95_ms": 23.63,
+    "p99_ms": 37.1,
+    "requests": 69963,
+    "errors": 0,
+    "skipped": false,
+    "skip_reason": ""
+  }
+]

@@ -1,0 +1,28 @@
+id: tracing-setup
+name: Tracing Setup
+category: comprehensive
+type: standard
+tags:
+- tracing
+summary:
+  short: Tracing Setup and implementation guidelines
+  long: Complete guide to tracing setup
+problem:
+  description: Challenges without proper tracing setup
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement tracing setup
+key_concepts:
+  concept: Tracing Setup
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

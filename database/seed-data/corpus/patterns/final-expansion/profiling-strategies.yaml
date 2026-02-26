@@ -1,0 +1,28 @@
+id: profiling-strategies
+name: Profiling Strategies
+category: comprehensive
+type: standard
+tags:
+- profiling
+summary:
+  short: Profiling Strategies and implementation guidelines
+  long: Complete guide to profiling strategies
+problem:
+  description: Challenges without proper profiling strategies
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement profiling strategies
+key_concepts:
+  concept: Profiling Strategies
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

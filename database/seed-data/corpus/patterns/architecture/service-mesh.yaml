@@ -1,0 +1,315 @@
+id: service-mesh
+name: "Service Mesh Integration Patterns"
+category: architecture
+type: standard
+tags:
+  - service-mesh
+  - microservices
+  - infrastructure
+  - observability
+
+summary:
+  short: "Managing service-to-service communication, security, and observability with service mesh"
+  long: |
+    A service mesh is a dedicated infrastructure layer that handles service-to-service communication. It provides cross-cutting concerns like mutual TLS, circuit breaking, rate limiting, and observability without modifying application code. Implementations include Istio, Linkerd, and Consul.
+
+problem:
+  description: "Microservices need reliable, secure, observable communication; manually implementing these in each service is complex and error-prone"
+  symptoms:
+    - "Debugging distributed requests requires instrumenting every service"
+    - "Each service implements its own retry logic, circuit breaking, timeouts"
+    - "Securing service-to-service communication requires SSL certificates everywhere"
+    - "No consistent observability; scattered logging and tracing"
+    - "Difficult to enforce policies (rate limiting, access control) consistently"
+  impact: "Security vulnerabilities, operational complexity, poor observability, code duplication"
+
+solution:
+  description: "Deploy a service mesh to handle cross-cutting concerns transparently"
+  architecture: |
+    Control Plane (manages configuration):
+    - Routes, policies, certificates
+    - Updates sidecars with desired state
+
+    Data Plane (handles traffic):
+    - Sidecar proxy in each pod (Envoy, etc.)
+    - Intercepts all traffic to/from application
+    - Applies policies, encryption, monitoring
+
+core_capabilities:
+  traffic_management:
+    description: "Advanced routing, retries, timeouts, circuit breaking"
+    features:
+      - "Canary deployments (route % to new version)"
+      - "A/B testing (route by header/cookie)"
+      - "Failover (automatic reroute on failure)"
+      - "Load balancing (consistent hash, round-robin, least-request)"
+    example: |
+      # Istio VirtualService - canary deployment
+      apiVersion: networking.istio.io/v1beta1
+      kind: VirtualService
+      metadata:
+        name: reviews
+      spec:
+        hosts:
+        - reviews
+        http:
+        - match:
+          - uri:
+              prefix: "/review"
+          route:
+          - destination:
+              host: reviews
+              subset: v2
+            weight: 10  # 10% to v2
+        - route:
+          - destination:
+              host: reviews
+              subset: v1
+            weight: 90  # 90% to v1
+
+  security:
+    description: "Mutual TLS, authorization policies, certificate management"
+    features:
+      - "Automatic mTLS between services"
+      - "Certificate rotation without code changes"
+      - "Fine-grained authorization (who can call what)"
+      - "Encryption in transit"
+    example: |
+      # Enable mTLS for all services
+      apiVersion: security.istio.io/v1beta1
+      kind: PeerAuthentication
+      metadata:
+        name: default
+        namespace: default
+      spec:
+        mtls:
+          mode: STRICT  # mTLS required
+
+  observability:
+    description: "Distributed tracing, metrics, logs"
+    features:
+      - "Automatic trace injection"
+      - "Request-level metrics (latency, error rate)"
+      - "Service dependency mapping"
+      - "Traffic visualization"
+    example: |
+      # Metrics exported automatically
+      envoy_cluster_upstream_rq: request count
+      envoy_cluster_upstream_rq_time: request latency
+      envoy_cluster_circuit_breakers: circuit breaker state
+
+implementations:
+  istio:
+    description: "Most feature-rich; largest ecosystem"
+    pros:
+      - "Rich feature set (traffic, security, observability)"
+      - "Powerful policy language"
+      - "Large community"
+      - "VirtualService, DestinationRule, Gateway resources"
+    cons:
+      - "Complex; steep learning curve"
+      - "Higher resource overhead (~1GB per sidecar)"
+      - "Can be overkill for simple deployments"
+
+  linkerd:
+    description: "Lightweight; focused on reliability"
+    pros:
+      - "Lightweight (~10MB per sidecar)"
+      - "Simple configuration"
+      - "Built-in traffic splitting and load balancing"
+      - "Excellent observability"
+    cons:
+      - "Fewer features than Istio"
+      - "Smaller ecosystem"
+
+  consul:
+    description: "Service discovery + mesh"
+    pros:
+      - "Integrated service discovery"
+      - "Multi-datacenter support"
+      - "Flexible deployment (VMs or containers)"
+    cons:
+      - "Different mental model than others"
+      - "Complexity of managing both discovery and mesh"
+
+deployment_patterns:
+  sidecar_proxy:
+    description: "One proxy per pod; handles all traffic"
+    example: |
+      Pod with application + Envoy sidecar proxy
+
+      Traffic flow:
+      - App → localhost:8000 → sidecar proxy
+      - Sidecar applies policies, routing, mTLS
+      - Sidecar → destination service
+
+  ingress_gateway:
+    description: "External traffic enters through gateway"
+    example: |
+      External Client → Ingress Gateway → Services
+
+      Gateway handles:
+      - SSL termination
+      - Routing to services
+      - Rate limiting
+      - Authentication
+
+  egress_gateway:
+    description: "Outbound traffic controlled through gateway"
+    example: |
+      Services → Egress Gateway → External APIs
+
+      Benefits:
+      - Control outbound traffic
+      - Monitor external API calls
+      - Centralized logging for egress
+
+traffic_policies:
+  retries: |
+    spec:
+      hosts:
+      - httpbin
+      http:
+      - route:
+        - destination:
+            host: httpbin
+        retries:
+          attempts: 3
+          perTryTimeout: 2s
+
+  timeout: |
+    spec:
+      hosts:
+      - httpbin
+      http:
+      - route:
+        - destination:
+            host: httpbin
+        timeout: 5s
+
+  circuit_breaker: |
+    apiVersion: networking.istio.io/v1beta1
+    kind: DestinationRule
+    metadata:
+      name: httpbin
+    spec:
+      host: httpbin
+      outlierDetection:
+        consecutive5xxErrors: 5
+        interval: 30s
+        baseEjectionTime: 30s
+
+authorization_policies:
+  description: "Fine-grained access control"
+  example: |
+    # Only allow reviews to call details
+    apiVersion: security.istio.io/v1beta1
+    kind: AuthorizationPolicy
+    metadata:
+      name: details-policy
+    spec:
+      rules:
+      - from:
+        - source:
+            principals:
+            - cluster.local/ns/default/sa/reviews
+        to:
+        - operation:
+            methods: ["GET"]
+            paths: ["/details*"]
+
+observability_integration:
+  tracing:
+    description: "Automatic trace injection with Jaeger, Zipkin"
+    how_it_works: |
+      1. Sidecar injects trace ID into request headers
+      2. All services propagate trace ID
+      3. Traces collected and visualized
+
+  metrics:
+    description: "Prometheus metrics exported automatically"
+    metrics: |
+      - Request rate (req/s)
+      - Request duration (p50, p95, p99)
+      - Error rate
+      - Request size
+      - Response size
+
+  dashboards:
+    description: "Grafana/Kiali for visualization"
+    provides: |
+      - Service dependency graph
+      - Real-time traffic flows
+      - Request latencies
+      - Error rates
+      - Pod/container metrics
+
+operational_complexity:
+  learning_curve: "High for Istio, medium for Linkerd"
+  resource_overhead: "Each sidecar consumes memory/CPU"
+  debugging: "Added layer makes debugging more complex"
+  operational_burden: "New skill required; monitoring mesh health"
+
+best_practices:
+  - name: "Start with mTLS and traffic management"
+    description: "Core capabilities; add policies later"
+
+  - name: "Use lightweight mesh for simple use cases"
+    description: "Linkerd often better than Istio for straightforward scenarios"
+
+  - name: "Monitor mesh health"
+    description: "Sidecar failures affect application; track sidecar metrics"
+
+  - name: "Implement observability first"
+    description: "Mesh enables observability; set up collection early"
+
+  - name: "Use policy as code"
+    description: "Version control routing, security, traffic policies"
+
+  - name: "Test policy changes in staging"
+    description: "Wrong policy can break production traffic"
+
+anti_patterns:
+  - name: "Overly complex routing policies"
+    description: "Too many rules make debugging difficult"
+    consequence: "Traffic goes to unexpected destinations"
+
+  - name: "Ignoring mesh overhead"
+    description: "Adding sidecar without capacity planning"
+    consequence: "Pod memory/CPU exhaustion"
+
+  - name: "Not monitoring sidecar health"
+    description: "Sidecar crash = application becomes unreachable"
+    consequence: "Silent failures; hard to debug"
+
+comparison:
+  service_mesh_vs_api_gateway:
+    service_mesh: "Internal service-to-service communication"
+    api_gateway: "External clients to services"
+    use_together: "Both layers for complete control"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Service mesh is like hiring a translator for international business:
+      - Without mesh: each person learns all languages (retry logic, security, etc. in each service)
+      - With mesh: translator handles communication (sidecar proxy)
+      - Translator also enforces rules (routing policies, security)
+
+      One translator (mesh) scales better than each person learning every language.
+
+  intermediate:
+    focus: "Service mesh implementation"
+    key_points:
+      - "Sidecar proxy architecture and data/control plane"
+      - "Traffic management and canary deployments"
+      - "mTLS and authorization policies"
+      - "Observability integration (tracing, metrics)"
+
+  advanced:
+    focus: "Service mesh operations"
+    key_points:
+      - "Multi-mesh deployments and federation"
+      - "Performance tuning and resource optimization"
+      - "Debugging complex routing and security issues"
+      - "Mesh-as-a-service patterns (AWS App Mesh, etc.)"

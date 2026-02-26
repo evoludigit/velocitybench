@@ -1,0 +1,151 @@
+id: test-data-management
+name: "Test Data Management & Fixtures"
+category: testing
+type: pattern
+tags:
+  - testing
+  - fixtures
+  - test-data
+  - test-isolation
+  - databases
+
+summary:
+  short: "Managing test data and fixtures to enable reliable, isolated tests"
+  long: |
+    Test data setup is often the slowest part of testing. Fixtures provide pre-built test data; factories generate realistic data on-demand. Strategies range from in-memory databases to copying production data subsets.
+
+problem:
+  description: "Test setup is slow and brittle; shared test data causes test interdependencies and flakiness"
+  symptoms:
+    - name: "Slow tests"
+      description: "Waiting for database initialization"
+    - name: "Flaky tests"
+      description: "Tests fail due to shared state or leftover data"
+    - name: "Brittle setup"
+      description: "Schema changes break test fixtures"
+    - name: "Hard to reproduce"
+      description: "Specific test data hard to recreate for debugging"
+
+solution:
+  approach: "Use factories for realistic data generation; isolate test data; clean between tests"
+  key_points:
+    - "Use factory libraries (Factory Boy, Faker) for data generation"
+    - "Isolate tests: each test gets fresh database or transaction"
+    - "Clean between tests: delete data or rollback transaction"
+    - "Use in-memory databases for speed"
+    - "Maintain test data builders and generators"
+
+test_data_generation:
+  factories:
+    description: "Define how to create realistic test objects"
+    benefit: "DRY; consistent test data; easy to modify for specific tests"
+    example: "UserFactory.create(name='Alice', role='admin')"
+    libraries: ["Factory Boy (Python)", "Fabricator (Ruby)", "Seeding utils (Node.js)"]
+
+  builders:
+    description: "Fluent API to construct test objects"
+    example: "new UserBuilder().withName('Alice').withRole('admin').build()"
+    benefit: "Readable, flexible"
+
+  faker:
+    description: "Generate realistic data (names, emails, dates)"
+    example: "Faker.name(), Faker.email()"
+    benefit: "Natural, varied test data"
+
+fixtures:
+  static_files:
+    description: "JSON/YAML files with pre-defined test data"
+    benefit: "Simple, reproducible"
+    risk: "Brittle; schema changes require updating files"
+    use_case: "Small datasets, complex scenarios"
+
+  dynamic_generation:
+    description: "Generate data on-the-fly for each test"
+    benefit: "Fresh data, no cleanup issues"
+    risk: "Slower than static fixtures"
+    use_case: "Large datasets, variable scenarios"
+
+test_isolation:
+  database_per_test:
+    description: "Each test gets fresh database"
+    speed: "Slow for file-based DBs, fast for in-memory"
+    cleanup: "Automatic (drop database)"
+    use_case: "Integration tests, small test suites"
+
+  transaction_rollback:
+    description: "Run test in transaction; rollback after"
+    speed: "Fast; transactions cheap"
+    risk: "Some DBs don't support savepoints in triggers"
+    use_case: "Most integration tests"
+
+  table_truncation:
+    description: "Delete data from tables after each test"
+    speed: "Moderate; DELETE statements needed"
+    risk: "Foreign key constraints may block deletion"
+    use_case: "When rollback not suitable"
+
+  table_snapshots:
+    description: "Save clean state; restore after test"
+    speed: "Very fast if using file-system snapshots"
+    use_case: "Complex initialization"
+
+in_memory_databases:
+  sqlite: "File-based but fast; good for testing"
+  h2: "Java in-memory database"
+  embedded_postgres: "Lightweight PostgreSQL for testing"
+  benefit: "Speed; no external dependencies"
+  limitation: "May not match production DB exactly"
+
+test_data_cleanup:
+  after_each_test: "Most reliable; ensures isolation"
+  after_all_tests: "Faster but risks test interdependencies"
+  transaction_rollback: "Cleanest; automatic cleanup"
+  truncate_tables: "Works when transactions not suitable"
+
+test_data_builders:
+  purpose: "Reduce duplication; make test data setup declarative"
+
+  example:
+    python: |
+      user = UserFactory.create(
+        name='Alice',
+        email='alice@example.com',
+        role='admin'
+      )
+      post = PostFactory.create(author=user, title='Test Post')
+
+  benefit: "Tests are self-documenting; setup is clear"
+
+test_data_seeding:
+  seed_database: "Pre-populate database with reference data"
+  use_case: "Lookup tables, enums, system data"
+  management: "Version seed files; apply in migrations"
+
+shared_test_database:
+  advantage: "Single database for all tests (shares state)"
+  risk: "Tests can interfere with each other"
+  solution: "Use transactions or cleanup carefully"
+  when: "Performance critical; tests sufficiently isolated"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Test fixtures are like IKEA instructions:
+      - Without: Build furniture from scratch (slow, error-prone)
+      - With: Provided parts and instructions (consistent, fast)
+
+      Test fixtures are instructions; factories are the parts list.
+
+  intermediate:
+    focus: "Building test data strategies"
+    key_points:
+      - "Factory libraries and builders"
+      - "Test isolation techniques"
+      - "Database-per-test vs transaction rollback"
+
+  advanced:
+    focus: "Large-scale test data management"
+    key_points:
+      - "Synthetic data generation"
+      - "Production-like test data without PII"
+      - "Distributed test data management"

@@ -1,0 +1,59 @@
+id: cryptographic-audit-trails
+name: Cryptographic Audit Trails
+category: fraiseql
+type: standard
+tags:
+- security
+- auditing
+- compliance
+- immutability
+- debezium
+summary:
+  short: Immutable audit logs with SHA-256 + HMAC-SHA256 chain verification
+  long: FraiseQL generates immutable audit trails using cryptographic chain verification
+    (SHA-256 + HMAC-SHA256) in Debezium-compatible format with per-tenant isolation,
+    providing tamper-proof audit logs for compliance.
+problem:
+  description: Audit logs can be tampered with or deleted after the fact
+  symptoms:
+  - No proof of audit log integrity
+  - Audit logs can be modified by admins
+  - Can't detect missing or altered entries
+  - No chain of custody
+  impact: Compliance violations and forensic evidence tampering
+solution:
+  description: Implement Cryptographic Audit Trails effectively
+key_concepts:
+  concept_1: Cryptographic chain linking entries
+  concept_2: SHA-256 for content hashing
+  concept_3: HMAC-SHA256 for chain verification
+  concept_4: Per-tenant immutable log tables
+  concept_5: Debezium format standardization
+implementation_considerations:
+  consideration_1: Chain verification performance
+  consideration_2: Handling chain breaks
+  consideration_3: Long-term storage and archival
+  consideration_4: Cross-tenant isolation
+best_practices:
+- name: Append-only tables
+  description: Never UPDATE or DELETE audit entries
+- name: Chain each entry
+  description: Include previous entry hash
+- name: Per-tenant isolation
+  description: Separate audit chains per tenant
+- name: Debezium format
+  description: Use standardized event format
+anti_patterns:
+- name: Mutable logs
+  consequence: Audit trails can be tampered
+- name: No chaining
+  consequence: Missing entries undetectable
+- name: Shared chains
+  consequence: Cross-tenant tampering possible
+blog_hooks:
+  beginner:
+    focus: Introduction to Cryptographic Audit Trails
+  intermediate:
+    focus: Implementing chain verification with SHA-256/HMAC
+  advanced:
+    focus: Advanced audit log archival and forensic analysis

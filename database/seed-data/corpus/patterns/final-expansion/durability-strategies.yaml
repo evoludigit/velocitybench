@@ -1,0 +1,28 @@
+id: durability-strategies
+name: Durability Strategies
+category: comprehensive
+type: standard
+tags:
+- durability
+summary:
+  short: Durability Strategies and implementation guidelines
+  long: Complete guide to durability strategies
+problem:
+  description: Challenges without proper durability strategies
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement durability strategies
+key_concepts:
+  concept: Durability Strategies
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

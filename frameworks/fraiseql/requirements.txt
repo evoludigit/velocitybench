@@ -1,10 +1,10 @@
- fastapi>=0.104.0
- uvicorn[standard]>=0.24.0
- fraiseql>=1.8.1
- asyncpg>=0.29.0
- psycopg[pool]>=3.3.1
- psycopg-pool>=3.3.0
- pydantic>=2.0.0
- pydantic-settings>=2.0.0
- prometheus-client>=0.19.0
- pyyaml>=6.0.1
+# FraiseQL Framework Requirements
+# FraiseQL v2: Compiled GraphQL execution engine
+
+# FraiseQL Python SDK for schema authoring
+fraiseql>=2.0.0rc5
+
+# Core dependencies
+requests>=2.31.0          # HTTP client for GraphQL queries
+psycopg[binary]>=3.1.0    # PostgreSQL adapter
+python-dotenv>=1.0.0      # Environment variable management

@@ -1,0 +1,49 @@
+id: database-introspection-strategy
+name: Database Introspection Strategy
+category: fraiseql
+type: standard
+tags:
+- compilation
+- database-introspection
+- validation
+- metadata
+summary:
+  short: Querying database metadata to validate schema bindings
+  long: The compiler introspects the target database to discover tables, views, columns,
+    and procedures, validating that schema bindings reference valid database objects.
+problem:
+  description: Schema references database objects that don't exist
+  symptoms:
+  - View bindings fail at runtime
+  - Column names don't match schema fields
+  - Stored procedures have wrong signatures
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Database Introspection Strategy effectively
+key_concepts:
+  concept_1: Introspection query patterns
+  concept_2: Metadata extraction and parsing
+  concept_3: Binding validation algorithms
+implementation_considerations:
+  consideration_1: Database-specific introspection queries
+  consideration_2: Performance of introspection
+  consideration_3: Handling schema evolution
+best_practices:
+- name: Cache metadata
+  description: Cache introspection results
+- name: Validate all objects
+  description: Check views, procedures, columns
+- name: Detect changes
+  description: Flag schema changes for review
+anti_patterns:
+- name: No introspection
+  consequence: Silent binding failures
+- name: Stale metadata
+  consequence: Invalid bindings not caught
+blog_hooks:
+  beginner:
+    focus: Introduction to Database Introspection Strategy
+  intermediate:
+    focus: Implementing Database Introspection Strategy
+  advanced:
+    focus: Advanced Database Introspection Strategy techniques

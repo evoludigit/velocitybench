@@ -1,0 +1,5 @@
+comment = 'Transactional Views (TVIEWs) for PostgreSQL with automatic refresh triggers'
+default_version = '0.1.0'
+module_pathname = '$libdir/pg_tviews'
+relocatable = false
+superuser = false

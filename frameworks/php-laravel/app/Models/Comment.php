@@ -22,6 +22,10 @@ class Comment extends Model
         "created_at"
     ];
 
+    protected $casts = [
+        "id" => "string",
+    ];
+
     protected $table = "benchmark.tb_comment";
     public $timestamps = false;
 

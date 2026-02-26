@@ -1,0 +1,28 @@
+id: resilience-anti-patterns
+name: Resilience Anti Patterns
+category: comprehensive
+type: standard
+tags:
+- resilience
+summary:
+  short: Resilience Anti Patterns and implementation guidelines
+  long: Complete guide to resilience anti patterns
+problem:
+  description: Challenges without proper resilience anti patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement resilience anti patterns
+key_concepts:
+  concept: Resilience Anti Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

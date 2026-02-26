@@ -1,0 +1,444 @@
+# Fraisier Multi-Environment Configuration Pattern
+# VelocityBench Knowledge Corpus
+
+id: fraisier-multi-environment
+name: "Fraisier: Multi-Environment Deployment Configuration"
+category: fraiseql
+type: pattern
+severity: high
+tags:
+  - fraisier
+  - deployment
+  - environments
+  - configuration
+  - devops
+  - dev-staging-prod
+
+summary:
+  short: "Configure services across development, staging, and production with environment-specific settings"
+  long: |
+    Fraisier allows each service to have different configurations per environment (dev/staging/prod).
+    Each environment can use different branches, paths, database strategies, and health checks.
+    Enables safe deployments: dev uses 'rebuild' strategy (drop DB), prod uses 'apply' strategy (safe migrations).
+    Each environment maintains separate state in its own database and log directories.
+
+problem:
+  description: |
+    Different environments have different requirements:
+    - Development: fast feedback, can reset data, use simple database
+    - Staging: production-like, safe migrations, but can experiment
+    - Production: safe migrations only, backups required, health checks essential
+
+    Managing this complexity across multiple services is error-prone.
+
+  symptoms:
+    - name: "Inconsistent configuration per environment"
+      description: "Dev and prod have different deployment scripts"
+      detection: "Different procedures for each environment, hard to maintain consistency"
+
+    - name: "Database strategy errors"
+      description: "Accidentally drop production database"
+      detection: "Production disaster from wrong migration strategy"
+
+    - name: "Missing backups"
+      description: "Staging and production don't have backup_before_deploy"
+      detection: "No recovery option after failed deployment"
+
+    - name: "Health check blind spots"
+      description: "Some environments have health checks, others don't"
+      detection: "Deployments fail silently in some environments"
+
+solution:
+  principle: "Environment-specific configuration with appropriate safety levels per environment"
+
+  components:
+    - name: "Environment definition"
+      type: "Configuration section"
+      purpose: "Specify settings for dev/staging/prod"
+
+    - name: "Branch mapping"
+      type: "Git integration"
+      purpose: "Map Git branches to environments"
+
+    - name: "Database strategy"
+      type: "Migration control"
+      purpose: "Safe 'apply' for prod, fast 'rebuild' for dev"
+
+    - name: "Health checks"
+      type: "Verification"
+      purpose: "Confirm deployment success"
+
+    - name: "Backups"
+      type: "Safety mechanism"
+      purpose: "Protect production data"
+
+configuration:
+  development_environment:
+    description: "Fast feedback, experimental, data can be reset"
+    example: |
+      development:
+        name: api.myapp.dev
+        branch: dev
+        git_repo: /var/git/api.myapp.dev.git
+        app_path: /var/www/api.myapp.dev
+        systemd_service: api-dev.service
+        database:
+          name: myapp_development
+          strategy: rebuild  # DROP and recreate (fast, no data loss)
+        health_check:
+          url: https://api.myapp.dev/health
+          timeout: 30
+    characteristics:
+      - Uses 'rebuild' database strategy (destructive, but fast)
+      - Dev branch for rapid changes
+      - Logs to /var/log/myapp-dev
+      - Health checks less critical
+      - No backup required
+
+  staging_environment:
+    description: "Production-like, safe migrations, experimental"
+    example: |
+      staging:
+        name: api.myapp.staging
+        branch: staging
+        git_repo: /var/git/api.myapp.staging.git
+        app_path: /var/www/api.myapp.staging
+        systemd_service: api-myapp-staging.service
+        database:
+          name: myapp_staging
+          strategy: apply  # Safe migrations only
+        health_check:
+          url: https://api.myapp.staging/health
+          timeout: 30
+    characteristics:
+      - Uses 'apply' database strategy (safe migrations)
+      - Staging branch for pre-release testing
+      - Production-like configuration
+      - Health checks required
+      - Optional backup (testing backup procedures)
+
+  production_environment:
+    description: "Safe, backup-protected, monitoring-heavy"
+    example: |
+      production:
+        name: api.myapp.io
+        branch: main
+        git_repo: /var/git/api.myapp.io.git
+        app_path: /var/www/api.myapp.io
+        systemd_service: api.service
+        database:
+          name: myapp_production
+          strategy: apply  # Safe migrations ONLY
+          backup_before_deploy: true  # Always backup before changes
+        health_check:
+          url: https://api.myapp.io/health
+          timeout: 30
+          expected_status: 200
+        notifications:
+          enabled: true
+          slack_channel: "#deployments"
+    characteristics:
+      - Uses 'apply' database strategy (safe migrations only)
+      - Main branch for releases
+      - Production IP/domain
+      - Strict health checks
+      - Backup before every deployment
+      - Deployment notifications enabled
+
+  database_strategies:
+    - strategy: "rebuild"
+      description: "Drop and recreate database (dev only)"
+      safety: "DESTRUCTIVE - data loss"
+      use_case: "Development"
+      sql: |
+        -- development.sql
+        DROP DATABASE IF EXISTS myapp_development CASCADE;
+        CREATE DATABASE myapp_development;
+        -- Run initial schema setup
+      speed: "Very fast (seconds)"
+      data_loss: "Yes - all data lost"
+      when_to_use: "Development only, frequent schema changes"
+
+    - strategy: "apply"
+      description: "Apply safe migrations only (no destructive changes)"
+      safety: "SAFE - no data loss"
+      use_case: "Staging and production"
+      sql: |
+        -- production.sql
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20);
+        CREATE INDEX IF NOT EXISTS idx_users_phone ON users(phone);
+        -- Only ADD, CREATE, or safe ALTER operations
+      speed: "Depends on schema size"
+      data_loss: "No - data preserved"
+      when_to_use: "Staging and production"
+      restrictions:
+        - "Cannot DROP columns (breaks existing apps)"
+        - "Cannot TRUNCATE tables (data loss)"
+        - "Cannot RENAME tables (breaks references)"
+        - "Can only ADD columns with defaults"
+
+  per_environment_overrides:
+    description: "Global environment config + per-fraise overrides"
+    example: |
+      # Global environment definition
+      environments:
+        production:
+          server: prod.myserver.com
+          log_dir: /var/log/myapp
+          notifications:
+            enabled: true
+            slack_channel: "#deployments"
+
+      # Per-fraise environment override
+      fraises:
+        api:
+          type: api
+          environments:
+            production:
+              name: api.myapp.io
+              branch: main
+              app_path: /var/www/api
+              systemd_service: api.service
+              database:
+                name: myapp_prod
+                strategy: apply
+                backup_before_deploy: true
+
+        worker:
+          type: etl
+          environments:
+            production:
+              # Uses global 'production' environment settings
+              app_path: /var/www/api
+              script_path: scripts/worker.sh
+              database:
+                name: myapp_prod
+                strategy: apply
+
+database_backup_strategies:
+  before_deploy_backup:
+    description: "Create backup before deployment in production"
+    example: |
+      production:
+        database:
+          name: myapp_prod
+          strategy: apply
+          backup_before_deploy: true  # Create backup before any migrations
+    benefit: "Ability to rollback if deployment fails"
+
+  scheduled_backups:
+    description: "Regular backups via backup fraise"
+    example: |
+      fraises:
+        backup:
+          type: backup
+          environments:
+            production:
+              jobs:
+                hourly_backup:
+                  name: db-backup-hourly
+                  script_path: scripts/backup.sh
+                  schedule: "0 * * * *"  # Every hour
+                  retention_days: 7
+
+  full_backup_strategy:
+    description: "Complete backup procedure for production"
+    steps:
+      - name: "Before deployment"
+        action: "Create backup using pg_dump"
+
+      - name: "Execute migration"
+        action: "Run safe ALTER statements"
+
+      - name: "Health check"
+        action: "Verify service responds"
+
+      - name: "Keep backup"
+        action: "Archive for X days"
+
+branch_mapping_per_environment:
+  description: "Route branches to correct environment"
+  example: |
+    branch_mapping:
+      dev:
+        fraise: api
+        environment: development
+      staging:
+        fraise: api
+        environment: staging
+      main:
+        fraise: api
+        environment: production
+
+    # For a service with different branch strategy
+    feature:
+      fraise: api
+      environment: development
+    hotfix:
+      fraise: api
+      environment: staging  # Hotfixes go to staging first
+
+health_check_per_environment:
+  description: "Different health checks for different environments"
+  example: |
+    fraises:
+      api:
+        type: api
+        environments:
+          development:
+            health_check:
+              url: http://localhost:3000/health  # No HTTPS in dev
+              timeout: 10
+          staging:
+            health_check:
+              url: https://api.staging.myapp.com/health
+              timeout: 30
+          production:
+            health_check:
+              url: https://api.myapp.io/health
+              timeout: 30
+              expected_status: 200
+              expected_body_regex: '"status":\s*"ok"'  # Custom validation
+
+migration_safety_levels:
+  development: |
+    strategy: rebuild
+    behavior: DROP DATABASE, CREATE DATABASE, recreate schema
+    use_when: "Schema constantly changing, no production data"
+    safety: ⚠️  DESTRUCTIVE
+
+  staging: |
+    strategy: apply
+    behavior: Safe migrations only (ADD, CREATE, safe ALTER)
+    use_when: "Testing migrations before production"
+    safety: ✅ SAFE
+
+  production: |
+    strategy: apply
+    behavior: Safe migrations only + backup before deploy
+    use_when: "Real data, need protection against failures"
+    safety: ✅✅ MAXIMUM SAFETY
+
+best_practices:
+  - name: "Use different database strategies per environment"
+    description: "Dev: rebuild, Staging/Prod: apply"
+    rationale: "Dev can afford data loss, prod cannot"
+
+  - name: "Always backup before production deployment"
+    description: "Set backup_before_deploy: true in production"
+    rationale: "Insurance against failed migrations"
+
+  - name: "Include health checks for all environments"
+    description: "Every environment should verify service is up"
+    rationale: "Catch deployment failures immediately"
+
+  - name: "Use branch mapping for webhook routing"
+    description: "Map branches to environments for automatic deployments"
+    rationale: "Push to main → auto-deploy to production"
+
+  - name: "Different notification levels per environment"
+    description: "Dev: silent, Prod: Slack notifications"
+    rationale: "Important deployments get attention"
+
+  - name: "Test backups in staging before production"
+    description: "Verify backup/restore works in staging first"
+    rationale: "Backups are useless if restore fails"
+
+anti_patterns:
+  - name: "Same database strategy for all environments"
+    consequence: "Accidentally drop production data"
+    example: "Use 'rebuild' strategy for all envs"
+
+  - name: "No health checks in production"
+    consequence: "Silent failures, users notice first"
+    example: "Skip health_check in prod to save time"
+
+  - name: "No backups in production"
+    consequence: "Data loss is permanent"
+    example: "Only backup in staging, skip in prod"
+
+  - name: "Hard-coded paths per environment"
+    consequence: "Configuration not reusable"
+    example: "/var/www/api vs /var/www/api-prod"
+
+  - name: "Different deployment tools per environment"
+    consequence: "Inconsistent behavior across environments"
+    example: "Dev uses shell scripts, prod uses different tool"
+
+use_cases:
+  - scenario: "Rapid development with safe staging"
+    setup: |
+      dev:
+        strategy: rebuild      # Fast iteration
+        health_check: http://localhost:3000
+      staging:
+        strategy: apply        # Production-like
+        health_check: https://api.staging.myapp.com
+      prod:
+        strategy: apply        # Maximum safety
+        backup_before_deploy: true
+    benefit: "Developers move fast, staging catches issues, prod is protected"
+
+  - scenario: "Microservices with shared database"
+    setup: |
+      fraises:
+        api:
+          environments:
+            prod:
+              database:
+                name: shared_prod
+                strategy: apply
+        worker:
+          environments:
+            prod:
+              database:
+                name: shared_prod  # Same database
+                strategy: apply
+    benefit: "Multiple services share same database safely"
+
+  - scenario: "Hotfix workflow"
+    setup: |
+      branch_mapping:
+        main:
+          fraise: api
+          environment: prod
+        hotfix:
+          fraise: api
+          environment: staging  # Hotfix to staging first
+    benefit: "Hotfixes can be tested in staging before production"
+
+related_patterns:
+  - id: "fraisier-deployment-orchestration"
+    description: "Overall deployment orchestration"
+
+  - id: "webhook-event-driven-deployment"
+    description: "Webhook-driven deployments per environment"
+
+  - id: "deployment-history-tracking"
+    description: "Track deployments per environment"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Environment-specific configuration is like having different care routines:
+      - Development: water daily, experiment with soil (can restart from scratch)
+      - Staging: use production-like conditions, test changes (safe updates)
+      - Production: careful maintenance, backups, insurance (maximum protection)
+
+  intermediate:
+    focus: "Database strategies and migration safety"
+    key_points:
+      - "rebuild strategy for dev (fast, destructive)"
+      - "apply strategy for staging/prod (safe migrations)"
+      - "backup_before_deploy in production"
+      - "Health checks verify deployment success"
+      - "Branch mapping routes changes to correct environment"
+
+  advanced:
+    focus: "Multi-service environment coordination"
+    key_points:
+      - "Shared database across services with safe migrations"
+      - "Hotfix workflow through staging"
+      - "Backup and restore testing"
+      - "Health check customization per environment"
+      - "Deployment notifications at appropriate levels"

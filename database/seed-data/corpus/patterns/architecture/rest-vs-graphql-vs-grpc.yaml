@@ -1,0 +1,340 @@
+# REST vs GraphQL vs gRPC - API Architecture Comparison
+# VelocityBench Knowledge Corpus
+
+id: rest-vs-graphql-vs-grpc
+name: "REST vs GraphQL vs gRPC"
+category: architecture
+type: comparison
+tags:
+  - api-design
+  - rest
+  - graphql
+  - grpc
+  - architecture
+  - performance
+
+summary:
+  short: "Comparing three major API paradigms: REST, GraphQL, and gRPC"
+  long: |
+    REST, GraphQL, and gRPC represent three distinct approaches to API design,
+    each with unique strengths. REST uses resource-oriented URLs with HTTP verbs,
+    GraphQL provides a flexible query language with a single endpoint, and gRPC
+    offers high-performance binary communication via Protocol Buffers. Choosing
+    the right paradigm depends on use case, client requirements, and performance needs.
+
+paradigms:
+  - name: REST
+    full_name: "Representational State Transfer"
+    year_introduced: 2000
+    creator: "Roy Fielding"
+    transport: HTTP/1.1, HTTP/2
+    format: JSON, XML
+    description: |
+      Resource-oriented architecture using HTTP methods (GET, POST, PUT, DELETE)
+      with predictable URL structures. Each resource has its own endpoint.
+
+    characteristics:
+      - Resource-based URLs (/users/123, /orders/456)
+      - HTTP verbs define actions (GET, POST, PUT, DELETE)
+      - Stateless communication
+      - Built-in caching via HTTP headers
+      - Human-readable JSON responses
+      - Hypermedia links (HATEOAS) for discoverability
+
+    strengths:
+      - Universal browser/HTTP support
+      - Easy to cache at multiple levels
+      - Simple to understand and debug
+      - Mature tooling and ecosystem
+      - Works well with CDNs
+      - No special client libraries required
+
+    weaknesses:
+      - Over-fetching (returns all fields, not just needed ones)
+      - Under-fetching (multiple requests for related data)
+      - Versioning challenges (v1, v2 endpoints)
+      - No built-in schema/type system
+      - N+1 problem with nested resources
+
+    best_for:
+      - Public APIs with diverse clients
+      - Simple CRUD operations
+      - Caching-heavy applications
+      - Browser-based applications
+      - When simplicity is prioritized
+
+  - name: GraphQL
+    full_name: "Graph Query Language"
+    year_introduced: 2015
+    creator: "Facebook (Meta)"
+    transport: HTTP/1.1, HTTP/2, WebSocket
+    format: JSON
+    description: |
+      Query language for APIs with a single endpoint. Clients specify exactly
+      what data they need, solving over-fetching and under-fetching problems.
+
+    characteristics:
+      - Single endpoint (/graphql)
+      - Strongly typed schema (SDL)
+      - Client specifies exact data needs
+      - Introspection for self-documentation
+      - Real-time subscriptions via WebSocket
+      - Nested queries in single request
+
+    strengths:
+      - No over-fetching or under-fetching
+      - Single request for complex data
+      - Strong typing with schema validation
+      - Self-documenting via introspection
+      - Excellent developer experience (GraphiQL, Apollo DevTools)
+      - Flexible for mobile/web with different data needs
+
+    weaknesses:
+      - Complex caching (no URL-based caching)
+      - N+1 problem requires DataLoader
+      - Learning curve for backend developers
+      - Potential for expensive queries (query complexity)
+      - All requests are POST (no HTTP caching)
+      - File uploads require special handling
+
+    best_for:
+      - Complex, interconnected data
+      - Mobile apps with bandwidth constraints
+      - Microservices aggregation (BFF pattern)
+      - Rapid frontend iteration
+      - Real-time features (subscriptions)
+
+  - name: gRPC
+    full_name: "gRPC Remote Procedure Call"
+    year_introduced: 2015
+    creator: "Google"
+    transport: HTTP/2
+    format: Protocol Buffers (binary)
+    description: |
+      High-performance RPC framework using Protocol Buffers for serialization.
+      Designed for microservices communication with bi-directional streaming.
+
+    characteristics:
+      - Binary Protocol Buffers format
+      - HTTP/2 multiplexing
+      - Bi-directional streaming
+      - Code generation from .proto files
+      - Strong typing via protobuf schema
+      - Deadline/timeout propagation
+
+    strengths:
+      - Extremely fast serialization/deserialization
+      - Small payload size (binary)
+      - HTTP/2 multiplexing and streaming
+      - Strong contracts via .proto files
+      - Built-in load balancing
+      - Excellent for microservices
+
+    weaknesses:
+      - Not browser-native (requires grpc-web)
+      - Binary format not human-readable
+      - Harder to debug without tools
+      - Less mature tooling than REST
+      - Steeper learning curve
+      - Breaking changes require careful versioning
+
+    best_for:
+      - Microservices communication
+      - High-performance internal APIs
+      - Streaming data (real-time, IoT)
+      - Polyglot environments
+      - When bandwidth/latency matter
+
+comparison_matrix:
+  performance:
+    rest: "Good - text-based, cacheable"
+    graphql: "Good - single request, but parsing overhead"
+    grpc: "Excellent - binary, HTTP/2"
+
+  flexibility:
+    rest: "Low - fixed endpoints"
+    graphql: "High - client-driven queries"
+    grpc: "Medium - defined in .proto"
+
+  learning_curve:
+    rest: "Low - familiar HTTP concepts"
+    graphql: "Medium - new query language"
+    grpc: "High - protobuf, streaming"
+
+  browser_support:
+    rest: "Native"
+    graphql: "Native (over HTTP)"
+    grpc: "Requires grpc-web proxy"
+
+  caching:
+    rest: "Built-in HTTP caching"
+    graphql: "Manual (Apollo Cache, etc.)"
+    grpc: "Application-level"
+
+  real_time:
+    rest: "Polling or SSE"
+    graphql: "Subscriptions (WebSocket)"
+    grpc: "Bi-directional streaming"
+
+  schema:
+    rest: "Optional (OpenAPI)"
+    graphql: "Required (SDL)"
+    grpc: "Required (.proto)"
+
+use_case_recommendations:
+  - scenario: "Public API for third-party developers"
+    recommendation: REST
+    reason: "Universal HTTP support, easy to consume without special libraries"
+
+  - scenario: "Mobile app with complex nested data"
+    recommendation: GraphQL
+    reason: "Single request, reduced bandwidth, flexible queries"
+
+  - scenario: "High-performance microservices"
+    recommendation: gRPC
+    reason: "Binary format, HTTP/2, streaming support"
+
+  - scenario: "Real-time dashboard"
+    recommendation: "GraphQL or gRPC"
+    reason: "GraphQL subscriptions or gRPC streaming"
+
+  - scenario: "Simple CRUD application"
+    recommendation: REST
+    reason: "Simple, well-understood, easy caching"
+
+  - scenario: "Backend-for-Frontend (BFF)"
+    recommendation: GraphQL
+    reason: "Aggregate multiple services, tailored responses"
+
+code_examples:
+  rest:
+    fetch_user_with_orders: |
+      # Multiple requests required
+      GET /users/123
+      GET /users/123/orders
+      GET /orders/456/items
+      GET /orders/789/items
+
+    response_example: |
+      {
+        "id": 123,
+        "name": "John Doe",
+        "email": "john@example.com",
+        "created_at": "2024-01-15T10:00:00Z"
+      }
+
+  graphql:
+    fetch_user_with_orders: |
+      # Single request
+      query {
+        user(id: "123") {
+          id
+          name
+          orders {
+            id
+            total
+            items {
+              product { name }
+              quantity
+            }
+          }
+        }
+      }
+
+    schema_example: |
+      type User {
+        id: ID!
+        name: String!
+        email: String!
+        orders: [Order!]!
+      }
+
+      type Order {
+        id: ID!
+        total: Float!
+        items: [OrderItem!]!
+      }
+
+      type Query {
+        user(id: ID!): User
+        users: [User!]!
+      }
+
+  grpc:
+    proto_definition: |
+      syntax = "proto3";
+
+      service UserService {
+        rpc GetUser(GetUserRequest) returns (User);
+        rpc GetUserWithOrders(GetUserRequest) returns (UserWithOrders);
+        rpc StreamOrders(GetUserRequest) returns (stream Order);
+      }
+
+      message GetUserRequest {
+        string user_id = 1;
+      }
+
+      message User {
+        string id = 1;
+        string name = 2;
+        string email = 3;
+      }
+
+      message Order {
+        string id = 1;
+        float total = 2;
+        repeated OrderItem items = 3;
+      }
+
+performance_benchmarks:
+  note: "Benchmarks vary by implementation. These are representative."
+  metrics:
+    - metric: "Requests/second (simple query)"
+      rest: "~15,000"
+      graphql: "~12,000"
+      grpc: "~25,000"
+
+    - metric: "Latency (p99)"
+      rest: "~10ms"
+      graphql: "~15ms"
+      grpc: "~5ms"
+
+    - metric: "Payload size (same data)"
+      rest: "~500 bytes (JSON)"
+      graphql: "~300 bytes (requested fields)"
+      grpc: "~150 bytes (protobuf)"
+
+migration_paths:
+  rest_to_graphql:
+    - "Create GraphQL schema matching REST resources"
+    - "Implement resolvers that call existing REST endpoints"
+    - "Add DataLoader for N+1 prevention"
+    - "Gradually move resolvers to direct DB access"
+
+  rest_to_grpc:
+    - "Define .proto files for each resource"
+    - "Generate server/client code"
+    - "Implement service methods"
+    - "Add grpc-web gateway for browser clients"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Think of ordering food:
+      - REST is like a fixed menu - you order dish #5 and get everything on the plate
+      - GraphQL is like a buffet - you pick exactly what you want
+      - gRPC is like a fast-food drive-through - optimized for speed, less flexible
+
+  intermediate:
+    focus: "Implementation tradeoffs and when to use each"
+    key_points:
+      - "REST caching strategies (ETags, Cache-Control)"
+      - "GraphQL DataLoader and query complexity"
+      - "gRPC service mesh integration"
+
+  advanced:
+    focus: "Performance optimization and hybrid architectures"
+    key_points:
+      - "GraphQL federation for microservices"
+      - "gRPC load balancing strategies"
+      - "Hybrid REST + GraphQL approaches"

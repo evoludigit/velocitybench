@@ -1,21 +1,23 @@
 package models
 
+import "github.com/google/uuid"
+
 // User represents a user in the system
 type User struct {
-	ID       string  `json:"id" db:"id"`
-	Username string  `json:"username" db:"username"`
-	FullName *string `json:"full_name,omitempty" db:"full_name"`
-	Bio      *string `json:"bio,omitempty" db:"bio"`
-	Posts    []Post  `json:"posts,omitempty"`
+	ID       uuid.UUID `json:"id" db:"id"`
+	Username string    `json:"username" db:"username"`
+	FullName *string   `json:"full_name,omitempty" db:"full_name"`
+	Bio      *string   `json:"bio,omitempty" db:"bio"`
+	Posts    []Post    `json:"posts,omitempty"`
 }
 
 // UserResponse represents the user data returned in API responses
 type UserResponse struct {
-	ID       string  `json:"id"`
-	Username string  `json:"username"`
-	FullName *string `json:"full_name,omitempty"`
-	Bio      *string `json:"bio,omitempty"`
-	Posts    []Post  `json:"posts,omitempty"`
+	ID       uuid.UUID `json:"id"`
+	Username string    `json:"username"`
+	FullName *string   `json:"full_name,omitempty"`
+	Bio      *string   `json:"bio,omitempty"`
+	Posts    []Post    `json:"posts,omitempty"`
 }
 
 // UpdateUserRequest represents the request payload for updating a user

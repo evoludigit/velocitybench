@@ -1,0 +1,58 @@
+id: query-result-streaming
+name: Query Result Streaming
+category: fraiseql
+type: standard
+tags:
+- performance
+- streaming
+- memory
+- large-results
+- optimization
+summary:
+  short: Chunked response streaming for large result sets
+  long: FraiseQL supports streaming query results in chunks to avoid memory exhaustion
+    on large result sets, using database cursors and incremental JSON serialization
+    for efficient memory utilization and Time-To-First-Byte optimization.
+problem:
+  description: Large result sets cause memory exhaustion and slow responses
+  symptoms:
+  - OOMKills on large queries
+  - Long Time-To-First-Byte (TTFB)
+  - Client timeout waiting for results
+  - High memory usage spikes
+  impact: Service instability and poor user experience
+solution:
+  description: Implement Query Result Streaming effectively
+key_concepts:
+  concept_1: Database cursor-based fetching
+  concept_2: Chunked JSON serialization
+  concept_3: Configurable chunk size (1000 rows)
+  concept_4: Backpressure handling
+implementation_considerations:
+  consideration_1: Chunk size tuning
+  consideration_2: Transaction isolation during streaming
+  consideration_3: Client streaming support
+  consideration_4: Error handling mid-stream
+best_practices:
+- name: Use cursors
+  description: Stream from database with cursors
+- name: Chunk responses
+  description: Send results in configurable chunks
+- name: Handle backpressure
+  description: Pause streaming if client slow
+- name: Set limits
+  description: Maximum result set size limits
+anti_patterns:
+- name: Buffer entire result
+  consequence: Memory exhaustion on large queries
+- name: No chunk limits
+  consequence: Unbounded memory usage
+- name: Ignore backpressure
+  consequence: Client buffer overflow
+blog_hooks:
+  beginner:
+    focus: Introduction to Query Result Streaming
+  intermediate:
+    focus: Implementing cursor-based streaming
+  advanced:
+    focus: Advanced backpressure handling and performance tuning

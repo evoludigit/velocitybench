@@ -1,0 +1,28 @@
+id: authorization-integration
+name: Authorization Integration
+category: comprehensive
+type: standard
+tags:
+- authorization
+summary:
+  short: Authorization Integration and implementation guidelines
+  long: Complete guide to authorization integration
+problem:
+  description: Challenges without proper authorization integration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement authorization integration
+key_concepts:
+  concept: Authorization Integration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

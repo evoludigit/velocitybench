@@ -1,0 +1,31 @@
+id: domain-hospitality
+name: Hospitality Domain Patterns
+category: general
+type: standard
+tags:
+- domain
+summary:
+  short: Best practices for hospitality domain patterns
+  long: Comprehensive guide to hospitality domain patterns. This pattern covers implementation
+    details, best practices, and common pitfalls.
+problem:
+  description: Issues without proper hospitality domain patterns
+  symptoms:
+  - Performance issues
+  - Reliability problems
+  - Scalability challenges
+  impact: System degradation
+solution:
+  description: Implement hospitality domain patterns effectively
+key_concepts:
+  concept: Understanding hospitality domain patterns
+best_practices:
+- name: Best practice 1
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Introduction to Hospitality Domain Patterns
+  intermediate:
+    focus: Implementing Hospitality Domain Patterns
+  advanced:
+    focus: Advanced Hospitality Domain Patterns

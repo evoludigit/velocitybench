@@ -1,0 +1,28 @@
+id: resilience-strategies
+name: Resilience Strategies
+category: comprehensive
+type: standard
+tags:
+- resilience
+summary:
+  short: Resilience Strategies and implementation guidelines
+  long: Complete guide to resilience strategies
+problem:
+  description: Challenges without proper resilience strategies
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement resilience strategies
+key_concepts:
+  concept: Resilience Strategies
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

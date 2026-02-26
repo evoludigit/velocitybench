@@ -1,0 +1,28 @@
+id: deployment-strategies
+name: Deployment Strategies
+category: comprehensive
+type: standard
+tags:
+- deployment
+summary:
+  short: Deployment Strategies and implementation guidelines
+  long: Complete guide to deployment strategies
+problem:
+  description: Challenges without proper deployment strategies
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement deployment strategies
+key_concepts:
+  concept: Deployment Strategies
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

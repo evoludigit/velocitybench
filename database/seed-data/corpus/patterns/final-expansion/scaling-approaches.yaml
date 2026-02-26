@@ -1,0 +1,28 @@
+id: scaling-approaches
+name: Scaling Approaches
+category: comprehensive
+type: standard
+tags:
+- scaling
+summary:
+  short: Scaling Approaches and implementation guidelines
+  long: Complete guide to scaling approaches
+problem:
+  description: Challenges without proper scaling approaches
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement scaling approaches
+key_concepts:
+  concept: Scaling Approaches
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

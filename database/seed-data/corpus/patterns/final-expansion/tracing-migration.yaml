@@ -1,0 +1,28 @@
+id: tracing-migration
+name: Tracing Migration
+category: comprehensive
+type: standard
+tags:
+- tracing
+summary:
+  short: Tracing Migration and implementation guidelines
+  long: Complete guide to tracing migration
+problem:
+  description: Challenges without proper tracing migration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement tracing migration
+key_concepts:
+  concept: Tracing Migration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

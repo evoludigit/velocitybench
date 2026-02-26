@@ -1,0 +1,291 @@
+# Async Programming Patterns
+# VelocityBench Knowledge Corpus
+
+id: async-patterns
+name: "Asynchronous Programming Patterns"
+category: performance
+type: pattern
+severity: medium
+tags:
+  - async
+  - concurrency
+  - performance
+  - promises
+  - event-loop
+
+summary:
+  short: "Handle concurrent operations without blocking threads"
+  long: |
+    Asynchronous programming allows a single thread to handle many concurrent operations
+    by not blocking while waiting for I/O. Instead of dedicating a thread to wait for
+    a database query, the thread handles other requests and resumes when data is ready.
+    This enables handling thousands of concurrent connections with minimal resources.
+
+problem:
+  description: |
+    Synchronous code blocks while waiting for I/O operations:
+    - A database query takes 50ms - thread does nothing for 50ms
+    - 100 concurrent requests need 100 threads (significant memory)
+    - Thread pool exhaustion causes request queuing
+    - Poor resource utilization despite low CPU usage
+
+  symptoms:
+    - name: "High thread count with low CPU"
+      description: "Many threads but CPU mostly idle"
+      detection: "Thread dump shows threads in WAITING state"
+
+    - name: "Poor throughput despite fast queries"
+      description: "Individual operations fast, but can't handle volume"
+      detection: "Requests queue despite available CPU"
+
+    - name: "Memory pressure from threads"
+      description: "Each thread consumes 1-2MB stack space"
+      detection: "OOM errors or high memory usage with many connections"
+
+solution:
+  principle: "Never block - register callbacks and let the event loop manage concurrency"
+
+  components:
+    - name: "Event Loop"
+      type: "runtime"
+      purpose: "Schedules and dispatches async operations"
+
+    - name: "Promises/Futures"
+      type: "abstraction"
+      purpose: "Represents eventual result of async operation"
+
+    - name: "Async/Await"
+      type: "syntax"
+      purpose: "Write async code that reads like sync code"
+
+implementation:
+  javascript:
+    callbacks: |
+      // Callback style (old, callback hell)
+      db.query('SELECT * FROM users', (err, users) => {
+        if (err) return handleError(err);
+        db.query('SELECT * FROM orders WHERE user_id = $1', [users[0].id], (err, orders) => {
+          if (err) return handleError(err);
+          console.log(orders);
+        });
+      });
+
+    promises: |
+      // Promise style (better)
+      db.query('SELECT * FROM users')
+        .then(users => db.query('SELECT * FROM orders WHERE user_id = $1', [users[0].id]))
+        .then(orders => console.log(orders))
+        .catch(handleError);
+
+    async_await: |
+      // Async/await (best readability)
+      async function getUserOrders(userId: string) {
+        try {
+          const users = await db.query('SELECT * FROM users WHERE id = $1', [userId]);
+          const orders = await db.query('SELECT * FROM orders WHERE user_id = $1', [userId]);
+          return { user: users[0], orders };
+        } catch (error) {
+          handleError(error);
+        }
+      }
+
+  python:
+    sync_vs_async: |
+      # Synchronous (blocking)
+      import requests
+
+      def fetch_all_sync(urls: list[str]) -> list[dict]:
+          results = []
+          for url in urls:
+              response = requests.get(url)  # Blocks!
+              results.append(response.json())
+          return results
+
+      # Asynchronous (non-blocking)
+      import aiohttp
+      import asyncio
+
+      async def fetch_all_async(urls: list[str]) -> list[dict]:
+          async with aiohttp.ClientSession() as session:
+              tasks = [fetch_one(session, url) for url in urls]
+              return await asyncio.gather(*tasks)
+
+      async def fetch_one(session, url: str) -> dict:
+          async with session.get(url) as response:
+              return await response.json()
+
+    database: |
+      # Sync database access
+      import psycopg2
+
+      def get_user_sync(user_id: int):
+          conn = psycopg2.connect(...)
+          cursor = conn.cursor()
+          cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+          return cursor.fetchone()
+
+      # Async database access
+      import psycopg
+
+      async def get_user_async(user_id: int):
+          async with await psycopg.AsyncConnection.connect(...) as conn:
+              async with conn.cursor() as cursor:
+                  await cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
+                  return await cursor.fetchone()
+
+patterns:
+  - name: "Parallel Execution"
+    description: "Run independent operations concurrently"
+    example:
+      javascript: |
+        // Sequential (slow) - 300ms total
+        const users = await getUsers();      // 100ms
+        const products = await getProducts(); // 100ms
+        const orders = await getOrders();     // 100ms
+
+        // Parallel (fast) - 100ms total
+        const [users, products, orders] = await Promise.all([
+          getUsers(),
+          getProducts(),
+          getOrders()
+        ]);
+
+      python: |
+        # Sequential (slow)
+        users = await get_users()
+        products = await get_products()
+        orders = await get_orders()
+
+        # Parallel (fast)
+        users, products, orders = await asyncio.gather(
+            get_users(),
+            get_products(),
+            get_orders()
+        )
+
+  - name: "Concurrent with Limit"
+    description: "Process many items with bounded concurrency"
+    example:
+      javascript: |
+        import pLimit from 'p-limit';
+
+        const limit = pLimit(10); // Max 10 concurrent
+
+        const results = await Promise.all(
+          urls.map(url => limit(() => fetch(url)))
+        );
+
+      python: |
+        import asyncio
+
+        async def process_with_limit(items, processor, limit=10):
+            semaphore = asyncio.Semaphore(limit)
+
+            async def limited_process(item):
+                async with semaphore:
+                    return await processor(item)
+
+            return await asyncio.gather(*[
+                limited_process(item) for item in items
+            ])
+
+  - name: "Race Pattern"
+    description: "Take first result, cancel others"
+    example:
+      javascript: |
+        // First response wins (e.g., multiple cache servers)
+        const result = await Promise.race([
+          fetchFromCache1(key),
+          fetchFromCache2(key),
+          fetchFromCache3(key)
+        ]);
+
+  - name: "Timeout Pattern"
+    description: "Abort if operation takes too long"
+    example:
+      javascript: |
+        async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+          const timeout = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout')), ms)
+          );
+          return Promise.race([promise, timeout]);
+        }
+
+        const result = await withTimeout(fetchData(), 5000);
+
+      python: |
+        async def with_timeout(coro, timeout_seconds: float):
+            try:
+                return await asyncio.wait_for(coro, timeout=timeout_seconds)
+            except asyncio.TimeoutError:
+                raise TimeoutError(f"Operation timed out after {timeout_seconds}s")
+
+  - name: "Error Handling with allSettled"
+    description: "Continue even if some operations fail"
+    example: |
+      // Promise.all fails fast on first error
+      // Promise.allSettled waits for all, reports individual results
+
+      const results = await Promise.allSettled([
+        fetchUser(1),
+        fetchUser(2),  // This one fails
+        fetchUser(3)
+      ]);
+
+      results.forEach((result, i) => {
+        if (result.status === 'fulfilled') {
+          console.log(`User ${i}:`, result.value);
+        } else {
+          console.log(`User ${i} failed:`, result.reason);
+        }
+      });
+
+common_mistakes:
+  - name: "Async without await"
+    description: "Forgetting await causes silent failures"
+    wrong: |
+      async function saveUser(user) {
+        db.query('INSERT INTO users ...', user);  // No await!
+        return { success: true };  // Returns before save completes
+      }
+    correct: |
+      async function saveUser(user) {
+        await db.query('INSERT INTO users ...', user);
+        return { success: true };
+      }
+
+  - name: "Sequential instead of parallel"
+    description: "Awaiting in a loop instead of gathering"
+    wrong: |
+      const results = [];
+      for (const id of ids) {
+        results.push(await fetchItem(id));  // Sequential!
+      }
+    correct: |
+      const results = await Promise.all(
+        ids.map(id => fetchItem(id))  // Parallel!
+      );
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Async is like a restaurant waiter:
+      - Sync waiter: Takes order, waits in kitchen until food ready, serves, repeat
+      - Async waiter: Takes order, gives to kitchen, serves other tables while cooking
+      One async waiter handles many tables efficiently!
+
+  intermediate:
+    focus: "Promise combinators and error handling"
+    key_points:
+      - "Promise.all vs Promise.allSettled vs Promise.race"
+      - "Proper error propagation in async code"
+      - "Avoiding unhandled promise rejections"
+      - "Debugging async stack traces"
+
+  advanced:
+    focus: "Event loop internals and performance optimization"
+    key_points:
+      - "Microtasks vs macrotasks"
+      - "Backpressure in async streams"
+      - "Cancellation patterns (AbortController)"
+      - "Async generators and iterators"

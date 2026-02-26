@@ -1,0 +1,61 @@
+id: memory-optimization
+name: "Memory Optimization Techniques"
+category: performance
+type: pattern
+tags:
+  - performance
+  - memory
+  - optimization
+  - profiling
+
+summary:
+  short: "Techniques to reduce memory usage and improve cache efficiency"
+  long: |
+    Memory is often a bottleneck. Optimization techniques include choosing
+    appropriate data structures, reducing object allocation, leveraging caches,
+    and understanding memory layouts.
+
+optimization_techniques:
+  - name: "Object Pooling"
+    description: "Reuse objects instead of creating new ones"
+    benefit: "Reduces GC pressure"
+  
+  - name: "Lazy Loading"
+    description: "Load data only when needed"
+    benefit: "Lower initial memory footprint"
+  
+  - name: "Compression"
+    description: "Compress large objects in memory"
+    benefit: "Trade CPU for reduced memory"
+  
+  - name: "Pagination"
+    description: "Process data in chunks"
+    benefit: "Bounded memory usage"
+
+profiling_tools:
+  - "Java: JProfiler, YourKit"
+  - "Python: Memory Profiler, Py-Spy"
+  - "Go: pprof"
+  - "Rust: Valgrind, flamegraph"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Memory is like room in your house.
+      - Efficient packing: Organized storage
+      - Lazy loading: Only unpacking what you need
+      - Caching: Keeping frequently used items accessible
+
+  intermediate:
+    focus: "Profiling and identifying bottlenecks"
+    key_points:
+      - "Memory profiling tools"
+      - "Identifying memory leaks"
+      - "Optimization trade-offs"
+
+  advanced:
+    focus: "Deep memory optimization"
+    key_points:
+      - "Memory layouts and CPU caches"
+      - "Garbage collection tuning"
+      - "NUMA considerations"

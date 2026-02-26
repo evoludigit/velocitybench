@@ -1,0 +1,28 @@
+id: failover-gotchas
+name: Failover Gotchas
+category: comprehensive
+type: standard
+tags:
+- failover
+summary:
+  short: Failover Gotchas and implementation guidelines
+  long: Complete guide to failover gotchas
+problem:
+  description: Challenges without proper failover gotchas
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement failover gotchas
+key_concepts:
+  concept: Failover Gotchas
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

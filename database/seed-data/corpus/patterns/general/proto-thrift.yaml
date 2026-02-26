@@ -1,0 +1,31 @@
+id: proto-thrift
+name: THRIFT Protocol Patterns
+category: general
+type: standard
+tags:
+- proto
+summary:
+  short: Best practices for thrift protocol patterns
+  long: Comprehensive guide to thrift protocol patterns. This pattern covers implementation
+    details, best practices, and common pitfalls.
+problem:
+  description: Issues without proper thrift protocol patterns
+  symptoms:
+  - Performance issues
+  - Reliability problems
+  - Scalability challenges
+  impact: System degradation
+solution:
+  description: Implement thrift protocol patterns effectively
+key_concepts:
+  concept: Understanding thrift protocol patterns
+best_practices:
+- name: Best practice 1
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Introduction to THRIFT Protocol Patterns
+  intermediate:
+    focus: Implementing THRIFT Protocol Patterns
+  advanced:
+    focus: Advanced THRIFT Protocol Patterns

@@ -1,0 +1,28 @@
+id: security-debugging
+name: Security Debugging
+category: comprehensive
+type: standard
+tags:
+- security
+summary:
+  short: Security Debugging and implementation guidelines
+  long: Complete guide to security debugging
+problem:
+  description: Challenges without proper security debugging
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement security debugging
+key_concepts:
+  concept: Security Debugging
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

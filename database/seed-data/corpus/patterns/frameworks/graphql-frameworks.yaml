@@ -1,0 +1,554 @@
+# GraphQL Framework Comparison
+# VelocityBench Knowledge Corpus
+
+id: graphql-frameworks
+name: "GraphQL Framework Comparison"
+category: frameworks
+type: comparison
+tags:
+  - graphql
+  - frameworks
+  - apollo
+  - strawberry
+  - postgraphile
+  - hasura
+  - performance
+
+summary:
+  short: "Comparing popular GraphQL frameworks across languages"
+  long: |
+    GraphQL can be implemented using code-first frameworks (Apollo, Strawberry),
+    schema-first frameworks (graphql-yoga), or database-first tools (PostGraphile, Hasura).
+    Each approach has tradeoffs in flexibility, performance, and developer experience.
+    This comparison covers the most popular options across JavaScript, Python, and Go.
+
+frameworks:
+  # JavaScript/TypeScript
+  - name: "Apollo Server"
+    language: JavaScript/TypeScript
+    approach: schema-first
+    category: full-featured
+    github: "apollographql/apollo-server"
+    npm: "@apollo/server"
+    description: |
+      The most popular GraphQL server implementation. Full-featured with
+      built-in caching, federation support, and excellent tooling.
+
+    characteristics:
+      - Schema-first with SDL
+      - Built-in DataLoader integration
+      - Apollo Federation for microservices
+      - Apollo Studio for monitoring
+      - Extensive plugin ecosystem
+      - TypeScript support
+
+    performance:
+      tier: "Good"
+      notes: "Overhead from features; optimize with caching"
+      throughput: "~10,000-15,000 req/s"
+
+    best_for:
+      - Production applications
+      - Teams using Apollo ecosystem
+      - Microservices (Federation)
+      - Full-stack TypeScript projects
+
+    tradeoffs:
+      pros:
+        - Most mature ecosystem
+        - Excellent documentation
+        - Great developer tools
+        - Federation for microservices
+      cons:
+        - Larger bundle size
+        - More opinionated
+        - Can be complex for simple use cases
+
+    example: |
+      import { ApolloServer } from '@apollo/server';
+      import { startStandaloneServer } from '@apollo/server/standalone';
+
+      const typeDefs = `#graphql
+        type User {
+          id: ID!
+          name: String!
+          orders: [Order!]!
+        }
+
+        type Query {
+          users: [User!]!
+          user(id: ID!): User
+        }
+      `;
+
+      const resolvers = {
+        Query: {
+          users: () => db.getUsers(),
+          user: (_, { id }) => db.getUserById(id),
+        },
+        User: {
+          orders: (user, _, { loaders }) => loaders.orders.load(user.id),
+        },
+      };
+
+      const server = new ApolloServer({ typeDefs, resolvers });
+      const { url } = await startStandaloneServer(server);
+
+  - name: "GraphQL Yoga"
+    language: JavaScript/TypeScript
+    approach: schema-first
+    category: lightweight
+    github: "dotansimha/graphql-yoga"
+    npm: "graphql-yoga"
+    description: |
+      Lightweight, batteries-included GraphQL server. Built on envelop
+      plugin system for extensibility. Successor to graphql-yoga v1.
+
+    characteristics:
+      - Minimal core, extensible via plugins
+      - Built-in subscriptions
+      - File uploads support
+      - Works with any JS runtime (Node, Deno, Bun)
+      - Envelop plugin ecosystem
+
+    performance:
+      tier: "Very Good"
+      notes: "Lightweight core, fast execution"
+      throughput: "~15,000-20,000 req/s"
+
+    best_for:
+      - Simple to medium complexity APIs
+      - When you want control over features
+      - Serverless deployments
+      - Teams wanting flexibility
+
+    example: |
+      import { createServer } from 'node:http';
+      import { createYoga, createSchema } from 'graphql-yoga';
+
+      const yoga = createYoga({
+        schema: createSchema({
+          typeDefs: /* GraphQL */ `
+            type Query {
+              hello: String
+            }
+          `,
+          resolvers: {
+            Query: {
+              hello: () => 'Hello World!',
+            },
+          },
+        }),
+      });
+
+      const server = createServer(yoga);
+      server.listen(4000);
+
+  - name: "Mercurius"
+    language: JavaScript/TypeScript
+    approach: schema-first
+    category: performance
+    github: "mercurius-js/mercurius"
+    npm: "mercurius"
+    description: |
+      High-performance GraphQL adapter for Fastify. Focused on speed
+      with built-in JIT compilation and caching.
+
+    characteristics:
+      - Built for Fastify
+      - JIT query compilation
+      - Built-in caching (in-memory, Redis)
+      - Federation support
+      - Gateway mode
+
+    performance:
+      tier: "Excellent"
+      notes: "JIT compilation significantly improves throughput"
+      throughput: "~25,000-35,000 req/s"
+
+    best_for:
+      - High-throughput applications
+      - Fastify-based projects
+      - When performance is critical
+      - Gateway/federation scenarios
+
+    example: |
+      import Fastify from 'fastify';
+      import mercurius from 'mercurius';
+
+      const app = Fastify();
+
+      const schema = `
+        type Query {
+          add(x: Int, y: Int): Int
+        }
+      `;
+
+      const resolvers = {
+        Query: {
+          add: async (_, { x, y }) => x + y,
+        },
+      };
+
+      app.register(mercurius, {
+        schema,
+        resolvers,
+        jit: 1, // Enable JIT after 1 execution
+      });
+
+      app.listen({ port: 3000 });
+
+  # Python
+  - name: "Strawberry"
+    language: Python
+    approach: code-first
+    category: modern
+    github: "strawberry-graphql/strawberry"
+    pypi: "strawberry-graphql"
+    description: |
+      Modern Python GraphQL library using dataclasses and type hints.
+      Code-first approach with excellent IDE support and async-native design.
+
+    characteristics:
+      - Code-first with Python type hints
+      - Dataclass-based types
+      - FastAPI/Django/Flask integration
+      - Async-native
+      - Excellent IDE autocomplete
+
+    performance:
+      tier: "Good"
+      notes: "Pure Python; use with uvicorn/gunicorn for best results"
+      throughput: "~5,000-8,000 req/s"
+
+    best_for:
+      - Python shops
+      - FastAPI applications
+      - Teams wanting type safety
+      - Modern Python projects (3.8+)
+
+    example: |
+      import strawberry
+      from strawberry.fastapi import GraphQLRouter
+      from fastapi import FastAPI
+
+      @strawberry.type
+      class User:
+          id: str
+          name: str
+
+          @strawberry.field
+          async def orders(self, info) -> list["Order"]:
+              return await info.context.loaders.orders.load(self.id)
+
+      @strawberry.type
+      class Query:
+          @strawberry.field
+          async def users(self) -> list[User]:
+              return await db.get_users()
+
+      schema = strawberry.Schema(Query)
+      app = FastAPI()
+      app.include_router(GraphQLRouter(schema), prefix="/graphql")
+
+  - name: "Graphene"
+    language: Python
+    approach: code-first
+    category: established
+    github: "graphql-python/graphene"
+    pypi: "graphene"
+    description: |
+      Mature Python GraphQL library. Predates type hints, uses class-based
+      approach. Well-integrated with Django and SQLAlchemy.
+
+    characteristics:
+      - Class-based types
+      - Django/SQLAlchemy integration
+      - Relay support
+      - Mature ecosystem
+
+    performance:
+      tier: "Good"
+      notes: "Similar to Strawberry; depends on ORM integration"
+      throughput: "~4,000-7,000 req/s"
+
+    best_for:
+      - Django projects
+      - Legacy Python codebases
+      - Relay-style pagination
+      - Teams familiar with class-based approach
+
+    example: |
+      import graphene
+
+      class User(graphene.ObjectType):
+          id = graphene.ID(required=True)
+          name = graphene.String(required=True)
+          orders = graphene.List(lambda: Order)
+
+          def resolve_orders(self, info):
+              return info.context.loaders.orders.load(self.id)
+
+      class Query(graphene.ObjectType):
+          users = graphene.List(User)
+
+          def resolve_users(self, info):
+              return db.get_users()
+
+      schema = graphene.Schema(query=Query)
+
+  - name: "Ariadne"
+    language: Python
+    approach: schema-first
+    category: lightweight
+    github: "mirumee/ariadne"
+    pypi: "ariadne"
+    description: |
+      Schema-first Python GraphQL library. Simple, explicit, and
+      easy to integrate with existing codebases.
+
+    characteristics:
+      - Schema-first with SDL
+      - Explicit resolver binding
+      - ASGI-native
+      - Lightweight core
+
+    performance:
+      tier: "Good"
+      notes: "Lightweight; good baseline performance"
+      throughput: "~5,000-8,000 req/s"
+
+    best_for:
+      - Schema-first workflows
+      - Teams migrating from other languages
+      - When SDL is source of truth
+      - Simple to medium APIs
+
+    example: |
+      from ariadne import QueryType, make_executable_schema
+      from ariadne.asgi import GraphQL
+
+      type_defs = """
+        type Query {
+          hello: String!
+        }
+      """
+
+      query = QueryType()
+
+      @query.field("hello")
+      def resolve_hello(_, info):
+          return "Hello World!"
+
+      schema = make_executable_schema(type_defs, query)
+      app = GraphQL(schema)
+
+  # Database-first / Auto-generated
+  - name: "PostGraphile"
+    language: JavaScript/TypeScript
+    approach: database-first
+    category: auto-generated
+    github: "graphile/crystal"
+    npm: "postgraphile"
+    description: |
+      Generates GraphQL API directly from PostgreSQL schema. Instant API
+      with filters, pagination, and mutations. Highly performant due to
+      query optimization.
+
+    characteristics:
+      - Auto-generated from PostgreSQL
+      - Smart query planning (no N+1)
+      - Plugin system for customization
+      - Real-time subscriptions via LISTEN/NOTIFY
+      - Row-level security support
+
+    performance:
+      tier: "Excellent"
+      notes: "Generates optimized SQL; minimal resolver overhead"
+      throughput: "~30,000-50,000 req/s"
+
+    best_for:
+      - PostgreSQL-centric applications
+      - Rapid prototyping
+      - When DB is source of truth
+      - Teams wanting minimal backend code
+
+    example: |
+      // CLI usage
+      // npx postgraphile -c postgres://localhost/mydb --watch
+
+      // Programmatic usage
+      import { postgraphile } from "postgraphile";
+      import express from "express";
+
+      const app = express();
+
+      app.use(
+        postgraphile(process.env.DATABASE_URL, "public", {
+          watchPg: true,
+          graphiql: true,
+          enhanceGraphiql: true,
+          // Smart query planning eliminates N+1
+          enableQueryBatching: true,
+        })
+      );
+
+      app.listen(5000);
+
+  - name: "Hasura"
+    language: Haskell (server), any (clients)
+    approach: database-first
+    category: auto-generated
+    github: "hasura/graphql-engine"
+    description: |
+      Instant GraphQL API over PostgreSQL (and other databases).
+      Managed service or self-hosted. Includes authorization,
+      event triggers, and remote schemas.
+
+    characteristics:
+      - Zero-code GraphQL API
+      - Real-time subscriptions
+      - Role-based authorization
+      - Event triggers
+      - Remote schema stitching
+      - Actions for custom logic
+
+    performance:
+      tier: "Excellent"
+      notes: "Highly optimized Haskell engine; compiles to efficient SQL"
+      throughput: "~40,000-60,000 req/s"
+
+    best_for:
+      - Rapid development
+      - Real-time applications
+      - Teams without GraphQL expertise
+      - When you want managed infrastructure
+
+  # Go
+  - name: "gqlgen"
+    language: Go
+    approach: schema-first
+    category: performance
+    github: "99designs/gqlgen"
+    description: |
+      Code-generation based GraphQL server for Go. Generates type-safe
+      code from SDL schema. Excellent performance due to Go's efficiency.
+
+    characteristics:
+      - Schema-first with code generation
+      - Type-safe resolvers
+      - DataLoader integration
+      - Excellent performance
+      - Middleware support
+
+    performance:
+      tier: "Excellent"
+      notes: "Go's performance + code generation = very fast"
+      throughput: "~50,000-80,000 req/s"
+
+    best_for:
+      - High-performance requirements
+      - Go microservices
+      - Type-safe GraphQL
+      - Teams familiar with Go
+
+    example: |
+      // schema.graphql
+      // type Query {
+      //   users: [User!]!
+      // }
+
+      // Generated resolver interface
+      type QueryResolver interface {
+        Users(ctx context.Context) ([]*model.User, error)
+      }
+
+      // Implementation
+      func (r *queryResolver) Users(ctx context.Context) ([]*model.User, error) {
+        return r.DB.GetAllUsers(ctx)
+      }
+
+comparison_matrix:
+  approach:
+    apollo: "Schema-first"
+    strawberry: "Code-first"
+    postgraphile: "Database-first"
+    hasura: "Database-first"
+    gqlgen: "Schema-first + codegen"
+
+  n_plus_one_handling:
+    apollo: "Manual DataLoader"
+    strawberry: "Manual DataLoader"
+    postgraphile: "Automatic (query planning)"
+    hasura: "Automatic (SQL compilation)"
+    gqlgen: "Manual DataLoader"
+
+  learning_curve:
+    apollo: "Medium"
+    strawberry: "Low (if you know Python)"
+    postgraphile: "Low"
+    hasura: "Very Low"
+    gqlgen: "Medium"
+
+  customization:
+    apollo: "High"
+    strawberry: "High"
+    postgraphile: "Medium (plugins)"
+    hasura: "Medium (Actions, Remote Schemas)"
+    gqlgen: "High"
+
+  performance:
+    apollo: "Good"
+    strawberry: "Good"
+    postgraphile: "Excellent"
+    hasura: "Excellent"
+    gqlgen: "Excellent"
+
+recommendation_matrix:
+  - scenario: "Full-stack TypeScript with microservices"
+    recommendation: "Apollo Server"
+    reason: "Federation, ecosystem, TypeScript support"
+
+  - scenario: "Python FastAPI application"
+    recommendation: "Strawberry"
+    reason: "Code-first, type hints, async-native"
+
+  - scenario: "PostgreSQL-centric app, rapid development"
+    recommendation: "PostGraphile"
+    reason: "Instant API, excellent performance, minimal code"
+
+  - scenario: "Real-time app with minimal backend"
+    recommendation: "Hasura"
+    reason: "Subscriptions, managed infrastructure, zero code"
+
+  - scenario: "High-throughput Go microservice"
+    recommendation: "gqlgen"
+    reason: "Go performance, type safety, codegen"
+
+  - scenario: "Simple Node.js API"
+    recommendation: "GraphQL Yoga or Mercurius"
+    reason: "Lightweight, fast, flexible"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Think of building a house:
+      - Code-first (Strawberry, Apollo): You design the house, then build it
+      - Schema-first (gqlgen, Yoga): You draw blueprints, then generate the structure
+      - Database-first (PostGraphile, Hasura): Your foundation automatically creates the house
+
+  intermediate:
+    focus: "Framework selection criteria"
+    key_points:
+      - "Team expertise and language preference"
+      - "Performance requirements"
+      - "Customization needs"
+      - "Database coupling tradeoffs"
+
+  advanced:
+    focus: "Advanced patterns and federation"
+    key_points:
+      - "Apollo Federation vs schema stitching"
+      - "Custom directives and plugins"
+      - "Performance optimization strategies"
+      - "Hybrid approaches"

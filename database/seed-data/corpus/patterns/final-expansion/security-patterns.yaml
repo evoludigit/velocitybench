@@ -1,0 +1,28 @@
+id: security-patterns
+name: Security Patterns
+category: comprehensive
+type: standard
+tags:
+- security
+summary:
+  short: Security Patterns and implementation guidelines
+  long: Complete guide to security patterns
+problem:
+  description: Challenges without proper security patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement security patterns
+key_concepts:
+  concept: Security Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

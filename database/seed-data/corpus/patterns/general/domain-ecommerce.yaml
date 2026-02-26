@@ -1,0 +1,31 @@
+id: domain-ecommerce
+name: Ecommerce Domain Patterns
+category: general
+type: standard
+tags:
+- domain
+summary:
+  short: Best practices for ecommerce domain patterns
+  long: Comprehensive guide to ecommerce domain patterns. This pattern covers implementation
+    details, best practices, and common pitfalls.
+problem:
+  description: Issues without proper ecommerce domain patterns
+  symptoms:
+  - Performance issues
+  - Reliability problems
+  - Scalability challenges
+  impact: System degradation
+solution:
+  description: Implement ecommerce domain patterns effectively
+key_concepts:
+  concept: Understanding ecommerce domain patterns
+best_practices:
+- name: Best practice 1
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Introduction to Ecommerce Domain Patterns
+  intermediate:
+    focus: Implementing Ecommerce Domain Patterns
+  advanced:
+    focus: Advanced Ecommerce Domain Patterns

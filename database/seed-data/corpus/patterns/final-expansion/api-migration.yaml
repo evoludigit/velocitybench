@@ -1,0 +1,28 @@
+id: api-migration
+name: Api Migration
+category: comprehensive
+type: standard
+tags:
+- api
+summary:
+  short: Api Migration and implementation guidelines
+  long: Complete guide to api migration
+problem:
+  description: Challenges without proper api migration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement api migration
+key_concepts:
+  concept: Api Migration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

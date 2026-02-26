@@ -1,0 +1,28 @@
+id: cloud-standards
+name: Cloud Standards
+category: comprehensive
+type: standard
+tags:
+- cloud
+summary:
+  short: Cloud Standards and implementation guidelines
+  long: Complete guide to cloud standards
+problem:
+  description: Challenges without proper cloud standards
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement cloud standards
+key_concepts:
+  concept: Cloud Standards
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

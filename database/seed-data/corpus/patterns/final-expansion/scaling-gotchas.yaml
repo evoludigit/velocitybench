@@ -1,0 +1,28 @@
+id: scaling-gotchas
+name: Scaling Gotchas
+category: comprehensive
+type: standard
+tags:
+- scaling
+summary:
+  short: Scaling Gotchas and implementation guidelines
+  long: Complete guide to scaling gotchas
+problem:
+  description: Challenges without proper scaling gotchas
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement scaling gotchas
+key_concepts:
+  concept: Scaling Gotchas
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

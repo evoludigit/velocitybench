@@ -23,6 +23,10 @@ class Post extends Model
         "created_at"
     ];
 
+    protected $casts = [
+        "id" => "string",
+    ];
+
     protected $table = "benchmark.tb_post";
 
     public function author(): BelongsTo

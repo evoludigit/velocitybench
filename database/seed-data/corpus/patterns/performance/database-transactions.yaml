@@ -1,0 +1,224 @@
+# Database Transaction Patterns
+# VelocityBench Knowledge Corpus
+
+id: database-transactions
+name: "Database Transaction Patterns"
+category: performance
+type: pattern
+tags:
+  - database
+  - transactions
+  - acid
+  - isolation
+  - concurrency
+
+summary:
+  short: "Ensure data consistency with proper transaction management"
+  long: |
+    Database transactions group multiple operations into atomic units. Either all
+    operations succeed (commit) or all fail (rollback). ACID properties (Atomicity,
+    Consistency, Isolation, Durability) guarantee data integrity. Understanding
+    isolation levels and locking is crucial for concurrent systems.
+
+problem:
+  description: |
+    Without transactions, concurrent operations can corrupt data. A bank transfer
+    that debits one account but crashes before crediting another loses money.
+    Race conditions between readers and writers cause inconsistent reads.
+    Improper isolation leads to phantom reads and lost updates.
+
+  symptoms:
+    - name: "Data inconsistency"
+      description: "Related data gets out of sync"
+      detection: "Business logic constraints violated"
+
+    - name: "Lost updates"
+      description: "Concurrent writes overwrite each other"
+      detection: "Audit shows changes disappearing"
+
+    - name: "Deadlocks"
+      description: "Transactions waiting on each other forever"
+      detection: "PostgreSQL deadlock_timeout errors"
+
+acid_properties:
+  - name: "Atomicity"
+    description: "All or nothing - transactions complete fully or not at all"
+    example: |
+      -- Either both happen or neither
+      BEGIN;
+      UPDATE accounts SET balance = balance - 100 WHERE id = 1;
+      UPDATE accounts SET balance = balance + 100 WHERE id = 2;
+      COMMIT;
+
+  - name: "Consistency"
+    description: "Database moves from one valid state to another"
+    example: "Constraints, triggers, and rules are always satisfied"
+
+  - name: "Isolation"
+    description: "Concurrent transactions don't interfere with each other"
+    example: "Transaction A doesn't see Transaction B's uncommitted changes"
+
+  - name: "Durability"
+    description: "Committed transactions survive system failures"
+    example: "Power loss after COMMIT doesn't lose data"
+
+isolation_levels:
+  - level: "READ UNCOMMITTED"
+    description: "Can see uncommitted changes from other transactions"
+    allows:
+      - "Dirty reads"
+      - "Non-repeatable reads"
+      - "Phantom reads"
+    use_case: "Almost never - only for approximate counts"
+    performance: "Fastest"
+
+  - level: "READ COMMITTED"
+    description: "Only see committed changes (PostgreSQL default)"
+    allows:
+      - "Non-repeatable reads"
+      - "Phantom reads"
+    prevents:
+      - "Dirty reads"
+    use_case: "Most OLTP workloads"
+    performance: "Good"
+    example: |
+      -- Transaction A
+      BEGIN;
+      SELECT balance FROM accounts WHERE id = 1;  -- Returns 100
+      -- Transaction B commits: UPDATE accounts SET balance = 50 WHERE id = 1
+      SELECT balance FROM accounts WHERE id = 1;  -- Returns 50 (different!)
+      COMMIT;
+
+  - level: "REPEATABLE READ"
+    description: "Same query returns same results within transaction"
+    allows:
+      - "Phantom reads (in some DBs)"
+    prevents:
+      - "Dirty reads"
+      - "Non-repeatable reads"
+    use_case: "Reports, consistent reads"
+    performance: "Moderate"
+
+  - level: "SERIALIZABLE"
+    description: "Transactions execute as if serial (one at a time)"
+    prevents:
+      - "Dirty reads"
+      - "Non-repeatable reads"
+      - "Phantom reads"
+    use_case: "Financial transactions, critical operations"
+    performance: "Slowest"
+    example: |
+      BEGIN ISOLATION LEVEL SERIALIZABLE;
+      -- Full isolation, but may fail with serialization_failure
+      COMMIT;
+
+transaction_patterns:
+  - name: "Short Transactions"
+    description: "Keep transactions as brief as possible"
+    why: "Reduces lock contention, improves concurrency"
+    bad: |
+      BEGIN;
+      SELECT * FROM products;
+      -- User thinks for 5 minutes
+      UPDATE products SET price = 100 WHERE id = 1;
+      COMMIT;
+    good: |
+      -- Do work outside transaction
+      product = fetch_product(1)
+      new_price = user_input()
+
+      -- Transaction only for write
+      BEGIN;
+      UPDATE products SET price = $1 WHERE id = $2 AND version = $3;
+      COMMIT;
+
+  - name: "Optimistic Locking"
+    description: "Check version/timestamp before committing"
+    how_it_works: |
+      1. Read record with version number
+      2. Make changes in application
+      3. Update with WHERE version = old_version
+      4. If no rows updated, retry (someone else changed it)
+    example: |
+      -- Add version column
+      ALTER TABLE products ADD COLUMN version INTEGER DEFAULT 1;
+
+      -- Read with version
+      SELECT id, name, price, version FROM products WHERE id = 1;
+      -- Returns: id=1, name='Widget', price=100, version=5
+
+      -- Update with version check
+      UPDATE products
+      SET price = 120, version = version + 1
+      WHERE id = 1 AND version = 5;
+
+      -- If 0 rows updated, someone else changed it - retry!
+
+  - name: "Pessimistic Locking"
+    description: "Lock rows before reading to prevent changes"
+    how_it_works: "SELECT ... FOR UPDATE locks rows until transaction ends"
+    example: |
+      BEGIN;
+      -- Lock the row - others must wait
+      SELECT * FROM accounts WHERE id = 1 FOR UPDATE;
+
+      -- Safe to read and write
+      UPDATE accounts SET balance = balance - 100 WHERE id = 1;
+      COMMIT;
+
+  - name: "Advisory Locks"
+    description: "Application-level locks using database"
+    use_case: "Coordinating distributed processes"
+    example: |
+      -- Try to acquire lock (returns true/false)
+      SELECT pg_try_advisory_lock(12345);
+
+      -- Do exclusive work...
+
+      -- Release lock
+      SELECT pg_advisory_unlock(12345);
+
+  - name: "Savepoints"
+    description: "Partial rollback within a transaction"
+    example: |
+      BEGIN;
+      INSERT INTO orders (user_id, total) VALUES (1, 100);
+
+      SAVEPOINT before_items;
+      INSERT INTO order_items (order_id, product_id) VALUES (1, 999);
+      -- Oops, product 999 doesn't exist - rollback just this part
+      ROLLBACK TO before_items;
+
+      INSERT INTO order_items (order_id, product_id) VALUES (1, 1);
+      COMMIT;
+
+deadlock_prevention:
+  - "Acquire locks in consistent order across all code paths"
+  - "Keep transactions short"
+  - "Use SELECT ... FOR UPDATE NOWAIT to fail fast"
+  - "Consider optimistic locking for low-contention scenarios"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Transactions are like a bank safe deposit box visit:
+      - Atomicity: Either you complete your business or nothing changes
+      - Consistency: The bank always balances its books
+      - Isolation: Other customers can't see inside your box
+      - Durability: What you put in stays there (even if power goes out)
+
+  intermediate:
+    focus: "Isolation levels and locking strategies"
+    key_points:
+      - "Choosing the right isolation level"
+      - "Optimistic vs pessimistic locking"
+      - "Handling deadlocks gracefully"
+      - "Transaction scope best practices"
+
+  advanced:
+    focus: "Distributed transactions and advanced patterns"
+    key_points:
+      - "Two-phase commit (2PC)"
+      - "Saga pattern for microservices"
+      - "Serializable snapshot isolation (SSI)"
+      - "Transaction outbox pattern"

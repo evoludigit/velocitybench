@@ -1,0 +1,28 @@
+id: caching-setup
+name: Caching Setup
+category: comprehensive
+type: standard
+tags:
+- caching
+summary:
+  short: Caching Setup and implementation guidelines
+  long: Complete guide to caching setup
+problem:
+  description: Challenges without proper caching setup
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement caching setup
+key_concepts:
+  concept: Caching Setup
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

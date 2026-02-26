@@ -21,6 +21,10 @@ class User extends Model
         "bio"
     ];
 
+    protected $casts = [
+        "id" => "string",
+    ];
+
     protected $table = "benchmark.tb_user";
 
     public function posts(): HasMany

@@ -1,0 +1,28 @@
+id: failover-monitoring
+name: Failover Monitoring
+category: comprehensive
+type: standard
+tags:
+- failover
+summary:
+  short: Failover Monitoring and implementation guidelines
+  long: Complete guide to failover monitoring
+problem:
+  description: Challenges without proper failover monitoring
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement failover monitoring
+key_concepts:
+  concept: Failover Monitoring
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

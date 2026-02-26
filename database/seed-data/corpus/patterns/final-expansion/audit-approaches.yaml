@@ -1,0 +1,28 @@
+id: audit-approaches
+name: Audit Approaches
+category: comprehensive
+type: standard
+tags:
+- audit
+summary:
+  short: Audit Approaches and implementation guidelines
+  long: Complete guide to audit approaches
+problem:
+  description: Challenges without proper audit approaches
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement audit approaches
+key_concepts:
+  concept: Audit Approaches
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,28 @@
+id: compliance-approaches
+name: Compliance Approaches
+category: comprehensive
+type: standard
+tags:
+- compliance
+summary:
+  short: Compliance Approaches and implementation guidelines
+  long: Complete guide to compliance approaches
+problem:
+  description: Challenges without proper compliance approaches
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement compliance approaches
+key_concepts:
+  concept: Compliance Approaches
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

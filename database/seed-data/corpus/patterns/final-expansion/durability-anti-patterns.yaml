@@ -1,0 +1,28 @@
+id: durability-anti-patterns
+name: Durability Anti Patterns
+category: comprehensive
+type: standard
+tags:
+- durability
+summary:
+  short: Durability Anti Patterns and implementation guidelines
+  long: Complete guide to durability anti patterns
+problem:
+  description: Challenges without proper durability anti patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement durability anti patterns
+key_concepts:
+  concept: Durability Anti Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

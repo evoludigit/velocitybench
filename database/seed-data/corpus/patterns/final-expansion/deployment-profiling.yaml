@@ -1,0 +1,28 @@
+id: deployment-profiling
+name: Deployment Profiling
+category: comprehensive
+type: standard
+tags:
+- deployment
+summary:
+  short: Deployment Profiling and implementation guidelines
+  long: Complete guide to deployment profiling
+problem:
+  description: Challenges without proper deployment profiling
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement deployment profiling
+key_concepts:
+  concept: Deployment Profiling
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,28 @@
+id: graphql-observability
+name: Graphql Observability
+category: comprehensive
+type: standard
+tags:
+- graphql
+summary:
+  short: Graphql Observability and implementation guidelines
+  long: Complete guide to graphql observability
+problem:
+  description: Challenges without proper graphql observability
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement graphql observability
+key_concepts:
+  concept: Graphql Observability
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

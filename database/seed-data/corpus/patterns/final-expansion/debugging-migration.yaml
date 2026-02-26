@@ -1,0 +1,28 @@
+id: debugging-migration
+name: Debugging Migration
+category: comprehensive
+type: standard
+tags:
+- debugging
+summary:
+  short: Debugging Migration and implementation guidelines
+  long: Complete guide to debugging migration
+problem:
+  description: Challenges without proper debugging migration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement debugging migration
+key_concepts:
+  concept: Debugging Migration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

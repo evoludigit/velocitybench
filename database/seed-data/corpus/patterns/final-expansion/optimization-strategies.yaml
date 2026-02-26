@@ -1,0 +1,28 @@
+id: optimization-strategies
+name: Optimization Strategies
+category: comprehensive
+type: standard
+tags:
+- optimization
+summary:
+  short: Optimization Strategies and implementation guidelines
+  long: Complete guide to optimization strategies
+problem:
+  description: Challenges without proper optimization strategies
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement optimization strategies
+key_concepts:
+  concept: Optimization Strategies
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

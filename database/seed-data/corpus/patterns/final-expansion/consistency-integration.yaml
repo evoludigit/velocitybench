@@ -1,0 +1,28 @@
+id: consistency-integration
+name: Consistency Integration
+category: comprehensive
+type: standard
+tags:
+- consistency
+summary:
+  short: Consistency Integration and implementation guidelines
+  long: Complete guide to consistency integration
+problem:
+  description: Challenges without proper consistency integration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement consistency integration
+key_concepts:
+  concept: Consistency Integration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

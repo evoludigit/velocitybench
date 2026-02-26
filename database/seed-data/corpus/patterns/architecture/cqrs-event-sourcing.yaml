@@ -1,0 +1,156 @@
+id: cqrs-event-sourcing
+name: "CQRS & Event Sourcing"
+category: architecture
+type: pattern
+tags:
+  - architecture
+  - cqrs
+  - event-sourcing
+  - events
+  - consistency
+
+summary:
+  short: "Separating command (write) and query (read) models using events as source of truth"
+  long: |
+    CQRS (Command Query Responsibility Segregation) separates write and read logic. Event sourcing stores all changes as immutable events; state is derived by replaying events. Together, they enable audit trails, temporal queries, and eventual consistency.
+
+problem:
+  description: "Single model for reads/writes causes complexity; no audit trail; hard to understand state changes"
+  symptoms:
+    - name: "No audit trail"
+      description: "Can't see who changed what when"
+    - name: "Complex queries"
+      description: "Read model tightly coupled to domain model"
+    - name: "Scaling difficulty"
+      description: "Reads and writes compete for same resources"
+    - name: "State inconsistency"
+      description: "Hard to understand how entity got into current state"
+
+solution:
+  approach: "Store immutable events; derive read/write state from events; separate command and query responsibilities"
+  key_points:
+    - "Store all changes as events (append-only)"
+    - "Command side: processes commands, generates events"
+    - "Query side: subscribes to events, builds read models"
+    - "Read and write models can be independently optimized"
+    - "Events are source of truth"
+
+event_sourcing:
+  event_stream: "Immutable log of all state changes"
+  example_event: |
+    {
+      "event_id": "123",
+      "event_type": "AccountCreated",
+      "aggregate_id": "user_456",
+      "timestamp": "2024-01-10T10:00:00Z",
+      "data": {
+        "name": "Alice",
+        "email": "alice@example.com"
+      }
+    }
+
+  benefits:
+    - "Complete audit trail"
+    - "Temporal queries (state at any point in time)"
+    - "Replay to debug issues"
+    - "Event-driven architecture"
+
+  challenges:
+    - "Eventual consistency (read models lag)"
+    - "Event versioning and schema evolution"
+    - "Duplicate event handling"
+    - "Storage overhead (all history kept)"
+
+cqrs_pattern:
+  command_side:
+    responsibility: "Process commands (write operations)"
+    example: "CreateAccount(name='Alice', email='alice@example.com')"
+    output: "Generate event(s)"
+    validation: "Validate command, check business rules"
+
+  query_side:
+    responsibility: "Answer queries (read operations)"
+    model: "Optimized for queries (denormalized, indexed)"
+    update: "Subscribe to events, update read model"
+    consistency: "Eventually consistent"
+
+event_store:
+  interface:
+    append: "Add event to stream"
+    read: "Get events for aggregate"
+    subscribe: "Listen to new events"
+
+  implementation:
+    database: "Use event table with proper indexing"
+    specialized: "EventStoreDB, Apache Kafka"
+    key_fields:
+      - "aggregate_id (group events by entity)"
+      - "event_type (event classification)"
+      - "timestamp (causality)"
+      - "version (optimistic locking)"
+      - "data (event payload)"
+
+event_versioning:
+  challenge: "Events change over time; old events may have old schema"
+
+  strategies:
+    upcasting: "Convert old event format to new format on read"
+    migration: "Migrate event store to new schema"
+    compatibility: "Keep old and new formats side-by-side"
+
+  example:
+    old_event: "{ user_id: 123, action: 'login' }"
+    new_event: "{ user_id: 123, action: 'login', timestamp: '2024-01-10', ip: '192.168.1.1' }"
+
+snapshot_pattern:
+  purpose: "Avoid replaying entire event history (improves performance)"
+  mechanism: "Periodically save aggregate state; only replay since last snapshot"
+  frequency: "Every 100-1000 events (configurable)"
+  tradeoff: "Better performance, more storage"
+
+projections:
+  definition: "Derived read models built from events"
+
+  example:
+    user_list: "All users with name and email"
+    user_detail: "Full user profile with posts and comments"
+    analytics: "Daily active users, signups, etc."
+
+  update_mechanism:
+    event_subscriber: "Listen to events; update read model"
+    real_time: "Update immediately (complex)"
+    batch: "Update every minute or hour (simpler)"
+
+eventual_consistency:
+  lag: "Read model may be behind event stream"
+  acceptable: "Usually < 1 second for most use cases"
+  handling: "Client can request stale-read or wait-for-sync"
+  trade_off: "Consistency for scalability and flexibility"
+
+event_driven_architecture:
+  consequence: "Events are public; other services subscribe"
+  benefit: "Loose coupling; services can evolve independently"
+  pattern: "Choreography (events) vs Orchestration (explicit flow)"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Event sourcing is like a ledger:
+      - Traditional: Keep current balance (fragile; if lost, can't recover)
+      - Event sourcing: Keep all transactions; derive balance from sum
+
+      Ledger is source of truth; balance is derived.
+
+  intermediate:
+    focus: "Implementing CQRS and event sourcing"
+    key_points:
+      - "Event store design and append operations"
+      - "Command validation and event generation"
+      - "Projection building and eventual consistency"
+
+  advanced:
+    focus: "CQRS/ES at scale"
+    key_points:
+      - "Event versioning and schema evolution"
+      - "Snapshots for performance"
+      - "Multi-region event synchronization"

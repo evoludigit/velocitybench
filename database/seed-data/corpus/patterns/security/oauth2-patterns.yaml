@@ -1,0 +1,51 @@
+id: oauth2-patterns
+name: OAuth 2.0 Patterns
+category: security
+type: standard
+tags:
+- security
+- oauth2_patterns
+summary:
+  short: Delegated authorization
+  long: Delegated authorization. This is a comprehensive pattern that provides guidance
+    on implementation and best practices.
+problem:
+  description: Issues arise without proper oauth 2.0 patterns
+  symptoms:
+  - System lacks proper oauth 2.0 patterns
+  - Performance or reliability issues
+  - Difficulty scaling the system
+  - Maintenance challenges
+  - Integration problems
+  impact: System reliability and performance degradation
+solution:
+  description: Implement oauth 2.0 patterns effectively
+key_concepts:
+  concept_1: Understanding oauth 2.0 patterns fundamentals
+  concept_2: Implementing oauth 2.0 patterns in your system
+  concept_3: Best practices for oauth 2.0 patterns
+implementation_considerations:
+  consideration_1: Understand your specific use case
+  consideration_2: Consider trade-offs and scalability
+  consideration_3: Plan for maintenance and evolution
+best_practices:
+- name: Understand oauth2-patterns
+  description: Learn the fundamentals before implementing
+- name: Plan carefully
+  description: Design for your specific requirements
+- name: Test thoroughly
+  description: Validate your implementation works
+- name: Monitor continuously
+  description: Track performance and issues
+anti_patterns:
+- name: Ignoring the pattern
+  consequence: Systems become unreliable
+- name: Misapplication
+  consequence: Wasted effort and poor results
+blog_hooks:
+  beginner:
+    focus: Introduction to OAuth 2.0 Patterns
+  intermediate:
+    focus: Implementing OAuth 2.0 Patterns
+  advanced:
+    focus: Advanced OAuth 2.0 Patterns techniques

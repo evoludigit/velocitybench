@@ -1,14 +1,17 @@
 import { AppDataSource } from './db.js';
 import { DataLoaders } from './dataloaders.js';
 import { updateUserSchema } from './validation.js';
+import { User } from './entities/User.js';
+import { Post } from './entities/Post.js';
+import { Comment } from './entities/Comment.js';
 
 interface Context {
   dataLoaders: DataLoaders;
 }
 
-const userRepository = AppDataSource.getRepository('User');
-const postRepository = AppDataSource.getRepository('Post');
-const commentRepository = AppDataSource.getRepository('Comment');
+const userRepository = AppDataSource.getRepository(User);
+const postRepository = AppDataSource.getRepository(Post);
+const commentRepository = AppDataSource.getRepository(Comment);
 
 export const resolvers = {
   Query: {

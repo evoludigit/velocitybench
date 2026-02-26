@@ -1,0 +1,140 @@
+id: evolution-of-c
+name: "Evolution of C Programming Language"
+category: history
+type: timeline
+tags:
+  - c
+  - history
+  - systems-programming
+  - low-level
+
+summary:
+  short: "From Bell Labs systems language to foundation of modern computing"
+  long: |
+    C transformed from a language for writing Unix into the most influential programming language. Created by Dennis Ritchie in 1972, C remains dominant in systems programming, embedded systems, and high-performance computing. Its simplicity and power shaped computing for 50+ years.
+
+timeline:
+  - year: 1972
+    title: "C Language Created"
+    description: "Dennis Ritchie develops C for writing Unix kernel"
+    context: "Needed language more powerful than B, closer to assembly"
+    philosophy: "Minimal, efficient, portable"
+
+  - year: 1973
+    title: "Unix Rewritten in C"
+    description: "First major C project; transforms systems programming"
+    significance: "Proves C viable for large systems"
+
+  - year: 1978
+    title: "The C Programming Language Book"
+    description: "Kernighan & Ritchie publish definitive manual"
+    impact: "De facto standard; shapes language design"
+
+  - year: 1983
+    title: "ANSI C Standardization Begins"
+    description: "Committee forms to standardize C"
+    motivation: "Numerous C dialects; need for compatibility"
+
+  - year: 1989
+    title: "ANSI C (C89) Standardized"
+    description: "First official C standard ratified"
+    features: ["Function prototypes", "Standard library definition"]
+
+  - year: 1990
+    title: "C89 Becomes ISO C90"
+    description: "ISO adopts ANSI C as international standard"
+    significance: "Global standard; portable across platforms"
+
+  - year: 1999
+    title: "C99 Standard Released"
+    description: "Major update: inline functions, variable declarations, comments"
+    adoption: "Slower than C89; some compilers resist"
+
+  - year: 2000
+    title: "C Dominates Systems Programming"
+    description: "Linux kernel, databases, operating systems all written in C"
+    reach: "Most software relies on C at some level"
+
+  - year: 2011
+    title: "C11 Standard Released"
+    description: "Generic programming, anonymous structures, threading"
+    modernization: "C adapts to multi-core processors"
+
+  - year: 2018
+    title: "C17 Standard Released"
+    description: "Bug fixes and clarifications; no major new features"
+    maturity: "C stabilizes; focuses on fixing edge cases"
+
+  - year: 2023
+    title: "C23 Standard Approved"
+    description: "Typeof operator, bit-precise integers, variable-length arrays"
+    trend: "C continues modernization while respecting 50-year history"
+
+  - year: 2024
+    title: "C Still Dominates Systems Programming"
+    description: "Every major OS kernel uses C; embedded systems rely on C"
+    longevity: "Only language to last 50+ years with growth, not decline"
+
+why_c_endures:
+  - "Minimal language; everyone understands it"
+  - "Direct hardware access; efficient code"
+  - "Portable across platforms; minimal runtime"
+  - "Simple to implement compiler; runs everywhere"
+  - "No garbage collection; predictable performance"
+
+c_philosophy:
+  - "Trust programmer to know what they're doing"
+  - "Minimal runtime overhead"
+  - "Explicit is better than implicit"
+  - "Power over safety (or give programmer choice)"
+
+c_vs_others:
+  c:
+    - "Low-level control, efficiency"
+    - "Steep learning curve, easy to make mistakes"
+    - "Minimal overhead, maximum performance"
+
+  python:
+    - "High-level, easy to learn"
+    - "Safe from many errors"
+    - "Slower, more overhead"
+
+  java:
+    - "Type-safe, garbage collection"
+    - "JVM overhead and startup time"
+    - "Middle ground: safety and performance"
+
+c_ecosystem:
+  kernels: ["Linux", "Windows", "macOS", "Unix"]
+  databases: ["PostgreSQL", "MySQL", "SQLite"]
+  systems: ["git", "Redis", "Memcached"]
+  compilers: ["GCC", "Clang", "Most language compilers"]
+
+learning_c:
+  difficulty: "High; no guardrails"
+  value: "Understanding memory, pointers, systems programming"
+  career: "Essential for systems, embedded, performance-critical work"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      C is like driving a manual transmission car:
+      - You control everything (power, efficiency)"
+      - Mistakes are expensive (burn out clutch)"
+      - Once learned, appreciate the control"
+
+      Trust and responsibility; no training wheels.
+
+  intermediate:
+    focus: "C systems programming"
+    key_points:
+      - "Memory management and pointers"
+      - "Why C remains dominant for systems"
+      - "When to use C vs higher-level languages"
+
+  advanced:
+    focus: "C for performance and systems"
+    key_points:
+      - "Cache-efficient algorithms"
+      - "Zero-overhead abstractions"
+      - "Interfacing with hardware and OS"

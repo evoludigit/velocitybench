@@ -1,0 +1,31 @@
+id: proto-mqtt
+name: MQTT Protocol Patterns
+category: general
+type: standard
+tags:
+- proto
+summary:
+  short: Best practices for mqtt protocol patterns
+  long: Comprehensive guide to mqtt protocol patterns. This pattern covers implementation
+    details, best practices, and common pitfalls.
+problem:
+  description: Issues without proper mqtt protocol patterns
+  symptoms:
+  - Performance issues
+  - Reliability problems
+  - Scalability challenges
+  impact: System degradation
+solution:
+  description: Implement mqtt protocol patterns effectively
+key_concepts:
+  concept: Understanding mqtt protocol patterns
+best_practices:
+- name: Best practice 1
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Introduction to MQTT Protocol Patterns
+  intermediate:
+    focus: Implementing MQTT Protocol Patterns
+  advanced:
+    focus: Advanced MQTT Protocol Patterns

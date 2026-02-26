@@ -44,7 +44,6 @@ if (app.Environment.IsDevelopment())
     app.UseDeveloperExceptionPage();
 }
 
-app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
@@ -80,8 +79,3 @@ app.MapGet("/metrics", () =>
 });
 
 app.Run();
-
-public class Query
-{
-    public string Hello() => "Hello from C# GraphQL!";
-}

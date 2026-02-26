@@ -1,0 +1,49 @@
+id: operator-support-validation
+name: Operator Support Validation
+category: fraiseql
+type: standard
+tags:
+- compilation
+- validation
+- operators
+- database-capabilities
+summary:
+  short: Verifying WHERE operators are supported by target database
+  long: The compiler validates that all WHERE operators in the schema are supported
+    by the target database, using the capability manifest.
+problem:
+  description: WHERE clause uses unsupported operators
+  symptoms:
+  - Query fails at runtime with unknown operator
+  - Different results on different databases
+  - No way to know what operators are available
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Operator Support Validation effectively
+key_concepts:
+  concept_1: Operator catalog
+  concept_2: Capability matching
+  concept_3: Fallback operator strategies
+implementation_considerations:
+  consideration_1: Operator aliases and variants
+  consideration_2: Performance of different operators
+  consideration_3: Custom operator support
+best_practices:
+- name: Match against capability
+  description: Use capability manifest to check
+- name: Suggest alternatives
+  description: If operator not available, suggest one that is
+- name: Clear errors
+  description: Tell user which operators unavailable
+anti_patterns:
+- name: No operator checking
+  consequence: Runtime query failures
+- name: Hardcoded operators
+  consequence: Same operators across all DBs
+blog_hooks:
+  beginner:
+    focus: Introduction to Operator Support Validation
+  intermediate:
+    focus: Implementing Operator Support Validation
+  advanced:
+    focus: Advanced Operator Support Validation techniques

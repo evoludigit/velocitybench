@@ -1,0 +1,59 @@
+id: database-orm-patterns
+name: ORM & Database Access Patterns
+category: frameworks
+type: standard
+tags:
+- frameworks
+- database_orm_patterns
+summary:
+  short: Using ORMs effectively while avoiding common pitfalls
+  long: Using ORMs effectively while avoiding common pitfalls. This pattern provides
+    comprehensive guidance on implementing and optimizing this aspect of software
+    engineering.
+problem:
+  description: Issues arise when using orms effectively while avoiding common pitfalls
+    is not properly implemented
+  symptoms:
+  - System performance degrades without proper database-orm-patterns
+  - Lack of visibility into system behavior
+  - Frequent failures and reliability issues
+  - Difficult to debug and troubleshoot problems
+  - Scaling issues as load increases
+  impact: Poor system reliability, performance issues, increased debugging time, production
+    incidents
+solution:
+  description: Implement best practices for using orms effectively while avoiding
+    common pitfalls
+key_concepts:
+  concept_1: Understanding database-orm-patterns fundamentals
+  concept_2: Implementing database-orm-patterns effectively
+  concept_3: Monitoring and maintaining database-orm-patterns
+best_practices:
+- name: Use database-orm-patterns strategically
+  description: Apply this pattern where it provides the most value
+- name: Monitor effectiveness
+  description: Track metrics to verify the pattern is working
+- name: Document decisions
+  description: Record why you chose this approach
+anti_patterns:
+- name: Ignoring this pattern
+  consequence: Systems become unreliable and difficult to maintain
+- name: Over-engineering
+  consequence: Unnecessary complexity
+blog_hooks:
+  beginner:
+    analogy: Using ORMs effectively while avoiding common pitfalls is a critical part
+      of software engineering.
+    focus: Understanding the basics
+  intermediate:
+    focus: Implementing database-orm-patterns effectively
+    key_points:
+    - Core concepts of database-orm-patterns
+    - Common implementation approaches
+    - Trade-offs and considerations
+  advanced:
+    focus: Advanced database-orm-patterns techniques
+    key_points:
+    - Optimization strategies
+    - Complex scenarios
+    - Production considerations

@@ -1,0 +1,49 @@
+id: query-planning-optimization
+name: Query Planning and Optimization
+category: fraiseql
+type: standard
+tags:
+- execution
+- performance
+- optimization
+- planning
+summary:
+  short: Pre-computed execution plans with optional database optimization
+  long: Queries are planned during compilation, creating pre-computed execution plans
+    that can be cached and optimized for the target database.
+problem:
+  description: Queries planned at runtime with variable performance
+  symptoms:
+  - Unpredictable query performance
+  - Query planning overhead
+  - Difficult to optimize queries
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Query Planning and Optimization effectively
+key_concepts:
+  concept_1: Plan caching
+  concept_2: Database-specific optimization
+  concept_3: Plan analysis and visualization
+implementation_considerations:
+  consideration_1: Plan cache invalidation
+  consideration_2: Plan size and complexity
+  consideration_3: Explain plan analysis
+best_practices:
+- name: Pre-compute plans
+  description: Generate plans during compilation
+- name: Cache plans
+  description: Reuse plans across requests
+- name: Monitor plans
+  description: Analyze plan efficiency
+anti_patterns:
+- name: Runtime planning
+  consequence: Variable performance
+- name: No caching
+  consequence: Repeated planning overhead
+blog_hooks:
+  beginner:
+    focus: Introduction to Query Planning and Optimization
+  intermediate:
+    focus: Implementing Query Planning and Optimization
+  advanced:
+    focus: Advanced Query Planning and Optimization techniques

@@ -2,7 +2,7 @@ import { Entity, Column, PrimaryColumn, ManyToOne, JoinColumn, CreateDateColumn 
 
 @Entity({ name: 'benchmark.tb_comment', synchronize: false })
 export class Comment {
-  @PrimaryColumn({ type: 'varchar' })
+  @PrimaryColumn({ type: 'uuid' })
   id!: string;
 
   @Column({ type: 'integer' })

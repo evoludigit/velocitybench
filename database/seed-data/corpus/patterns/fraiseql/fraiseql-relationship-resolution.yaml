@@ -1,0 +1,571 @@
+id: fraiseql-relationship-resolution
+name: "FraiseQL Relationship Resolution Patterns"
+category: fraiseql
+type: standard
+tags:
+  - fraiseql
+  - relationships
+  - composition
+  - nested-queries
+  - foreign-keys
+  - jsonb
+
+summary:
+  short: "Efficient relationship resolution through JSONB composition at database layer"
+  long: |
+    FraiseQL resolves relationships (one-to-many, many-to-one, self-referential) by
+    pre-composing nested objects as JSONB in the database layer. Unlike application-level
+    resolvers which cause N+1 queries, database composition fetches entire object graphs
+    in single queries. Understanding relationship patterns, composition strategies, and
+    proper index design is essential for building performant GraphQL APIs.
+
+problem:
+  description: |
+    GraphQL queries with relationships create N+1 query problems:
+    - Query user → 1 query
+    - For each user, fetch posts → N queries
+    - For each post, fetch author (again) → N queries
+    - For each post, fetch comments → N queries
+    - Total: 1 + N + N + N = exponential queries
+
+    Traditional solutions (DataLoaders) still require multiple database round-trips.
+    Database-layer composition returns entire graphs in single queries.
+
+  symptoms:
+    - name: "N+1 queries in nested relationships"
+      description: "Query user → posts → comments → authors"
+      detection: "Multiple SELECT queries in slow_log"
+
+    - name: "DataLoader overhead"
+      description: "Even with batching, multiple round-trips to DB"
+      detection: "3-4 database queries for what should be 1"
+
+    - name: "Relationship cycles"
+      description: "Post has author (User), User has posts, infinite nesting"
+      consequence: "Cannot compose cycles without depth limit"
+
+  impact: |
+    Database connection exhaustion, slow API responses, poor scalability,
+    expensive resource usage, difficult query optimization
+
+solution:
+  principle: "Pre-compose nested objects as JSONB at database layer; single query for entire graph"
+
+  components:
+    - name: "One-to-Many Relationship (User → Posts)"
+      type: "Relationship pattern"
+      description: "User has many posts; each post has one author"
+      resolution_strategy: |
+        User query:
+        1. Query tv_user (User JSONB object)
+        2. For each user, DON'T separately query posts
+        3. Instead, posts are nested in composition if requested
+
+        Post query (with author):
+        1. Query tv_post (Post JSONB with nested author pre-composed)
+        2. Author already in JSONB; no separate query needed
+      implementation: |
+        CREATE VIEW tv_post AS
+        SELECT p.id, jsonb_build_object(
+            'id', p.id,
+            'title', p.title,
+            'author', (SELECT u.data FROM tv_user u WHERE u.id = (
+                SELECT id FROM v_user WHERE pk_user = p.fk_author
+            ))
+        ) as data
+        FROM v_post p;
+      benefit: "Single query returns post + author; no N+1"
+      performance: "<50ms (regardless of number of posts)"
+
+    - name: "Many-to-One Relationship (Post → Author)"
+      type: "Relationship pattern"
+      description: "Multiple posts have one author; many-to-one via FK"
+      resolution_strategy: |
+        When querying posts, include nested author:
+        - tv_post view includes author JSONB composition
+        - Single query returns all posts with authors
+        - No separate queries for authors
+      implementation: |
+        -- Post has fk_author (INTEGER) pointing to User pk_user
+        CREATE TABLE tb_post (
+            pk_post SERIAL PRIMARY KEY,
+            id UUID,
+            fk_author INTEGER NOT NULL REFERENCES tb_user(pk_user),
+            title VARCHAR(500),
+            ...
+        );
+
+        -- Composition includes nested author
+        CREATE VIEW tv_post AS
+        SELECT p.id, jsonb_build_object(
+            'id', p.id,
+            'title', p.title,
+            'author', (SELECT u.data FROM tv_user u WHERE ...)
+        ) as data FROM v_post p;
+
+      benefit: "FK relationship transparently composed in JSONB"
+      performance: "O(1) per post (all authors fetched in composition)"
+
+    - name: "Self-Referential Relationship (Comment → Parent Comment)"
+      type: "Relationship pattern"
+      description: "Comment can reference parent comment (tree structure)"
+      resolution_strategy: |
+        Comment has optional fk_parent pointing to parent comment:
+        1. Query tv_comment (includes nested parent and author)
+        2. Parent comment is JSONB-composed from tv_comment recursively
+        3. Depth limited to prevent infinite cycles
+      implementation: |
+        CREATE TABLE tb_comment (
+            pk_comment SERIAL PRIMARY KEY,
+            id UUID,
+            fk_post INTEGER NOT NULL REFERENCES tb_post(pk_post),
+            fk_author INTEGER NOT NULL REFERENCES tb_user(pk_user),
+            fk_parent INTEGER REFERENCES tb_comment(pk_comment),
+            content TEXT,
+            ...
+        );
+
+        CREATE VIEW tv_comment AS
+        SELECT c.id, jsonb_build_object(
+            'id', c.id,
+            'content', c.content,
+            'author', (SELECT u.data FROM tv_user u WHERE ...),
+            'post', (SELECT p.data FROM tv_post p WHERE ...),
+            'parentComment', CASE
+                WHEN c.fk_parent IS NOT NULL THEN
+                    (SELECT tc.data FROM tv_comment tc WHERE ...)
+                ELSE null::jsonb
+            END
+        ) as data FROM v_comment c;
+
+      benefit: "Tree structures supported; depth limit prevents cycles"
+      performance: "O(depth) queries avoided; single composition query"
+      caveat: "Limit recursion depth (3-5 levels typical)"
+
+    - name: "Nested JSONB Composition"
+      type: "Implementation pattern"
+      description: "Building nested objects using recursive view queries"
+      pattern: |
+        -- Simple object composition
+        jsonb_build_object(
+            'id', field1,
+            'name', field2,
+            'nested', (SELECT nested_obj FROM nested_view)
+        )
+
+        -- Null handling for optional relationships
+        COALESCE(
+            (SELECT obj FROM view WHERE condition),
+            jsonb_null()
+        )
+
+        -- Array composition (if needed)
+        COALESCE(
+            jsonb_agg(elem ORDER BY id),
+            '[]'::jsonb
+        )
+      benefit: "Compose arbitrarily complex nested structures"
+      considerations:
+        - "Keep nesting depth reasonable (3-5 levels)"
+        - "Index FK columns for efficient composition joins"
+        - "Test performance with EXPLAIN ANALYZE"
+
+    - name: "Relationship Filtering"
+      type: "Query pattern"
+      description: "Filter related entities (e.g., posts by author)"
+      strategy: |
+        Instead of:
+        1. Get user by id
+        2. Get posts where fk_author = user.pk_user
+
+        Do:
+        Query posts directly with WHERE fk_author = %s
+        (fk_author indexed; single index scan)
+      implementation: |
+        -- Filter by author efficiently
+        SELECT * FROM tv_post
+        WHERE fk_author = (SELECT pk_user FROM v_user WHERE id = %s)
+        ORDER BY created_at DESC
+        LIMIT 10;
+
+        -- Index for efficiency
+        CREATE INDEX idx_post_author ON tb_post(fk_author);
+      benefit: "Avoids join overhead; uses indexed FK directly"
+
+key_concepts:
+  concept_1: "One-to-many composed via nested JSONB in tv_* view"
+  concept_2: "Many-to-one via FK column (fk_author) in JSONB composition"
+  concept_3: "Self-referential (tree) via recursive view composition"
+  concept_4: "Pre-composition at DB layer eliminates N+1 entirely"
+  concept_5: "JSONB nesting depth limited (3-5 levels typical)"
+  concept_6: "FK columns must be indexed for efficient composition"
+  concept_7: "Circular references handled by depth limits, NULL fallback"
+  concept_8: "Single query fetches entire object graph (no round-trips)"
+
+implementation_considerations:
+  consideration_1: "Index all FK columns used in composition (fk_author, fk_post)"
+  consideration_2: "Limit JSONB nesting depth to 3-5 levels"
+  consideration_3: "Handle NULL optional relationships with COALESCE"
+  consideration_4: "Test composition performance with EXPLAIN ANALYZE"
+  consideration_5: "Document relationship depth in schema"
+  consideration_6: "Consider materialized views for expensive compositions"
+  consideration_7: "Monitor composition query time; optimize if > 100ms"
+  consideration_8: "Test circular reference handling (tree with max depth)"
+  consideration_9: "Verify composed objects deserialize correctly to dataclasses"
+  consideration_10: "Benchmark with realistic data size"
+
+best_practices:
+  - name: "Index all FK columns"
+    description: "CREATE INDEX idx_post_author ON tb_post(fk_author)"
+
+  - name: "Limit nesting depth"
+    description: "Typically 3-5 levels; avoid deep trees"
+
+  - name: "Use COALESCE for optional relationships"
+    description: "Handle NULL with jsonb_null() fallback"
+
+  - name: "Name relationships clearly"
+    description: "author, post, parentComment (not just 'parent')"
+
+  - name: "Test circular reference handling"
+    description: "Verify cycles don't cause infinite recursion"
+
+  - name: "Document composition depth"
+    description: "Comment includes post (depth 2); post includes author (depth 1)"
+
+  - name: "Benchmark composition queries"
+    description: "Verify < 50-100ms even with many nested objects"
+
+  - name: "Consider lazy loading"
+    description: "Not all relationships need to be composed (trade-off)"
+
+anti_patterns:
+  - name: "Unindexed FK columns"
+    description: "Composition JOIN on fk_author without index"
+    consequence: "Slow composition queries; sequential scans"
+    fix: "CREATE INDEX idx_post_author ON tb_post(fk_author)"
+
+  - name: "Deep arbitrary nesting"
+    description: "User → posts → comments → replies → nested replies (5+ levels)"
+    consequence: "Exponential query complexity; timeouts"
+    fix: "Limit nesting depth to 3-5 levels"
+
+  - name: "Circular references without depth limit"
+    description: "Post → comment → post (infinite cycle)"
+    consequence: "Infinite recursion; query never returns"
+    fix: "Add depth limit; use CASE WHEN to stop recursion"
+
+  - name: "Composing unnecessary relationships"
+    description: "Always include all nested objects (even if not requested)"
+    consequence: "Slower queries; larger responses"
+    fix: "Only compose requested relationships (GraphQL field selection)"
+
+  - name: "No NULL handling"
+    description: "JSONB composition without COALESCE(..., jsonb_null())"
+    consequence: "Missing relationships cause NULL errors"
+    fix: "Always handle NULL optional relationships"
+
+  - name: "Array composition in JSONB"
+    description: "User posts as array in user object (duplicates all posts)"
+    consequence: "Huge response size; exponential data duplication"
+    fix: "Query posts separately with WHERE filter; don't nest in user"
+
+implementation:
+  title: "Implementing Relationship Resolution"
+  steps:
+    - number: 1
+      title: "Design relationship schema"
+      description: |
+        ```sql
+        -- User table (no nested posts)
+        CREATE TABLE tb_user (
+            pk_user SERIAL PRIMARY KEY,
+            id UUID UNIQUE,
+            username VARCHAR(255) UNIQUE,
+            ...
+        );
+
+        -- Post table with FK to User
+        CREATE TABLE tb_post (
+            pk_post SERIAL PRIMARY KEY,
+            id UUID UNIQUE,
+            fk_author INTEGER NOT NULL REFERENCES tb_user(pk_user),
+            title VARCHAR(500),
+            ...
+        );
+
+        -- Comment table with FKs to Post, User, and self
+        CREATE TABLE tb_comment (
+            pk_comment SERIAL PRIMARY KEY,
+            id UUID UNIQUE,
+            fk_post INTEGER NOT NULL REFERENCES tb_post(pk_post),
+            fk_author INTEGER NOT NULL REFERENCES tb_user(pk_user),
+            fk_parent INTEGER REFERENCES tb_comment(pk_comment),
+            content TEXT,
+            ...
+        );
+
+        -- Indexes for composition
+        CREATE INDEX idx_post_author ON tb_post(fk_author);
+        CREATE INDEX idx_comment_post ON tb_comment(fk_post);
+        CREATE INDEX idx_comment_author ON tb_comment(fk_author);
+        CREATE INDEX idx_comment_parent ON tb_comment(fk_parent);
+        ```
+
+    - number: 2
+      title: "Create projection views (v_*)"
+      description: |
+        ```sql
+        CREATE VIEW v_user AS
+        SELECT pk_user, id, username, email, bio, created_at
+        FROM tb_user;
+
+        CREATE VIEW v_post AS
+        SELECT pk_post, id, fk_author, title, content, created_at
+        FROM tb_post;
+
+        CREATE VIEW v_comment AS
+        SELECT pk_comment, id, fk_post, fk_author, fk_parent, content, created_at
+        FROM tb_comment;
+        ```
+
+    - number: 3
+      title: "Create composition views (tv_*)"
+      description: |
+        ```sql
+        -- Base: User (no nested objects)
+        CREATE VIEW tv_user AS
+        SELECT u.id, jsonb_build_object(
+            'id', u.id,
+            'username', u.username,
+            'email', u.email,
+            'bio', u.bio,
+            'createdAt', u.created_at
+        ) as data
+        FROM v_user u;
+
+        -- Many-to-one: Post with nested Author
+        CREATE VIEW tv_post AS
+        SELECT p.id, p.fk_author, jsonb_build_object(
+            'id', p.id,
+            'title', p.title,
+            'content', p.content,
+            'createdAt', p.created_at,
+            'author', COALESCE(
+                (SELECT u.data FROM tv_user u WHERE u.id = (
+                    SELECT id FROM v_user WHERE pk_user = p.fk_author
+                )),
+                jsonb_null()
+            )
+        ) as data
+        FROM v_post p;
+
+        -- Complex: Comment with nested Post, Author, Parent
+        CREATE VIEW tv_comment AS
+        SELECT c.id, c.fk_post, c.fk_author, c.fk_parent, jsonb_build_object(
+            'id', c.id,
+            'content', c.content,
+            'createdAt', c.created_at,
+            'author', COALESCE(
+                (SELECT u.data FROM tv_user u WHERE u.id = (
+                    SELECT id FROM v_user WHERE pk_user = c.fk_author
+                )),
+                jsonb_null()
+            ),
+            'post', COALESCE(
+                (SELECT p.data FROM tv_post p WHERE p.id = (
+                    SELECT id FROM v_post WHERE pk_post = c.fk_post
+                )),
+                jsonb_null()
+            ),
+            'parentComment', CASE
+                WHEN c.fk_parent IS NOT NULL THEN COALESCE(
+                    (SELECT tc.data FROM tv_comment tc WHERE tc.id = (
+                        SELECT id FROM v_comment WHERE pk_comment = c.fk_parent
+                    )),
+                    jsonb_null()
+                )
+                ELSE null::jsonb
+            END
+        ) as data
+        FROM v_comment c;
+        ```
+
+    - number: 4
+      title: "Define Python types"
+      description: |
+        ```python
+        @fraiseql.type(sql_source="benchmark.tv_user")
+        class User:
+            id: UUID
+            username: str
+            email: str
+            bio: str | None = None
+            created_at: str
+
+        @fraiseql.type(sql_source="benchmark.tv_post")
+        class Post:
+            id: UUID
+            title: str
+            content: str | None = None
+            author: User  # Pre-composed in tv_post JSONB
+            created_at: str
+
+        @fraiseql.type(sql_source="benchmark.tv_comment")
+        class Comment:
+            id: UUID
+            content: str
+            author: User              # Pre-composed
+            post: Post                # Pre-composed
+            parent_comment: "Comment | None" = None  # Self-referential
+            created_at: str
+        ```
+
+    - number: 5
+      title: "Test relationship resolution"
+      description: |
+        ```python
+        def test_post_with_author(factory, db):
+            # Create user and post
+            user = factory.create_user('alice', 'alice@example.com')
+            post = factory.create_post(user['pk_user'], 'Title', 'content')
+
+            # Query post with nested author
+            result = factory.get_post(post['id'])
+
+            # Verify author is included (no separate query)
+            assert result['author'] is not None
+            assert result['author']['username'] == 'alice'
+
+        def test_comment_with_relationships(factory, db):
+            # Create user, post, comment
+            user = factory.create_user('alice', 'alice@example.com')
+            post = factory.create_post(user['pk_user'], 'Title', 'content')
+            commenter = factory.create_user('bob', 'bob@example.com')
+            comment = factory.create_comment(post['pk_post'], commenter['pk_user'], 'Great post!')
+
+            # Query comment with nested author and post
+            result = factory.get_comment(comment['id'])
+
+            # Verify all relationships included
+            assert result['author']['username'] == 'bob'
+            assert result['post']['title'] == 'Title'
+            assert result['post']['author']['username'] == 'alice'
+        ```
+
+examples:
+  example_1:
+    title: "One-to-Many: User has Posts"
+    description: "User object with related posts"
+    code: |
+      -- From test_resolvers.py
+      -- Create user with posts
+      user = factory.create_user('alice', 'alice@example.com')
+      post1 = factory.create_post(user['pk_user'], 'Post 1', 'content')
+      post2 = factory.create_post(user['pk_user'], 'Post 2', 'content')
+
+      -- Query posts (includes author relationship)
+      posts = factory.get_posts_by_author(user['pk_user'])
+
+      -- Both posts have author nested
+      assert posts[0]['author']['id'] == user['id']
+      assert posts[1]['author']['id'] == user['id']
+
+  example_2:
+    title: "Many-to-One: Post has Author"
+    description: "Post with nested author object"
+    code: |
+      -- From test_resolvers.py
+      author = factory.create_user('author', 'author@example.com')
+      post = factory.create_post(author['pk_user'], 'Test Post', 'Content')
+
+      -- Query post directly
+      result = factory.get_post(post['id'])
+
+      -- Author pre-composed in JSONB
+      assert result['author'] is not None
+      assert result['author']['username'] == 'author'
+      # No separate query for author needed
+
+  example_3:
+    title: "Self-Referential: Comment Tree"
+    description: "Comments with optional parent comment"
+    code: |
+      -- From test_resolvers.py
+      author = factory.create_user('alice', 'alice@example.com')
+      post = factory.create_post(author['pk_user'], 'Discussion', 'content')
+
+      -- Comment without parent
+      comment1 = factory.create_comment(post['pk_post'], author['pk_user'], 'comment-1', 'First comment')
+
+      -- Child comment with parent
+      comment2 = factory.create_comment(post['pk_post'], author['pk_user'], 'comment-2', 'Reply to first')
+
+      -- Query child comment
+      result = factory.get_comment(comment2['id'])
+
+      # All relationships included
+      assert result['post']['id'] == post['id']
+      assert result['author']['id'] == author['id']
+      # parentComment would be included if set
+
+comparison_matrix:
+  relationship_type:
+    one_to_many: "User → Posts"
+    many_to_one: "Post → Author"
+    self_referential: "Comment → Parent Comment"
+
+  implementation:
+    one_to_many: "Query posts with WHERE fk_author = user_pk"
+    many_to_one: "Compose author in post JSONB via fk_author"
+    self_referential: "Recursive tv_comment composition"
+
+  n_plus_one_risk:
+    one_to_many: "High (without composition)"
+    many_to_one: "Medium (FK join needed)"
+    self_referential: "High (recursive)"
+
+  index_strategy:
+    one_to_many: "Index on fk_author for filtering"
+    many_to_one: "Index on fk_author for composition join"
+    self_referential: "Index on fk_parent for recursive join"
+
+  depth_limit:
+    one_to_many: "No limit (query at same level)"
+    many_to_one: "No limit (single level)"
+    self_referential: "Must limit (prevent cycles)"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Relationships are like Russian nesting dolls:
+      - User doll contains Post doll
+      - Post doll contains Author doll
+      - One doll at a time, vs unpacking entire set
+
+      Database composition = get entire set unpacked at once!
+
+    focus: "Understanding relationship types and composition"
+    key_points:
+      - "One-to-many: User has many Posts"
+      - "Many-to-one: Post has one Author (via FK)"
+      - "Self-referential: Comment can have parent Comment"
+      - "Composition in JSONB = fetch all related objects together"
+
+  intermediate:
+    focus: "Efficient relationship composition"
+    key_points:
+      - "JSONB composition pre-fetches nested objects"
+      - "FK columns must be indexed for efficient joins"
+      - "Limit nesting depth to prevent cycles"
+      - "COALESCE handles NULL optional relationships"
+      - "Single query fetches entire object graph"
+
+  advanced:
+    focus: "Optimization and edge cases"
+    key_points:
+      - "Materialized views for expensive compositions"
+      - "Selective composition (only compose requested fields)"
+      - "Handling circular references (depth limits)"
+      - "Performance monitoring (EXPLAIN ANALYZE)"
+      - "Caching strategies for large pre-composed objects"

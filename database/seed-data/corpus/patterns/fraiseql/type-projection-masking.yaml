@@ -1,0 +1,49 @@
+id: type-projection-masking
+name: Type Projection with Auth Masking
+category: fraiseql
+type: standard
+tags:
+- execution
+- authorization
+- security
+- projection
+summary:
+  short: Applying authorization rules to mask fields in response
+  long: Type projection applies authorization rules to mask fields that the user doesn't
+    have permission to see.
+problem:
+  description: Masking not applied to response fields
+  symptoms:
+  - Users see fields they shouldn't
+  - Authorization leaks in nested data
+  - Difficult to implement field-level security
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Type Projection with Auth Masking effectively
+key_concepts:
+  concept_1: Field auth metadata
+  concept_2: Masking logic
+  concept_3: Nested field handling
+implementation_considerations:
+  consideration_1: Null vs error for masked
+  consideration_2: Performance of masking
+  consideration_3: Error messages
+best_practices:
+- name: Apply auth rules
+  description: Check permission for each field
+- name: Consistent masking
+  description: Always mask the same fields
+- name: Clear semantics
+  description: Define what happens to masked fields
+anti_patterns:
+- name: No masking
+  consequence: Users see restricted data
+- name: Inconsistent masking
+  consequence: Same field masked differently
+blog_hooks:
+  beginner:
+    focus: Introduction to Type Projection with Auth Masking
+  intermediate:
+    focus: Implementing Type Projection with Auth Masking
+  advanced:
+    focus: Advanced Type Projection with Auth Masking techniques

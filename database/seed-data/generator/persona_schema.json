@@ -1,0 +1,166 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Persona Schema",
+  "description": "Schema for blog comment personas with Trinity Pattern IDs",
+  "type": "object",
+  "required": [
+    "pk_user",
+    "id",
+    "name",
+    "title",
+    "years_experience",
+    "background",
+    "expertise_areas",
+    "communication_style",
+    "personality_traits",
+    "preferred_comment_types",
+    "example_phrases",
+    "interests",
+    "generated_at"
+  ],
+  "properties": {
+    "pk_user": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647,
+      "description": "Primary key for database relationships (Trinity Pattern)"
+    },
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "UUID for API exposure (Trinity Pattern)"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "description": "Full name of the persona"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "description": "Professional title (e.g., Senior Backend Engineer)"
+    },
+    "years_experience": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 60,
+      "description": "Years of professional experience"
+    },
+    "background": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 1000,
+      "description": "Career background and experience summary"
+    },
+    "expertise_areas": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100
+      },
+      "description": "List of technical expertise areas"
+    },
+    "communication_style": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "description": "How this persona communicates (e.g., direct, analytical, friendly)"
+    },
+    "personality_traits": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 50
+      },
+      "description": "List of personality traits"
+    },
+    "preferred_comment_types": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "items": {
+        "type": "string",
+        "enum": [
+          "technical_issue",
+          "missing_edge_case",
+          "question",
+          "tradeoff",
+          "validation",
+          "critical_analysis",
+          "experience_sharing"
+        ]
+      },
+      "description": "Types of comments this persona prefers to write"
+    },
+    "example_phrases": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      },
+      "description": "Example phrases this persona might use"
+    },
+    "interests": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100
+      },
+      "description": "Topics this persona is interested in"
+    },
+    "generated_at": {
+      "type": "number",
+      "description": "Unix timestamp when the persona was generated"
+    },
+    "reply_style": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "Preferred communication/reply style (e.g., direct, friendly, analytical)"
+    },
+    "experience_level": {
+      "type": "string",
+      "enum": ["Junior", "Mid-level", "Senior", "Staff", "Principal"],
+      "description": "Career experience level"
+    },
+    "company_type": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Type/size of company they work for"
+    },
+    "business_domain": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "Business domain or industry vertical"
+    },
+    "geographic_region": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "Geographic location/region"
+    },
+    "language_background": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "description": "Language background and English fluency level"
+    }
+  },
+  "additionalProperties": false
+}

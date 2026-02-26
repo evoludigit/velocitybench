@@ -1,0 +1,334 @@
+# Database Sharding
+# VelocityBench Knowledge Corpus
+
+id: database-sharding
+name: "Database Sharding Strategies"
+category: architecture
+type: pattern
+severity: high
+tags:
+  - database
+  - scaling
+  - distributed-systems
+  - partitioning
+  - architecture
+
+summary:
+  short: "Distribute data across multiple databases for horizontal scaling"
+  long: |
+    Database sharding splits data across multiple database instances (shards) to handle
+    more data and traffic than a single server can manage. Each shard contains a subset
+    of the data, determined by a sharding key. When done well, queries only hit one shard.
+    This enables near-linear horizontal scaling but adds complexity in queries, joins,
+    and data management.
+
+problem:
+  description: |
+    Single database instances hit limits:
+    - Storage limits: Can't fit all data on one machine
+    - Write throughput: Single master bottleneck
+    - Read throughput: Even with replicas, hot spots remain
+    - Memory limits: Can't cache enough data for fast queries
+
+  symptoms:
+    - name: "Vertical scaling exhaustion"
+      description: "Already on largest available instance"
+      detection: "Using max CPU/RAM instances, still slow"
+
+    - name: "Replication lag"
+      description: "Read replicas can't keep up with writes"
+      detection: "Growing lag, stale read complaints"
+
+    - name: "Hot table problems"
+      description: "One large table dominates resources"
+      detection: "Single table > 80% of I/O or storage"
+
+solution:
+  principle: "Split data by a key so most queries hit single shard"
+
+  components:
+    - name: "Shard Key"
+      type: "design decision"
+      purpose: "Determines which shard holds each row"
+
+    - name: "Sharding Function"
+      type: "algorithm"
+      purpose: "Maps shard key to shard number"
+
+    - name: "Shard Router"
+      type: "infrastructure"
+      purpose: "Directs queries to correct shard"
+
+sharding_strategies:
+  - name: "Range-Based Sharding"
+    description: "Divide by ranges of shard key"
+    example: |
+      Shard 1: user_id 1-1,000,000
+      Shard 2: user_id 1,000,001-2,000,000
+      Shard 3: user_id 2,000,001-3,000,000
+    pros:
+      - "Easy to understand"
+      - "Range queries efficient"
+    cons:
+      - "Uneven distribution if keys clustered"
+      - "Hot spots on newest shard"
+
+  - name: "Hash-Based Sharding"
+    description: "Hash shard key to determine shard"
+    example: |
+      shard_number = hash(user_id) % num_shards
+    pros:
+      - "Even distribution"
+      - "No hot spots from sequential IDs"
+    cons:
+      - "Range queries must hit all shards"
+      - "Resharding is complex"
+
+  - name: "Directory-Based Sharding"
+    description: "Lookup table maps keys to shards"
+    example: |
+      # Lookup table
+      shard_map = {
+          "tenant_a": "shard_1",
+          "tenant_b": "shard_2",
+          "tenant_c": "shard_1"  # Can colocate
+      }
+    pros:
+      - "Flexible placement"
+      - "Easy to move tenants"
+    cons:
+      - "Lookup table is single point of failure"
+      - "Additional latency for lookup"
+
+  - name: "Geographic Sharding"
+    description: "Shard by geographic region"
+    example: |
+      EU users -> eu-shard.database.com
+      US users -> us-shard.database.com
+      APAC users -> apac-shard.database.com
+    pros:
+      - "Data locality for compliance (GDPR)"
+      - "Lower latency for users"
+    cons:
+      - "Cross-region queries expensive"
+      - "Uneven load between regions"
+
+implementation:
+  hash_sharding:
+    python: |
+      import hashlib
+      from typing import Optional
+
+      class ShardRouter:
+          def __init__(self, shard_count: int, shard_connections: dict):
+              self.shard_count = shard_count
+              self.connections = shard_connections
+
+          def get_shard_for_key(self, shard_key: str) -> int:
+              """Consistent hash to shard number."""
+              hash_value = int(hashlib.md5(
+                  str(shard_key).encode()
+              ).hexdigest(), 16)
+              return hash_value % self.shard_count
+
+          def get_connection(self, shard_key: str):
+              """Get database connection for this key."""
+              shard_num = self.get_shard_for_key(shard_key)
+              return self.connections[shard_num]
+
+          async def execute_on_shard(
+              self,
+              shard_key: str,
+              query: str,
+              params: tuple
+          ):
+              """Execute query on appropriate shard."""
+              conn = self.get_connection(shard_key)
+              return await conn.fetch(query, *params)
+
+          async def execute_on_all_shards(self, query: str, params: tuple):
+              """Execute query on all shards (scatter-gather)."""
+              results = []
+              for conn in self.connections.values():
+                  result = await conn.fetch(query, *params)
+                  results.extend(result)
+              return results
+
+      # Usage
+      router = ShardRouter(
+          shard_count=4,
+          shard_connections={
+              0: db_pool_0,
+              1: db_pool_1,
+              2: db_pool_2,
+              3: db_pool_3
+          }
+      )
+
+      # Single-shard query (fast)
+      user = await router.execute_on_shard(
+          shard_key=user_id,
+          query="SELECT * FROM users WHERE id = $1",
+          params=(user_id,)
+      )
+
+      # Cross-shard query (slow, avoid when possible)
+      all_admins = await router.execute_on_all_shards(
+          query="SELECT * FROM users WHERE role = $1",
+          params=("admin",)
+      )
+
+  consistent_hashing:
+    python: |
+      import hashlib
+      from bisect import bisect_left
+      from typing import Dict, List
+
+      class ConsistentHashRing:
+          """
+          Consistent hashing for shard distribution.
+          Minimizes data movement when adding/removing shards.
+          """
+
+          def __init__(self, nodes: List[str], virtual_nodes: int = 150):
+              self.ring: Dict[int, str] = {}
+              self.sorted_keys: List[int] = []
+              self.virtual_nodes = virtual_nodes
+
+              for node in nodes:
+                  self.add_node(node)
+
+          def _hash(self, key: str) -> int:
+              return int(hashlib.md5(key.encode()).hexdigest(), 16)
+
+          def add_node(self, node: str):
+              """Add node with virtual nodes for better distribution."""
+              for i in range(self.virtual_nodes):
+                  virtual_key = f"{node}:{i}"
+                  hash_value = self._hash(virtual_key)
+                  self.ring[hash_value] = node
+                  self.sorted_keys.append(hash_value)
+              self.sorted_keys.sort()
+
+          def remove_node(self, node: str):
+              """Remove node and its virtual nodes."""
+              for i in range(self.virtual_nodes):
+                  virtual_key = f"{node}:{i}"
+                  hash_value = self._hash(virtual_key)
+                  del self.ring[hash_value]
+                  self.sorted_keys.remove(hash_value)
+
+          def get_node(self, key: str) -> str:
+              """Get the node responsible for this key."""
+              if not self.ring:
+                  raise ValueError("No nodes in ring")
+
+              hash_value = self._hash(key)
+              idx = bisect_left(self.sorted_keys, hash_value)
+
+              if idx == len(self.sorted_keys):
+                  idx = 0
+
+              return self.ring[self.sorted_keys[idx]]
+
+      # Usage
+      ring = ConsistentHashRing(["shard-1", "shard-2", "shard-3"])
+
+      # Get shard for user
+      shard = ring.get_node(f"user:{user_id}")
+
+      # Adding a new shard only moves ~25% of data (1/4 of keys)
+      ring.add_node("shard-4")
+
+  application_sharding:
+    python: |
+      from sqlalchemy import create_engine
+      from sqlalchemy.orm import sessionmaker
+
+      class ShardedDatabase:
+          def __init__(self, shard_configs: dict):
+              self.engines = {}
+              self.sessions = {}
+
+              for shard_id, config in shard_configs.items():
+                  engine = create_engine(config["url"])
+                  self.engines[shard_id] = engine
+                  self.sessions[shard_id] = sessionmaker(bind=engine)
+
+          def get_session(self, shard_key: str):
+              shard_id = self._get_shard_id(shard_key)
+              return self.sessions[shard_id]()
+
+          def _get_shard_id(self, shard_key: str) -> str:
+              # Simple hash-based routing
+              hash_val = hash(shard_key) % len(self.engines)
+              return list(self.engines.keys())[hash_val]
+
+      # Multi-tenant sharding by tenant ID
+      class TenantShardedDB(ShardedDatabase):
+          def get_session_for_tenant(self, tenant_id: str):
+              # Each tenant on specific shard
+              return self.get_session(tenant_id)
+
+      # Usage with SQLAlchemy
+      sharded_db = TenantShardedDB({
+          "shard_0": {"url": "postgresql://localhost/shard0"},
+          "shard_1": {"url": "postgresql://localhost/shard1"},
+      })
+
+      # Queries automatically go to correct shard
+      with sharded_db.get_session_for_tenant("tenant_123") as session:
+          orders = session.query(Order).filter_by(tenant_id="tenant_123").all()
+
+challenges:
+  - name: "Cross-Shard Joins"
+    problem: "Can't JOIN across database instances"
+    solutions:
+      - "Denormalize data to avoid joins"
+      - "Application-level joins (fetch, then merge)"
+      - "Broadcast small tables to all shards"
+
+  - name: "Cross-Shard Transactions"
+    problem: "ACID transactions don't span shards"
+    solutions:
+      - "Two-phase commit (slow, complex)"
+      - "Saga pattern with compensation"
+      - "Design to avoid cross-shard transactions"
+
+  - name: "Resharding"
+    problem: "Adding/removing shards requires data migration"
+    solutions:
+      - "Consistent hashing (minimize movement)"
+      - "Virtual shards (logical > physical)"
+      - "Double-write during migration"
+
+  - name: "Hot Spots"
+    problem: "One shard gets disproportionate traffic"
+    solutions:
+      - "Better shard key selection"
+      - "Split hot shards"
+      - "Rate limiting per tenant"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Sharding is like splitting a library across buildings:
+      - One library: All books in one place, gets crowded
+      - Sharded: A-M in Building 1, N-Z in Building 2
+      You need to know which building has your book, but each building is less crowded!
+
+  intermediate:
+    focus: "Choosing shard keys and avoiding pitfalls"
+    key_points:
+      - "High-cardinality shard keys"
+      - "Avoiding cross-shard queries"
+      - "Handling the 'tenant_id everywhere' pattern"
+      - "Rebalancing and data migration"
+
+  advanced:
+    focus: "Production sharding at scale"
+    key_points:
+      - "Consistent hashing and virtual shards"
+      - "Cross-shard transaction patterns"
+      - "Global secondary indexes"
+      - "Automated shard splitting and balancing"

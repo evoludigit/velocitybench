@@ -1,0 +1,356 @@
+# Observability Stack: Metrics, Logs, and Traces
+# VelocityBench Knowledge Corpus
+
+id: observability-stack
+name: "Observability: Metrics, Logs, and Traces"
+category: infrastructure
+type: pattern
+severity: high
+tags:
+  - observability
+  - monitoring
+  - logging
+  - tracing
+  - prometheus
+  - elasticsearch
+
+summary:
+  short: "Implement three pillars of observability: metrics, logs, and traces"
+  long: |
+    Observability combines three complementary tools: Metrics (performance numbers),
+    Logs (events), and Traces (request flows). Prometheus scrapes metrics. ELK stack
+    stores logs. Jaeger traces requests through microservices. Together they enable
+    understanding system behavior, debugging production issues, and alerting on anomalies.
+
+problem:
+  description: |
+    Incomplete observability creates blind spots:
+    - No metrics: Can't track performance
+    - No logs: Can't debug what happened
+    - No traces: Can't find where time was spent
+    - Each tool in isolation doesn't show complete picture
+    - Hard to correlate issues across tools
+
+  symptoms:
+    - name: "Slow application"
+      description: "Can't pinpoint bottleneck"
+      detection: "No visibility into what's slow"
+
+    - name: "Unexpected errors"
+      description: "Errors appear in production without context"
+      detection: "No logs, no trace of cause"
+
+    - name: "Difficult incident response"
+      description: "Takes hours to understand issue"
+      detection: "No correlation between metrics, logs, traces"
+
+solution:
+  principle: "Monitor with metrics, investigate with logs, trace with traces"
+
+  components:
+    - name: "Metrics"
+      type: "numbers"
+      examples: ["CPU usage", "Requests/sec", "Latency", "Error rate"]
+      purpose: "Understand system health"
+
+    - name: "Logs"
+      type: "events"
+      examples: ["Info", "Warning", "Error", "Debug"]
+      purpose: "Understand what happened"
+
+    - name: "Traces"
+      type: "requests"
+      examples: ["API call flow", "Database queries", "Cache lookups"]
+      purpose: "Understand where time is spent"
+
+implementation:
+  prometheus_metrics:
+    scrape_config: |
+      # prometheus.yml
+      global:
+        scrape_interval: 15s
+        evaluation_interval: 15s
+
+      scrape_configs:
+        - job_name: 'api-server'
+          static_configs:
+            - targets: ['localhost:8000']
+
+        - job_name: 'postgres'
+          static_configs:
+            - targets: ['localhost:9187']  # postgres_exporter
+
+        - job_name: 'redis'
+          static_configs:
+            - targets: ['localhost:9121']  # redis_exporter
+
+    custom_metrics_python: |
+      from prometheus_client import Counter, Histogram, Gauge
+      import time
+
+      # Counter: monotonically increasing
+      requests_total = Counter(
+          'api_requests_total',
+          'Total API requests',
+          ['method', 'endpoint']
+      )
+
+      # Histogram: latency distribution
+      request_duration = Histogram(
+          'api_request_duration_seconds',
+          'API request latency',
+          ['method', 'endpoint'],
+          buckets=[0.01, 0.05, 0.1, 0.5, 1.0]
+      )
+
+      # Gauge: current value
+      active_connections = Gauge(
+          'active_connections',
+          'Active database connections'
+      )
+
+      # Usage
+      @app.route('/api/users')
+      def get_users():
+          start = time.time()
+          requests_total.labels(method='GET', endpoint='/api/users').inc()
+
+          try:
+              users = db.get_all_users()
+              duration = time.time() - start
+              request_duration.labels(
+                  method='GET',
+                  endpoint='/api/users'
+              ).observe(duration)
+              return users
+          except Exception as e:
+              requests_total.labels(
+                  method='GET',
+                  endpoint='/api/users'
+              ).inc(amount=0)  # Failure tracked separately
+
+    alerting: |
+      # alert.yml
+      groups:
+        - name: api_alerts
+          rules:
+            - alert: HighErrorRate
+              expr: |
+                (sum(rate(api_requests_total{status="error"}[5m]))
+                 / sum(rate(api_requests_total[5m]))) > 0.05
+              for: 5m
+              annotations:
+                summary: "Error rate {{ $value | humanizePercentage }}"
+
+            - alert: SlowAPI
+              expr: |
+                histogram_quantile(0.95, api_request_duration_seconds) > 1.0
+              for: 10m
+              annotations:
+                summary: "P95 latency {{ $value }}s"
+
+  elasticsearch_logs:
+    structure: |
+      {
+        "timestamp": "2024-01-15T10:30:45.123Z",
+        "level": "ERROR",
+        "logger": "api.orders",
+        "message": "Failed to process order",
+        "order_id": "order-123",
+        "user_id": "user-456",
+        "error": "Database connection timeout",
+        "trace_id": "abc123def456"
+      }
+
+    python_logging: |
+      import logging
+      import json
+      from pythonjsonlogger import jsonlogger
+
+      # JSON logging
+      logger = logging.getLogger()
+      logHandler = logging.StreamHandler()
+      formatter = jsonlogger.JsonFormatter()
+      logHandler.setFormatter(formatter)
+      logger.addHandler(logHandler)
+
+      # Usage
+      logger.error(
+          "Failed to process order",
+          extra={
+              'order_id': order_id,
+              'user_id': user_id,
+              'trace_id': trace_id,
+              'error': str(e)
+          }
+      )
+
+    kibana_queries: |
+      # Find errors for specific user
+      user_id: "user-456" AND level: "ERROR"
+
+      # Find slow requests
+      duration_ms: [1000 TO *]
+
+      # Find requests by trace
+      trace_id: "abc123def456"
+
+  jaeger_tracing:
+    setup: |
+      from jaeger_client import Config
+      import opentracing
+
+      # Initialize tracer
+      config = Config(
+          config={
+              'sampler': {
+                  'type': 'const',
+                  'param': 1,  # Sample all requests
+              },
+              'logging': True,
+          },
+          service_name='api-server',
+          validate=True,
+      )
+      tracer = config.initialize_tracer()
+
+    instrumentation: |
+      from opentracing import tags
+      from opentracing.propagation import Format
+
+      @app.route('/api/orders/<order_id>')
+      def get_order(order_id):
+          # Extract parent span from headers
+          span_ctx = tracer.extract(
+              Format.HTTP_HEADERS,
+              request.headers
+          )
+
+          with tracer.start_active_span('get_order', child_of=span_ctx) as scope:
+              span = scope.span
+              span.set_tag('order_id', order_id)
+
+              # Query database
+              with tracer.start_active_span('db_query'):
+                  order = db.get_order(order_id)
+
+              # Call external service
+              with tracer.start_active_span('external_api_call'):
+                  enriched = await enrich_order(order)
+
+              span.set_tag(tags.HTTP_STATUS_CODE, 200)
+              return enriched
+
+    trace_visualization: |
+      # Jaeger UI shows:
+      # - Trace timeline (total duration)
+      # - Service calls (db, external APIs)
+      # - Latency per service
+      # - Errors in any span
+
+correlation:
+    trace_id_propagation: |
+      # All three tools share trace_id
+
+      1. Request comes in
+      2. Generate trace_id in middleware
+      3. Store in context
+      4. Add to logs
+      5. Add to metrics labels
+      6. Pass to downstream services (headers)
+
+      # Result: Can correlate metrics + logs + traces
+
+    example: |
+      # User reports: "Page is slow"
+
+      # 1. Check metrics
+      request_duration_seconds{p95} = 5.0
+      → Yes, requests are slow
+
+      # 2. Look at logs (trace_id filter)
+      {"trace_id": "xyz789", "db_query_ms": 4500}
+      → Database is slow
+
+      # 3. Look at trace
+      db_query span: 4500ms
+      → Specific query is the problem
+
+      # 4. Fix database query, verify metrics drop
+      request_duration_seconds{p95} = 0.2
+      → Fixed!
+
+best_practices:
+  - name: "Use structured logging"
+    description: "JSON logs, not free-form text"
+    benefit: "Searchable, parseable, queryable"
+
+  - name: "Correlate with trace_id"
+    description: "Pass trace_id through logs and metrics"
+    benefit: "Debug specific requests across all tools"
+
+  - name: "Set appropriate log levels"
+    description: "Not everything needs to be logged"
+    guidance: |
+      DEBUG: Dev-only details
+      INFO: Significant events
+      WARN: Unexpected but recoverable
+      ERROR: Errors need action
+
+  - name: "Set up alerts on metrics"
+    description: "Proactive notification, not reactive"
+    examples:
+      - "Error rate > 1%"
+      - "P99 latency > 1s"
+      - "Database connections > 90%"
+
+  - name: "Sample traces intelligently"
+    description: "Tracing every request is expensive"
+    strategy: |
+      - Sample all errors
+      - Sample % of normal requests
+      - Increase sampling on slow requests
+
+stack_comparison:
+  open_source: |
+    Metrics: Prometheus
+    Logs: ELK (Elasticsearch + Logstash + Kibana)
+    Traces: Jaeger
+    Cost: Self-hosted (infrastructure cost)
+
+  commercial: |
+    Datadog: All three (expensive but managed)
+    New Relic: All three (expensive)
+    Dynatrace: All three (expensive)
+    Cost: Per-host/per-metric licensing
+
+  hybrid: |
+    Metrics: Prometheus (open)
+    Logs: Cloud logging (AWS CloudWatch)
+    Traces: Jaeger (open)
+    Cost: Low infrastructure, some cloud costs
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Observability pillars are like investigating a crime:
+      - Metrics: Surveillance camera (when did it happen?)
+      - Logs: Witness testimony (what happened?)
+      - Traces: Video playback (where did the suspect go?)
+      All three together solve the mystery!
+
+  intermediate:
+    focus: "Setting up all three pillars"
+    key_points:
+      - "Prometheus scraping and PromQL"
+      - "ELK stack and log aggregation"
+      - "Jaeger tracing setup"
+      - "Trace ID correlation"
+
+  advanced:
+    focus: "Advanced observability patterns"
+    key_points:
+      - "Sampling strategies for cost"
+      - "Cardinality management"
+      - "Alert tuning and thresholds"
+      - "OpenTelemetry standardization"

@@ -1,0 +1,28 @@
+id: edge-profiling
+name: Edge Profiling
+category: comprehensive
+type: standard
+tags:
+- edge
+summary:
+  short: Edge Profiling and implementation guidelines
+  long: Complete guide to edge profiling
+problem:
+  description: Challenges without proper edge profiling
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement edge profiling
+key_concepts:
+  concept: Edge Profiling
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

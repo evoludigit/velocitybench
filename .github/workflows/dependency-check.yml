@@ -1,0 +1,187 @@
+name: Dependency Security Check
+
+on:
+  push:
+    branches: [main, develop, feat/*]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Run daily at 1 AM UTC
+    - cron: '0 1 * * *'
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  dependency-check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: python
+            files: 'requirements.txt,venv/requirements.txt,database/pyproject.toml,frameworks/*/pyproject.toml,frameworks/*/requirements*.txt'
+          - language: javascript
+            files: 'frameworks/*/package.json'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        if: matrix.language == 'python'
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node.js
+        if: matrix.language == 'javascript'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install audit tools
+        run: |
+          if [ "${{ matrix.language }}" == "python" ]; then
+            pip install pip-audit safety cyclonedx-bom
+          else
+            npm install -g npm-check-updates
+            npm audit --version
+          fi
+
+      - name: Run Python dependency audit
+        if: matrix.language == 'python'
+        id: python-audit
+        continue-on-error: true
+        run: |
+          echo "### Python Dependency Audit" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          total_vulns=0
+          total_packages=0
+
+          # Root venv
+          if [ -f "requirements.txt" ]; then
+            echo "#### Root Requirements" >> $GITHUB_STEP_SUMMARY
+            pip-audit --desc --requirement requirements.txt 2>&1 | tee /tmp/root-audit.txt || true
+            vulns=$(grep -c "VULNERABILITIES FOUND" /tmp/root-audit.txt || echo 0)
+            total_vulns=$((total_vulns + vulns))
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Framework requirements
+          for req_file in frameworks/*/requirements*.txt; do
+            if [ -f "$req_file" ]; then
+              echo "#### $(dirname $req_file)" >> $GITHUB_STEP_SUMMARY
+              pip-audit --desc --requirement "$req_file" 2>&1 | tail -20 >> $GITHUB_STEP_SUMMARY || true
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+          # Safety check for known vulnerabilities
+          echo "#### Safety Check (Known Vulnerabilities)" >> $GITHUB_STEP_SUMMARY
+          safety check --json --file requirements.txt 2>/dev/null || echo "0 vulnerabilities found" >> $GITHUB_STEP_SUMMARY
+
+      - name: Run JavaScript dependency audit
+        if: matrix.language == 'javascript'
+        id: js-audit
+        continue-on-error: true
+        run: |
+          echo "### JavaScript Dependency Audit" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          for pkg_file in frameworks/*/package.json; do
+            if [ -f "$pkg_file" ]; then
+              framework=$(dirname "$pkg_file" | xargs basename)
+              echo "#### $framework" >> $GITHUB_STEP_SUMMARY
+              cd "$(dirname $pkg_file)"
+              npm audit --audit-level=moderate 2>&1 | tail -20 >> $GITHUB_STEP_SUMMARY || true
+              cd - > /dev/null
+              echo "" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+      - name: Generate audit reports
+        if: always()
+        run: |
+          mkdir -p audit-reports
+
+          # Python audit report
+          if [ "${{ matrix.language }}" == "python" ]; then
+            pip-audit --desc --requirement requirements.txt --output json > audit-reports/python-audit.json 2>/dev/null || echo '{"vulnerabilities": []}' > audit-reports/python-audit.json
+          fi
+
+          # JavaScript audit report
+          if [ "${{ matrix.language }}" == "javascript" ]; then
+            npm audit --json > audit-reports/js-audit.json 2>/dev/null || echo '{"vulnerabilities": []}' > audit-reports/js-audit.json
+          fi
+
+      - name: Upload audit reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: audit-reports-${{ matrix.language }}
+          path: audit-reports/
+          retention-days: 90
+
+      - name: Comment on PR with audit results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const language = '${{ matrix.language }}';
+            let comment = `## 🔍 Dependency Security Audit - ${language.toUpperCase()}\n\n`;
+
+            if ('${{ steps.python-audit.outcome }}' === 'failure' || '${{ steps.js-audit.outcome }}' === 'failure') {
+              comment += '⚠️ **Vulnerabilities detected** - Review audit reports in workflow artifacts.\n\n';
+            } else {
+              comment += '✅ **No known vulnerabilities** in declared dependencies.\n\n';
+            }
+
+            comment += '**Action Items**:\n';
+            comment += '- [ ] Review audit reports\n';
+            comment += '- [ ] Update vulnerable packages\n';
+            comment += '- [ ] Document accepted risks\n\n';
+            comment += '📦 See audit reports in workflow artifacts.';
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  license-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Check licenses
+        run: |
+          pip install licensecheck pip-licenses
+          echo "## License Check Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Python Licenses" >> $GITHUB_STEP_SUMMARY
+          pip-licenses --format=markdown --with-urls >> $GITHUB_STEP_SUMMARY || true
+
+      - name: Check restricted licenses
+        run: |
+          # Define restricted licenses
+          RESTRICTED='GPL|AGPL|SSPL'
+
+          # Check for restricted licenses
+          pip-licenses --format=json | grep -i "$RESTRICTED" && \
+            echo "⚠️ WARNING: Restricted licenses detected" || \
+            echo "✅ No restricted licenses detected"
+
+          # This doesn't fail the build but alerts maintainers

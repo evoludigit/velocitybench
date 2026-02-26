@@ -1,0 +1,28 @@
+id: monolith-best-practices
+name: Monolith Best Practices
+category: comprehensive
+type: standard
+tags:
+- monolith
+summary:
+  short: Monolith Best Practices and implementation guidelines
+  long: Complete guide to monolith best practices
+problem:
+  description: Challenges without proper monolith best practices
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement monolith best practices
+key_concepts:
+  concept: Monolith Best Practices
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

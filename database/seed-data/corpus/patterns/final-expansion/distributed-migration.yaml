@@ -1,0 +1,28 @@
+id: distributed-migration
+name: Distributed Migration
+category: comprehensive
+type: standard
+tags:
+- distributed
+summary:
+  short: Distributed Migration and implementation guidelines
+  long: Complete guide to distributed migration
+problem:
+  description: Challenges without proper distributed migration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement distributed migration
+key_concepts:
+  concept: Distributed Migration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

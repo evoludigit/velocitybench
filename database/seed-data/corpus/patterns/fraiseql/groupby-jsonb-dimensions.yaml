@@ -1,0 +1,319 @@
+# GROUP BY with JSONB Dimensions (FraiseQL)
+# VelocityBench Knowledge Corpus
+
+id: groupby-jsonb-dimensions
+name: "GROUP BY with JSONB Dimensions"
+category: fraiseql
+type: pattern
+severity: medium
+tags:
+  - fraiseql
+  - analytics
+  - group-by
+  - jsonb
+  - postgresql
+  - performance
+
+summary:
+  short: "Group analytical data by flexible JSONB dimensions"
+  long: |
+    FraiseQL extracts dimensions from JSONB columns (data->>'field') for GROUP BY operations,
+    enabling flexible grouping without schema changes. Supports single and multiple dimensions,
+    nested paths, and benefits from GIN indexes. Performance: 1-3ms for 1M rows with proper indexing.
+
+problem:
+  description: |
+    Traditional SQL grouping requires predefined columns:
+    - Adding new dimensions requires ALTER TABLE (schema migration)
+    - Multi-tenant systems need separate columns for each tenant's dimensions
+    - Flexible analytics require dynamic pivoting on arbitrary attributes
+    - JSONB storage is flexible but slow without proper indexing
+
+    FraiseQL solves this by extracting JSONB paths for GROUP BY with GIN index optimization.
+
+  symptoms:
+    - name: "Rigid schema for analytics"
+      description: "Need ALTER TABLE to add new grouping dimensions"
+      detection: "Frequent schema migrations for new analytical attributes"
+
+    - name: "Slow JSONB grouping"
+      description: "GROUP BY on JSONB takes 100ms+ without indexes"
+      detection: "High query latency for dimensional analytics"
+
+    - name: "Complex ETL for new dimensions"
+      description: "Adding dimension requires column, index, data backfill"
+      detection: "Multi-day ETL for schema changes"
+
+solution:
+  principle: "Extract JSONB dimensions with GIN-indexed paths for flexible, fast grouping"
+
+  components:
+    - name: "JSONB Extraction"
+      type: "SQL operator"
+      purpose: "data->>'field' extracts text value from JSONB"
+
+    - name: "GIN Index"
+      type: "Index type"
+      purpose: "Speeds up JSONB path extraction from 100ms+ to 1-3ms"
+
+    - name: "Nested Paths"
+      type: "JSONB navigation"
+      purpose: "data->'parent'->>'child' for nested dimension hierarchies"
+
+    - name: "Multiple Dimensions"
+      type: "GROUP BY clause"
+      purpose: "Group by multiple JSONB fields simultaneously"
+
+implementation:
+  single_dimension:
+    graphql: |
+      query {
+        sales_aggregate(groupBy: { category: true }) {
+          category
+          revenue_sum
+          count
+        }
+      }
+
+    postgresql: |
+      SELECT
+          data->>'category' AS category,
+          SUM(revenue) AS revenue_sum,
+          COUNT(*) AS count
+      FROM tf_sales
+      GROUP BY data->>'category'
+      ORDER BY revenue_sum DESC;
+
+    performance: "~1-2ms for 1M rows (with GIN index)"
+
+  multiple_dimensions:
+    graphql: |
+      query {
+        sales_aggregate(
+          groupBy: {
+            category: true,
+            region: true,
+            channel: true
+          }
+        ) {
+          category
+          region
+          channel
+          revenue_sum
+          quantity_sum
+          count
+        }
+      }
+
+    postgresql: |
+      SELECT
+          data->>'category' AS category,
+          data->>'region' AS region,
+          data->>'channel' AS channel,
+          SUM(revenue) AS revenue_sum,
+          SUM(quantity) AS quantity_sum,
+          COUNT(*) AS count
+      FROM tf_sales
+      GROUP BY
+          data->>'category',
+          data->>'region',
+          data->>'channel'
+      ORDER BY revenue_sum DESC;
+
+    performance: "~2-3ms for 1M rows"
+
+  nested_dimensions:
+    graphql: |
+      query {
+        events_aggregate(
+          groupBy: {
+            client_type: true,
+            client_version: true
+          }
+        ) {
+          client_type
+          client_version
+          count
+          error_rate: error_count_sum
+        }
+      }
+
+    postgresql: |
+      -- JSONB structure: { "client": { "type": "mobile", "version": "1.2.3" } }
+      SELECT
+          data->'client'->>'type' AS client_type,
+          data->'client'->>'version' AS client_version,
+          COUNT(*) AS count,
+          SUM(error_count) AS error_rate
+      FROM tf_events
+      GROUP BY
+          data->'client'->>'type',
+          data->'client'->>'version'
+      ORDER BY count DESC;
+
+    performance: "~2-4ms for 1M rows (GIN index supports nested paths)"
+
+  combined_sql_and_jsonb:
+    graphql: |
+      query {
+        sales_aggregate(
+          groupBy: {
+            occurred_at_day: true,  # SQL column with DATE_TRUNC
+            category: true           # JSONB dimension
+          }
+        ) {
+          occurred_at_day
+          category
+          revenue_sum
+          count
+        }
+      }
+
+    postgresql: |
+      SELECT
+          DATE_TRUNC('day', occurred_at) AS occurred_at_day,
+          data->>'category' AS category,
+          SUM(revenue) AS revenue_sum,
+          COUNT(*) AS count
+      FROM tf_sales
+      GROUP BY
+          DATE_TRUNC('day', occurred_at),
+          data->>'category'
+      ORDER BY occurred_at_day, revenue_sum DESC;
+
+    performance: "~5-10ms for 1M rows (uses index on occurred_at + GIN on data)"
+
+indexing_strategy:
+  gin_index:
+    description: "Generalized Inverted Index for JSONB columns"
+    creation: |
+      CREATE INDEX idx_sales_data_gin ON tf_sales USING GIN(data);
+
+    benefits:
+      - "Speeds up data->>'field' extraction"
+      - "Supports nested path queries (data->'parent'->>'child')"
+      - "Works with WHERE and GROUP BY on JSONB"
+      - "~10-100x faster than full table scan"
+
+    limitations:
+      - "Larger index size (~30-50% of table size)"
+      - "Slower INSERT/UPDATE due to index maintenance"
+      - "PostgreSQL-specific (MySQL uses JSON indexes differently)"
+
+  composite_index:
+    description: "B-tree index combining SQL column + JSONB extraction"
+    creation: |
+      CREATE INDEX idx_sales_customer_category
+          ON tf_sales(customer_id, (data->>'category'));
+
+    benefits:
+      - "Fast filtering + grouping (WHERE customer_id = X GROUP BY category)"
+      - "Smaller than GIN index"
+      - "Faster writes than GIN"
+
+    use_case: "Specific query patterns known in advance"
+
+database_specific_syntax:
+  postgresql:
+    text_extraction: "data->>'field'"
+    json_extraction: "data->'field' (returns JSONB)"
+    nested_text: "data->'parent'->>'child'"
+    index_type: "GIN"
+
+  mysql:
+    text_extraction: "JSON_UNQUOTE(JSON_EXTRACT(data, '$.field'))"
+    json_extraction: "JSON_EXTRACT(data, '$.field')"
+    nested_text: "JSON_UNQUOTE(JSON_EXTRACT(data, '$.parent.child'))"
+    index_type: "VIRTUAL COLUMN + B-tree index"
+
+  sqlite:
+    text_extraction: "json_extract(data, '$.field')"
+    json_extraction: "json_extract(data, '$.field')"
+    nested_text: "json_extract(data, '$.parent.child')"
+    index_type: "No native JSON indexes"
+
+best_practices:
+  - name: "Always create GIN index on data column"
+    description: "CREATE INDEX ... USING GIN(data) for PostgreSQL JSONB grouping"
+    rationale: "10-100x performance improvement for GROUP BY on JSONB"
+
+  - name: "Denormalize frequently-grouped dimensions"
+    description: "Move high-cardinality dimensions to SQL columns if queried often"
+    rationale: "SQL columns group faster than JSONB (but lose flexibility)"
+
+  - name: "Use nested paths sparingly"
+    description: "Deep nesting (data->'a'->'b'->'c'->>'d') is harder to optimize"
+    rationale: "GIN indexes work best with shallow paths"
+
+  - name: "Validate JSONB structure at ETL time"
+    description: "Ensure all records have expected dimension keys"
+    rationale: "Missing keys return NULL in GROUP BY, creating unexpected groups"
+
+  - name: "Monitor GROUP BY cardinality"
+    description: "High cardinality (millions of groups) kills performance"
+    rationale: "Memory usage grows with distinct group count"
+
+anti_patterns:
+  - name: "No GIN index on JSONB"
+    consequence: "100ms+ GROUP BY queries on 1M rows"
+    example: "GROUP BY data->>'category' without CREATE INDEX ... USING GIN(data)"
+
+  - name: "Grouping by entire JSONB object"
+    consequence: "Every record becomes its own group (no aggregation)"
+    example: "GROUP BY data (should be GROUP BY data->>'specific_field')"
+
+  - name: "Deep nesting without structure"
+    consequence: "Unpredictable NULL values, slow extraction"
+    example: "data->'a'->'b'->'c'->'d'->>'e' with inconsistent structure"
+
+  - name: "High-cardinality JSONB dimensions"
+    consequence: "Millions of groups, OOM errors"
+    example: "GROUP BY data->>'user_id' with 10M unique users"
+
+use_cases:
+  - scenario: "E-commerce: Revenue by category and region"
+    dimensions: "category, region (both in JSONB)"
+    benefits: "Add new dimensions (channel, customer_segment) without schema change"
+
+  - scenario: "SaaS: API usage by endpoint and version"
+    dimensions: "endpoint, version, client_type (nested in JSONB)"
+    benefits: "Flexible grouping on arbitrary client attributes"
+
+  - scenario: "Time-series: Metrics by host and service"
+    dimensions: "host, service, environment (all JSONB)"
+    benefits: "Multi-tenant system with dynamic dimension attributes"
+
+related_patterns:
+  - id: "fact-dimension-pattern"
+    description: "Table structure with JSONB dimensions column"
+
+  - id: "aggregation-model"
+    description: "How FraiseQL compiles GROUP BY queries"
+
+  - id: "having-clause-filtering"
+    description: "Filtering grouped results after aggregation"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      GROUP BY with JSONB is like sorting receipts into folders:
+      - JSONB column = sticky notes on each receipt (category, region, etc.)
+      - GROUP BY = sort receipts into folders by category
+      - GIN index = pre-organized filing system (find folders fast!)
+      - Multiple dimensions = sort by category, then by region within each category
+
+  intermediate:
+    focus: "Performance optimization with GIN indexes"
+    key_points:
+      - "JSONB extraction: data->>'field' for text, data->'field' for JSON"
+      - "GIN index speeds up GROUP BY from 100ms to 1-3ms"
+      - "Multiple dimensions: GROUP BY field1, field2, field3"
+      - "Nested paths: data->'parent'->>'child' for hierarchies"
+
+  advanced:
+    focus: "Database-specific optimizations and edge cases"
+    key_points:
+      - "PostgreSQL GIN vs MySQL virtual columns"
+      - "Composite indexes combining SQL + JSONB extraction"
+      - "High-cardinality grouping and memory management"
+      - "When to move dimensions from JSONB to SQL columns"

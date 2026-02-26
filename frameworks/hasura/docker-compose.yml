@@ -1,0 +1,41 @@
+version: '3.8'
+
+# Standalone Hasura configuration for development and testing
+# For benchmark runs, use the main docker-compose.yml with --profile hasura
+
+services:
+  hasura:
+    image: hasura/graphql-engine:v2.36.0
+    ports:
+      - "4000:8080"  # Map Hasura's 8080 to standardized GraphQL port 4000
+    environment:
+      # Database connection - connects to external PostgreSQL
+      HASURA_GRAPHQL_DATABASE_URL: ${DATABASE_URL:-postgresql://velocitybench:password@host.docker.internal:5432/velocitybench_test}
+      # Console and development settings
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
+      HASURA_GRAPHQL_DEV_MODE: "true"
+      # Admin secret for protected operations
+      HASURA_GRAPHQL_ADMIN_SECRET: ${HASURA_ADMIN_SECRET:-benchmark-admin}
+      # Metadata configuration
+      HASURA_GRAPHQL_METADATA_DIR: /hasura-metadata
+      # Performance settings
+      HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
+      # CORS
+      HASURA_GRAPHQL_CORS_DOMAIN: "*"
+      # Unauthorized role for public access
+      HASURA_GRAPHQL_UNAUTHORIZED_ROLE: public
+    volumes:
+      - ./metadata:/hasura-metadata
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+networks:
+  default:
+    name: velocitybench-network
+    external: true

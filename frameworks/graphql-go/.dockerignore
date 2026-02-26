@@ -1,0 +1,23 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test files
+*_test.go
+test_helpers.go
+
+# Build artifacts
+server
+*.exe
+
+# Misc
+*.md
+*.log
+.env*
+database/

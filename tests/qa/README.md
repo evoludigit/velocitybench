@@ -23,7 +23,7 @@ pip install -r requirements.txt
 python -m tests.qa.framework_validator
 
 # View results
-cat .phases/qa-framework-verification/VERIFICATION_RESULTS.md
+cat reports/qa-verification-YYYY-MM-DD.md
 ```
 
 ## Architecture
@@ -219,7 +219,7 @@ baseline_framework: fraiseql  # Used for data consistency comparison
 
 ### Markdown Report
 
-Human-readable report: `.phases/qa-framework-verification/VERIFICATION_RESULTS.md`
+Human-readable report: `reports/qa-verification-YYYY-MM-DD.md`
 
 ```markdown
 # Framework Validation Report
@@ -252,7 +252,7 @@ Human-readable report: `.phases/qa-framework-verification/VERIFICATION_RESULTS.m
 
 ### JSON Report
 
-Machine-readable report: `.phases/qa-framework-verification/verification_results.json`
+Machine-readable report: `reports/qa-verification-YYYY-MM-DD.json`
 
 ```json
 {
@@ -309,7 +309,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: validation-results
-          path: .phases/qa-framework-verification/
+          path: reports/qa-verification-*.json
 ```
 
 ## Development Workflow

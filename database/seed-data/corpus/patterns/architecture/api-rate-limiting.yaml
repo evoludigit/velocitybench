@@ -1,0 +1,265 @@
+id: api-rate-limiting
+name: "API Rate Limiting & Throttling"
+category: architecture
+type: standard
+tags:
+  - api
+  - performance
+  - security
+  - distributed-systems
+
+summary:
+  short: "Controlling request flow to protect APIs from overload and abuse"
+  long: |
+    Rate limiting controls the number of requests clients can make to an API within a specified time window. Throttling gracefully degrades service by delaying or rejuing requests. These patterns are essential for protecting APIs from abuse, managing load, and ensuring fair resource allocation across clients.
+
+problem:
+  description: "APIs face unlimited requests from clients (intentionally malicious or unintentionally due to bugs), causing resource exhaustion and poor service for legitimate users"
+  symptoms:
+    - "Sudden traffic spike overwhelms servers, causing cascading failures"
+    - "Single misbehaving client consumes all available resources"
+    - "No way to differentiate legitimate from abusive traffic"
+    - "Cost unpredictability in pay-per-request models"
+  impact: "Service degradation, increased infrastructure costs, unfair resource allocation, vulnerability to DDoS"
+
+solution:
+  description: "Implement request rate limiting using proven algorithms and strategies"
+  principles:
+    - "Define clear rate limits per client, user, or API endpoint"
+    - "Use appropriate algorithm (token bucket, sliding window, fixed window)"
+    - "Provide graceful degradation with clear feedback to clients"
+    - "Track and enforce limits consistently across distributed systems"
+
+algorithms:
+  token_bucket:
+    description: "Requests consume tokens; bucket refills at fixed rate"
+    pros:
+      - "Allows burst traffic (credits accumulate)"
+      - "Smooth, predictable rate limiting"
+      - "Industry standard, well-understood"
+    cons:
+      - "More complex to implement"
+      - "Requires tracking bucket state per client"
+    example: |
+      # Token bucket: 100 req/min (1.67 per second)
+      - Bucket capacity: 100 tokens
+      - Refill rate: 1 token per 600ms
+      - Client receives request: consumes 1 token
+      - If tokens available: request proceeds
+      - If no tokens: request queued or rejected
+
+  sliding_window:
+    description: "Count requests in rolling time window; reject if limit exceeded"
+    pros:
+      - "Precise counting; no burst allowance"
+      - "Simple conceptually"
+    cons:
+      - "More memory per client (track timestamp of each request)"
+      - "Computationally expensive for high rates"
+    example: |
+      # Sliding window: 100 req/min
+      - Maintain list of request timestamps for each client
+      - For new request: remove timestamps older than 1 minute
+      - Count remaining timestamps
+      - If count >= 100: reject; else accept
+
+  fixed_window:
+    description: "Reset counter at fixed intervals (simple but less accurate)"
+    pros:
+      - "Extremely simple implementation"
+      - "Low memory and CPU"
+    cons:
+      - "Cliff effect: burst possible at window boundaries"
+      - "Less precise; can allow 2x limit in edge cases"
+    example: |
+      # Fixed window: 100 req/min
+      - Reset counter every 60 seconds
+      - Increment counter on each request
+      - If counter > 100: reject
+
+strategies:
+  per_user:
+    description: "Rate limit per authenticated user (fair share allocation)"
+    use_case: "SaaS platforms, internal APIs"
+    example: "Premium tier: 1000 req/min, Standard: 100 req/min"
+
+  per_ip:
+    description: "Rate limit per IP address (protects against DDoS)"
+    use_case: "Public APIs without authentication"
+    example: "Max 100 requests/min per IP"
+
+  per_endpoint:
+    description: "Different limits for different endpoints based on cost"
+    use_case: "Expensive operations need stricter limits"
+    example: |
+      - GET /users: 1000 req/min (read-heavy, cheap)
+      - POST /process: 10 req/min (compute-heavy, expensive)
+
+  global:
+    description: "Total requests to API across all clients"
+    use_case: "Protect shared infrastructure"
+    example: "API can handle max 10,000 req/sec total"
+
+  distributed:
+    description: "Rate limiting across multiple servers/regions"
+    challenge: "Must coordinate state across distributed nodes"
+    solutions:
+      - "Centralized counter (Redis, memcached)"
+      - "Distributed algorithms (gossip protocol)"
+      - "Cell-level quotas with eventual consistency"
+
+responses:
+  - name: "429 Too Many Requests (standard)"
+    description: "Client exceeded limit; should back off and retry"
+    headers:
+      - "Retry-After: 60 (seconds to wait)"
+      - "RateLimit-Limit: 1000 (total limit)"
+      - "RateLimit-Remaining: 5 (requests left in window)"
+      - "RateLimit-Reset: 1234567890 (Unix timestamp when limit resets)"
+
+  - name: "Graceful degradation"
+    description: "Instead of rejecting, queue request or return cached response"
+    tradeoff: "Delays request vs losing it; better user experience but masks overload"
+
+  - name: "503 Service Unavailable"
+    description: "Server at capacity; client should retry later"
+    use_case: "When graceful degradation insufficient"
+
+implementation:
+  redis_example: |
+    # Using Redis sliding window
+    FUNCTION rate_limit_check(user_id, limit, window_secs):
+      key = f"rate_limit:{user_id}"
+      current_time = NOW()
+      window_start = current_time - window_secs
+
+      # Remove old entries
+      ZREMRANGEBYSCORE key -inf window_start
+
+      # Count requests in window
+      count = ZCARD key
+
+      if count >= limit:
+        return REJECT
+
+      # Add current request
+      ZADD key current_time 1
+
+      return ALLOW
+
+  kubernetes_example: |
+    # Using Istio for distributed rate limiting
+    apiVersion: config.istio.io/v1alpha2
+    kind: quota
+    metadata:
+      name: requestcount
+    spec:
+      dimensions:
+        - source
+        - destination
+        - method
+
+    ---
+    apiVersion: config.istio.io/v1alpha2
+    kind: rule
+    metadata:
+      name: rate-limit-rule
+    spec:
+      quota:
+        - quota: requestcount
+          dimensions: ["source"]
+          limit: "100-per-minute"
+
+best_practices:
+  - name: "Use token bucket for user-facing APIs"
+    description: "Allows burst traffic while maintaining fair limits"
+
+  - name: "Provide RateLimit headers in responses"
+    description: "Clients can see remaining quota and plan requests"
+
+  - name: "Implement exponential backoff in clients"
+    description: "Respect Retry-After header; back off when rate limited"
+
+  - name: "Log rate limit events"
+    description: "Track who's hitting limits; identify abuse patterns"
+
+  - name: "Use tiered limits based on client tier"
+    description: "Premium users get higher limits; aligns with business model"
+
+  - name: "Monitor rate limit effectiveness"
+    description: "Track % requests rejected, fairness metrics"
+
+anti_patterns:
+  - name: "Static limits ignoring server capacity"
+    description: "Set limits without understanding actual throughput"
+    consequence: "Either limits too high (overload) or too low (underutilize)"
+
+  - name: "No distributed rate limiting"
+    description: "Limiting per-server means N servers = N * limit"
+    consequence: "Limits ineffective in distributed systems"
+
+  - name: "Immediate rejection without warning"
+    description: "No gradual degradation; clients hit wall suddenly"
+    consequence: "Poor user experience; no chance to backoff gracefully"
+
+  - name: "Forgetting burst scenarios"
+    description: "Not allowing token accumulation in token bucket"
+    consequence: "Legitimate burst traffic (webhook deliveries, batch jobs) rejected"
+
+trade_offs:
+  accuracy_vs_complexity:
+    - "Fixed window: simplest, least accurate"
+    - "Token bucket: balanced, industry standard"
+    - "Sliding window: most accurate, most complex"
+
+  centralized_vs_distributed:
+    - "Centralized (Redis): accurate, single point of failure"
+    - "Distributed: resilient, eventually consistent"
+
+  strict_vs_graceful:
+    - "Strict (reject): simple, predictable"
+    - "Graceful (queue/cache): better UX, masks overload"
+
+comparison:
+  authentication_vs_rate_limiting:
+    authentication: "WHO are you? (identity)"
+    rate_limiting: "How much can you do? (capacity)"
+    both_needed: "Authentication determines tier; rate limiting enforces tier"
+
+  api_gateway_vs_application:
+    api_gateway: "Coarse-grained, cross-service limits (10K req/sec total)"
+    application: "Fine-grained, per-endpoint limits (100 req/min for expensive endpoint)"
+    strategy: "Use both; defense in depth"
+
+monitoring:
+  - "% requests rate-limited per user tier"
+  - "P50/P95/P99 latency for rate-limited requests"
+  - "Tokens remaining distribution (are clients getting surprised?)"
+  - "Abuse detection: IPs/users hitting limits frequently"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Rate limiting is like a theater with limited seats:
+      - Theater capacity: 1000 people (global rate limit)
+      - Per-performance: 100 tickets (time-window limit)
+      - Token bucket: Can save unused tickets for next show (burst allowance)
+      - Fixed window: Tickets reset every hour, no rollover (cliff effect)
+
+      Without limits, everyone rushes in and nobody enjoys the show.
+
+  intermediate:
+    focus: "Distributed rate limiting challenges"
+    key_points:
+      - "Token bucket algorithm and implementation"
+      - "Redis vs memory-based rate limiting"
+      - "Designing rate limit headers for API contracts"
+      - "Coordinating limits across service boundaries"
+
+  advanced:
+    focus: "Large-scale rate limiting"
+    key_points:
+      - "Distributed rate limiting (eventual consistency tradeoffs)"
+      - "Quota management at global scale"
+      - "Fair allocation algorithms (max-min fairness)"
+      - "Integrating with traffic management (circuit breaker, load balancing)"

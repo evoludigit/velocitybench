@@ -1,0 +1,301 @@
+id: fraiseql-federation-subgraphs
+name: "FraiseQL Apollo Federation v2 Subgraphs"
+category: fraiseql
+type: standard
+tags:
+  - fraiseql
+  - federation
+  - apollo-federation
+  - subgraphs
+  - entity-references
+
+summary:
+  short: "Defining authoritative subgraph types with @key decorators for Apollo Federation"
+  long: |
+    Apollo Federation v2 enables composing multiple GraphQL services into a federated graph.
+    FraiseQL supports federation with @key decorators for defining entity types that can be
+    referenced across subgraphs. Each subgraph is authoritative for certain entities and can
+    extend entities defined in other subgraphs. Understanding federation keys and entity
+    resolution is critical for distributed GraphQL architectures.
+
+problem:
+  description: |
+    Monolithic GraphQL servers don't scale to large organizations:
+    - Teams need independent services (users, orders, products, etc.)
+    - Services need to share domain entities (User in multiple services)
+    - Coordinating schema changes across teams is difficult
+    - No clear ownership boundaries
+
+    Federation solves this by allowing each team to own their schema while composing
+    into a single global graph.
+
+  symptoms:
+    - name: "Single point of failure"
+      description: "One service down = entire GraphQL API unavailable"
+      detection: "Service availability tied to monolithic server"
+
+    - name: "Coordination overhead"
+      description: "All teams must coordinate on schema changes"
+      detection: "Slow schema evolution, blocked by other teams"
+
+    - name: "Unclear ownership"
+      description: "User type defined in 3 services differently"
+      detection: "Type conflicts, confusing schema"
+
+  impact: |
+    Poor scalability, slow feature development, coordination overhead, version skew
+
+solution:
+  principle: "Define authoritative entity types per service with federation keys"
+
+  components:
+    - name: "@key Decorator"
+      type: "Federation marker"
+      purpose: "Define entity reference key for federation"
+      pattern: |
+        @fraiseql.type
+        @key("id")  # Entity key for federation lookup
+        class User:
+            id: str
+            email: str
+            name: str
+
+      semantics: |
+        - @key("id"): Users can be referenced by id across services
+        - Enables: reference User in Orders service by passing id
+        - GraphQL: Generates _Entity query support
+
+    - name: "Single Service Definition"
+      type: "Architecture pattern"
+      purpose: "Own entity definition in one authoritative service"
+      pattern: |
+        **Users Service** (authoritative):
+        - Defines User type with all user data
+        - Owns User.id and other fields
+        - Provides User entity resolution
+
+        **Orders Service**:
+        - Extends User with orders relationship
+        - References User by id (external)
+        - Cannot modify User fields
+
+      benefit: |
+        - Clear ownership (Users service owns User)
+        - Single source of truth
+        - Other services extend without conflict
+
+    - name: "Composite Federation Keys"
+      type: "Advanced pattern"
+      purpose: "Multi-field keys for complex entities"
+      pattern: |
+        @fraiseql.type
+        @key("tenant_id")
+        @key("id")  # Composite key: (tenant_id, id)
+        class Account:
+            tenant_id: str
+            id: str
+            name: str
+
+      use_case: |
+        - Multi-tenant systems
+        - Scoped entities (Account scoped by tenant)
+        - Natural composite keys
+
+    - name: "Entity Resolution"
+      type: "Federation mechanism"
+      purpose: "Resolve entities referenced from other services"
+      pattern: |
+        When Orders service asks for User(id: "123"):
+        1. Apollo Gateway receives request
+        2. Queries Users service __resolveReference with id
+        3. Users service returns User { id, email, name }
+        4. Apollo Gateway returns to Orders service
+
+    - name: "Service Configuration"
+      type: "Setup pattern"
+      purpose: "Configure FraiseQL for federation"
+      config: |
+        # Users Service
+        fraiseql_config = FraiseQLConfig(
+            federation_enabled=True,
+            federation_service_name="users",
+            federation_sdl_endpoint="/graphql/.well-known/apollo/server-health",
+            ...
+        )
+
+    - name: "Subgraph Schema Publishing"
+      type: "Deployment pattern"
+      purpose: "Publish schema to Apollo registry"
+      pattern: |
+        1. Define types with @key decorators
+        2. FraiseQL generates federation SDL
+        3. CLI publishes to Apollo registry:
+           fraiseql publish --graph=graph-name --variant=prod
+        4. Apollo Composition validates against other subgraphs
+        5. Updates supergraph
+
+key_concepts:
+  concept_1: "@key defines entity reference keys for federation"
+  concept_2: "Each service is authoritative for certain types"
+  concept_3: "Services extend types to add domain-specific relationships"
+  concept_4: "Entity resolution via __resolveReference"
+  concept_5: "Composite keys for multi-field federation"
+  concept_6: "Federation SDL generated from @key decorators"
+  concept_7: "Apollo registry validates subgraph compatibility"
+  concept_8: "Supergraph composes all subgraphs into single graph"
+
+best_practices:
+  - name: "One service owns each entity type"
+    description: "Define User in Users service only"
+
+  - name: "Use natural keys for federation"
+    description: "User.id, Order.id, Product.id (not internal PKs)"
+
+  - name: "Keep keys immutable"
+    description: "Never change @key fields (breaks federation)"
+
+  - name: "Name federation keys consistently"
+    description: "Use 'id' across services for easy composition"
+
+  - name: "Publish schema to Apollo Registry"
+    description: "Validates composition, prevents breaking changes"
+
+  - name: "Test entity resolution"
+    description: "Verify __resolveReference works correctly"
+
+  - name: "Document service boundaries"
+    description: "Clear which service owns which types"
+
+anti_patterns:
+  - name: "Defining same type in multiple services"
+    description: "User defined in Users AND Orders services"
+    consequence: "Type conflicts, composition fails"
+    fix: "Define once in authoritative service, extend in others"
+
+  - name: "No @key decorator"
+    description: "Type defined but not federatable"
+    consequence: "Other services can't reference type"
+    fix: "Add @key decorator with identifying field"
+
+  - name: "Changing @key field"
+    description: "Change User.id to User.email after deploying"
+    consequence: "Breaks references from other services"
+    fix: "Keys are immutable contracts"
+
+  - name: "Multiple @key decorators same fields"
+    description: "Multiple @key('id')"
+    consequence: "Composition validation fails"
+    fix: "Use single @key or composite @key('a') @key('b')"
+
+examples:
+  example_1:
+    title: "Users Service (Authoritative)"
+    description: "Define User type with federation key"
+    code: |
+      @fraiseql.type
+      @key("id")
+      class User:
+          id: str              # Federation key
+          email: str
+          name: str
+          created_at: str
+
+      # FraiseQL generates SDL:
+      # type User @key(fields: "id") {
+      #   id: String!
+      #   email: String!
+      #   name: String!
+      #   createdAt: String!
+      # }
+
+  example_2:
+    title: "Orders Service (Extends User)"
+    description: "Reference User from Orders service"
+    code: |
+      from fraiseql.federation import extends, external, key
+
+      @fraiseql.type
+      @extends
+      @key("id")
+      class User:
+          id: str = external()    # Reference from Users service
+          orders: list[Order]     # New relationship in Orders
+
+      @fraiseql.type
+      @key("id")
+      class Order:
+          id: str
+          user_id: str             # Reference to User.id
+          total: float
+          created_at: str
+
+  example_3:
+    title: "Multi-Tenant Composite Key"
+    description: "Account scoped by tenant and id"
+    code: |
+      @fraiseql.type
+      @key("tenant_id")
+      @key("id")
+      class Account:
+          tenant_id: str      # Tenant scope
+          id: str             # Entity ID
+          name: str
+          created_at: str
+
+      # FraiseQL generates SDL:
+      # type Account @key(fields: "tenantId id") {
+      #   tenantId: String!
+      #   id: String!
+      #   name: String!
+      #   createdAt: String!
+      # }
+
+comparison_matrix:
+  aspect:
+    monolithic: "Single GraphQL server"
+    federated: "Multiple subgraph services"
+
+  ownership:
+    monolithic: "Shared (team conflicts)"
+    federated: "Clear per-service"
+
+  scaling:
+    monolithic: "Vertical (bigger server)"
+    federated: "Horizontal (more services)"
+
+  deployment:
+    monolithic: "All changes together"
+    federated: "Independent per service"
+
+  schema_evolution:
+    monolithic: "Coordinated across teams"
+    federated: "Independent service ownership"
+
+  entity_sharing:
+    monolithic: "Type definitions duplicated"
+    federated: "Single authoritative definition"
+
+blog_hooks:
+  beginner:
+    focus: "Understanding federation basics"
+    key_points:
+      - "@key defines how to reference type across services"
+      - "Each service owns certain entity types"
+      - "Services extend types from other services"
+      - "Apollo Gateway composes into single graph"
+
+  intermediate:
+    focus: "Designing federated schemas"
+    key_points:
+      - "Authoritative service owns entity type"
+      - "Other services extend with relationships"
+      - "Composite keys for multi-tenant or scoped entities"
+      - "Entity resolution via __resolveReference"
+
+  advanced:
+    focus: "Federation composition and validation"
+    key_points:
+      - "Apollo composition validates schema compatibility"
+      - "Federation SDL generation from decorators"
+      - "Schema registry and CI/CD integration"
+      - "Error handling and field resolution"

@@ -1,0 +1,58 @@
+id: primary-key-strategy
+name: Primary Key Strategy (pk_*)
+category: fraiseql
+type: standard
+tags:
+- database
+- naming
+- primary-keys
+- performance
+- identifiers
+summary:
+  short: Surrogate INTEGER primary keys (pk_*) for optimal performance
+  long: FraiseQL uses SERIAL INTEGER primary keys with pk_* prefix as internal surrogate
+    keys for optimal B-tree performance, while exposing UUID id fields externally
+    and human-readable identifiers for URLs (Trinity Pattern).
+problem:
+  description: UUID primary keys cause index bloat and slow JOINs
+  symptoms:
+  - Large index sizes (16 bytes vs 4 bytes)
+  - Slow JOIN operations
+  - Random UUID insertions fragment B-tree
+  - Poor database cache utilization
+  impact: Significant performance degradation at scale
+solution:
+  description: Implement Primary Key Strategy effectively
+key_concepts:
+  concept_1: pk_* prefix for all primary keys
+  concept_2: SERIAL INTEGER (4 bytes) for compactness
+  concept_3: Sequential insertion for optimal B-tree
+  concept_4: Never expose pk_* in API
+implementation_considerations:
+  consideration_1: Sequence exhaustion (use BIGSERIAL if needed)
+  consideration_2: Multi-tenant pk_* uniqueness
+  consideration_3: Replication and sequence conflicts
+  consideration_4: Migration from UUID PKs
+best_practices:
+- name: Use pk_ prefix
+  description: All primary keys named pk_entity
+- name: SERIAL type
+  description: Use SERIAL or BIGSERIAL for auto-increment
+- name: Hide from API
+  description: Never expose pk_* in GraphQL schema
+- name: INDEX optimization
+  description: Leverage sequential pk_* for range queries
+anti_patterns:
+- name: UUID primary keys
+  consequence: Poor JOIN and index performance
+- name: Exposing pk_*
+  consequence: Business information leakage
+- name: Natural keys
+  consequence: Complex updates when keys change
+blog_hooks:
+  beginner:
+    focus: Introduction to Primary Key Strategy
+  intermediate:
+    focus: Implementing pk_* pattern with Trinity identifiers
+  advanced:
+    focus: Performance optimization and migration strategies

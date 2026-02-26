@@ -1,0 +1,28 @@
+id: rest-observability
+name: Rest Observability
+category: comprehensive
+type: standard
+tags:
+- rest
+summary:
+  short: Rest Observability and implementation guidelines
+  long: Complete guide to rest observability
+problem:
+  description: Challenges without proper rest observability
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement rest observability
+key_concepts:
+  concept: Rest Observability
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,49 @@
+id: deterministic-authorization-enforcement
+name: Deterministic Authorization Enforcement
+category: fraiseql
+type: standard
+tags:
+- execution
+- authorization
+- security
+- determinism
+summary:
+  short: Applying pre-compiled authorization rules consistently
+  long: Authorization is enforced by applying pre-compiled metadata rules, not runtime
+    resolver logic, ensuring consistent and auditable authorization decisions.
+problem:
+  description: Authorization enforcement varies or can be bypassed
+  symptoms:
+  - Inconsistent authorization across fields
+  - Authorization bypassed through alternate queries
+  - No audit trail of auth decisions
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Deterministic Authorization Enforcement effectively
+key_concepts:
+  concept_1: Rule metadata application
+  concept_2: Decision algorithms
+  concept_3: Authorization context
+implementation_considerations:
+  consideration_1: Rule composition
+  consideration_2: Context availability
+  consideration_3: Performance of enforcement
+best_practices:
+- name: Use compiled rules
+  description: Apply pre-compiled auth metadata
+- name: Consistent enforcement
+  description: Same rules everywhere
+- name: Audit decisions
+  description: Log authorization decisions
+anti_patterns:
+- name: Runtime auth checks
+  consequence: Can be bypassed or inconsistent
+- name: Ad-hoc rules
+  consequence: Difficult to reason about
+blog_hooks:
+  beginner:
+    focus: Introduction to Deterministic Authorization Enforcement
+  intermediate:
+    focus: Implementing Deterministic Authorization Enforcement
+  advanced:
+    focus: Advanced Deterministic Authorization Enforcement techniques

@@ -1,0 +1,28 @@
+id: mobile-native-bridge-communication
+name: Native Bridge Communication Patterns
+category: specialized
+type: standard
+tags:
+- mobile
+summary:
+  short: Patterns and practices for native bridge communication patterns
+  long: Comprehensive guide to native bridge communication patterns
+problem:
+  description: Challenges with native bridge communication patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement native bridge communication patterns
+key_concepts:
+  concept: Understanding Native Bridge Communication Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Native Bridge Communication Patterns
+  intermediate:
+    focus: Implementing Native Bridge Communication Patterns
+  advanced:
+    focus: Advanced Native Bridge Communication Patterns

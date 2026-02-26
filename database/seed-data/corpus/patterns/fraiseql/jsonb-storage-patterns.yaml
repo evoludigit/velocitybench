@@ -1,0 +1,58 @@
+id: jsonb-storage-patterns
+name: JSONB Storage Patterns
+category: fraiseql
+type: standard
+tags:
+- database
+- jsonb
+- indexing
+- performance
+- flexibility
+summary:
+  short: When to use JSONB vs normalized columns with indexing strategies
+  long: FraiseQL leverages PostgreSQL JSONB for flexible semi-structured data with
+    specific patterns for when to use JSONB vs normalized columns, GIN/GiST indexing
+    strategies, and query performance trade-offs.
+problem:
+  description: Unclear when to use JSONB vs normalized columns
+  symptoms:
+  - Over-normalization creates too many tables
+  - JSONB used for everything causes slow queries
+  - No indexing on JSONB columns
+  - Can't query nested JSON efficiently
+  impact: Schema complexity and query performance issues
+solution:
+  description: Implement JSONB Storage Patterns effectively
+key_concepts:
+  concept_1: Use JSONB for semi-structured/variable schema
+  concept_2: Normalize for known/query-critical fields
+  concept_3: GIN indexes for JSONB containment queries
+  concept_4: GiST indexes for JSONB proximity queries
+implementation_considerations:
+  consideration_1: JSONB indexing overhead
+  consideration_2: Query performance vs flexibility
+  consideration_3: Schema evolution in JSONB
+  consideration_4: Partial index strategies
+best_practices:
+- name: Normalize key fields
+  description: Extract frequently-queried fields to columns
+- name: JSONB for metadata
+  description: Use JSONB for flexible metadata/attributes
+- name: GIN indexes
+  description: Create GIN indexes for containment queries
+- name: Validate JSONB
+  description: Use CHECK constraints for schema
+anti_patterns:
+- name: Everything in JSONB
+  consequence: Slow queries and no type safety
+- name: No indexing
+  consequence: Full table scans on JSONB queries
+- name: Deep nesting
+  consequence: Complex queries and poor performance
+blog_hooks:
+  beginner:
+    focus: Introduction to JSONB Storage Patterns
+  intermediate:
+    focus: Implementing JSONB with GIN/GiST indexes
+  advanced:
+    focus: Advanced JSONB query optimization and partial indexes

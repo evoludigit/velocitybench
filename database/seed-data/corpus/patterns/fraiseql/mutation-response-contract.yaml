@@ -1,0 +1,49 @@
+id: mutation-response-contract
+name: Mutation Response Contract
+category: fraiseql
+type: standard
+tags:
+- execution
+- mutations
+- contracts
+- response-design
+summary:
+  short: Structured response from stored procedures matching schema
+  long: Stored procedures return structured responses conforming to the mutation response
+    contract defined in the schema.
+problem:
+  description: Procedure responses don't match expected schema
+  symptoms:
+  - Response parsing fails
+  - Missing required fields
+  - Type mismatches in response
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Mutation Response Contract effectively
+key_concepts:
+  concept_1: Response structure
+  concept_2: Contract definition
+  concept_3: Response validation
+implementation_considerations:
+  consideration_1: Error responses
+  consideration_2: Partial success handling
+  consideration_3: Response size limits
+best_practices:
+- name: Define contract
+  description: Clearly specify response structure
+- name: Validate response
+  description: Check response matches contract
+- name: Test responses
+  description: Test all response scenarios
+anti_patterns:
+- name: Informal contract
+  consequence: Responses unpredictable
+- name: No validation
+  consequence: Invalid responses not caught
+blog_hooks:
+  beginner:
+    focus: Introduction to Mutation Response Contract
+  intermediate:
+    focus: Implementing Mutation Response Contract
+  advanced:
+    focus: Advanced Mutation Response Contract techniques

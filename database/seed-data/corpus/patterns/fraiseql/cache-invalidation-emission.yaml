@@ -1,0 +1,49 @@
+id: cache-invalidation-emission
+name: Cache Invalidation Emission
+category: fraiseql
+type: standard
+tags:
+- execution
+- caching
+- mutations
+- cache-invalidation
+summary:
+  short: Emitting cache invalidation events after mutations
+  long: After mutations complete, cache invalidation events are emitted indicating
+    what cached data is now stale.
+problem:
+  description: Cache never invalidated after mutations
+  symptoms:
+  - Stale data returned from cache
+  - Users see old data
+  - Manual cache clearing required
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Cache Invalidation Emission effectively
+key_concepts:
+  concept_1: Invalidation event types
+  concept_2: Entity dependency tracking
+  concept_3: Cascade invalidation
+implementation_considerations:
+  consideration_1: Invalidation timing
+  consideration_2: Partial invalidation
+  consideration_3: Cache warming strategies
+best_practices:
+- name: Track mutations
+  description: Know what was changed
+- name: Emit events
+  description: Send invalidation events
+- name: Handle cascades
+  description: Invalidate dependent data
+anti_patterns:
+- name: No invalidation
+  consequence: Stale cached data
+- name: Overly broad invalidation
+  consequence: Unnecessary cache misses
+blog_hooks:
+  beginner:
+    focus: Introduction to Cache Invalidation Emission
+  intermediate:
+    focus: Implementing Cache Invalidation Emission
+  advanced:
+    focus: Advanced Cache Invalidation Emission techniques

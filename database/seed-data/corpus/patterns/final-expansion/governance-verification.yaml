@@ -1,0 +1,28 @@
+id: governance-verification
+name: Governance Verification
+category: comprehensive
+type: standard
+tags:
+- governance
+summary:
+  short: Governance Verification and implementation guidelines
+  long: Complete guide to governance verification
+problem:
+  description: Challenges without proper governance verification
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement governance verification
+key_concepts:
+  concept: Governance Verification
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

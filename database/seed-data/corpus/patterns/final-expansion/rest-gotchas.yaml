@@ -1,0 +1,28 @@
+id: rest-gotchas
+name: Rest Gotchas
+category: comprehensive
+type: standard
+tags:
+- rest
+summary:
+  short: Rest Gotchas and implementation guidelines
+  long: Complete guide to rest gotchas
+problem:
+  description: Challenges without proper rest gotchas
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement rest gotchas
+key_concepts:
+  concept: Rest Gotchas
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

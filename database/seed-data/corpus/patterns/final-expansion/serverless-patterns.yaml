@@ -1,0 +1,28 @@
+id: serverless-patterns
+name: Serverless Patterns
+category: comprehensive
+type: standard
+tags:
+- serverless
+summary:
+  short: Serverless Patterns and implementation guidelines
+  long: Complete guide to serverless patterns
+problem:
+  description: Challenges without proper serverless patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement serverless patterns
+key_concepts:
+  concept: Serverless Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

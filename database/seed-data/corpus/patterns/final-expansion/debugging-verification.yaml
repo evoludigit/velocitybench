@@ -1,0 +1,28 @@
+id: debugging-verification
+name: Debugging Verification
+category: comprehensive
+type: standard
+tags:
+- debugging
+summary:
+  short: Debugging Verification and implementation guidelines
+  long: Complete guide to debugging verification
+problem:
+  description: Challenges without proper debugging verification
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement debugging verification
+key_concepts:
+  concept: Debugging Verification
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

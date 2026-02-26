@@ -1,0 +1,28 @@
+id: optimization-monitoring
+name: Optimization Monitoring
+category: comprehensive
+type: standard
+tags:
+- optimization
+summary:
+  short: Optimization Monitoring and implementation guidelines
+  long: Complete guide to optimization monitoring
+problem:
+  description: Challenges without proper optimization monitoring
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement optimization monitoring
+key_concepts:
+  concept: Optimization Monitoring
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

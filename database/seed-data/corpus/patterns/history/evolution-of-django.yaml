@@ -1,0 +1,151 @@
+id: evolution-of-django
+name: "Evolution of Django Web Framework"
+category: history
+type: timeline
+tags:
+  - django
+  - python
+  - web-frameworks
+  - history
+
+summary:
+  short: "From newspaper CMS to world's most mature web framework"
+  long: |
+    Django evolved from a newspaper content management system into the most stable, full-featured Python web framework. The journey reflects lessons learned in scaling web applications, the rise of REST APIs, and how modern frameworks balance rapid development with architectural flexibility.
+
+timeline:
+  - year: 2003
+    title: "Django Begins as Internal Project"
+    description: "World Online (Lawrence Journal-World) creates framework for news sites"
+    motivation: "Need for rapid web development with clean architecture"
+
+  - year: 2005
+    title: "Django Released as Open Source"
+    description: "Published on July 21 under BSD license"
+    founders: ["Adrian Holovaty", "Simon Willison"]
+    philosophy: "Batteries included; rapid development; DRY principle"
+
+  - year: 2005
+    title: "Django 0.91"
+    description: "Early version with basic ORM, admin panel, URL routing"
+    features: ["Admin interface", "ORM", "Middleware"]
+
+  - year: 2006
+    title: "Django 0.95"
+    description: "Approaches 1.0; stabilizes core functionality"
+    impact: "Used in production by news organizations"
+
+  - year: 2008
+    title: "Django 1.0 Released"
+    description: "Backwards compatibility promise begins"
+    significance: "Django becomes enterprise-grade framework"
+    commitment: "Promise of API stability for 2 years"
+
+  - year: 2010
+    title: "Class-Based Views"
+    description: "Introduction of CBV as alternative to function-based views"
+    flexibility: "Enables more advanced patterns"
+
+  - year: 2011
+    title: "Django 1.3: Staticfiles"
+    description: "Built-in static file handling and collection"
+    impact: "Deployment becomes simpler"
+
+  - year: 2012
+    title: "Django REST Framework Released"
+    description: "Excellent REST API framework built on top of Django"
+    game_changer: "Django becomes viable for API-driven applications"
+
+  - year: 2013
+    title: "Django 1.5: Customizable User Model"
+    description: "Finally allows extending the User model"
+    friction_point: "Resolved long-standing limitation"
+
+  - year: 2014
+    title: "Django 1.7: Migrations"
+    description: "Built-in database migrations system"
+    impact: "Eliminates dependency on South; migrations become standard"
+
+  - year: 2015
+    title: "Django 1.8: Long-Term Support"
+    description: "First LTS release with 3-year support"
+    stability: "Enterprise standardizes on LTS releases"
+
+  - year: 2016
+    title: "Django 1.10: Async Support Discussion"
+    description: "Community begins discussions about async"
+    challenge: "Django's synchronous foundation becomes limitation"
+
+  - year: 2019
+    title: "Django 3.0"
+    description: "Drops Python 2 support; requires Python 3.6+"
+    significance: "Modern Python only; no legacy baggage"
+
+  - year: 2021
+    title: "Django 3.2: LTS Release"
+    description: "Another LTS release with comprehensive features"
+    enterprise: "Companies standardize on 3.2 LTS"
+
+  - year: 2022
+    title: "Django 4.0: Path Converters & Decorators"
+    description: "Improved URL routing and async views"
+    async: "Full async/await support arrives"
+
+  - year: 2023
+    title: "Django 4.2: LTS with Modern Features"
+    description: "Database-agnostic features, async improvements"
+    maturity: "Django reaches peak maturity; 20-year-old framework"
+
+  - year: 2024
+    title: "Django Still Dominates Python Web"
+    description: "Most used Python web framework; 20+ year production track record"
+    ecosystem: "FastAPI rises for performance-critical APIs; Django remains for full-stack"
+
+key_strengths:
+  - "Admin interface out-of-the-box (huge time saver)"
+  - "ORM abstracts database complexity"
+  - "Excellent documentation and community"
+  - "Batteries included approach"
+  - "Proven stability and security track record"
+  - "Convention over configuration"
+
+design_philosophy:
+  - "DRY (Don't Repeat Yourself)"
+  - "Explicit is better than implicit"
+  - "Design for change"
+  - "Loose coupling, tight cohesion"
+
+evolution_timeline:
+  newspaper_cms: "2003-2005: Internal project for news sites"
+  open_source: "2005-2008: Early open source, gaining adoption"
+  maturity: "2008-2015: Production framework, backwards compatibility"
+  modernization: "2015-2024: Async support, modern Python features"
+
+competitors_journey:
+  - "2011-2015: Rails dominance, Django's steady rise"
+  - "2015+: FastAPI for APIs, Django for full-stack"
+  - "2024: Django stable, FastAPI for performance, Flask for simplicity"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Django is like a city with good infrastructure:
+      - Comes with roads, electricity, water (admin, ORM, auth)
+      - You build on solid foundation (20+ years proven)
+      - City grows with you (from startup to enterprise)
+
+      Other frameworks give you land; Django gives you a city.
+
+  intermediate:
+    focus: "Django architecture and patterns"
+    key_points:
+      - "MTV (Model-Template-View) architecture"
+      - "ORM design and database abstraction"
+      - "Middleware and signal patterns"
+
+  advanced:
+    focus: "Django at scale"
+    key_points:
+      - "Async views and background tasks"
+      - "Scaling patterns (caching, database optimization)"
+      - "When to use Django vs FastAPI vs other frameworks"

@@ -1,0 +1,28 @@
+id: authorization-guidelines
+name: Authorization Guidelines
+category: comprehensive
+type: standard
+tags:
+- authorization
+summary:
+  short: Authorization Guidelines and implementation guidelines
+  long: Complete guide to authorization guidelines
+problem:
+  description: Challenges without proper authorization guidelines
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement authorization guidelines
+key_concepts:
+  concept: Authorization Guidelines
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

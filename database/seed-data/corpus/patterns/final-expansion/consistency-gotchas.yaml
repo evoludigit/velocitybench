@@ -1,0 +1,28 @@
+id: consistency-gotchas
+name: Consistency Gotchas
+category: comprehensive
+type: standard
+tags:
+- consistency
+summary:
+  short: Consistency Gotchas and implementation guidelines
+  long: Complete guide to consistency gotchas
+problem:
+  description: Challenges without proper consistency gotchas
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement consistency gotchas
+key_concepts:
+  concept: Consistency Gotchas
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

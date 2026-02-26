@@ -1,0 +1,28 @@
+id: on-premise-conventions
+name: On-Premise Conventions
+category: comprehensive
+type: standard
+tags:
+- on-premise
+summary:
+  short: On-Premise Conventions and implementation guidelines
+  long: Complete guide to on-premise conventions
+problem:
+  description: Challenges without proper on-premise conventions
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement on-premise conventions
+key_concepts:
+  concept: On-Premise Conventions
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

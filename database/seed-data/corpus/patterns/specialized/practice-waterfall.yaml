@@ -1,0 +1,28 @@
+id: practice-waterfall
+name: Waterfall Practices
+category: specialized
+type: standard
+tags:
+- practice
+summary:
+  short: Patterns and practices for waterfall practices
+  long: Comprehensive guide to waterfall practices
+problem:
+  description: Challenges with waterfall practices
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement waterfall practices
+key_concepts:
+  concept: Understanding Waterfall Practices
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Waterfall Practices
+  intermediate:
+    focus: Implementing Waterfall Practices
+  advanced:
+    focus: Advanced Waterfall Practices

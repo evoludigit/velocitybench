@@ -1,0 +1,51 @@
+id: six-phase-compilation-process
+name: Six-Phase Compilation Process
+category: fraiseql
+type: standard
+tags:
+- compilation
+- phases
+- architecture
+- design
+summary:
+  short: Parser, Binder, WHERE Generator, Validator, Optimizer, and Artifact Emitter
+    phases
+  long: 'The compilation pipeline consists of six phases: parsing the input schema,
+    binding types to databases, generating WHERE filter types, validating everything,
+    optimizing, and emitting artifacts.'
+problem:
+  description: Ad-hoc compilation without clear phases
+  symptoms:
+  - Unclear where compilation errors originate
+  - Difficult to add compilation features
+  - Inconsistent compilation behavior
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Six-Phase Compilation Process effectively
+key_concepts:
+  concept_1: Phase architecture
+  concept_2: Phase responsibilities and boundaries
+  concept_3: Data flow between phases
+implementation_considerations:
+  consideration_1: Phase extensibility
+  consideration_2: Phase performance and ordering
+  consideration_3: Error propagation between phases
+best_practices:
+- name: Clear phases
+  description: Each phase has single responsibility
+- name: Validate between phases
+  description: Check output of each phase
+- name: Document flow
+  description: Explain data flow through phases
+anti_patterns:
+- name: Mixed concerns
+  consequence: Hard to maintain and extend
+- name: No validation
+  consequence: Invalid intermediate states
+blog_hooks:
+  beginner:
+    focus: Introduction to Six-Phase Compilation Process
+  intermediate:
+    focus: Implementing Six-Phase Compilation Process
+  advanced:
+    focus: Advanced Six-Phase Compilation Process techniques

@@ -1,0 +1,14 @@
+#!/bin/sh
+#
+# Gradle start up script for UN*X
+#
+GRADLE_WRAPPER_JAR="$(dirname "$0")/gradle/wrapper/gradle-wrapper.jar"
+GRADLE_WRAPPER_PROPERTIES="$(dirname "$0")/gradle/wrapper/gradle-wrapper.properties"
+
+if [ ! -f "$GRADLE_WRAPPER_JAR" ]; then
+    echo "Gradle wrapper jar not found at: $GRADLE_WRAPPER_JAR"
+    echo "Using system gradle instead"
+    exec gradle "$@"
+fi
+
+exec java -classpath "$GRADLE_WRAPPER_JAR" org.gradle.wrapper.GradleWrapperMain "$@"

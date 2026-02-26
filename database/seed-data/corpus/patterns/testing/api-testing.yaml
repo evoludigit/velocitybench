@@ -1,0 +1,251 @@
+# API Testing Patterns
+# VelocityBench Knowledge Corpus
+
+id: api-testing
+name: "API Testing Strategies"
+category: testing
+type: pattern
+tags:
+  - testing
+  - api
+  - integration
+  - e2e
+  - mocking
+
+summary:
+  short: "Approaches for testing APIs at different levels of the pyramid"
+  long: |
+    API testing verifies that your endpoints work correctly, handle errors gracefully,
+    and meet performance requirements. The testing pyramid suggests more unit tests,
+    fewer integration tests, and even fewer end-to-end tests. Each level serves a
+    different purpose in ensuring API quality.
+
+testing_pyramid:
+  - level: "Unit Tests"
+    count: "Many"
+    scope: "Individual functions/methods"
+    speed: "Milliseconds"
+    what_to_test:
+      - "Business logic in isolation"
+      - "Data transformations"
+      - "Validation rules"
+      - "Error handling"
+    example: |
+      # Python - Unit test for validation
+      def test_validate_email():
+          assert validate_email("user@example.com") == True
+          assert validate_email("invalid") == False
+          assert validate_email("") == False
+
+  - level: "Integration Tests"
+    count: "Some"
+    scope: "Components working together"
+    speed: "Seconds"
+    what_to_test:
+      - "Database queries"
+      - "Service interactions"
+      - "Cache behavior"
+      - "Message queue processing"
+    example: |
+      # Python - Integration test with database
+      async def test_create_user(db_session):
+          user = await create_user(db_session, {
+              "email": "test@example.com",
+              "name": "Test User"
+          })
+
+          assert user.id is not None
+          assert user.email == "test@example.com"
+
+          # Verify in database
+          saved = await db_session.get(User, user.id)
+          assert saved.name == "Test User"
+
+  - level: "End-to-End Tests"
+    count: "Few"
+    scope: "Full request flow"
+    speed: "Seconds to minutes"
+    what_to_test:
+      - "Critical user journeys"
+      - "Authentication flows"
+      - "Payment processing"
+      - "Multi-service workflows"
+    example: |
+      # Python - E2E test with HTTP client
+      async def test_order_flow(client):
+          # Create user
+          user = await client.post("/users", json={"email": "test@example.com"})
+
+          # Create order
+          order = await client.post("/orders", json={
+              "user_id": user["id"],
+              "items": [{"product_id": 1, "quantity": 2}]
+          })
+
+          # Verify order status
+          status = await client.get(f"/orders/{order['id']}")
+          assert status["status"] == "pending"
+
+api_testing_approaches:
+  - name: "Contract Testing"
+    description: "Verify API matches documented contract"
+    tools: ["Pact", "OpenAPI validation", "Dredd"]
+    example: |
+      # Pact consumer test
+      def test_get_user():
+          expected = {
+              "id": 1,
+              "name": "John Doe",
+              "email": "john@example.com"
+          }
+
+          pact.given("user exists").upon_receiving("get user").with_request(
+              method="GET",
+              path="/users/1"
+          ).will_respond_with(200, body=expected)
+
+          result = get_user(1)
+          assert result == expected
+
+  - name: "Property-Based Testing"
+    description: "Generate random inputs, verify properties hold"
+    tools: ["Hypothesis (Python)", "fast-check (JS)"]
+    example: |
+      from hypothesis import given, strategies as st
+
+      @given(st.emails())
+      def test_email_roundtrip(email):
+          user = create_user(email=email)
+          assert user.email == email
+
+  - name: "Snapshot Testing"
+    description: "Compare response against saved snapshot"
+    use_case: "Detect unintended API changes"
+    example: |
+      def test_user_response(snapshot):
+          response = client.get("/users/1")
+          assert response.json() == snapshot
+
+  - name: "Load Testing"
+    description: "Test performance under load"
+    tools: ["k6", "Locust", "Artillery", "wrk"]
+    example: |
+      # k6 load test
+      import http from 'k6/http';
+      import { check } from 'k6';
+
+      export const options = {
+        vus: 100,
+        duration: '30s',
+      };
+
+      export default function () {
+        const res = http.get('http://localhost:3000/api/users');
+        check(res, {
+          'status is 200': (r) => r.status === 200,
+          'response time < 500ms': (r) => r.timings.duration < 500,
+        });
+      }
+
+test_fixtures:
+  - name: "Database Fixtures"
+    description: "Pre-populate test database with known data"
+    example: |
+      @pytest.fixture
+      async def sample_users(db):
+          users = [
+              User(email="user1@test.com", name="User 1"),
+              User(email="user2@test.com", name="User 2"),
+          ]
+          db.add_all(users)
+          await db.commit()
+          return users
+
+  - name: "Factory Pattern"
+    description: "Generate test data programmatically"
+    tools: ["factory_boy (Python)", "Faker", "fishery (JS)"]
+    example: |
+      # Python with factory_boy
+      class UserFactory(factory.Factory):
+          class Meta:
+              model = User
+
+          email = factory.Sequence(lambda n: f"user{n}@test.com")
+          name = factory.Faker('name')
+
+      def test_list_users(db):
+          UserFactory.create_batch(10)
+          response = client.get("/users")
+          assert len(response.json()) == 10
+
+  - name: "Mocking External Services"
+    description: "Replace external dependencies with controlled responses"
+    example: |
+      # Python with pytest-mock
+      def test_payment_processing(mocker):
+          # Mock Stripe API
+          mock_stripe = mocker.patch('stripe.PaymentIntent.create')
+          mock_stripe.return_value = {"id": "pi_123", "status": "succeeded"}
+
+          result = process_payment(amount=100)
+
+          assert result.status == "succeeded"
+          mock_stripe.assert_called_once()
+
+graphql_testing:
+  approaches:
+    - name: "Schema Testing"
+      description: "Verify schema is valid and complete"
+
+    - name: "Query Testing"
+      description: "Test individual queries and mutations"
+      example: |
+        async def test_user_query(client):
+            query = """
+              query GetUser($id: ID!) {
+                user(id: $id) {
+                  id
+                  name
+                  email
+                }
+              }
+            """
+            result = await client.execute(query, variables={"id": "1"})
+            assert result["data"]["user"]["name"] == "John Doe"
+
+    - name: "Resolver Unit Tests"
+      description: "Test resolvers in isolation"
+
+best_practices:
+  - "Test happy path and error cases"
+  - "Use realistic test data"
+  - "Clean up test data after tests"
+  - "Run tests in isolated environments"
+  - "Keep tests deterministic (no random without seeds)"
+  - "Test authentication and authorization"
+  - "Verify response schemas"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      API testing is like quality control in a factory:
+      - Unit tests: Check each component (screws, bolts)
+      - Integration tests: Check assembled parts work together
+      - E2E tests: Test the entire product as a customer would
+      Catching defects early (unit tests) is cheaper than recalls (production bugs)!
+
+  intermediate:
+    focus: "Building a comprehensive API test suite"
+    key_points:
+      - "Test pyramid balance"
+      - "Database testing strategies"
+      - "Mocking external services"
+      - "CI/CD integration"
+
+  advanced:
+    focus: "Testing distributed systems"
+    key_points:
+      - "Contract testing for microservices"
+      - "Chaos engineering"
+      - "Performance testing at scale"
+      - "Testing eventual consistency"

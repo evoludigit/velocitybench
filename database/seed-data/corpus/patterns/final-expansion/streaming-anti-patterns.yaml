@@ -1,0 +1,28 @@
+id: streaming-anti-patterns
+name: Streaming Anti Patterns
+category: comprehensive
+type: standard
+tags:
+- streaming
+summary:
+  short: Streaming Anti Patterns and implementation guidelines
+  long: Complete guide to streaming anti patterns
+problem:
+  description: Challenges without proper streaming anti patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement streaming anti patterns
+key_concepts:
+  concept: Streaming Anti Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

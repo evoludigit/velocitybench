@@ -1,0 +1,28 @@
+id: hashing-observability
+name: Hashing Observability
+category: comprehensive
+type: standard
+tags:
+- hashing
+summary:
+  short: Hashing Observability and implementation guidelines
+  long: Complete guide to hashing observability
+problem:
+  description: Challenges without proper hashing observability
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement hashing observability
+key_concepts:
+  concept: Hashing Observability
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

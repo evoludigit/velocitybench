@@ -1,0 +1,361 @@
+# Generation Matrix Configuration
+# Defines which pattern/framework/depth combinations to generate
+
+# ============================================================
+# BLOG POST GENERATION MATRIX
+# ============================================================
+blog_generation:
+  # Patterns to generate blog posts for
+  patterns:
+    - trinity-pattern
+    - n-plus-one
+    # FraiseQL-specific patterns:
+    - compiled-graphql-execution
+    - sql-generation-optimization
+    - streaming-json-results
+    # Analytics enrichment patterns:
+    - analytics-schema-conventions
+    # NEW: Pre-computed temporal dimensions
+    - analytics-fact-table-date-info
+    # NEW: Flat dimension structure
+    - analytics-optimized-dimensions
+    # NEW: Hybrid optimized schema
+    - analytics-complete-fact-table
+    # NEW: Fact table column naming best practices (data → dimensions)
+    - analytics-column-naming-convention
+    # Core Capabilities Patterns:
+    # Query Capabilities
+    - window-functions
+    - query-optimization
+    - prepared-statements
+    # Streaming Capabilities
+    - streaming-performance
+    - streaming-memory-efficiency
+    - result-streaming
+    # Production Capabilities
+    - connection-pooling
+    - query-caching
+    - error-handling
+    # Performance Capabilities
+    - latency-optimization
+    - throughput-optimization
+    - memory-optimization
+    # Future patterns:
+    # - cqrs
+    # - dataloader-pattern
+    # - pagination
+    # - soft-deletes
+
+  # Blog post types
+  types:
+    - tutorial
+    - troubleshooting
+    - reference
+
+  # Audience depths
+  depths:
+    - beginner
+    - intermediate
+    - advanced
+
+  # Framework comparisons to generate
+  comparisons:
+    - frameworks: [postgraphile, apollo-server]
+      patterns: [trinity-pattern, n-plus-one]
+
+    - frameworks: [strawberry, graphene]
+      patterns: [trinity-pattern, n-plus-one]
+
+    - frameworks: [quarkus-graphql]
+      patterns: [trinity-pattern]
+
+    - frameworks: [hot-chocolate, graphql-net]
+      patterns: [trinity-pattern]
+
+    # FraiseQL comparisons (compiled vs interpreted)
+    - frameworks: [fraiseql, apollo-server]
+      patterns: [compiled-graphql-execution, sql-generation-optimization]
+      focus: "compiled vs interpreted execution"
+
+    - frameworks: [fraiseql, postgraphile]
+      patterns: [streaming-json-results, sql-generation-optimization]
+      focus: "database-first approaches with streaming"
+
+    - frameworks: [fraiseql, strawberry]
+      patterns: [compiled-graphql-execution]
+      focus: "performance: compiled Rust vs interpreted Python"
+
+    # Analytics-specific comparisons
+    - frameworks: [fraiseql, apollo-server]
+      patterns: [analytics-schema-conventions, analytics-fact-table-date-info]
+      focus: "analytics performance: compiled GraphQL vs traditional"
+
+    - frameworks: [fraiseql, postgraphile]
+      patterns: [analytics-optimized-dimensions, analytics-complete-fact-table]
+      focus: "analytics at scale: FraiseQL vs database-first"
+
+  # Model assignment for different content types
+  model_assignment:
+    tutorial:
+      beginner: opencode      # Simple, free tier works well
+      intermediate: opencode  # Still straightforward
+      advanced: claude-code   # Needs nuance and depth
+
+    comparison:
+      all: claude-code        # Needs judgment for fair comparison
+
+    troubleshooting:
+      beginner: opencode
+      intermediate: opencode
+      advanced: claude-code   # Complex debugging guidance
+
+    reference:
+      all: vllm               # Structured output, repetitive
+
+    # FraiseQL-specific patterns require Claude for nuance
+    compiled-graphql-execution:
+      beginner: opencode
+      intermediate: claude-code  # Architecture understanding needed
+      advanced: claude-code      # Compiler internals
+
+    sql-generation-optimization:
+      beginner: vllm          # Structured reference material
+      intermediate: claude-code  # Strategic SQL decisions
+      advanced: claude-code      # Advanced optimization
+
+    streaming-json-results:
+      beginner: opencode
+      intermediate: opencode
+      advanced: claude-code   # fraiseql-wire internals
+
+    # Analytics patterns - enriched with date_info and dimensions
+    analytics-schema-conventions:
+      beginner: opencode      # Table naming basics
+      intermediate: opencode  # Column structure and indexing
+      advanced: claude-code   # Compiler introspection
+
+    analytics-fact-table-date-info:
+      beginner: opencode      # What and why pre-compute
+      intermediate: claude-code  # Implementation strategy
+      advanced: claude-code   # Performance optimization (7-10x speedup)
+
+    analytics-optimized-dimensions:
+      beginner: opencode      # Flat vs nested structure
+      intermediate: opencode  # Design patterns and naming
+      advanced: claude-code   # Complex multi-dimension scenarios
+
+    analytics-complete-fact-table:
+      beginner: opencode      # Overview of hybrid approach
+      intermediate: claude-code  # Architecture design
+      advanced: claude-code   # Performance profiling and scaling
+
+    analytics-column-naming-convention:
+      beginner: opencode      # Why naming matters for schemas
+      intermediate: opencode  # Best practices and examples
+      advanced: claude-code   # Migration strategy and trade-offs
+
+    # Core Capability Patterns - User-Facing Features
+    # Query Capabilities (enables complex analytics and reporting)
+    window-functions:
+      beginner: opencode      # What are window functions
+      intermediate: opencode  # Common window function patterns
+      advanced: claude-code   # Performance tuning and optimization
+
+    query-optimization:
+      beginner: vllm          # Optimization hints and syntax
+      intermediate: claude-code  # When and how to optimize
+      advanced: claude-code   # Optimizer internals and trade-offs
+
+    prepared-statements:
+      beginner: opencode      # Prepared statement basics
+      intermediate: opencode  # Statement pooling and reuse
+      advanced: claude-code   # Caching, coherency, and performance
+
+    # Streaming Capabilities (enables real-time data, memory efficiency)
+    streaming-performance:
+      beginner: opencode      # Streaming basics and throughput
+      intermediate: opencode  # Performance characteristics
+      advanced: claude-code   # Benchmarking and optimization (2nd order: impacts memory usage)
+
+    streaming-memory-efficiency:
+      beginner: opencode      # Memory concepts in streaming
+      intermediate: claude-code  # Backpressure and adaptive chunking
+      advanced: claude-code   # Zero-copy techniques, profiling (3rd order: enables concurrent queries)
+
+    result-streaming:
+      beginner: opencode      # Streaming result sets
+      intermediate: opencode  # Pause/resume operations
+      advanced: claude-code   # Complex orchestration scenarios
+
+    # Production Capabilities (enables reliable, scalable deployments)
+    connection-pooling:
+      beginner: opencode      # Pool concepts and configuration
+      intermediate: opencode  # Pool sizing and tuning
+      advanced: claude-code   # Advanced strategies (2nd order: reduces latency, improves throughput)
+
+    query-caching:
+      beginner: opencode      # Caching basics and concepts
+      intermediate: claude-code  # Cache implementation and invalidation
+      advanced: claude-code   # Cache coherency and performance (3rd order: enables higher concurrency)
+
+    error-handling:
+      beginner: opencode      # Error handling basics
+      intermediate: opencode  # Retry policies and circuit breakers
+      advanced: claude-code   # Graceful degradation and recovery (2nd order: improves availability)
+
+    # Performance Capabilities (reduces latency, increases throughput)
+    latency-optimization:
+      beginner: opencode      # Latency concepts and measurement
+      intermediate: claude-code  # Optimization strategies
+      advanced: claude-code   # Profiling, tracing, and trade-offs (2nd order: enables higher user concurrency)
+
+    throughput-optimization:
+      beginner: opencode      # Throughput concepts and measurement
+      intermediate: opencode  # Batching and parallelization
+      advanced: claude-code   # Resource allocation and scaling (3rd order: enables larger deployments)
+
+    memory-optimization:
+      beginner: opencode      # Memory profiling and concepts
+      intermediate: opencode  # Memory reduction techniques
+      advanced: claude-code   # Architecture optimization and trade-offs (2nd order: reduces infrastructure costs)
+
+# ============================================================
+# SQL GENERATION MATRIX
+# ============================================================
+sql_generation:
+  # Dataset sizes to generate
+  sizes:
+    - xs
+    - medium
+    - large
+
+  # Output locations
+  output:
+    xs: "database/03-data-xs.sql"
+    medium: "database/03-data-medium.sql"
+    large: "database/03-data-large.sql"
+
+# ============================================================
+# FRAMEWORK COVERAGE
+# ============================================================
+frameworks:
+  # All 26 frameworks in VelocityBench
+  all:
+    - postgraphile
+    - fraiseql
+    - apollo-server
+    - graphql-yoga
+    - express-graphql
+    - mercurius
+    - strawberry
+    - graphene
+    - ariadne
+    - asgi-graphql
+    - hanami
+    - micronaut-graphql
+    - quarkus-graphql
+    - play-graphql
+    - hot-chocolate
+    - entity-framework-core
+    - graphql-net
+    - gqlgen
+    - graphql-go
+    - graphql-core-php
+    - webonyx-graphql-php
+    - async-graphql
+    - juniper
+
+  # Frameworks by language (for language-specific posts)
+  by_language:
+    javascript:
+      - postgraphile
+      - apollo-server
+      - graphql-yoga
+      - express-graphql
+      - mercurius
+
+    python:
+      - strawberry
+      - graphene
+      - ariadne
+      - asgi-graphql
+
+    ruby:
+      - hanami
+
+    java:
+      - micronaut-graphql
+      - quarkus-graphql
+      - play-graphql
+
+    csharp:
+      - hot-chocolate
+      - entity-framework-core
+      - graphql-net
+
+    go:
+      - gqlgen
+      - graphql-go
+
+    php:
+      - graphql-core-php
+      - webonyx-graphql-php
+
+    rust:
+      - async-graphql
+      - juniper
+      - fraiseql
+      - fraiseql-wire
+
+    custom:
+      - fraiseql
+
+# ============================================================
+# GENERATION STATISTICS (EXPECTED)
+# ============================================================
+expected_output:
+  blog_posts:
+    # Per pattern: 3 types × 3 depths = 9 posts (reference has 1 depth)
+    # = 3 + 3 + 1 = 7 posts per pattern
+    per_pattern: 7
+
+    # Comparisons: each generates 1 post
+    comparisons: 4
+
+    # With 2 patterns currently:
+    # 2 patterns × 7 posts = 14
+    # + 4 comparisons = 4
+    # Total: 18 blog posts (with current patterns)
+
+    # With 50 patterns:
+    # 50 patterns × 7 = 350 posts
+    # + 325 comparisons (26 choose 2) × 3 depths = 975
+    # Total: 1,325+ blog posts
+
+  sql_files:
+    count: 3
+    sizes: [xs, medium, large]
+
+# ============================================================
+# AUTOMATION HINTS
+# ============================================================
+automation:
+  # Run order for full generation
+  sequence:
+    - "Generate SQL files first (needed for testing)"
+    - "Generate blog prompts"
+    - "Use opencode for bulk generation"
+    - "Use Claude Code for quality review"
+
+  # CI/CD integration
+  ci_commands:
+    generate_sql: "python generator/generate_sql.py --size xs"
+    generate_prompts: "python generator/generate_blog_prompt.py --pattern trinity-pattern --all-types --all-depths"
+    validate: "python generator/validate_corpus.py"
+
+  # Parallelization hints
+  parallel_safe:
+    - sql_generation      # Each size independent
+    - prompt_generation   # Each pattern independent
+  not_parallel_safe:
+    - blog_generation     # API rate limits

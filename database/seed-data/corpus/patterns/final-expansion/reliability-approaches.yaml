@@ -1,0 +1,28 @@
+id: reliability-approaches
+name: Reliability Approaches
+category: comprehensive
+type: standard
+tags:
+- reliability
+summary:
+  short: Reliability Approaches and implementation guidelines
+  long: Complete guide to reliability approaches
+problem:
+  description: Challenges without proper reliability approaches
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement reliability approaches
+key_concepts:
+  concept: Reliability Approaches
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

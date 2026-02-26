@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/benchmark/gin-rest/internal/db"
 	"github.com/benchmark/gin-rest/internal/models"
@@ -13,6 +14,49 @@ import (
 )
 
 func GetUsers(c *gin.Context) {
+	// Batch fetch by IDs if provided
+	idsParam := c.Query("ids")
+	if idsParam != "" {
+		idList := strings.Split(idsParam, ",")
+		var cleanIDs []string
+		for _, id := range idList {
+			id = strings.TrimSpace(id)
+			if id != "" {
+				cleanIDs = append(cleanIDs, id)
+			}
+		}
+		if len(cleanIDs) == 0 {
+			c.JSON(http.StatusOK, gin.H{"users": []models.UserResponse{}})
+			return
+		}
+
+		rows, err := db.Pool.Query(c.Request.Context(), `
+			SELECT id, username, full_name, bio, avatar_url
+			FROM benchmark.tb_user
+			WHERE id = ANY($1::uuid[])
+		`, cleanIDs)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		defer rows.Close()
+
+		var users []models.UserResponse
+		for rows.Next() {
+			var user models.UserResponse
+			var avatarUrl *string
+			err := rows.Scan(&user.ID, &user.Username, &user.FullName, &user.Bio, &avatarUrl)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			users = append(users, user)
+		}
+
+		c.JSON(http.StatusOK, gin.H{"users": users})
+		return
+	}
+
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
 	rows, err := db.Pool.Query(c.Request.Context(), `
@@ -106,7 +150,10 @@ func UpdateUser(c *gin.Context) {
 	query += " WHERE id = $" + strconv.Itoa(argIdx)
 	args = append(args, id)
 
-	_, err := db.Pool.Exec(c.Request.Context(), query, args...)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer cancel()
+
+	_, err := db.Pool.Exec(ctx, query, args...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -218,4 +265,54 @@ func getAuthorByID(ctx context.Context, authorID string) map[string]interface{} 
 	}
 
 	return map[string]interface{}{"id": id, "username": username}
+}
+
+func GetPostComments(c *gin.Context) {
+	postID := c.Param("id")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+
+	rows, err := db.Pool.Query(c.Request.Context(), `
+		SELECT c.id, c.content, c.created_at, c.is_approved,
+		       u.id as author_id, u.username as author_username, u.avatar_url as author_avatar
+		FROM benchmark.tb_comment c
+		JOIN benchmark.tb_post p ON c.fk_post = p.pk_post
+		JOIN benchmark.tb_user u ON c.fk_author = u.pk_user
+		WHERE p.id = $1
+		ORDER BY c.created_at DESC
+		LIMIT $2
+	`, postID, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	var comments []map[string]interface{}
+	for rows.Next() {
+		var id, content, authorID, authorUsername string
+		var createdAt string
+		var isApproved bool
+		var authorAvatar *string
+
+		err := rows.Scan(&id, &content, &createdAt, &isApproved, &authorID, &authorUsername, &authorAvatar)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		comment := map[string]interface{}{
+			"id":              id,
+			"content":         content,
+			"created_at":      createdAt,
+			"is_approved":     isApproved,
+			"author_id":       authorID,
+			"author_username": authorUsername,
+		}
+		if authorAvatar != nil {
+			comment["author_avatar"] = *authorAvatar
+		}
+		comments = append(comments, comment)
+	}
+
+	c.JSON(http.StatusOK, comments)
 }

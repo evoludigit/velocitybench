@@ -1,0 +1,60 @@
+id: cpu-optimization
+name: "CPU Optimization and Profiling"
+category: performance
+type: pattern
+tags:
+  - performance
+  - cpu
+  - profiling
+  - optimization
+
+summary:
+  short: "Identifying and optimizing CPU bottlenecks"
+  long: |
+    CPU optimization starts with measurement. Use profilers to identify hot spots,
+    then optimize algorithms, leverage vectorization, and consider parallelization.
+
+optimization_strategies:
+  - name: "Algorithm Optimization"
+    description: "Choose faster algorithms or data structures"
+    impact: "Often 10-100x improvements"
+  
+  - name: "Vectorization"
+    description: "Process multiple data items in parallel"
+    impact: "2-8x improvements"
+  
+  - name: "Parallelization"
+    description: "Use multiple CPU cores"
+    impact: "Near-linear with core count"
+  
+  - name: "Caching"
+    description: "Reduce cache misses"
+    impact: "2-10x depending on miss rate"
+
+profiling_tools:
+  - "flamegraph: Visualize call stacks"
+  - "perf: Linux performance events"
+  - "py-spy: Python sampling profiler"
+  - "Instruments: macOS profiler"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      CPU optimization is like assembly line efficiency:
+      - Algorithm: Steps in the process
+      - Caching: Having materials nearby
+      - Parallelization: Multiple assembly lines
+
+  intermediate:
+    focus: "Using profilers effectively"
+    key_points:
+      - "Sampling vs instrumentation"
+      - "Reading flame graphs"
+      - "Hot spot analysis"
+
+  advanced:
+    focus: "CPU-level optimization"
+    key_points:
+      - "Vectorization techniques"
+      - "Cache line optimization"
+      - "Branch prediction"

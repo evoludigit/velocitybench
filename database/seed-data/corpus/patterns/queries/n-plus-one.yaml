@@ -1,0 +1,477 @@
+# N+1 Query Problem - Detection and Prevention
+# Core performance pattern for VelocityBench educational corpus
+
+id: n-plus-one
+name: "N+1 Query Problem"
+category: queries
+difficulty: beginner-to-intermediate
+tags:
+  - performance
+  - database
+  - orm
+  - graphql
+  - optimization
+
+# ============================================================
+# SUMMARY
+# ============================================================
+summary:
+  short: "The silent performance killer in database applications"
+  long: |
+    The N+1 query problem occurs when your code executes 1 query to fetch
+    a list of N items, then N additional queries to fetch related data for
+    each item. This transforms O(1) database operations into O(N), causing
+    exponential performance degradation as data grows.
+
+    It's called the "silent killer" because the application still works -
+    it's just 10-1000x slower than it should be.
+
+# ============================================================
+# THE PROBLEM
+# ============================================================
+problem:
+  description: |
+    Consider a simple request: "Get all posts with their authors."
+
+    Naive ORM code often does this:
+    1. Query 1: SELECT * FROM posts (returns 100 posts)
+    2. Query 2-101: SELECT * FROM users WHERE id = ? (one per post)
+
+    That's 101 queries for what should be 1-2 queries.
+
+  visual_example: |
+    Request: GET /posts?include=author
+
+    ❌ N+1 Problem (101 queries):
+    ┌─────────────────────────────────────────────────────────┐
+    │ SELECT * FROM posts;                           -- 1     │
+    │ SELECT * FROM users WHERE pk_user = 1;         -- 2     │
+    │ SELECT * FROM users WHERE pk_user = 2;         -- 3     │
+    │ SELECT * FROM users WHERE pk_user = 1;         -- 4     │
+    │ SELECT * FROM users WHERE pk_user = 3;         -- 5     │
+    │ ... (96 more queries)                          -- ...   │
+    │ SELECT * FROM users WHERE pk_user = 17;        -- 101   │
+    └─────────────────────────────────────────────────────────┘
+    Total time: 500ms+ (10ms × 50 unique users)
+
+    ✅ Proper Solution (2 queries):
+    ┌─────────────────────────────────────────────────────────┐
+    │ SELECT * FROM posts;                           -- 1     │
+    │ SELECT * FROM users WHERE pk_user IN (1,2,3...);-- 2    │
+    └─────────────────────────────────────────────────────────┘
+    Total time: 20ms (10ms × 2 queries)
+
+  symptoms:
+    - name: "Linear response time growth"
+      description: "API response time grows linearly with result count"
+      example: "10 items = 100ms, 100 items = 1000ms, 1000 items = 10000ms"
+      detection: "Plot response time vs result count"
+
+    - name: "Database connection exhaustion"
+      description: "Connection pool depletes under load"
+      example: "100 concurrent requests × 100 queries each = 10,000 connections"
+      detection: "Monitor connection pool usage"
+
+    - name: "Query log explosion"
+      description: "Similar queries repeated many times"
+      example: "Log shows SELECT * FROM users WHERE id = ? hundreds of times"
+      detection: "Enable query logging, look for patterns"
+
+    - name: "Works in dev, dies in prod"
+      description: "Small test datasets hide the problem"
+      example: "10 users in dev = fine, 10,000 in prod = disaster"
+      detection: "Load test with realistic data volumes"
+
+  root_causes:
+    - name: "ORM lazy loading"
+      description: "ORMs fetch related data on first access"
+      frameworks: ["Django", "Rails", "SQLAlchemy", "Hibernate"]
+
+    - name: "GraphQL nested resolvers"
+      description: "Each field resolver fetches independently"
+      frameworks: ["Apollo", "Strawberry", "graphql-js"]
+
+    - name: "Loop-based data fetching"
+      description: "Manual queries inside for loops"
+      frameworks: ["Any"]
+
+# ============================================================
+# THE SOLUTIONS
+# ============================================================
+solutions:
+  - name: "Eager Loading (JOINs)"
+    description: "Fetch related data in the initial query using JOINs"
+    effectiveness: "90%+ of N+1 cases"
+    tradeoffs:
+      pros:
+        - "Single query, minimal latency"
+        - "Predictable performance"
+        - "Easy to understand"
+      cons:
+        - "May over-fetch unused data"
+        - "Large result sets with many joins"
+        - "Complex for deep nesting"
+
+    example_sql: |
+      -- Instead of separate queries, JOIN everything
+      SELECT
+        p.id AS post_id,
+        p.title,
+        p.content,
+        u.id AS author_id,
+        u.username,
+        u.email
+      FROM tb_post p
+      JOIN tb_user u ON p.fk_author = u.pk_user
+      WHERE p.published_at IS NOT NULL;
+
+    orm_examples:
+      django: |
+        # ❌ N+1 Problem
+        posts = Post.objects.all()
+        for post in posts:
+            print(post.author.name)  # Query per post!
+
+        # ✅ Eager loading with select_related
+        posts = Post.objects.select_related('author').all()
+        for post in posts:
+            print(post.author.name)  # No additional queries
+
+      rails: |
+        # ❌ N+1 Problem
+        posts = Post.all
+        posts.each { |post| puts post.author.name }  # Query per post!
+
+        # ✅ Eager loading with includes
+        posts = Post.includes(:author).all
+        posts.each { |post| puts post.author.name }  # No additional queries
+
+      sqlalchemy: |
+        # ❌ N+1 Problem
+        posts = session.query(Post).all()
+        for post in posts:
+            print(post.author.name)  # Query per post!
+
+        # ✅ Eager loading with joinedload
+        from sqlalchemy.orm import joinedload
+        posts = session.query(Post).options(joinedload(Post.author)).all()
+
+  - name: "DataLoader Pattern (Batching)"
+    description: "Batch multiple requests into single queries"
+    effectiveness: "Essential for GraphQL"
+    tradeoffs:
+      pros:
+        - "Works with any query pattern"
+        - "Automatic deduplication"
+        - "Per-request caching"
+      cons:
+        - "Adds complexity"
+        - "Requires framework support"
+        - "Still multiple queries (batched)"
+
+    example_js: |
+      // DataLoader batches individual loads into single queries
+      const userLoader = new DataLoader(async (userIds) => {
+        // Called once with all IDs: [1, 2, 3, 5, 7]
+        const users = await db.query(
+          'SELECT * FROM users WHERE pk_user = ANY($1)',
+          [userIds]
+        );
+        // Return in same order as requested IDs
+        return userIds.map(id => users.find(u => u.pk_user === id));
+      });
+
+      // In resolvers, just call .load() - batching is automatic
+      const resolvers = {
+        Post: {
+          author: (post) => userLoader.load(post.fk_author)
+        }
+      };
+
+  - name: "Denormalization (Pre-computed)"
+    description: "Store related data directly to eliminate joins"
+    effectiveness: "100% for read-heavy workloads"
+    tradeoffs:
+      pros:
+        - "Single table access"
+        - "Fastest possible reads"
+        - "Simple queries"
+      cons:
+        - "Data duplication"
+        - "Write complexity"
+        - "Consistency challenges"
+
+    example_sql: |
+      -- Denormalized post table includes author info
+      CREATE TABLE tb_post_denormalized (
+        pk_post SERIAL PRIMARY KEY,
+        id UUID UNIQUE NOT NULL,
+        title VARCHAR(500),
+        content TEXT,
+        -- Denormalized author data
+        author_id UUID NOT NULL,
+        author_username VARCHAR(100) NOT NULL,
+        author_avatar_url TEXT
+      );
+
+      -- Or use JSONB for flexible denormalization
+      CREATE TABLE tb_post_with_author (
+        pk_post SERIAL PRIMARY KEY,
+        id UUID UNIQUE NOT NULL,
+        title VARCHAR(500),
+        content TEXT,
+        author JSONB NOT NULL  -- {"id": "uuid", "username": "alice", ...}
+      );
+
+# ============================================================
+# DETECTION TECHNIQUES
+# ============================================================
+detection:
+  - name: "Query logging analysis"
+    description: "Enable SQL logging and look for repeated patterns"
+    example: |
+      # PostgreSQL: Enable logging
+      ALTER SYSTEM SET log_statement = 'all';
+      SELECT pg_reload_conf();
+
+      # Look for patterns like:
+      # SELECT * FROM users WHERE pk_user = 1
+      # SELECT * FROM users WHERE pk_user = 2
+      # SELECT * FROM users WHERE pk_user = 1  (duplicate!)
+
+  - name: "Query count assertions in tests"
+    description: "Assert expected query count in test suite"
+    example_python: |
+      # Django
+      from django.test.utils import CaptureQueriesContext
+
+      def test_no_n_plus_one():
+          with CaptureQueriesContext(connection) as context:
+              list(Post.objects.select_related('author').all())
+          assert len(context) <= 2, f"Too many queries: {len(context)}"
+
+    example_ruby: |
+      # Rails with Bullet gem
+      Bullet.enable = true
+      Bullet.raise = true  # Raise exception on N+1
+
+  - name: "APM tools"
+    description: "Application Performance Monitoring catches N+1 in production"
+    tools:
+      - "New Relic"
+      - "Datadog"
+      - "Scout APM"
+      - "Django Debug Toolbar"
+
+# ============================================================
+# GRAPHQL-SPECIFIC CONSIDERATIONS
+# ============================================================
+graphql_specific:
+  why_graphql_amplifies_n_plus_one: |
+    GraphQL's resolver-per-field architecture naturally creates N+1 problems:
+
+    ```graphql
+    query {
+      posts {        # 1 query: SELECT * FROM posts
+        title
+        author {     # N queries: SELECT * FROM users WHERE id = ?
+          name
+          posts {    # N×M queries: SELECT * FROM posts WHERE author_id = ?
+            title
+          }
+        }
+      }
+    }
+    ```
+
+    Nested queries can explode: 1 + N + N×M + N×M×K queries
+
+  solutions:
+    - name: "DataLoader (standard)"
+      description: "Facebook's batching solution"
+      implementation: "Use dataloader library in resolvers"
+
+    - name: "Lookahead"
+      description: "Inspect query AST to plan optimal fetching"
+      implementation: "Check info.fieldNodes to see what fields are requested"
+
+    - name: "Database-level (PostGraphile/Hasura)"
+      description: "Let the database handle query planning"
+      implementation: "Generate single optimized SQL from GraphQL query"
+
+# ============================================================
+# SEED DATA FOR DEMONSTRATING N+1
+# ============================================================
+seed_data:
+  description: |
+    This seed data is specifically designed to make N+1 problems visible.
+    With 100 posts by 50 authors, naive code will execute 100+ queries
+    instead of 2.
+
+  demonstration_queries:
+    - name: "Show N+1 problem"
+      description: "This query pattern triggers N+1"
+      naive_implementation: |
+        -- What naive ORM does (N+1):
+        SELECT * FROM tb_post;  -- Returns 100 rows
+        -- Then for each post:
+        SELECT * FROM tb_user WHERE pk_user = 1;
+        SELECT * FROM tb_user WHERE pk_user = 2;
+        -- ... 98 more queries
+
+      optimal_implementation: |
+        -- What you should do:
+        SELECT
+          p.*,
+          u.id AS author_id,
+          u.username AS author_username
+        FROM tb_post p
+        JOIN tb_user u ON p.fk_author = u.pk_user;
+        -- 1 query, all data
+
+    - name: "Nested N+1 (GraphQL)"
+      description: "posts -> author -> posts pattern"
+      query_count_naive: "1 + N + N×M (potentially thousands)"
+      query_count_optimal: "1-3"
+
+# ============================================================
+# BLOG HOOKS
+# ============================================================
+blog_hooks:
+  beginner:
+    analogy: |
+      Imagine ordering pizza for a party:
+
+      ❌ N+1 Way: Call the pizza place 20 times, ordering 1 pizza each call.
+      ✅ Proper Way: Call once and order all 20 pizzas.
+
+      Both get you 20 pizzas, but one takes 20 minutes of phone calls
+      and the other takes 2 minutes.
+
+    common_mistakes:
+      - "Not knowing it exists (the silent killer)"
+      - "Testing with tiny datasets that hide the problem"
+      - "Assuming the ORM handles it automatically"
+      - "Adding caching instead of fixing the root cause"
+
+    key_takeaways:
+      - "N+1 is 1 query + N queries instead of 1-2 queries"
+      - "Use eager loading (JOINs) or DataLoader"
+      - "Test with realistic data volumes"
+      - "Monitor query counts in production"
+
+  intermediate:
+    detection_checklist:
+      - "Enable query logging in development"
+      - "Add query count assertions to tests"
+      - "Use APM tools in production"
+      - "Profile with production-like data"
+
+    framework_specific_solutions:
+      django: "select_related(), prefetch_related()"
+      rails: "includes(), eager_load(), preload()"
+      sqlalchemy: "joinedload(), subqueryload()"
+      graphql: "DataLoader, lookahead, Hasura/PostGraphile"
+
+  advanced:
+    optimization_strategies:
+      - "Analyze query plans with EXPLAIN ANALYZE"
+      - "Consider denormalization for read-heavy workloads"
+      - "Use materialized views for complex aggregations"
+      - "Implement cursor-based pagination to limit N"
+
+    architectural_patterns:
+      - "CQRS: Separate read models eliminate joins"
+      - "Event Sourcing: Pre-computed projections"
+      - "GraphQL Federation: Distributed DataLoaders"
+
+# ============================================================
+# APPLICABLE FRAMEWORKS
+# ============================================================
+applicable_frameworks:
+  affected:
+    - framework: "apollo-server"
+      severity: "high"
+      solution: "DataLoader"
+
+    - framework: "strawberry"
+      severity: "high"
+      solution: "DataLoader"
+
+    - framework: "graphene"
+      severity: "high"
+      solution: "DataLoader"
+
+    - framework: "rails"
+      severity: "high"
+      solution: "includes()"
+
+    - framework: "django"
+      severity: "high"
+      solution: "select_related()"
+
+  immune_by_design:
+    - framework: "postgraphile"
+      reason: "Generates single optimized SQL from GraphQL"
+
+    - framework: "hasura"
+      reason: "Database-level query optimization"
+
+    - framework: "fraiseql"
+      reason: "View-based architecture with pre-computed joins"
+
+# ============================================================
+# RELATED PATTERNS
+# ============================================================
+related_patterns:
+  - id: "dataloader-pattern"
+    relationship: "solves"
+    description: "Primary solution for GraphQL N+1"
+
+  - id: "eager-loading"
+    relationship: "solves"
+    description: "ORM solution via JOINs"
+
+  - id: "denormalization"
+    relationship: "alternative"
+    description: "Trade write complexity for read performance"
+
+  - id: "cqrs"
+    relationship: "architectural-solution"
+    description: "Separate read models eliminate the problem"
+
+# ============================================================
+# PERFORMANCE DATA
+# ============================================================
+performance:
+  benchmarks:
+    - scenario: "Fetch 100 posts with authors"
+      results:
+        - approach: "N+1 (101 queries)"
+          avg_time: "450ms"
+          db_connections: "101"
+
+        - approach: "Eager load (1 query)"
+          avg_time: "15ms"
+          db_connections: "1"
+
+        - approach: "DataLoader (2 queries)"
+          avg_time: "25ms"
+          db_connections: "2"
+
+    - scenario: "Fetch 1000 posts with authors and comments"
+      results:
+        - approach: "N+1"
+          avg_time: "12,000ms"
+          db_connections: "2001"
+
+        - approach: "Optimized"
+          avg_time: "150ms"
+          db_connections: "3"
+
+  scaling_impact: |
+    N+1 scales linearly with data:
+    - 10 items: 10ms overhead → "fast enough"
+    - 100 items: 100ms overhead → "noticeable"
+    - 1000 items: 1000ms overhead → "slow"
+    - 10000 items: 10000ms overhead → "unusable"

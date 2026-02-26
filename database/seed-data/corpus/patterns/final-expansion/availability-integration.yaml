@@ -1,0 +1,28 @@
+id: availability-integration
+name: Availability Integration
+category: comprehensive
+type: standard
+tags:
+- availability
+summary:
+  short: Availability Integration and implementation guidelines
+  long: Complete guide to availability integration
+problem:
+  description: Challenges without proper availability integration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement availability integration
+key_concepts:
+  concept: Availability Integration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

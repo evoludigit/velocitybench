@@ -1,0 +1,314 @@
+# Soft Deletes Pattern
+# VelocityBench Knowledge Corpus
+
+id: soft-deletes
+name: "Soft Deletes vs Hard Deletes"
+category: data
+type: pattern
+severity: medium
+tags:
+  - database
+  - data-management
+  - deletion
+  - recovery
+  - compliance
+
+summary:
+  short: "Mark records as deleted instead of removing them permanently"
+  long: |
+    Soft deletes mark records as deleted (typically with a deleted_at timestamp) rather
+    than removing them from the database. This enables data recovery, audit trails, and
+    maintains referential integrity while hiding deleted data from normal queries. Hard
+    deletes physically remove data and should be used when data must be truly erased
+    (GDPR right to be forgotten) or for temporary/non-critical data.
+
+problem:
+  description: |
+    Hard deletes create challenges:
+    - Accidental deletions are unrecoverable
+    - Audit trails lose context when referenced data disappears
+    - Foreign key constraints break or cascade unexpectedly
+    - Compliance requirements may mandate data retention
+    - Analytics on historical data becomes impossible
+
+  symptoms:
+    - name: "Broken references"
+      description: "Foreign keys point to non-existent records"
+      detection: "NULL references, orphaned records, constraint errors"
+
+    - name: "Lost audit context"
+      description: "Audit logs reference deleted entities"
+      detection: "Audit reports show 'unknown user' or missing details"
+
+    - name: "Recovery requests"
+      description: "Users accidentally delete data and need it back"
+      detection: "Support tickets for data recovery"
+
+solution:
+  principle: "Soft delete by default, hard delete only when required"
+
+  components:
+    - name: "deleted_at column"
+      type: "schema"
+      purpose: "Timestamp indicating when record was deleted"
+
+    - name: "Default scope"
+      type: "query"
+      purpose: "Automatically filter out deleted records"
+
+    - name: "Hard delete process"
+      type: "procedure"
+      purpose: "Permanently remove after retention period"
+
+implementation:
+  schema_design:
+    postgresql: |
+      -- Add soft delete columns to tables
+      ALTER TABLE users ADD COLUMN deleted_at TIMESTAMPTZ DEFAULT NULL;
+      ALTER TABLE users ADD COLUMN deleted_by UUID REFERENCES users(id);
+
+      -- Create partial index for efficient queries (excludes deleted)
+      CREATE INDEX idx_users_active ON users (email)
+        WHERE deleted_at IS NULL;
+
+      -- Create view for active records
+      CREATE VIEW active_users AS
+        SELECT * FROM users WHERE deleted_at IS NULL;
+
+      -- For hard delete audit, can also track:
+      ALTER TABLE users ADD COLUMN deletion_reason TEXT;
+
+    migrations: |
+      -- Alembic migration example (Python)
+      def upgrade():
+          op.add_column('users', sa.Column('deleted_at', sa.DateTime(timezone=True)))
+          op.add_column('users', sa.Column('deleted_by', sa.UUID()))
+          op.create_index('idx_users_active', 'users', ['email'],
+                          postgresql_where=text('deleted_at IS NULL'))
+
+      def downgrade():
+          op.drop_index('idx_users_active')
+          op.drop_column('users', 'deleted_by')
+          op.drop_column('users', 'deleted_at')
+
+  orm_implementation:
+    sqlalchemy: |
+      from sqlalchemy import Column, DateTime, event
+      from sqlalchemy.orm import Query
+      from datetime import datetime
+
+      class SoftDeleteMixin:
+          """Mixin for soft-deletable models."""
+          deleted_at = Column(DateTime(timezone=True), nullable=True, index=True)
+
+          def soft_delete(self):
+              self.deleted_at = datetime.utcnow()
+
+          def restore(self):
+              self.deleted_at = None
+
+          @property
+          def is_deleted(self) -> bool:
+              return self.deleted_at is not None
+
+      class SoftDeleteQuery(Query):
+          """Query class that filters out soft-deleted records by default."""
+
+          def __new__(cls, *args, **kwargs):
+              obj = super().__new__(cls)
+              obj._with_deleted = kwargs.pop('_with_deleted', False)
+              return obj
+
+          def __init__(self, *args, **kwargs):
+              kwargs.pop('_with_deleted', None)
+              super().__init__(*args, **kwargs)
+
+          def __iter__(self):
+              return Query.__iter__(self.private())
+
+          def private(self):
+              if self._with_deleted:
+                  return self
+              return self.filter_by(deleted_at=None)
+
+          def with_deleted(self):
+              """Include soft-deleted records in results."""
+              return self.__class__(
+                  self._only_full_mapper_zero('get'),
+                  session=self.session,
+                  _with_deleted=True
+              )
+
+      # Usage
+      class User(Base, SoftDeleteMixin):
+          __tablename__ = 'users'
+          id = Column(UUID, primary_key=True)
+          email = Column(String, unique=True)
+
+      # Normal query (excludes deleted)
+      users = session.query(User).all()
+
+      # Include deleted
+      all_users = session.query(User).with_deleted().all()
+
+      # Soft delete
+      user.soft_delete()
+      session.commit()
+
+    python_fastapi: |
+      from fastapi import APIRouter, Depends, HTTPException
+      from sqlalchemy.orm import Session
+      from datetime import datetime
+
+      router = APIRouter()
+
+      @router.delete("/users/{user_id}")
+      async def delete_user(user_id: str, db: Session = Depends(get_db)):
+          """Soft delete a user."""
+          user = db.query(User).filter(User.id == user_id).first()
+          if not user:
+              raise HTTPException(404, "User not found")
+
+          user.deleted_at = datetime.utcnow()
+          db.commit()
+
+          return {"message": "User deleted"}
+
+      @router.post("/users/{user_id}/restore")
+      async def restore_user(user_id: str, db: Session = Depends(get_db)):
+          """Restore a soft-deleted user."""
+          user = db.query(User).with_deleted().filter(User.id == user_id).first()
+          if not user:
+              raise HTTPException(404, "User not found")
+          if not user.is_deleted:
+              raise HTTPException(400, "User is not deleted")
+
+          user.deleted_at = None
+          db.commit()
+
+          return {"message": "User restored"}
+
+      @router.delete("/users/{user_id}/permanent")
+      async def hard_delete_user(user_id: str, db: Session = Depends(get_db)):
+          """Permanently delete a user (admin only)."""
+          user = db.query(User).with_deleted().filter(User.id == user_id).first()
+          if not user:
+              raise HTTPException(404, "User not found")
+
+          db.delete(user)
+          db.commit()
+
+          return {"message": "User permanently deleted"}
+
+  querying:
+    postgresql: |
+      -- Active records only (default behavior)
+      SELECT * FROM users WHERE deleted_at IS NULL;
+
+      -- Include deleted records
+      SELECT * FROM users;
+
+      -- Only deleted records
+      SELECT * FROM users WHERE deleted_at IS NOT NULL;
+
+      -- Records deleted in last 30 days
+      SELECT * FROM users
+        WHERE deleted_at IS NOT NULL
+        AND deleted_at > NOW() - INTERVAL '30 days';
+
+      -- Using the active_users view
+      SELECT * FROM active_users WHERE email = 'alice@example.com';
+
+  hard_delete_process:
+    description: "Permanently delete records after retention period"
+    postgresql: |
+      -- Delete records soft-deleted more than 90 days ago
+      DELETE FROM users
+        WHERE deleted_at IS NOT NULL
+        AND deleted_at < NOW() - INTERVAL '90 days';
+
+      -- Or archive to separate table first
+      INSERT INTO users_archive
+        SELECT * FROM users
+        WHERE deleted_at IS NOT NULL
+        AND deleted_at < NOW() - INTERVAL '90 days';
+
+      DELETE FROM users
+        WHERE deleted_at IS NOT NULL
+        AND deleted_at < NOW() - INTERVAL '90 days';
+
+    scheduled_job: |
+      # Python scheduled job for hard delete
+      from apscheduler.schedulers.background import BackgroundScheduler
+
+      def hard_delete_old_records():
+          """Run daily to permanently delete old soft-deleted records."""
+          with get_db_session() as session:
+              cutoff = datetime.utcnow() - timedelta(days=90)
+
+              # Archive first
+              deleted_users = session.query(User)\
+                  .with_deleted()\
+                  .filter(User.deleted_at < cutoff)\
+                  .all()
+
+              for user in deleted_users:
+                  archive_user(user)
+                  session.delete(user)
+
+              session.commit()
+              logger.info(f"Hard deleted {len(deleted_users)} users")
+
+      scheduler = BackgroundScheduler()
+      scheduler.add_job(hard_delete_old_records, 'cron', hour=2)
+
+considerations:
+  - name: "Unique constraints"
+    problem: "Soft-deleted records can block new records with same unique value"
+    solution: |
+      -- Option 1: Partial unique index
+      CREATE UNIQUE INDEX idx_users_email_unique
+        ON users (email)
+        WHERE deleted_at IS NULL;
+
+      -- Option 2: Include deleted_at in constraint
+      -- (allows duplicate emails if one is deleted)
+
+  - name: "Foreign key cascades"
+    problem: "Cascading deletes bypass soft delete"
+    solution: |
+      -- Don't use ON DELETE CASCADE with soft deletes
+      -- Instead, implement soft delete in application code
+      -- Or use triggers to soft-delete child records
+
+  - name: "Performance"
+    problem: "Table grows without bound"
+    solution: |
+      -- Partition by time range
+      -- Regular hard-delete cleanup jobs
+      -- Archive tables for old deleted data
+      -- Partial indexes for active records
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Soft delete is like the Recycle Bin on your computer:
+      - Hard delete: File gone forever (Shift+Delete)
+      - Soft delete: File in Recycle Bin (can restore)
+      Most apps should use a Recycle Bin by default!
+
+  intermediate:
+    focus: "Implementing soft deletes with ORM and handling edge cases"
+    key_points:
+      - "Default scopes for automatic filtering"
+      - "Handling unique constraints"
+      - "Querying with and without deleted records"
+      - "Restoration workflows"
+
+  advanced:
+    focus: "Compliance, GDPR, and data lifecycle management"
+    key_points:
+      - "GDPR right to erasure vs soft deletes"
+      - "Audit logging for deletions"
+      - "Archival strategies and partitioning"
+      - "Cross-service deletion propagation"

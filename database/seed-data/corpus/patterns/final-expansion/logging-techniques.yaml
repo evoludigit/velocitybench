@@ -1,0 +1,28 @@
+id: logging-techniques
+name: Logging Techniques
+category: comprehensive
+type: standard
+tags:
+- logging
+summary:
+  short: Logging Techniques and implementation guidelines
+  long: Complete guide to logging techniques
+problem:
+  description: Challenges without proper logging techniques
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement logging techniques
+key_concepts:
+  concept: Logging Techniques
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

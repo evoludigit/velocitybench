@@ -1,0 +1,28 @@
+id: availability-profiling
+name: Availability Profiling
+category: comprehensive
+type: standard
+tags:
+- availability
+summary:
+  short: Availability Profiling and implementation guidelines
+  long: Complete guide to availability profiling
+problem:
+  description: Challenges without proper availability profiling
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement availability profiling
+key_concepts:
+  concept: Availability Profiling
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

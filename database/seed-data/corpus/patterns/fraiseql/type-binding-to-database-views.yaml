@@ -1,0 +1,50 @@
+id: type-binding-to-database-views
+name: Type Binding to Database Views
+category: fraiseql
+type: standard
+tags:
+- compilation
+- database-binding
+- views
+- schema-validation
+summary:
+  short: Mapping GraphQL types to database views (v_* naming convention)
+  long: FraiseQL types are bound to database views rather than resolver functions,
+    enabling compile-time verification that the data source exists and matches the
+    schema.
+problem:
+  description: Resolvers can reference non-existent database objects or wrong schemas
+  symptoms:
+  - Resolvers written before database schema exists
+  - Schema and database get out of sync
+  - Runtime errors when views don't exist
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Type Binding to Database Views effectively
+key_concepts:
+  concept_1: View naming conventions and discovery
+  concept_2: Column-to-field mapping
+  concept_3: Type matching and validation
+implementation_considerations:
+  consideration_1: Binding strategy and flexibility
+  consideration_2: Handling optional or polymorphic views
+  consideration_3: DBA vs API developer concerns
+best_practices:
+- name: Follow conventions
+  description: Use v_* prefix for GraphQL views
+- name: Validate bindings
+  description: Verify views exist before compilation
+- name: Document mappings
+  description: Clearly show type-to-view mappings
+anti_patterns:
+- name: Ad-hoc naming
+  consequence: Binding failures and confusion
+- name: Missing validation
+  consequence: Runtime errors in production
+blog_hooks:
+  beginner:
+    focus: Introduction to Type Binding to Database Views
+  intermediate:
+    focus: Implementing Type Binding to Database Views
+  advanced:
+    focus: Advanced Type Binding to Database Views techniques

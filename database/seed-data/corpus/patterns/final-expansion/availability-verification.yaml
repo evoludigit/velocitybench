@@ -1,0 +1,28 @@
+id: availability-verification
+name: Availability Verification
+category: comprehensive
+type: standard
+tags:
+- availability
+summary:
+  short: Availability Verification and implementation guidelines
+  long: Complete guide to availability verification
+problem:
+  description: Challenges without proper availability verification
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement availability verification
+key_concepts:
+  concept: Availability Verification
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

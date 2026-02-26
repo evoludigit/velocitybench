@@ -20,7 +20,7 @@ public class Comment {
     @Column(name = "pk_comment")
     private Integer pkComment;
 
-    @Column(name = "id")
+    @Column(name = "id", columnDefinition = "uuid")
     private String id;
 
     @Column(name = "fk_post")

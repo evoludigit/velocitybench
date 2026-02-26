@@ -1,0 +1,28 @@
+id: optimization-best-practices
+name: Optimization Best Practices
+category: comprehensive
+type: standard
+tags:
+- optimization
+summary:
+  short: Optimization Best Practices and implementation guidelines
+  long: Complete guide to optimization best practices
+problem:
+  description: Challenges without proper optimization best practices
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement optimization best practices
+key_concepts:
+  concept: Optimization Best Practices
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

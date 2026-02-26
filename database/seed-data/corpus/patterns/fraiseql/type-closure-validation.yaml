@@ -1,0 +1,49 @@
+id: type-closure-validation
+name: Type Closure Validation
+category: fraiseql
+type: standard
+tags:
+- compilation
+- validation
+- type-system
+- graph-analysis
+summary:
+  short: Ensuring all referenced types are defined and relationships are valid
+  long: The validator checks type closure by ensuring all referenced types exist,
+    circular dependencies are avoided, and relationship constraints are satisfied.
+problem:
+  description: Schema references undefined types
+  symptoms:
+  - Runtime errors when missing types referenced
+  - Circular type dependencies cause confusion
+  - Invalid relationships allowed
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Type Closure Validation effectively
+key_concepts:
+  concept_1: Type graph construction
+  concept_2: Closure checking algorithms
+  concept_3: Circular dependency detection
+implementation_considerations:
+  consideration_1: Handling interfaces and unions
+  consideration_2: Performance of closure checking
+  consideration_3: Clear error messages
+best_practices:
+- name: Validate closure
+  description: Check all types are defined
+- name: Detect cycles
+  description: Find and report circular deps
+- name: Clear errors
+  description: Show missing types and cycles
+anti_patterns:
+- name: No closure check
+  consequence: Runtime type errors
+- name: Cycle detection fails
+  consequence: Infinite loops or confusion
+blog_hooks:
+  beginner:
+    focus: Introduction to Type Closure Validation
+  intermediate:
+    focus: Implementing Type Closure Validation
+  advanced:
+    focus: Advanced Type Closure Validation techniques

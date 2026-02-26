@@ -1,0 +1,297 @@
+# The Evolution of Web Frameworks
+# VelocityBench Knowledge Corpus
+
+id: evolution-of-web-frameworks
+name: "The Evolution of Web Frameworks: From CGI to Modern React"
+category: history
+type: timeline
+tags:
+  - frameworks
+  - history
+  - web-development
+  - architecture
+
+summary:
+  short: "How web frameworks evolved from server-side CGI scripts to modern JavaScript-based single-page applications"
+  long: |
+    Web frameworks have undergone dramatic transformation since the early days of CGI.
+    Starting with server-side frameworks like Django and Rails, through the LAMP stack,
+    to modern JavaScript frameworks like React, Vue, and Angular, the landscape has
+    shifted from server-rendering to client-side interactivity. This history explores
+    the problems each generation solved and the architectural patterns that emerged.
+
+timeline:
+  - year: 1993
+    title: "CGI (Common Gateway Interface)"
+    description: |
+      The first dynamic web generation. CGI allowed servers to execute programs
+      that generated HTML on the fly. Apache servers would fork a new process
+      for each request, running Perl or C scripts.
+    problem_solved:
+      - Static HTML only - no dynamic content
+      - No database integration
+      - No session management
+    performance_characteristics: |
+      - One process per request (massive overhead)
+      - Startup time for each request
+      - Limited to simple pages
+
+  - year: 1995
+    title: "Apache Modules & FastCGI"
+    description: |
+      FastCGI created persistent processes instead of spawning new ones per request.
+      Apache modules allowed code to run within the web server process itself.
+      This was a massive performance improvement.
+    innovation: "Keep-alive connections and persistent processes"
+    impact: "Made high-traffic sites feasible"
+
+  - year: 1996
+    title: "Server-Side Includes & Template Systems"
+    description: |
+      Developers began embedding code in HTML files using SSI and template languages.
+      This separated content from logic to some degree.
+    tools:
+      - "Apache SSI (Server-Side Includes)"
+      - "Early Perl templating"
+
+  - year: 1997-1998
+    title: "ASP & JSP Emerge"
+    description: |
+      Microsoft's Active Server Pages and Java Server Pages brought different
+      philosophies to dynamic web generation. Both embedded code directly in HTML.
+    asp_approach: "Embed VBScript/JScript in HTML"
+    jsp_approach: "Embed Java in HTML (compiled to servlets)"
+    market_split: "ASP dominated Windows hosting, JSP in enterprise Java shops"
+
+  - year: 2000
+    title: "Open Source Alternatives: PHP Explosion"
+    description: |
+      PHP (created by Rasmus Lerdorf in 1995) exploded in popularity around 2000.
+      Cheap shared hosting embraced PHP. The "LAMP stack" (Linux, Apache, MySQL, PHP)
+      became the dominant web platform.
+    why_php_won: |
+      - Easy to learn (no compilation required)
+      - Cheap hosting widely available
+      - Great for small-to-medium sites
+      - Rapid development cycle
+    downside: |
+      - No strong architectural guidance
+      - Spaghetti code common
+      - Security vulnerabilities widespread
+
+  - year: 2003
+    title: "Ruby on Rails Changes Everything"
+    description: |
+      David Heinemeier Hansson released Rails in 2004, but the philosophy
+      was revolutionary even in 2003 discussions. Rails brought:
+      - Convention over configuration
+      - Active Record ORM
+      - Built-in testing
+      - RESTful routing
+    paradigm_shift: "From 'how do I build this?' to 'let the framework guide me'"
+    impact: "Sparked a generation of opinionated frameworks"
+
+  - year: 2005-2008
+    title: "Framework Wars: Django, Spring, Symfony"
+    description: |
+      Every language wanted its Rails equivalent. Python got Django, PHP got Symfony,
+      Java had Spring (evolved from it). A pattern emerged:
+      - Comprehensive ORM layer
+      - Template engines
+      - Routing systems
+      - Middleware/middleware patterns
+    frameworks_born:
+      - "Django (Python, 2005)"
+      - "Symfony (PHP, 2005)"
+      - "Pylons/Pyramid (Python, 2008)"
+      - "Spring MVC matured"
+
+  - year: 2008
+    title: "Node.js Released"
+    description: |
+      Ryan Dahl released Node.js, bringing JavaScript to the server.
+      This had massive implications:
+      - Same language for frontend and backend
+      - Event-driven, non-blocking I/O
+      - Lightweight and fast
+    revolution: "JavaScript + non-blocking I/O changed server architecture"
+
+  - year: 2009-2011
+    title: "Express.js Brings Convention to Node"
+    description: |
+      Express.js (TJ Holowaychuk) became the Rails of Node.js.
+      Minimalist but powerful. Middleware-based architecture.
+    architectural_pattern: "Middleware chain (request → middlewares → response)"
+    influence: "Every subsequent framework adopted this pattern"
+
+  - year: 2010
+    title: "Single Page Application (SPA) Movement"
+    description: |
+      Backbone.js introduced the idea of moving application logic to the browser.
+      SPAs load once, then interact with APIs. This fundamentally changed architecture:
+      - Frontend became its own application
+      - Backend became API-first
+      - Required JavaScript MVC frameworks
+    implication: "Separation of concerns between server API and client UI"
+
+  - year: 2011
+    title: "Angular.js Released by Google"
+    description: |
+      Angular brought comprehensive framework to client-side JavaScript.
+      Two-way data binding, dependency injection, powerful templating.
+    revolutionary_feature: "Two-way data binding (model ↔ view automatic sync)"
+    downside: "Learning curve, magic, performance issues with large apps"
+
+  - year: 2013
+    title: "React Introduces Virtual DOM"
+    description: |
+      Facebook released React with a revolutionary idea: a virtual representation
+      of the DOM that diffs and efficiently updates. Component-based architecture.
+      JSX mixed HTML and JavaScript, which seemed wrong but felt right.
+    innovation: "Virtual DOM - re-render everything efficiently"
+    philosophy: "UI as pure function of state: UI = f(state)"
+    impact: "Most influential frontend framework ever released"
+
+  - year: 2014
+    title: "Vue.js: The Progressive Framework"
+    description: |
+      Evan You created Vue as "the best of Angular and React."
+      Single-file components, gentle learning curve, excellent documentation.
+    positioning: "Progressive enhancement - use as much or as little as needed"
+    market_position: "Asian adoption strong, especially in China"
+
+  - year: 2015-2016
+    title: "Webpack and Tooling Revolution"
+    description: |
+      Build tools became as important as frameworks.
+      - Webpack module bundler
+      - Babel JavaScript transpiler
+      - npm package ecosystem explosion
+    implication: "Frontend development now required complex build pipelines"
+    backlash: |
+      - Configuration complexity
+      - Tool churn
+      - Fatigue from ecosystem fragmentation
+
+  - year: 2016
+    title: "Next.js & Server-Side Rendering Returns"
+    description: |
+      After years of client-side rendering, developers realized:
+      - SEO requires server-side rendering
+      - Initial load performance suffered with SPAs
+      - Next.js provided React + server-rendering
+    paradigm: "Hybrid: Server-side rendering for initial load, client SPA for interaction"
+    significance: "Framework-level solution to SPA limitations"
+
+  - year: 2017
+    title: "Vue 3 & React Hooks"
+    description: |
+      React introduced hooks (function components with state).
+      Vue 3 completed similar shift to composition API.
+      Both moved away from class components.
+    innovation: "Composition over inheritance in frontend frameworks"
+    adoption_pattern: "Gradual transition, backwards compatible"
+
+  - year: 2020
+    title: "Edge Computing & Serverless Frameworks"
+    description: |
+      - Vercel (Next.js creators) optimized for edge computing
+      - Remix brought back server focus
+      - Serverless platforms (AWS Lambda, Cloudflare Workers) required different patterns
+    trend: "Full-stack frameworks with edge-first architecture"
+
+  - year: 2021-2023
+    title: "Svelte & Astro Challenge Assumptions"
+    description: |
+      - Svelte: Compiler-based framework, ships less JavaScript
+      - Astro: Islands architecture, send minimal JS to browser
+      - Both question React's dominance
+    philosophy_shift: |
+      - Send less JavaScript to browser
+      - Static generation where possible
+      - Interactivity only where needed
+
+  - year: 2023-present
+    title: "Full-Stack Frameworks Ascendant"
+    description: |
+      - Next.js 13+ with App Router
+      - Remix for full-stack thinking
+      - SvelteKit, Nuxt, Astro all maturing
+      - Emphasis on server components, streaming
+    current_trend: |
+      - Bring back server-side rendering benefits
+      - Minimize shipped JavaScript
+      - Better developer experience
+      - Type safety (TypeScript ubiquitous)
+
+key_architectural_shifts:
+  - name: "CGI → FastCGI → Application Servers"
+    description: "Separate app process from web server"
+    impact: "Enabled application frameworks to exist independently"
+
+  - name: "Server-rendered HTML → Client-side JavaScript"
+    description: "Logic moved from server to browser"
+    impact: "Changed how we think about application architecture"
+
+  - name: "MVC on Server → API + Client MVC"
+    description: "Backend became API, frontend became its own application"
+    impact: "Enabled specialized frontend and backend development"
+
+  - name: "Monolithic Framework → Composition of Libraries"
+    description: "React's minimal core + ecosystem"
+    impact: "More flexibility but more choice/complexity"
+
+  - name: "Build Complexity → Better Tooling"
+    description: "From simple script tags to webpack/vite"
+    impact: "Professional development but steep learning curve"
+
+  - name: "Client-rendering → Hybrid SSR + Client"
+    description: "Recognize SSR benefits while keeping SPA interactivity"
+    impact: "Better performance and SEO out of the box"
+
+mistakes_and_lessons:
+  - problem: "Separation of Concerns Lost"
+    when: "Early web frameworks mixed HTML and code"
+    lesson: "Templates and logic need clear boundaries"
+
+  - problem: "Monoliths vs Microservices"
+    when: "Rails/Django encouraged monolithic architecture"
+    lesson: "Right-sized services, not artificial splitting"
+
+  - problem: "Client-Side Rendering Overuse"
+    when: "SPA enthusiasm (2010s)"
+    lesson: "Server-side rendering still valuable for performance/SEO"
+
+  - problem: "Tooling Fatigue"
+    when: "2015-2019 JavaScript ecosystem explosion"
+    lesson: "More tools ≠ better development"
+
+  - problem: "Framework Lock-in"
+    when: "Large Angular/Ember applications"
+    lesson: "Prefer tools with good escape hatches"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Web frameworks are like kitchen tools:
+      - CGI: Hand whisk (tedious, slow, but works)
+      - Rails/Django: Stand mixer (powerful, efficient, opinionated)
+      - React: Modular kitchen (flexible, but requires assembly)
+
+      Each solved different problems at different times.
+
+  intermediate:
+    focus: "Understanding architectural implications"
+    key_points:
+      - "How each framework era solved real problems"
+      - "Why certain patterns became standard"
+      - "Trade-offs between simplicity and power"
+      - "Why frameworks keep evolving"
+
+  advanced:
+    focus: "Lessons for architectural decisions"
+    key_points:
+      - "What works where: monolith vs SPA vs SSR"
+      - "Building frameworks vs using them"
+      - "Predicting future trends"
+      - "Anti-patterns from each generation"

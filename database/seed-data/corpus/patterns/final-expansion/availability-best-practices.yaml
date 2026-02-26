@@ -1,0 +1,28 @@
+id: availability-best-practices
+name: Availability Best Practices
+category: comprehensive
+type: standard
+tags:
+- availability
+summary:
+  short: Availability Best Practices and implementation guidelines
+  long: Complete guide to availability best practices
+problem:
+  description: Challenges without proper availability best practices
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement availability best practices
+key_concepts:
+  concept: Availability Best Practices
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,28 @@
+id: latency-best-practices
+name: Latency Best Practices
+category: comprehensive
+type: standard
+tags:
+- latency
+summary:
+  short: Latency Best Practices and implementation guidelines
+  long: Complete guide to latency best practices
+problem:
+  description: Challenges without proper latency best practices
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement latency best practices
+key_concepts:
+  concept: Latency Best Practices
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

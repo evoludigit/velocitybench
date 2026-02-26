@@ -1,0 +1,154 @@
+id: acid-vs-base
+name: "ACID vs BASE Transactions"
+category: data
+type: pattern
+tags:
+  - database
+  - transactions
+  - consistency
+  - distributed-systems
+  - tradeoffs
+
+summary:
+  short: "Understanding ACID and BASE transaction models and when to use each"
+  long: |
+    ACID transactions ensure strong consistency but don't scale well across distributed systems. BASE trades consistency for availability and partition tolerance. This pattern covers both models, their tradeoffs, and strategies for distributed transactions.
+
+problem:
+  description: "Single-region ACID transactions don't scale globally; distributed transactions are complex"
+  symptoms:
+    - name: "Multi-region consistency challenges"
+      description: "Coordinating transactions across geographic regions"
+    - name: "Performance degradation"
+      description: "Waiting for distributed locks and consensus"
+    - name: "Availability issues"
+      description: "Network partitions cause transaction failures"
+    - name: "Scalability limits"
+      description: "Can't add regions/nodes without replication latency"
+
+solution:
+  approach: "Choose ACID for single-region consistency-critical features; use BASE for globally distributed, highly available systems"
+  key_points:
+    - "Understand CAP theorem tradeoffs"
+    - "Use ACID where consistency is critical"
+    - "Embrace eventual consistency where appropriate"
+    - "Implement compensating transactions for distributed work"
+    - "Monitor consistency gaps and implement safeguards"
+
+acid_model:
+  acronym: "Atomicity, Consistency, Isolation, Durability"
+
+  atomicity: "All-or-nothing: entire transaction succeeds or fails"
+  consistency: "Database transitions from valid state to valid state"
+  isolation: "Concurrent transactions don't interfere"
+  durability: "Committed data survives system failures"
+
+  guarantees:
+    - "Strong consistency: data is always correct"
+    - "Predictable behavior: same inputs = same outputs"
+    - "Easy to reason about: no race conditions"
+
+  costs:
+    - "Single-region only: distributed ACID is expensive"
+    - "Performance: coordination overhead"
+    - "Scalability: bottlenecks at coordinator"
+
+  best_for:
+    - "Financial transactions"
+    - "Inventory systems"
+    - "Accounts and permissions"
+    - "Any correctness-critical feature"
+
+base_model:
+  acronym: "Basically Available, Soft state, Eventually consistent"
+
+  basically_available: "System stays up even with failures"
+  soft_state: "Data can be inconsistent temporarily"
+  eventually_consistent: "Replicas eventually match"
+
+  guarantees:
+    - "High availability: always responsive"
+    - "Partition tolerance: survives network splits"
+    - "Scalability: no global coordinator needed"
+
+  costs:
+    - "Eventual consistency: temporary inconsistency"
+    - "Complex reasoning: race conditions possible"
+    - "Application burden: handle stale data"
+
+  best_for:
+    - "User feeds and timelines"
+    - "Search indexes"
+    - "Analytics and reporting"
+    - "Real-time notifications"
+
+distributed_transaction_patterns:
+  - name: "Saga Pattern"
+    description: "Orchestrate distributed transaction as series of local transactions"
+    coordination: "Choreography (event-driven) or Orchestration (controller)"
+    recovery: "Compensating transactions on failure"
+    use_case: "Multi-service workflows, order processing"
+
+  - name: "Two-Phase Commit (2PC)"
+    description: "Coordinator ensures all parties commit or all rollback"
+    tradeoff: "Strong consistency, but slow and blocks on coordinator failure"
+    use_case: "Legacy systems, specific consistency requirements"
+
+  - name: "Event Sourcing"
+    description: "Store immutable events; derive state from event log"
+    tradeoff: "Strong audit trail, but eventual consistency for derived state"
+    use_case: "Event-driven systems, audit-critical applications"
+
+consistency_guarantees:
+  - name: "Strong Consistency"
+    definition: "All reads see latest write"
+    examples: ["ACID transactions", "Serializability"]
+
+  - name: "Causal Consistency"
+    definition: "If write A causes write B, all reads see A before B"
+    examples: ["Dynamo", "Cassandra with quorum reads"]
+
+  - name: "Eventual Consistency"
+    definition: "Reads eventually match latest write"
+    examples: ["DNS", "Email"]
+
+  - name: "Weak Consistency"
+    definition: "No timing guarantees"
+    examples: ["Memcached", "Transient caches"]
+
+cap_theorem:
+  description: "Choose 2 of 3: Consistency, Availability, Partition tolerance"
+
+  consistency_availability: "Single-region ACID systems; choose consistency over partition"
+  availability_partition: "BASE systems; choose availability/partition over consistency"
+  consistency_partition: "Rare; requires coordination, poor availability"
+
+compensating_transactions:
+  - "Implement for each forward operation in saga"
+  - "Compensating transaction must be idempotent"
+  - "Log compensations for debugging and replay"
+  - "Design rollback transactions carefully (e.g., can't unburn money)"
+  - "Consider partial compensation (e.g., credit account, note cancellation)"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      ACID vs BASE is like two restaurant payment models:
+      - ACID: Credit card (payment guaranteed all-or-nothing, strong consistency)
+      - BASE: Split check (eventual settlement, but diners might leave before final tally)
+
+      ACID is safe but slow; BASE is fast but requires trust.
+
+  intermediate:
+    focus: "Choosing transaction models"
+    key_points:
+      - "CAP theorem and its implications"
+      - "Saga pattern for distributed transactions"
+      - "Detecting and handling eventual consistency conflicts"
+
+  advanced:
+    focus: "Large-scale distributed transactions"
+    key_points:
+      - "Event sourcing for consistency guarantees"
+      - "Consensus algorithms and their costs"
+      - "Compensation strategies and idempotence"

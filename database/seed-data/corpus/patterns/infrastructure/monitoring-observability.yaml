@@ -1,0 +1,321 @@
+id: monitoring-observability
+name: "Monitoring & Observability Systems"
+category: infrastructure
+type: standard
+tags:
+  - monitoring
+  - observability
+  - metrics
+  - logging
+  - alerting
+
+summary:
+  short: "Collecting metrics, logs, and traces to understand system behavior and detect issues"
+  long: |
+    Observability combines three pillars - metrics, logs, and traces - to answer any question about system state without having to change code. Monitoring proactively alerts on thresholds, while observability enables debugging unknown unknowns by exploring system behavior.
+
+problem:
+  description: "System fails silently; no visibility into what happened"
+  symptoms:
+    - "API is slow; don't know if it's database, network, or code"
+    - "Error spike but don't know which service caused it"
+    - "Memory grows continuously; can't find leak"
+    - "Customer reports issue; no logs to investigate"
+    - "Service down; no alert was triggered"
+  impact: "Delayed incident response, customer impact, lost revenue, unresolved issues"
+
+solution:
+  description: "Implement comprehensive monitoring and observability"
+
+three_pillars:
+  metrics:
+    description: "Numerical measurements over time (counters, gauges, histograms)"
+    examples: |
+      - Request count per second
+      - Response time (p50, p95, p99 percentiles)
+      - CPU usage %
+      - Memory usage MB
+      - Database connection pool utilization
+      - Cache hit rate %
+
+    tools: |
+      Prometheus: Time-series database for metrics
+      Grafana: Visualization and dashboards
+      DataDog: Cloud-hosted metrics
+      New Relic: APM with metrics
+      CloudWatch: AWS metrics
+
+    example_prometheus: |
+      # Expose metrics
+      from prometheus_client import Counter, Histogram
+
+      request_count = Counter('requests_total', 'Total requests')
+      request_duration = Histogram(
+          'request_duration_seconds',
+          'Request latency'
+      )
+
+      @app.route('/api/users')
+      def get_users():
+          request_count.inc()
+          with request_duration.time():
+              return db.query("SELECT * FROM users")
+
+  logs:
+    description: "Detailed event records with structured data"
+    examples: |
+      - Application logs (INFO, WARNING, ERROR)
+      - Access logs (HTTP requests)
+      - Audit logs (who did what when)
+      - Debug logs (detailed execution flow)
+
+    tools: |
+      ELK Stack: Elasticsearch, Logstash, Kibana
+      Splunk: Log aggregation and analysis
+      DataDog Logs: Cloud-hosted logging
+      Grafana Loki: Lightweight log aggregation
+      CloudWatch Logs: AWS logging
+
+    example_structured_logging: |
+      import logging
+      import json
+
+      logger = logging.getLogger(__name__)
+
+      # Structured log (easier to search and analyze)
+      logger.info("user_login", extra={
+          "user_id": 12345,
+          "email": "user@example.com",
+          "ip_address": "192.168.1.1",
+          "success": True,
+          "duration_ms": 250
+      })
+
+      # Output:
+      # {
+      #   "timestamp": "2025-01-10T10:30:45Z",
+      #   "level": "INFO",
+      #   "message": "user_login",
+      #   "user_id": 12345,
+      #   "email": "user@example.com",
+      #   "ip_address": "192.168.1.1",
+      #   "success": true,
+      #   "duration_ms": 250
+      # }
+
+  traces:
+    description: "Request path through distributed system"
+    examples: |
+      - Request hits API → calls Database → calls Cache → returns
+      - Shows latency breakdown per service
+      - Identifies bottleneck in request path
+      - Correlates logs and metrics to requests
+
+    tools: |
+      Jaeger: Open-source distributed tracing
+      Zipkin: Distributed tracing
+      DataDog APM: Cloud-hosted APM
+      Elastic APM: Part of Elastic stack
+      AWS X-Ray: AWS tracing
+
+    example_jaeger: |
+      from jaeger_client import Config
+
+      config = Config(
+          config={'sampler': {'type': 'const', 'param': 1}},
+          service_name='my-service'
+      )
+      tracer = config.initialize_tracer()
+
+      with tracer.start_active_span('get_user') as scope:
+          span = scope.span
+          span.set_tag('user_id', 123)
+
+          # Call database
+          with tracer.start_active_span('database_query') as db_scope:
+              user = db.query("SELECT * FROM users WHERE id = 123")
+
+          # Trace shows:
+          # get_user (150ms total)
+          #   └─ database_query (120ms)
+
+      # Can answer: Why is request slow? Database query took 120ms
+
+metric_types:
+  counters:
+    description: "Values that only increase (requests, errors, events)"
+    example: |
+      requests_total = 1000
+      errors_total = 5
+      cache_hits_total = 800
+
+      Rate of change: requests_total / 60sec = 16.7 req/sec
+
+  gauges:
+    description: "Values that go up and down (temperature, connections, memory)"
+    example: |
+      active_connections = 42
+      cpu_usage_percent = 75
+      memory_usage_mb = 512
+
+  histograms:
+    description: "Distribution of values (latencies, sizes)"
+    example: |
+      response_time_histogram:
+        p50: 50ms    (50% of requests ≤ 50ms)
+        p95: 200ms   (95% of requests ≤ 200ms)
+        p99: 500ms   (99% of requests ≤ 500ms)
+        max: 5000ms
+
+      Shows: Most requests fast (p50), but some slow outliers (p99)
+
+alerting_strategies:
+  threshold_based: |
+    Alert when metric exceeds threshold:
+    - CPU > 90% for 5 minutes
+    - Error rate > 5%
+    - Response time p95 > 1000ms
+
+    Pitfall: Alert fatigue (too many false alarms)
+
+  anomaly_detection: |
+    Alert when metric deviates from baseline:
+    - Error rate increases 200% above average
+    - Request count drops 50% (service down?)
+    - Latency increases 10x normal
+
+    Better: Adapts to normal fluctuations
+
+  composite_alerts: |
+    Alert on combination of metrics:
+    - CPU high AND memory high → likely resource leak
+    - Error rate high AND latency normal → application bug
+    - Error rate high AND latency high → database issue
+
+  runbook_driven: |
+    Each alert includes runbook:
+    - Alert: "High error rate"
+    - Check: Error logs in last 5 minutes
+    - Action: Restart service or rollback deployment
+
+common_metrics:
+  red_method:
+    description: "Rate, Errors, Duration (for services)"
+    metrics: |
+      Rate: Requests per second
+      Errors: Percentage of requests failing
+      Duration: Response time (p50, p99)
+
+  use_method:
+    description: "Utilization, Saturation, Errors (for resources)"
+    metrics: |
+      Utilization: CPU %, memory %, disk usage
+      Saturation: Queue depth, connection pool exhaustion
+      Errors: Timeouts, failures
+
+dashboards:
+  system_overview: |
+    High-level view:
+    - CPU, Memory, Disk usage
+    - Network throughput
+    - Error rate
+    - Request latency (p50, p95, p99)
+
+  service_dashboard: |
+    Per-service view:
+    - Request count (rate)
+    - Error rate
+    - Latency percentiles
+    - Dependency health
+
+  business_metrics: |
+    Business KPIs:
+    - Revenue per minute
+    - Conversion rate
+    - User signups per day
+    - Active users
+
+testing_observability:
+  alert_testing: |
+    def test_alert_fires():
+      # Trigger condition
+      spike_cpu_usage(threshold=95)
+
+      # Wait for alert
+      time.sleep(5)
+
+      # Verify alert was sent
+      assert alert_sent == True
+
+  log_validation: |
+    def test_structured_logs():
+      with capture_logs() as logs:
+          process_order(order_id=123)
+
+      error_log = logs[-1]
+      assert error_log['order_id'] == 123
+      assert error_log['level'] == 'ERROR'
+
+best_practices:
+  - name: "Instrument all services"
+    description: "Metrics, logs, traces in every service (client, API, database, cache)"
+
+  - name: "Use structured logging"
+    description: "JSON logs with fields, not unstructured text"
+
+  - name: "Set appropriate retention"
+    description: "Keep metrics 1-2 years, logs 30-90 days, traces 7 days"
+
+  - name: "Alert on symptoms, not logs"
+    description: "Alert on high error rate, not 'error in logs'"
+
+  - name: "Make runbooks explicit"
+    description: "Each alert includes steps to investigate and fix"
+
+  - name: "Test alerts regularly"
+    description: "Fire test alerts monthly to verify they work"
+
+  - name: "Correlate across pillars"
+    description: "Use distributed tracing to connect logs and metrics"
+
+  - name: "Monitor the monitors"
+    description: "Alert if monitoring system fails"
+
+anti_patterns:
+  - name: "No metrics"
+    consequence: "Flying blind; can't see problems until users complain"
+    fix: "Instrument all critical code paths"
+
+  - name: "Alert on everything"
+    consequence: "Alert fatigue; people ignore alerts"
+    fix: "Alert only on actionable issues"
+
+  - name: "Metrics with no aggregation"
+    description: "Per-second metrics; lose trends"
+    fix: "Aggregate and store historical data"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Observability is like checking your car's dashboard:
+      - No dashboard: Don't know gas level, temperature, speed
+      - Speedometer only: Know speed, but not if engine overheats
+      - Full dashboard: See everything (metrics, warnings, diagnostics)
+
+      You need all three pillars for complete visibility!
+
+  intermediate:
+    focus: "Implementing monitoring and observability"
+    key_points:
+      - "Metrics, logs, traces and how they complement each other"
+      - "Choosing the right metrics to track"
+      - "Structured logging for searchability"
+      - "Setting up effective alerting"
+
+  advanced:
+    focus: "Advanced observability patterns"
+    key_points:
+      - "Anomaly detection and threshold tuning"
+      - "Distributed tracing in microservices"
+      - "Cost optimization in high-volume environments"
+      - "Observability-driven debugging"

@@ -21,11 +21,11 @@ def validate(db_path: str):
 
     # Check record counts
     checks = {
-        'users': (500, "SELECT COUNT(*) FROM users"),
-        'posts': (5000, "SELECT COUNT(*) FROM posts"),
-        'comments': (25000, "SELECT COUNT(*) FROM comments"),
-        'follows': (2000, "SELECT COUNT(*) FROM user_follows"),  # At least
-        'likes': (8000, "SELECT COUNT(*) FROM post_likes"),  # At least
+        "users": (500, "SELECT COUNT(*) FROM users"),
+        "posts": (5000, "SELECT COUNT(*) FROM posts"),
+        "comments": (25000, "SELECT COUNT(*) FROM comments"),
+        "follows": (2000, "SELECT COUNT(*) FROM user_follows"),  # At least
+        "likes": (8000, "SELECT COUNT(*) FROM post_likes"),  # At least
     }
 
     print("\n📊 Record Counts:")
@@ -47,7 +47,9 @@ def validate(db_path: str):
     ).fetchone()[0]
 
     print(f"  {'✓' if orphan_posts == 0 else '✗'} Orphaned posts: {orphan_posts}")
-    print(f"  {'✓' if orphan_comments == 0 else '✗'} Orphaned comments: {orphan_comments}")
+    print(
+        f"  {'✓' if orphan_comments == 0 else '✗'} Orphaned comments: {orphan_comments}"
+    )
 
     if orphan_posts > 0 or orphan_comments > 0:
         all_pass = False

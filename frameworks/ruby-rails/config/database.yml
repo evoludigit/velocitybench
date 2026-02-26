@@ -5,7 +5,7 @@ default: &default
   username: <%= ENV['DB_USER'] || 'benchmark' %>
   password: <%= ENV['DB_PASSWORD'] || 'benchmark123' %>
   host: <%= ENV['DB_HOST'] || 'postgres' %>
-  port: <%= ENV['DB_PORT'] || 5434 %>
+  port: <%= ENV['DB_PORT'] || 5432 %>
   checkout_timeout: 5
   reaping_frequency: 10
   dead_connection_timeout: 5

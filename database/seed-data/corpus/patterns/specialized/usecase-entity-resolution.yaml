@@ -1,0 +1,28 @@
+id: usecase-entity-resolution
+name: Entity Resolution Patterns
+category: specialized
+type: standard
+tags:
+- usecase
+summary:
+  short: Patterns and practices for entity resolution patterns
+  long: Comprehensive guide to entity resolution patterns
+problem:
+  description: Challenges with entity resolution patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement entity resolution patterns
+key_concepts:
+  concept: Understanding Entity Resolution Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Entity Resolution Patterns
+  intermediate:
+    focus: Implementing Entity Resolution Patterns
+  advanced:
+    focus: Advanced Entity Resolution Patterns

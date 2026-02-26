@@ -1,0 +1,28 @@
+id: tracing-tuning
+name: Tracing Tuning
+category: comprehensive
+type: standard
+tags:
+- tracing
+summary:
+  short: Tracing Tuning and implementation guidelines
+  long: Complete guide to tracing tuning
+problem:
+  description: Challenges without proper tracing tuning
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement tracing tuning
+key_concepts:
+  concept: Tracing Tuning
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

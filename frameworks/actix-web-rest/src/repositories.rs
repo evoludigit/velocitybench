@@ -72,6 +72,28 @@ impl UserRepository {
         Ok(users)
     }
 
+    pub async fn update_bio(&self, id: &str, bio: &str) -> Result<User, ApiError> {
+        let client = self.get_client().await?;
+
+        let row = client
+            .query_one(
+                "UPDATE benchmark.tb_user SET bio = $1
+                 WHERE id::text = $2
+                 RETURNING id::text, username, full_name, bio",
+                &[&bio, &id],
+            )
+            .await
+            .map_err(|_| ApiError::NotFound)?;
+
+        Ok(User {
+            id: row.get("id"),
+            username: row.get("username"),
+            full_name: row.get("full_name"),
+            bio: row.get("bio"),
+            posts: None,
+        })
+    }
+
     pub async fn find_posts_by_user(&self, user_id: &str, limit: i64) -> Result<Vec<Post>, ApiError> {
         let client = self.get_client().await?;
 
@@ -81,7 +103,7 @@ impl UserRepository {
                         u.id::text as user_id, u.username, u.full_name, u.bio
                  FROM benchmark.tb_post p
                  JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-                 WHERE u.id::text = $1 AND p.published = true
+                 WHERE u.id = $1 AND p.published = true
                  ORDER BY p.created_at DESC
                  LIMIT $2",
                 &[&user_id, &limit],
@@ -109,7 +131,7 @@ impl UserRepository {
                 title: row.get("title"),
                 content: row.get("content"),
                 author_id: row.get("user_id"),
-                author,
+                author: Some(author),
                 created_at,
             };
 
@@ -146,7 +168,7 @@ impl PostRepository {
                         u.id::text as user_id, u.username, u.full_name, u.bio
                  FROM benchmark.tb_post p
                  JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-                 WHERE p.id::text = $1",
+                 WHERE p.id = $1",
                 &[&id],
             )
             .await
@@ -170,14 +192,46 @@ impl PostRepository {
             title: row.get("title"),
             content: row.get("content"),
             author_id: row.get("user_id"),
-            author,
+            author: Some(author),
             created_at,
         };
 
         Ok(Some(post))
     }
 
-    pub async fn find_all(&self, limit: i64, offset: i64) -> Result<Vec<Post>, ApiError> {
+    pub async fn find_all_simple(&self, limit: i64, offset: i64) -> Result<Vec<Post>, ApiError> {
+        let client = self.get_client().await?;
+
+        let rows = client
+            .query(
+                "SELECT p.id::text, p.title, p.fk_author::text as author_id
+                 FROM benchmark.tb_post p
+                 WHERE p.published = true
+                 ORDER BY p.created_at DESC
+                 LIMIT $1 OFFSET $2",
+                &[&limit, &offset],
+            )
+            .await
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+        let mut posts = Vec::new();
+        for row in rows {
+            let post = Post {
+                id: row.get("id"),
+                title: row.get("title"),
+                content: None,
+                author_id: row.get("author_id"),
+                author: None,
+                created_at: chrono::Utc::now(), // Not needed for simple
+            };
+
+            posts.push(post);
+        }
+
+        Ok(posts)
+    }
+
+    pub async fn find_all_with_author(&self, limit: i64, offset: i64) -> Result<Vec<Post>, ApiError> {
         let client = self.get_client().await?;
 
         let rows = client
@@ -214,7 +268,7 @@ impl PostRepository {
                 title: row.get("title"),
                 content: row.get("content"),
                 author_id: row.get("user_id"),
-                author,
+                author: Some(author),
                 created_at,
             };
 
@@ -222,6 +276,10 @@ impl PostRepository {
         }
 
         Ok(posts)
+    }
+
+    pub async fn find_all(&self, limit: i64, offset: i64) -> Result<Vec<Post>, ApiError> {
+        self.find_all_with_author(limit, offset).await
     }
 
     pub async fn find_by_author(&self, author_id: &str, limit: i64, offset: i64) -> Result<Vec<Post>, ApiError> {
@@ -233,7 +291,7 @@ impl PostRepository {
                         u.id::text as user_id, u.username, u.full_name, u.bio
                  FROM benchmark.tb_post p
                  JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-                 WHERE u.id::text = $1 AND p.published = true
+                 WHERE u.id = $1 AND p.published = true
                  ORDER BY p.created_at DESC
                  LIMIT $2 OFFSET $3",
                 &[&author_id, &limit, &offset],
@@ -261,7 +319,7 @@ impl PostRepository {
                 title: row.get("title"),
                 content: row.get("content"),
                 author_id: row.get("user_id"),
-                author,
+                author: Some(author),
                 created_at,
             };
 

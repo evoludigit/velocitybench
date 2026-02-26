@@ -1,0 +1,28 @@
+id: compliance-testing
+name: Compliance Testing
+category: comprehensive
+type: standard
+tags:
+- compliance
+summary:
+  short: Compliance Testing and implementation guidelines
+  long: Complete guide to compliance testing
+problem:
+  description: Challenges without proper compliance testing
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement compliance testing
+key_concepts:
+  concept: Compliance Testing
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

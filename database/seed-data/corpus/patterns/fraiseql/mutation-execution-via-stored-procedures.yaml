@@ -1,0 +1,49 @@
+id: mutation-execution-via-stored-procedures
+name: Mutation Execution via Stored Procedures
+category: fraiseql
+type: standard
+tags:
+- execution
+- mutations
+- stored-procedures
+- database-logic
+summary:
+  short: Calling database stored procedures for mutations
+  long: GraphQL mutations are executed as stored procedure calls, delegating business
+    logic to the database.
+problem:
+  description: Mutations duplicated across application and database
+  symptoms:
+  - Inconsistent mutation logic
+  - Data integrity issues
+  - Difficult to debug mutations
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Mutation Execution via Stored Procedures effectively
+key_concepts:
+  concept_1: Procedure call patterns
+  concept_2: Parameter passing
+  concept_3: Response parsing
+implementation_considerations:
+  consideration_1: Transaction handling
+  consideration_2: Error handling
+  consideration_3: Audit logging
+best_practices:
+- name: Single logic source
+  description: Put mutation logic in stored procedure
+- name: Consistent calls
+  description: Always use same calling pattern
+- name: Test procedures
+  description: Test all mutation procedures
+anti_patterns:
+- name: Application logic
+  consequence: Duplication with database logic
+- name: Inconsistent calls
+  consequence: Hard to maintain
+blog_hooks:
+  beginner:
+    focus: Introduction to Mutation Execution via Stored Procedures
+  intermediate:
+    focus: Implementing Mutation Execution via Stored Procedures
+  advanced:
+    focus: Advanced Mutation Execution via Stored Procedures techniques

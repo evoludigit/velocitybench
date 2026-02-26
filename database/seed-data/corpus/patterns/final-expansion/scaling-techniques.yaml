@@ -1,0 +1,28 @@
+id: scaling-techniques
+name: Scaling Techniques
+category: comprehensive
+type: standard
+tags:
+- scaling
+summary:
+  short: Scaling Techniques and implementation guidelines
+  long: Complete guide to scaling techniques
+problem:
+  description: Challenges without proper scaling techniques
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement scaling techniques
+key_concepts:
+  concept: Scaling Techniques
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

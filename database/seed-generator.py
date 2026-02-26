@@ -6,17 +6,16 @@ Generates realistic social media data at scale with reproducible seeding.
 Usage:
     python seed-generator.py --preset large --db postgresql://user:pass@localhost/dbname
 """
+
 import argparse
 import random
-import uuid
-import json
-from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
 import sys
+import uuid
+from datetime import datetime, timedelta
 
 try:
-    from faker import Faker
     import psycopg
+    from faker import Faker
 except ImportError:
     print("Error: Required packages not installed")
     print("Install with: pip install faker psycopg[binary]")
@@ -30,7 +29,7 @@ PRESETS = {
         "comments": 2000,
         "follows": 200,
         "likes": 1000,
-        "description": "Small dataset for development (100 users, 500 posts)"
+        "description": "Small dataset for development (100 users, 500 posts)",
     },
     "medium": {
         "users": 1000,
@@ -38,7 +37,7 @@ PRESETS = {
         "comments": 20000,
         "follows": 5000,
         "likes": 10000,
-        "description": "Medium dataset (1K users, 5K posts)"
+        "description": "Medium dataset (1K users, 5K posts)",
     },
     "large": {
         "users": 10000,
@@ -46,7 +45,7 @@ PRESETS = {
         "comments": 500000,
         "follows": 50000,
         "likes": 200000,
-        "description": "Large dataset (10K users, 100K posts)"
+        "description": "Large dataset (10K users, 100K posts)",
     },
     "xlarge": {
         "users": 50000,
@@ -54,7 +53,7 @@ PRESETS = {
         "comments": 2000000,
         "follows": 200000,
         "likes": 1000000,
-        "description": "Extra large dataset (50K users, 500K posts)"
+        "description": "Extra large dataset (50K users, 500K posts)",
     },
 }
 
@@ -72,8 +71,8 @@ class DataGenerator:
         Faker.seed(seed)
         random.seed(seed)
 
-        self.user_ids: List[uuid.UUID] = []
-        self.post_ids: List[uuid.UUID] = []
+        self.user_ids: list[uuid.UUID] = []
+        self.post_ids: list[uuid.UUID] = []
 
     def close(self):
         """Close database connection."""
@@ -94,34 +93,44 @@ class DataGenerator:
                 for i in range(batch_start, batch_end):
                     # First 100 users get predictable UUIDs for testing
                     if i < 100:
-                        user_id = uuid.UUID(f"{i+1:08d}-1111-1111-1111-111111111111")
-                        identifier = f"user_{i+1:05d}"
+                        user_id = uuid.UUID(f"{i + 1:08d}-1111-1111-1111-111111111111")
+                        identifier = f"user_{i + 1:05d}"
                     else:
                         user_id = uuid.uuid4()
                         identifier = f"user_{self.fake.user_name()[:20]}"
 
                     self.user_ids.append(user_id)
 
-                    users_data.append({
-                        "id": user_id,
-                        "identifier": identifier,
-                        "email": self.fake.unique.email(),
-                        "username": f"user_{i}" if i < 100 else self.fake.unique.user_name(),
-                        "full_name": self.fake.name(),
-                        "bio": self.fake.text(max_nb_chars=500) if random.random() > 0.3 else None,
-                    })
+                    users_data.append(
+                        {
+                            "id": user_id,
+                            "identifier": identifier,
+                            "email": self.fake.unique.email(),
+                            "username": f"user_{i}"
+                            if i < 100
+                            else self.fake.unique.user_name(),
+                            "full_name": self.fake.name(),
+                            "bio": self.fake.text(max_nb_chars=500)
+                            if random.random() > 0.3
+                            else None,
+                        }
+                    )
 
                 # Use COPY for better performance
-                with cur.copy("COPY benchmark.tb_user (id, identifier, email, username, full_name, bio) FROM STDIN") as copy:
+                with cur.copy(
+                    "COPY benchmark.tb_user (id, identifier, email, username, full_name, bio) FROM STDIN"
+                ) as copy:
                     for user in users_data:
-                        copy.write_row((
-                            user["id"],
-                            user["identifier"],
-                            user["email"],
-                            user["username"],
-                            user["full_name"],
-                            user["bio"],
-                        ))
+                        copy.write_row(
+                            (
+                                user["id"],
+                                user["identifier"],
+                                user["email"],
+                                user["username"],
+                                user["full_name"],
+                                user["bio"],
+                            )
+                        )
 
                 self.conn.commit()
                 print(f"  Users: {batch_end}/{count}")
@@ -141,8 +150,8 @@ class DataGenerator:
                 for i in range(batch_start, batch_end):
                     # First 100 posts get predictable UUIDs
                     if i < 100:
-                        post_id = uuid.UUID(f"{i+1:08d}-2222-2222-2222-222222222222")
-                        identifier = f"post_{i+1:05d}"
+                        post_id = uuid.UUID(f"{i + 1:08d}-2222-2222-2222-222222222222")
+                        identifier = f"post_{i + 1:05d}"
                     else:
                         post_id = uuid.uuid4()
                         identifier = f"post_{self.fake.slug()[:30]}"
@@ -151,30 +160,38 @@ class DataGenerator:
 
                     status = random.choice(statuses)
                     created_at = datetime.now() - timedelta(days=random.randint(0, 365))
-                    published = (status == "published")
+                    published = status == "published"
 
-                    posts_data.append({
-                        "id": post_id,
-                        "identifier": identifier,
-                        "title": self.fake.sentence(nb_words=random.randint(4, 12)),
-                        "content": self.fake.text(max_nb_chars=random.randint(200, 5000)),
-                        "fk_author": (i % len(self.user_ids)) + 1,  # pk_user from 1
-                        "published": published,
-                        "created_at": created_at,
-                    })
+                    posts_data.append(
+                        {
+                            "id": post_id,
+                            "identifier": identifier,
+                            "title": self.fake.sentence(nb_words=random.randint(4, 12)),
+                            "content": self.fake.text(
+                                max_nb_chars=random.randint(200, 5000)
+                            ),
+                            "fk_author": (i % len(self.user_ids)) + 1,  # pk_user from 1
+                            "published": published,
+                            "created_at": created_at,
+                        }
+                    )
 
                 # Use COPY for posts
-                with cur.copy("COPY benchmark.tb_post (id, identifier, title, content, fk_author, published, created_at) FROM STDIN") as copy:
+                with cur.copy(
+                    "COPY benchmark.tb_post (id, identifier, title, content, fk_author, published, created_at) FROM STDIN"
+                ) as copy:
                     for post in posts_data:
-                        copy.write_row((
-                            post["id"],
-                            post["identifier"],
-                            post["title"],
-                            post["content"],
-                            post["fk_author"],
-                            post["published"],
-                            post["created_at"],
-                        ))
+                        copy.write_row(
+                            (
+                                post["id"],
+                                post["identifier"],
+                                post["title"],
+                                post["content"],
+                                post["fk_author"],
+                                post["published"],
+                                post["created_at"],
+                            )
+                        )
 
                 self.conn.commit()
                 print(f"  Posts: {batch_end}/{count}")
@@ -194,34 +211,45 @@ class DataGenerator:
                 for i in range(batch_start, batch_end):
                     # First 100 comments get predictable UUIDs
                     if i < 100:
-                        comment_id = uuid.UUID(f"{i+1:08d}-3333-3333-3333-333333333333")
-                        identifier = f"comment_{i+1:05d}"
+                        comment_id = uuid.UUID(
+                            f"{i + 1:08d}-3333-3333-3333-333333333333"
+                        )
+                        identifier = f"comment_{i + 1:05d}"
                     else:
                         comment_id = uuid.uuid4()
                         identifier = None
 
-                    comments_data.append({
-                        "id": comment_id,
-                        "identifier": identifier,
-                        "content": self.fake.text(max_nb_chars=random.randint(50, 1000)),
-                        "fk_post": (i % len(self.post_ids)) + 1,  # pk_post from 1
-                        "fk_author": random.randint(1, len(self.user_ids)),
-                        "created_at": datetime.now() - timedelta(days=random.randint(0, 180)),
-                    })
+                    comments_data.append(
+                        {
+                            "id": comment_id,
+                            "identifier": identifier,
+                            "content": self.fake.text(
+                                max_nb_chars=random.randint(50, 1000)
+                            ),
+                            "fk_post": (i % len(self.post_ids)) + 1,  # pk_post from 1
+                            "fk_author": random.randint(1, len(self.user_ids)),
+                            "created_at": datetime.now()
+                            - timedelta(days=random.randint(0, 180)),
+                        }
+                    )
 
                     comment_ids.append(comment_id)
 
                 # Use COPY for comments
-                with cur.copy("COPY benchmark.tb_comment (id, identifier, content, fk_post, fk_author, created_at) FROM STDIN") as copy:
+                with cur.copy(
+                    "COPY benchmark.tb_comment (id, identifier, content, fk_post, fk_author, created_at) FROM STDIN"
+                ) as copy:
                     for comment in comments_data:
-                        copy.write_row((
-                            comment["id"],
-                            comment["identifier"],
-                            comment["content"],
-                            comment["fk_post"],
-                            comment["fk_author"],
-                            comment["created_at"],
-                        ))
+                        copy.write_row(
+                            (
+                                comment["id"],
+                                comment["identifier"],
+                                comment["content"],
+                                comment["fk_post"],
+                                comment["fk_author"],
+                                comment["created_at"],
+                            )
+                        )
 
                 self.conn.commit()
                 print(f"  Comments: {batch_end}/{count}")
@@ -248,14 +276,18 @@ class DataGenerator:
 
         with self.conn.cursor() as cur:
             for batch_start in range(0, len(follows_list), batch_size):
-                batch = follows_list[batch_start:batch_start + batch_size]
+                batch = follows_list[batch_start : batch_start + batch_size]
 
-                with cur.copy("COPY benchmark.tb_user_follows (fk_follower, fk_following) FROM STDIN") as copy:
+                with cur.copy(
+                    "COPY benchmark.tb_user_follows (fk_follower, fk_following) FROM STDIN"
+                ) as copy:
                     for follower_pk, following_pk in batch:
                         copy.write_row((follower_pk, following_pk))
 
                 self.conn.commit()
-                print(f"  Follows: {min(batch_start + batch_size, len(follows_list))}/{len(follows_list)}")
+                print(
+                    f"  Follows: {min(batch_start + batch_size, len(follows_list))}/{len(follows_list)}"
+                )
 
     def generate_likes(self, count: int, batch_size: int = 5000):
         """Generate post likes/reactions."""
@@ -275,14 +307,18 @@ class DataGenerator:
 
         with self.conn.cursor() as cur:
             for batch_start in range(0, len(likes_list), batch_size):
-                batch = likes_list[batch_start:batch_start + batch_size]
+                batch = likes_list[batch_start : batch_start + batch_size]
 
-                with cur.copy("COPY benchmark.tb_post_like (fk_user, fk_post, reaction_type) FROM STDIN") as copy:
+                with cur.copy(
+                    "COPY benchmark.tb_post_like (fk_user, fk_post, reaction_type) FROM STDIN"
+                ) as copy:
                     for user_pk, post_pk, reaction_type in batch:
                         copy.write_row((user_pk, post_pk, reaction_type))
 
                 self.conn.commit()
-                print(f"  Likes: {min(batch_start + batch_size, len(likes_list))}/{len(likes_list)}")
+                print(
+                    f"  Likes: {min(batch_start + batch_size, len(likes_list))}/{len(likes_list)}"
+                )
 
     def sync_tv_tables(self):
         """Sync all data to query side (tv_* tables)."""
@@ -337,11 +373,11 @@ class DataGenerator:
 
         print("  Analysis complete")
 
-    def run(self, config: Dict[str, int]):
+    def run(self, config: dict[str, int]):
         """Run full data generation."""
-        print(f"\n{'='*60}")
-        print(f"Starting data generation")
-        print(f"{'='*60}")
+        print(f"\n{'=' * 60}")
+        print("Starting data generation")
+        print(f"{'=' * 60}")
         print(f"Seed: {self.seed}")
         print(f"Config: {config}\n")
 
@@ -355,9 +391,9 @@ class DataGenerator:
             self.sync_tv_tables()
             self.analyze_tables()
 
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print("Data generation complete!")
-            print(f"{'='*60}\n")
+            print(f"{'=' * 60}\n")
 
         except Exception as e:
             print(f"\nError during data generation: {e}")
@@ -376,48 +412,44 @@ Examples:
   python seed-generator.py --preset large
   python seed-generator.py --preset large --db postgresql://user:pass@localhost:5432/fraiseql_benchmark
   python seed-generator.py --preset xlarge --seed 12345
-        """
+        """,
     )
 
     parser.add_argument(
         "--preset",
         choices=list(PRESETS.keys()),
         default="small",
-        help="Data volume preset (default: small)"
+        help="Data volume preset (default: small)",
     )
 
     parser.add_argument(
         "--db",
-        default="postgresql://benchmark:benchmark123@localhost:5432/fraiseql_benchmark",
-        help="Database connection string"
+        default=None,
+        help="Database connection string (required if DB_PASSWORD env var not set)",
     )
 
     parser.add_argument(
         "--seed",
         type=int,
         default=42,
-        help="Random seed for reproducible data (default: 42)"
+        help="Random seed for reproducible data (default: 42)",
     )
 
-    parser.add_argument(
-        "--users",
-        type=int,
-        help="Override number of users"
-    )
+    parser.add_argument("--users", type=int, help="Override number of users")
 
-    parser.add_argument(
-        "--posts",
-        type=int,
-        help="Override number of posts"
-    )
+    parser.add_argument("--posts", type=int, help="Override number of posts")
 
-    parser.add_argument(
-        "--comments",
-        type=int,
-        help="Override number of comments"
-    )
+    parser.add_argument("--comments", type=int, help="Override number of comments")
 
     args = parser.parse_args()
+
+    # Validate database connection string
+    if not args.db:
+        raise ValueError(
+            "Database connection string is required. "
+            "Use --db 'postgresql://user:password@host:port/db' "
+            "or set DB_PASSWORD environment variable."
+        )
 
     # Get base config from preset
     config = PRESETS[args.preset].copy()

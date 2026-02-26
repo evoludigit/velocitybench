@@ -1,0 +1,320 @@
+id: profiling-optimization
+name: "Profiling & Performance Optimization Techniques"
+category: performance
+type: standard
+tags:
+  - performance
+  - profiling
+  - optimization
+  - monitoring
+
+summary:
+  short: "Identifying performance bottlenecks through profiling and optimizing critical code paths"
+  long: |
+    Performance optimization starts with profiling - measuring where time and resources are actually spent. Premature optimization without profiling wastes effort. Profilers show CPU time, memory usage, and function call frequencies, enabling data-driven optimization decisions.
+
+problem:
+  description: "Application is slow; unclear where the bottleneck is"
+  symptoms:
+    - "API endpoint takes 5 seconds; don't know why"
+    - "Memory usage grows continuously"
+    - "CPU stays at 80% even with light load"
+    - "Database queries are slow; not sure which ones"
+    - "Optimization efforts don't improve performance"
+  impact: "Poor user experience, high infrastructure costs, customer churn"
+
+solution:
+  description: "Profile to find bottlenecks, then optimize based on data"
+
+profiling_types:
+  cpu_profiling:
+    description: "Measure which functions consume most CPU time"
+    tool_examples: |
+      Python: cProfile, py-spy
+      Java: JProfiler, YourKit
+      Go: pprof
+      Node.js: clinic.js, 0x
+      Ruby: stackprof
+
+    example_python: |
+      import cProfile
+      import pstats
+
+      def slow_function():
+          result = sum(range(1000000))  # CPU-intensive
+          return result
+
+      profiler = cProfile.Profile()
+      profiler.enable()
+
+      slow_function()
+
+      profiler.disable()
+      stats = pstats.Stats(profiler)
+      stats.sort_stats('cumulative').print_stats(10)
+
+      # Output shows:
+      # Function                    ncalls  cumtime  percall
+      # sum                             1    0.050    0.050
+      # range                           1    0.001    0.001
+
+  memory_profiling:
+    description: "Track memory allocation and detect memory leaks"
+    tool_examples: |
+      Python: memory_profiler, tracemalloc
+      Java: JProfiler, Eclipse MAT
+      Go: pprof, go-torch
+      Node.js: clinic.js, clinic doctor
+
+    example_python: |
+      from memory_profiler import profile
+
+      @profile
+      def memory_intensive():
+          large_list = [i for i in range(1000000)]
+          data = {x: x**2 for x in range(100000)}
+          return len(large_list)
+
+      # Line-by-line memory usage:
+      # Line                           Mem usage    Increment
+      # 4  large_list = [...]         50.5 MB     +50.5 MB
+      # 5  data = {...}               55.2 MB     +4.7 MB
+      # 6  return len(large_list)     55.2 MB     +0.0 MB
+
+  call_graph_profiling:
+    description: "Show which functions call which (call stack)"
+    example: |
+      main()
+        → get_user(user_id)
+          → query_database()  [slow]
+          → format_response()
+        → process_response()
+          → json_encode()  [slow]
+
+      Shows: 80% time in query_database(), 15% in json_encode()
+
+  database_query_profiling:
+    description: "Identify slow SQL queries"
+    examples: |
+      PostgreSQL: EXPLAIN ANALYZE
+      MySQL: EXPLAIN FORMAT=JSON
+      MongoDB: db.collection.explain()
+
+    postgresql_example: |
+      EXPLAIN ANALYZE
+      SELECT * FROM users WHERE email = 'test@example.com';
+
+      Output:
+      Seq Scan on users  (cost=0.00..35.50 rows=1)
+        Filter: email = 'test@example.com'
+        Rows: 1
+
+      Problem: Seq Scan (scanning all rows)
+      Solution: CREATE INDEX ON users(email)
+
+common_bottlenecks:
+  inefficient_algorithms:
+    description: "O(n²) algorithm when O(n log n) available"
+    example: |
+      # SLOW: O(n²)
+      def find_duplicates(items):
+          duplicates = []
+          for i in range(len(items)):
+              for j in range(i+1, len(items)):
+                  if items[i] == items[j]:
+                      duplicates.append(items[i])
+          return duplicates
+
+      # FAST: O(n)
+      def find_duplicates(items):
+          seen = set()
+          duplicates = set()
+          for item in items:
+              if item in seen:
+                  duplicates.add(item)
+              seen.add(item)
+          return duplicates
+
+      # Profiler shows: Slow version 10x slower with 1000 items
+
+  n_plus_one_queries:
+    description: "Fetching parent, then one query per child"
+    example: |
+      # SLOW: N+1 queries
+      users = db.query("SELECT * FROM users")
+      for user in users:
+          posts = db.query("SELECT * FROM posts WHERE user_id = ?", [user.id])
+          # 1 query for users + N queries for posts = N+1 total
+
+      # FAST: Single query
+      users = db.query("""
+        SELECT u.*, p.*
+        FROM users u
+        LEFT JOIN posts p ON p.user_id = u.id
+      """)
+      # 1 query
+
+  synchronous_operations:
+    description: "Waiting for one operation instead of parallel"
+    example: |
+      # SLOW: Sequential (3 seconds total)
+      data1 = fetch_from_api1()  # 1 second
+      data2 = fetch_from_api2()  # 1 second
+      data3 = fetch_from_api3()  # 1 second
+      # Total: 3 seconds
+
+      # FAST: Parallel (1 second total)
+      import asyncio
+      data = await asyncio.gather(
+          fetch_from_api1(),
+          fetch_from_api2(),
+          fetch_from_api3()
+      )
+      # Total: 1 second (all concurrent)
+
+  unbounded_memory_usage:
+    description: "Loading entire dataset into memory"
+    example: |
+      # SLOW: Loads 1 million rows
+      all_data = db.query("SELECT * FROM huge_table")  # 2GB RAM
+      for row in all_data:
+          process(row)
+
+      # FAST: Process in chunks
+      batch_size = 1000
+      for offset in range(0, total_rows, batch_size):
+          batch = db.query(
+              "SELECT * FROM huge_table LIMIT ? OFFSET ?",
+              [batch_size, offset]
+          )
+          for row in batch:
+              process(row)
+      # Only loads 1000 rows at a time
+
+optimization_techniques:
+  caching:
+    description: "Store computed results to avoid recomputation"
+    example: |
+      # SLOW: Recalculate every time
+      def get_user_posts_count(user_id):
+          return db.query("SELECT COUNT(*) FROM posts WHERE user_id = ?")
+
+      # FAST: Cache result
+      from functools import lru_cache
+
+      @lru_cache(maxsize=128)
+      def get_user_posts_count(user_id):
+          return db.query("SELECT COUNT(*) FROM posts WHERE user_id = ?")
+
+      # Second call returns instantly from cache
+
+  indexing:
+    description: "Create database indexes on frequently queried columns"
+    example: |
+      # Query without index: 5 seconds
+      SELECT * FROM users WHERE email = 'test@example.com'
+
+      # Add index
+      CREATE INDEX idx_users_email ON users(email)
+
+      # Same query: 0.001 seconds (5000x faster)
+
+  lazy_loading:
+    description: "Load data only when needed"
+    example: |
+      # EAGER (slow if many users)
+      users = db.query("SELECT * FROM users WITH EAGER POSTS")
+      # Loads posts for all 10k users even if you only view 10
+
+      # LAZY (fast)
+      users = db.query("SELECT * FROM users")
+      for user in users[:10]:
+          posts = user.posts  # Loaded on-demand
+
+  batch_processing:
+    description: "Process multiple items in one operation"
+    example: |
+      # SLOW: Individual inserts (1000 queries)
+      for user in users:
+          db.insert("users", user)
+
+      # FAST: Batch insert (1 query)
+      db.insert_batch("users", users)
+
+testing_performance:
+  baseline_metrics: |
+    def test_query_performance():
+      import time
+
+      start = time.time()
+      result = expensive_query()
+      duration = time.time() - start
+
+      assert duration < 0.1  # Must complete in 100ms
+
+  profiler_integration: |
+    def test_with_profile():
+      import cProfile
+
+      profiler = cProfile.Profile()
+      profiler.enable()
+
+      run_slow_operation()
+
+      profiler.disable()
+      # Assert top function takes < 50% of time
+      assert 'unoptimized_algorithm' not in profiler.getstats()
+
+best_practices:
+  - name: "Profile before optimizing"
+    description: "Always measure first; optimization based on data, not guesses"
+
+  - name: "Optimize hot paths"
+    description: "Focus on code that runs frequently; small improvements help most"
+
+  - name: "Measure improvement"
+    description: "Time before and after optimization to verify it helped"
+
+  - name: "Avoid premature optimization"
+    description: "Code clarity > 10% performance improvement unless in critical path"
+
+  - name: "Consider space-time tradeoffs"
+    description: "Caching uses more memory to save CPU time"
+
+  - name: "Monitor in production"
+    description: "Profiler results from staging may differ from production"
+
+anti_patterns:
+  - name: "Optimizing without profiling"
+    consequence: "Optimize wrong code; waste effort on 5% improvement in rarely-used code"
+    fix: "Profile first to find actual bottlenecks"
+
+  - name: "Microoptimizations over algorithmic improvements"
+    consequence: "O(n²) algorithm with loop unrolling still O(n²)"
+    fix: "Focus on algorithm first, microoptimizations later"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Profiling is like finding traffic bottlenecks:
+      - Without data: Guess which road is slow
+      - With profiling: See exact congestion points
+      - Then: Add lanes only where needed (actual traffic)
+
+      Measure first, optimize second!
+
+  intermediate:
+    focus: "Profiling and optimization techniques"
+    key_points:
+      - "Types of profilers (CPU, memory, call graph)"
+      - "Identifying bottlenecks with profiler output"
+      - "Common performance problems (N+1, algorithms, synchronous operations)"
+      - "Testing performance improvements"
+
+  advanced:
+    focus: "Advanced optimization strategies"
+    key_points:
+      - "Profiling in production environments"
+      - "Trade-offs between space and time"
+      - "Optimizing different resource types (CPU vs memory vs I/O)"
+      - "Sustainable performance improvements"

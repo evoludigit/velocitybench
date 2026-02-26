@@ -1,0 +1,313 @@
+id: fraiseql-error-handling-status-codes
+name: "FraiseQL Error Handling and Status Codes"
+category: fraiseql
+type: standard
+tags:
+  - fraiseql
+  - error-handling
+  - mutations
+  - status-codes
+  - response-patterns
+
+summary:
+  short: "Structured error handling through @fraiseql.success/@fraiseql.error with proper status codes"
+  long: |
+    FraiseQL mutations use three-state responses (success/error/noop) with auto-injected status codes,
+    messages, and error arrays. This pattern provides consistent error handling across all mutations
+    while allowing clients to determine what happened and how to recover. Understanding error codes,
+    error details, and when to use each response type is critical for robust APIs.
+
+problem:
+  description: |
+    Mutation errors need clear communication to clients:
+    - Did the mutation succeed?
+    - Why did it fail?
+    - Can the client retry?
+    - What should the UI show?
+
+    Without structured errors, clients can't determine state or recovery strategy.
+
+  symptoms:
+    - name: "Unclear error responses"
+      description: "Client gets GraphQL error, can't determine what happened"
+      detection: "Error message is database-level, not user-facing"
+
+    - name: "No error context"
+      description: "Error message lacks details needed to recover"
+      detection: "Client can't show helpful message or auto-retry"
+
+    - name: "Inconsistent error format"
+      description: "Different mutations return errors in different formats"
+      detection: "Client needs switch statement for each mutation"
+
+  impact: |
+    Poor user experience, hard to debug, inconsistent client handling
+
+solution:
+  principle: "Structured three-state responses with consistent error format"
+
+  components:
+    - name: "Success Response"
+      type: "Response type"
+      purpose: "Return mutated entity and confirmation"
+      decorator: |
+        @fraiseql.success
+        class UpdateUserSuccess:
+            user: User              # Updated entity
+            cascade: Cascade | None  # Optional cascade info
+            # Auto-injected: status='success', message, errors
+      benefit: |
+        - status='success' signals success to client
+        - Entity included so client can update cache
+        - Optional metadata about side effects
+
+    - name: "Error Response"
+      type: "Response type"
+      purpose: "Return error details and context"
+      decorator: |
+        @fraiseql.error
+        class UpdateUserError:
+            current_user: User | None  # State before failure
+            cascade: Cascade | None    # Failed cascade info
+            # Auto-injected: status='error', message, errors, code
+      benefit: |
+        - status='error' signals failure
+        - Error array with detailed error list
+        - Error code for categorization
+        - Previous state for rollback UI
+
+    - name: "NoOp Response"
+      type: "Response type"
+      purpose: "No changes needed (idempotent)"
+      decorator: |
+        @fraiseql.noop
+        class UpdateUserNoop:
+            # No custom fields
+            # Auto-injected: status='noop', message
+      benefit: |
+        - status='noop' = idempotent (already in desired state)
+        - Client doesn't need to refresh
+        - Safe to retry
+
+    - name: "Status Codes"
+      type: "Enumeration"
+      purpose: "Classify error types for client handling"
+      codes: |
+        **2xx (Success)**
+        - 200 'success': Mutation succeeded
+        - 201 'noop': Idempotent (no changes)
+
+        **4xx (Client Error, Retryable)**
+        - 400 'validation_error': Input invalid (fix input, retry)
+        - 409 'conflict': Race condition (retry)
+        - 422 'constraint_violation': Business rule violated
+
+        **4xx (Client Error, Non-Retryable)**
+        - 401 'unauthorized': Not authenticated
+        - 403 'forbidden': Not authorized
+        - 404 'not_found': Entity doesn't exist
+
+        **5xx (Server Error, Retryable)**
+        - 500 'internal_error': Unexpected error
+        - 503 'service_unavailable': Database/service down
+
+    - name: "Error Arrays"
+      type: "Structure"
+      purpose: "Detailed error information"
+      format: |
+        errors: [
+          {
+            code: 'invalid_email',
+            field: 'email',
+            message: 'Email must be valid format',
+            value: 'not-an-email'
+          },
+          {
+            code: 'duplicate_email',
+            field: 'email',
+            message: 'Email already in use',
+            value: 'alice@example.com'
+          }
+        ]
+
+    - name: "HTTP Status Code Mapping"
+      type: "REST mapping"
+      purpose: "Map GraphQL status to HTTP status"
+      mapping: |
+        'success' → 200 OK
+        'noop' → 200 OK
+        'validation_error' → 400 Bad Request
+        'conflict' → 409 Conflict
+        'unauthorized' → 401 Unauthorized
+        'forbidden' → 403 Forbidden
+        'not_found' → 404 Not Found
+        'internal_error' → 500 Internal Server Error
+        'service_unavailable' → 503 Service Unavailable
+
+key_concepts:
+  concept_1: "Three states: success, error, noop (not just success/error)"
+  concept_2: "Success response includes mutated entity"
+  concept_3: "Error response includes error array with details"
+  concept_4: "Status codes classify error for client handling"
+  concept_5: "Error field provides programmatic error code"
+  concept_6: "Message provides user-facing error explanation"
+  concept_7: "Errors array details each validation error"
+  concept_8: "NoOp indicates idempotent (safe to retry)"
+
+best_practices:
+  - name: "Include error details in errors array"
+    description: "Each error: code, field, message, value"
+
+  - name: "Use consistent error codes"
+    description: "Same error code across all mutations"
+
+  - name: "Provide user-facing messages"
+    description: "Errors describe what went wrong, not database details"
+
+  - name: "Include previous state in error"
+    description: "current_user for rollback/recovery UI"
+
+  - name: "Support retries for transient errors"
+    description: "Status 409, 500, 503 are safe to retry"
+
+  - name: "Test error paths"
+    description: "Verify error messages are helpful and accurate"
+
+  - name: "Log errors for debugging"
+    description: "Server-side logging for support team"
+
+anti_patterns:
+  - name: "No error details"
+    description: "message='Error' with no error array"
+    consequence: "Client can't determine what failed"
+    fix: "Include errors array with field, code, message"
+
+  - name: "Database-level errors"
+    description: "message='duplicate key value violates unique constraint'"
+    consequence: "Not user-facing, unhelpful"
+    fix: "Translate to business error (e.g., 'Email already in use')"
+
+  - name: "Wrong status code"
+    description: "Validation error with status='internal_error'"
+    consequence: "Client treats fixable error as server problem"
+    fix: "Use correct status code (400, 409, 422)"
+
+  - name: "No noop response"
+    description: "Only success/error, no idempotent handling"
+    consequence: "Hard to retry safely (success might mean noop)"
+    fix: "Return noop when no changes needed"
+
+  - name: "Inconsistent error format"
+    description: "Different mutations return different error structures"
+    consequence: "Client needs different handling per mutation"
+    fix: "Use @fraiseql.error decorator for consistent format"
+
+examples:
+  example_1:
+    title: "Success Response"
+    description: "Mutation succeeded, return updated entity"
+    code: |
+      @fraiseql.success
+      class UpdateUserSuccess:
+          user: User
+          cascade: Cascade | None = None
+
+      # GraphQL response:
+      {
+        "status": "success",
+        "message": "User updated successfully",
+        "user": {
+          "id": "550e8400-...",
+          "email": "alice@example.com",
+          "name": "Alice"
+        }
+      }
+
+  example_2:
+    title: "Error Response with Details"
+    description: "Mutation failed, return error array"
+    code: |
+      @fraiseql.error
+      class UpdateUserError:
+          current_user: User | None = None
+
+      # GraphQL response:
+      {
+        "status": "error",
+        "code": "validation_error",
+        "message": "Validation failed",
+        "errors": [
+          {
+            "code": "invalid_email",
+            "field": "email",
+            "message": "Email must be valid format",
+            "value": "not-an-email"
+          },
+          {
+            "code": "duplicate_email",
+            "field": "email",
+            "message": "Email already in use",
+            "value": "alice@example.com"
+          }
+        ]
+      }
+
+  example_3:
+    title: "NoOp Response"
+    description: "User already in desired state (idempotent)"
+    code: |
+      {
+        "status": "noop",
+        "message": "User already active"
+      }
+
+comparison_matrix:
+  status:
+    success: "Mutation succeeded"
+    error: "Mutation failed"
+    noop: "No changes needed (already desired state)"
+
+  includes_entity:
+    success: "Yes (updated entity)"
+    error: "No (use current_user instead)"
+    noop: "No (no entity needed)"
+
+  includes_errors:
+    success: "No"
+    error: "Yes (detailed array)"
+    noop: "No"
+
+  retryable:
+    success: "N/A"
+    error: "Depends on code (some yes, some no)"
+    noop: "Yes (safe to retry)"
+
+  http_status:
+    success: "200 OK"
+    error: "Varies (400-500)"
+    noop: "200 OK"
+
+blog_hooks:
+  beginner:
+    focus: "Understanding three-state responses"
+    key_points:
+      - "Success: mutation succeeded, entity included"
+      - "Error: mutation failed, errors array included"
+      - "NoOp: no changes needed (idempotent)"
+      - "Status code tells client what happened"
+
+  intermediate:
+    focus: "Error handling and recovery"
+    key_points:
+      - "Error array with field, code, message per error"
+      - "Client determines what to retry (based on status)"
+      - "User-facing messages in error.message"
+      - "Programmer-facing codes in error.code"
+
+  advanced:
+    focus: "Complex error scenarios"
+    key_points:
+      - "Partial failures in batch operations"
+      - "Cascade failures and rollback handling"
+      - "Idempotency with noop status"
+      - "Error logging for support team"

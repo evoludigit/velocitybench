@@ -1,0 +1,28 @@
+id: databases-strategies
+name: Databases Strategies
+category: comprehensive
+type: standard
+tags:
+- databases
+summary:
+  short: Databases Strategies and implementation guidelines
+  long: Complete guide to databases strategies
+problem:
+  description: Challenges without proper databases strategies
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement databases strategies
+key_concepts:
+  concept: Databases Strategies
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

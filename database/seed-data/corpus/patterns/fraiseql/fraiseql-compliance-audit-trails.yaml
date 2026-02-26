@@ -1,0 +1,374 @@
+id: fraiseql-compliance-audit-trails
+name: "FraiseQL Compliance and Audit Trails with pgGit"
+category: fraiseql
+type: standard
+tags:
+  - fraiseql
+  - pggit
+  - compliance
+  - audit-trails
+  - hipaa
+  - gdpr
+  - soc2
+
+summary:
+  short: "Automatic DDL audit trails and compliance tracking for regulated industries"
+  long: |
+    For regulated industries (HIPAA, GDPR, SOX, PCI-DSS, SOC 2), automatic DDL audit trails are
+    critical. pgGit provides immutable audit trails of all schema changes: who made the change,
+    when, why, and what changed. This pattern covers audit trail collection, compliance reporting,
+    schema drift detection, and unauthorized change detection.
+
+problem:
+  description: |
+    Compliance frameworks require documenting:
+    - Who changed the database schema
+    - When the change occurred
+    - What was changed
+    - Why (justification)
+    - Was it authorized
+
+    Without automatic tracking, manual audit trails are error-prone and incomplete.
+
+  symptoms:
+    - name: "No audit trail"
+      description: "Column was added, but no record of who/when/why"
+      detection: "Can't answer compliance questions"
+
+    - name: "Ad-hoc changes"
+      description: "DBA makes direct SQL changes, bypassing migration system"
+      consequence: "No audit trail, schema drift"
+
+    - name: "Schema drift"
+      description: "Production schema doesn't match expected state"
+      detection: "Unauthorized changes went undetected"
+
+    - name: "Compliance violation"
+      description: "Can't prove schema changes were authorized"
+      consequence: "Audit failure, regulatory fine"
+
+  impact: |
+    Compliance violation, audit failure, regulatory penalties (up to 4% revenue)
+
+solution:
+  principle: "Automatic, immutable DDL audit trails with compliance reporting"
+
+  components:
+    - name: "Automatic Change Capture"
+      type: "Database feature"
+      purpose: "Record all DDL changes automatically"
+      mechanism: |
+        pgGit captures every schema change:
+        - CREATE/ALTER/DROP TABLE
+        - CREATE/ALTER/DROP INDEX
+        - GRANT/REVOKE permissions
+        - Any DDL statement
+
+        Stored in immutable event log:
+        - timestamp (when)
+        - user (who)
+        - statement (what)
+        - previous_state (before)
+        - new_state (after)
+
+    - name: "Audit Trail Schema"
+      type: "Data structure"
+      purpose: "Store compliance audit trail"
+      fields: |
+        audit_id: UUID (unique)
+        timestamp: TIMESTAMPTZ (when)
+        user_id: UUID (who)
+        user_name: TEXT (human-readable)
+        change_type: ENUM (CREATE, ALTER, DROP, GRANT)
+        object_type: TEXT (TABLE, INDEX, VIEW, FUNCTION)
+        object_name: TEXT (table name, etc)
+        statement: TEXT (full DDL)
+        reason: TEXT (justification)
+        approved_by: UUID (approval chain)
+        approval_date: TIMESTAMPTZ
+        is_authorized: BOOLEAN
+        signature: TEXT (cryptographic verification)
+
+    - name: "Change Authorization"
+      type: "Approval workflow"
+      purpose: "Ensure changes are approved"
+      workflow: |
+        1. Developer proposes schema change
+        2. DBA reviews (diff, impact analysis)
+        3. Approval from manager/DBA
+        4. Change recorded with approval metadata
+        5. Immutable record created
+
+    - name: "Compliance Reporting"
+      type: "Reporting feature"
+      purpose: "Generate compliance reports"
+      reports: |
+        **Schema Change Report**:
+        - All changes in date range
+        - Who made each change
+        - What was changed
+        - Approval status
+
+        **Unauthorized Change Detection**:
+        - DDL executed without migration tool
+        - Direct SQL changes (detected via drift)
+        - Changes by non-authorized users
+
+        **User Activity Report**:
+        - Changes per user
+        - Frequency
+        - Types of changes
+        - Approval rate
+
+    - name: "Schema Drift Detection"
+      type: "Compliance check"
+      purpose: "Detect unauthorized changes"
+      mechanism: |
+        Periodically compare:
+        - Expected schema (from Confiture migrations)
+        - Actual schema (in production)
+
+        If differ:
+        - Log unauthorized change alert
+        - Trigger compliance incident
+        - Report to security team
+
+    - name: "Cryptographic Verification"
+      type: "Data integrity"
+      purpose: "Ensure audit trail not tampered"
+      mechanism: |
+        Each audit record signed with:
+        - Timestamp
+        - Previous record hash
+        - Change content
+        - User signature
+
+        Tampering detected by broken signature chain
+
+    - name: "Retention Policy"
+      type: "Compliance requirement"
+      purpose: "Keep audit trails for required period"
+      examples: |
+        - HIPAA: 6 years
+        - GDPR: 3-7 years (varies by data type)
+        - SOX: 7 years
+        - PCI-DSS: 1 year minimum
+
+        pgGit enforces retention (prevent deletion)
+
+    - name: "Compliance Frameworks Integration"
+      type: "Preset configurations"
+      purpose: "Pre-configured for specific regulations"
+      frameworks:
+        hipaa: |
+          - All changes tracked
+          - User attribution required
+          - 6-year retention
+          - Encryption at rest
+          - Tamper-evident logs
+
+        gdpr: |
+          - Data subject changes logged
+          - Consent tracking
+          - Right to audit
+          - Data processing records
+          - Breach notification
+
+        sox: |
+          - Financial data changes
+          - Segregation of duties
+          - Audit trail immutability
+          - Quarterly compliance reports
+
+        pci_dss: |
+          - All access logged
+          - User authentication required
+          - 1-year+ retention
+          - Regular access reviews
+
+        soc2: |
+          - Change authorization
+          - Audit trail maintenance
+          - Monitoring alerts
+          - Compliance reporting
+
+key_concepts:
+  concept_1: "pgGit automatically captures all DDL changes"
+  concept_2: "Immutable audit trail prevents tampering"
+  concept_3: "Change authorization enforced before execution"
+  concept_4: "Schema drift detected automatically"
+  concept_5: "Cryptographic signatures verify audit integrity"
+  concept_6: "Retention policies enforced (can't delete old records)"
+  concept_7: "Compliance reporting for audits"
+  concept_8: "Preset configurations for HIPAA, GDPR, SOX, PCI-DSS, SOC2"
+
+best_practices:
+  - name: "Enable pgGit for all production databases"
+    description: "Automatic change capture for compliance"
+
+  - name: "Require authorization before changes"
+    description: "DBA approval, recorded with change"
+
+  - name: "Regular compliance reports"
+    description: "Monthly/quarterly reports for auditors"
+
+  - name: "Monitor for schema drift"
+    description: "Alert on unauthorized changes"
+
+  - name: "Retain audit trails per regulation"
+    description: "HIPAA: 6 years, GDPR: varies, SOX: 7 years"
+
+  - name: "Test audit trail integrity"
+    description: "Verify signatures, detect tampering"
+
+  - name: "Disable direct SQL changes"
+    description: "Force all changes through migration tool"
+
+  - name: "Document change justifications"
+    description: "Each change includes business reason"
+
+anti_patterns:
+  - name: "No audit trail"
+    description: "No tracking of schema changes"
+    consequence: "Compliance violation, failed audit"
+    fix: "Enable pgGit for automatic capture"
+
+  - name: "Ad-hoc schema changes"
+    description: "DBA runs direct SQL, bypassing tool"
+    consequence: "Untracked changes, schema drift"
+    fix: "Disable direct access, require migration tool"
+
+  - name: "No authorization"
+    description: "Anyone can make schema changes"
+    consequence: "Unauthorized changes possible"
+    fix: "Require approval before executing"
+
+  - name: "Deletable audit trails"
+    description: "Audit records can be deleted/modified"
+    consequence: "Compliance violation (tamperable trail)"
+    fix: "Immutable audit trail, cryptographic signatures"
+
+  - name: "No retention policy"
+    description: "Keep audit trails forever (or delete after 1 month)"
+    consequence: "Compliance violation"
+    fix: "Enforce retention per regulation (6-7 years typical)"
+
+examples:
+  example_1:
+    title: "Audit Trail of Schema Change"
+    description: "Complete record of change with approval"
+    code: |
+      Audit Record:
+      {
+        audit_id: "550e8400-...",
+        timestamp: "2025-01-29T10:30:00Z",
+        user_id: "alice-uuid",
+        user_name: "Alice Johnson",
+        change_type: "ALTER",
+        object_type: "TABLE",
+        object_name: "tb_user",
+        statement: "ALTER TABLE tb_user ADD COLUMN stripe_id TEXT UNIQUE;",
+        reason: "Stripe payment integration for subscriptions",
+        approved_by: "bob-uuid",
+        approval_date: "2025-01-29T10:00:00Z",
+        is_authorized: true,
+        signature: "sha256:abc123..."
+      }
+
+  example_2:
+    title: "Compliance Report"
+    description: "HIPAA audit report of all schema changes"
+    code: |
+      HIPAA Compliance Report: Jan 2025
+
+      Summary:
+      - Total schema changes: 5
+      - Authorized changes: 5
+      - Unauthorized changes: 0
+      - Drift detected: No
+      - Audit trail integrity: ✓ Valid (all signatures verified)
+
+      Changes:
+      1. 2025-01-05 ADD COLUMN patient_phone (Approved: Dr. Smith)
+      2. 2025-01-10 ALTER TABLE medical_records (Approved: CTO Alice)
+      3. 2025-01-15 ADD INDEX on patient_id (Approved: DBA Bob)
+      4. 2025-01-20 GRANT SELECT ON sensitive_data (Approved: Security)
+      5. 2025-01-25 CREATE VIEW patient_summary (Approved: Clinical Lead)
+
+      Conclusion: HIPAA compliant. No issues detected.
+
+  example_3:
+    title: "Schema Drift Detection"
+    description: "Unauthorized change detected and alerted"
+    code: |
+      # Scheduled compliance check finds drift
+      SELECT pggit.detect_drift();
+
+      Result:
+      {
+        drift_detected: true,
+        expected_schema_hash: "abc123...",
+        actual_schema_hash: "def456...",
+        unauthorized_changes: [
+          {
+            object: "tb_payment",
+            change: "Column stripe_api_key added",
+            detected_at: "2025-01-29T15:30:00Z",
+            previous_state: "...",
+            current_state: "..."
+          }
+        ]
+      }
+
+      # Alert sent to security team
+      # Incident created for investigation
+
+comparison_matrix:
+  aspect:
+    compliance_enabled: "pgGit audit trails enabled"
+    compliance_disabled: "No automatic audit trail"
+
+  change_tracking:
+    compliance_enabled: "Automatic (all DDL captured)"
+    compliance_disabled: "Manual (error-prone)"
+
+  audit_trail:
+    compliance_enabled: "Immutable, cryptographically signed"
+    compliance_disabled: "No official record"
+
+  authorization:
+    compliance_enabled: "Required and recorded"
+    compliance_disabled: "Optional, unrecorded"
+
+  drift_detection:
+    compliance_enabled: "Automatic detection"
+    compliance_disabled: "Manual audit required"
+
+  compliance_ready:
+    compliance_enabled: "HIPAA, GDPR, SOX, PCI-DSS ready"
+    compliance_disabled: "Non-compliant"
+
+blog_hooks:
+  beginner:
+    focus: "Understanding audit trails for compliance"
+    key_points:
+      - "pgGit captures all schema changes automatically"
+      - "Who, when, what, why recorded for each change"
+      - "Immutable trail prevents tampering"
+      - "Compliance reporting for auditors"
+
+  intermediate:
+    focus: "Authorization and drift detection"
+    key_points:
+      - "Authorization required before changes"
+      - "Cryptographic signatures verify integrity"
+      - "Schema drift detection alerts on unauthorized changes"
+      - "Retention policies per regulation"
+
+  advanced:
+    focus: "Compliance framework integration"
+    key_points:
+      - "HIPAA, GDPR, SOX, PCI-DSS, SOC2 presets"
+      - "Regulatory reporting automation"
+      - "Incident response on unauthorized changes"
+      - "Audit trail tamper detection"

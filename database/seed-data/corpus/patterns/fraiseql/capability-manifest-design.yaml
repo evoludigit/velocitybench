@@ -1,0 +1,50 @@
+id: capability-manifest-design
+name: Capability Manifest Design
+category: fraiseql
+type: standard
+tags:
+- compilation
+- capabilities
+- database-features
+- manifest
+summary:
+  short: Database feature declarations for capability-driven compilation
+  long: FraiseQL uses a capability manifest to declare what features each database
+    supports (operators, functions, extensions), enabling capability-driven compilation
+    and optimization.
+problem:
+  description: Hardcoded database feature support matrix
+  symptoms:
+  - Difficult to add support for new database
+  - Wrong operators generated for database
+  - Manual updates when database changes
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Capability Manifest Design effectively
+key_concepts:
+  concept_1: Capability categories and types
+  concept_2: Manifest structure and format
+  concept_3: Capability matching algorithms
+implementation_considerations:
+  consideration_1: Manifest versioning
+  consideration_2: Capability discovery vs declaration
+  consideration_3: Fallback capabilities
+best_practices:
+- name: Structured manifest
+  description: Organize capabilities logically
+- name: Version capabilities
+  description: Track capability versions
+- name: Test coverage
+  description: Test each capability
+anti_patterns:
+- name: Hardcoded features
+  consequence: Unmaintainable feature list
+- name: Undeclared capabilities
+  consequence: Missing optimizations
+blog_hooks:
+  beginner:
+    focus: Introduction to Capability Manifest Design
+  intermediate:
+    focus: Implementing Capability Manifest Design
+  advanced:
+    focus: Advanced Capability Manifest Design techniques

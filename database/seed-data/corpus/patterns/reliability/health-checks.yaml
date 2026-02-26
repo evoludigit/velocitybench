@@ -1,0 +1,326 @@
+# Health Checks and Liveness Probes
+# VelocityBench Knowledge Corpus
+
+id: health-checks
+name: "Health Checks and Liveness Probes"
+category: reliability
+type: pattern
+severity: high
+tags:
+  - reliability
+  - monitoring
+  - kubernetes
+  - load-balancer
+  - observability
+
+summary:
+  short: "Expose endpoints to verify service health for orchestration and load balancing"
+  long: |
+    Health checks allow load balancers and orchestrators to know if your service is
+    functioning correctly. Liveness probes detect if a service is stuck and needs restart.
+    Readiness probes detect if a service can handle traffic. Proper health checks enable
+    automatic failover, rolling deployments, and self-healing infrastructure.
+
+problem:
+  description: |
+    Without health checks, infrastructure can't distinguish healthy from unhealthy instances:
+    - Load balancers send traffic to dead or degraded services
+    - Kubernetes can't know when to restart stuck containers
+    - Rolling deployments complete before new instances are ready
+    - Cascading failures spread because broken instances aren't removed
+
+  symptoms:
+    - name: "Traffic to dead instances"
+      description: "Load balancer routes to instances that can't respond"
+      detection: "Timeout errors despite healthy instances existing"
+
+    - name: "Stuck processes"
+      description: "Service appears running but can't handle requests"
+      detection: "Container running but requests hang indefinitely"
+
+    - name: "Deployment failures"
+      description: "New versions break but aren't rolled back"
+      detection: "Errors spike after deployment, manual intervention needed"
+
+solution:
+  principle: "Actively verify service health and dependencies"
+
+  probe_types:
+    - name: "Liveness Probe"
+      purpose: "Is the process alive and not deadlocked?"
+      failure_action: "Restart the container/process"
+      check: "Usually simple - can the process respond at all?"
+
+    - name: "Readiness Probe"
+      purpose: "Can the service handle traffic right now?"
+      failure_action: "Remove from load balancer, stop sending traffic"
+      check: "More thorough - are dependencies available?"
+
+    - name: "Startup Probe"
+      purpose: "Has the application finished initializing?"
+      failure_action: "Don't start liveness/readiness checks yet"
+      check: "One-time check for slow-starting applications"
+
+implementation:
+  basic_health_endpoint:
+    python_fastapi: |
+      from fastapi import FastAPI, Response, status
+      from datetime import datetime
+
+      app = FastAPI()
+
+      @app.get("/health")
+      async def health_check():
+          """Simple liveness check - can we respond?"""
+          return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+
+      @app.get("/health/live")
+      async def liveness():
+          """Kubernetes liveness probe - is process alive?"""
+          return {"status": "live"}
+
+      @app.get("/health/ready")
+      async def readiness(response: Response):
+          """Kubernetes readiness probe - can we handle traffic?"""
+          checks = {
+              "database": check_database(),
+              "cache": check_cache(),
+              "external_api": check_external_api()
+          }
+
+          all_healthy = all(checks.values())
+
+          if not all_healthy:
+              response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+
+          return {
+              "status": "ready" if all_healthy else "not_ready",
+              "checks": checks
+          }
+
+    javascript_express: |
+      const express = require('express');
+      const app = express();
+
+      // Simple liveness
+      app.get('/health', (req, res) => {
+        res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+      });
+
+      // Readiness with dependency checks
+      app.get('/health/ready', async (req, res) => {
+        const checks = {
+          database: await checkDatabase(),
+          cache: await checkCache(),
+          queue: await checkMessageQueue()
+        };
+
+        const allHealthy = Object.values(checks).every(v => v);
+
+        res.status(allHealthy ? 200 : 503).json({
+          status: allHealthy ? 'ready' : 'not_ready',
+          checks
+        });
+      });
+
+      async function checkDatabase() {
+        try {
+          await pool.query('SELECT 1');
+          return true;
+        } catch {
+          return false;
+        }
+      }
+
+  dependency_checks:
+    python: |
+      import asyncio
+      from typing import Dict
+      import aiohttp
+      import asyncpg
+      import redis.asyncio as redis
+
+      async def check_database() -> bool:
+          """Check if database is responsive."""
+          try:
+              conn = await asyncpg.connect(DATABASE_URL)
+              await conn.fetchval("SELECT 1")
+              await conn.close()
+              return True
+          except Exception:
+              return False
+
+      async def check_redis() -> bool:
+          """Check if Redis is responsive."""
+          try:
+              client = redis.from_url(REDIS_URL)
+              await client.ping()
+              await client.close()
+              return True
+          except Exception:
+              return False
+
+      async def check_external_api() -> bool:
+          """Check if critical external API is reachable."""
+          try:
+              async with aiohttp.ClientSession() as session:
+                  async with session.get(
+                      "https://api.stripe.com/v1/health",
+                      timeout=aiohttp.ClientTimeout(total=5)
+                  ) as response:
+                      return response.status == 200
+          except Exception:
+              return False
+
+      async def run_all_checks() -> Dict[str, bool]:
+          """Run all health checks concurrently."""
+          results = await asyncio.gather(
+              check_database(),
+              check_redis(),
+              check_external_api(),
+              return_exceptions=True
+          )
+
+          return {
+              "database": results[0] is True,
+              "redis": results[1] is True,
+              "external_api": results[2] is True
+          }
+
+kubernetes_configuration:
+  deployment: |
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: my-api
+    spec:
+      template:
+        spec:
+          containers:
+          - name: api
+            image: my-api:latest
+            ports:
+            - containerPort: 8000
+
+            # Liveness: restart if stuck
+            livenessProbe:
+              httpGet:
+                path: /health/live
+                port: 8000
+              initialDelaySeconds: 10
+              periodSeconds: 10
+              timeoutSeconds: 5
+              failureThreshold: 3
+
+            # Readiness: remove from service if not ready
+            readinessProbe:
+              httpGet:
+                path: /health/ready
+                port: 8000
+              initialDelaySeconds: 5
+              periodSeconds: 5
+              timeoutSeconds: 3
+              failureThreshold: 2
+
+            # Startup: for slow-starting apps
+            startupProbe:
+              httpGet:
+                path: /health/live
+                port: 8000
+              failureThreshold: 30
+              periodSeconds: 10
+
+  probe_tuning:
+    - name: "initialDelaySeconds"
+      description: "Wait before first probe"
+      guidance: "Set based on app startup time"
+
+    - name: "periodSeconds"
+      description: "How often to probe"
+      guidance: "5-10s for readiness, 10-30s for liveness"
+
+    - name: "timeoutSeconds"
+      description: "How long to wait for response"
+      guidance: "Should be less than periodSeconds"
+
+    - name: "failureThreshold"
+      description: "Consecutive failures before action"
+      guidance: "2-3 for readiness, 3-5 for liveness"
+
+best_practices:
+  - name: "Keep liveness simple"
+    description: "Liveness should only check if process is alive, not dependencies"
+    wrong: |
+      # BAD: Liveness checks database
+      @app.get("/health/live")
+      def liveness():
+          db.execute("SELECT 1")  # If DB is down, all pods restart!
+          return {"status": "live"}
+    correct: |
+      # GOOD: Liveness is simple
+      @app.get("/health/live")
+      def liveness():
+          return {"status": "live"}
+
+      # Readiness checks dependencies
+      @app.get("/health/ready")
+      def readiness():
+          if not db.is_connected():
+              return Response(status_code=503)
+          return {"status": "ready"}
+
+  - name: "Don't cascade failures"
+    description: "External dependency down shouldn't mark all instances unhealthy"
+    example: |
+      # If Stripe is down, maybe you're still partially functional
+      @app.get("/health/ready")
+      def readiness():
+          critical = check_database()  # Must have
+          optional = check_stripe()    # Nice to have
+
+          if not critical:
+              return Response(status_code=503)
+
+          return {
+              "status": "ready",
+              "degraded": not optional
+          }
+
+  - name: "Include useful debugging info"
+    example: |
+      @app.get("/health")
+      def health():
+          return {
+              "status": "healthy",
+              "version": os.getenv("APP_VERSION", "unknown"),
+              "uptime_seconds": time.time() - START_TIME,
+              "hostname": socket.gethostname(),
+              "checks": {
+                  "database": {"healthy": True, "latency_ms": 2},
+                  "cache": {"healthy": True, "latency_ms": 1},
+              }
+          }
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Health checks are like a doctor's checkup for your service:
+      - Liveness probe: "Is the patient breathing?" (restart if not)
+      - Readiness probe: "Can the patient work today?" (no traffic if not)
+      Without checkups, you send sick workers to handle customers!
+
+  intermediate:
+    focus: "Designing health checks for different deployment scenarios"
+    key_points:
+      - "Separating liveness from readiness concerns"
+      - "Avoiding cascade failures from dependency checks"
+      - "Tuning probe timing for your application"
+      - "Graceful shutdown and drain connections"
+
+  advanced:
+    focus: "Health check patterns in complex distributed systems"
+    key_points:
+      - "Deep vs shallow health checks"
+      - "Health check aggregation across services"
+      - "Circuit breaker integration with health status"
+      - "Custom metrics exposure for auto-scaling decisions"

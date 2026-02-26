@@ -1,0 +1,367 @@
+# Window Functions
+# VelocityBench Knowledge Corpus
+
+id: window-functions
+name: "SQL Window Functions"
+category: queries
+type: pattern
+severity: medium
+tags:
+  - sql
+  - postgresql
+  - analytics
+  - performance
+  - queries
+
+summary:
+  short: "Perform calculations across related rows without collapsing them"
+  long: |
+    Window functions perform calculations across a set of rows related to the current row,
+    without grouping rows into a single output row like GROUP BY. They enable running
+    totals, rankings, moving averages, and comparisons to previous/next rows - all in a
+    single query. Essential for analytics, reporting, and time-series analysis.
+
+problem:
+  description: |
+    Many calculations require context from related rows:
+    - What's the running total of sales?
+    - Rank products by sales within each category
+    - Compare each employee's salary to department average
+    - Calculate month-over-month growth
+    Standard GROUP BY collapses rows, losing individual row details.
+
+  symptoms:
+    - name: "Self-joins for running totals"
+      description: "Joining table to itself to calculate cumulative sums"
+      detection: "Complex self-joins in queries, poor performance"
+
+    - name: "Application-side calculations"
+      description: "Fetching all data, calculating rankings in code"
+      detection: "Large result sets, calculation logic in application"
+
+    - name: "Correlated subqueries"
+      description: "Subquery that references outer query"
+      detection: "Slow queries with subqueries per row"
+
+solution:
+  principle: "Perform calculations across row windows in a single pass"
+
+  syntax: |
+    function_name(args) OVER (
+        [PARTITION BY partition_columns]
+        [ORDER BY order_columns]
+        [frame_clause]
+    )
+
+  components:
+    - name: "PARTITION BY"
+      purpose: "Divide rows into groups (like GROUP BY but keeps rows)"
+
+    - name: "ORDER BY"
+      purpose: "Define order within each partition"
+
+    - name: "Frame clause"
+      purpose: "Define which rows to include in calculation"
+
+implementation:
+  ranking_functions:
+    postgresql: |
+      -- ROW_NUMBER: Sequential numbers, no gaps, no ties
+      SELECT
+          product_name,
+          category,
+          sales,
+          ROW_NUMBER() OVER (
+              PARTITION BY category
+              ORDER BY sales DESC
+          ) AS row_num
+      FROM products;
+      -- Result: ranks 1, 2, 3, 4... within each category
+
+      -- RANK: Same rank for ties, gaps after ties
+      SELECT
+          product_name,
+          sales,
+          RANK() OVER (ORDER BY sales DESC) AS rank
+      FROM products;
+      -- With ties: 1, 2, 2, 4 (skips 3)
+
+      -- DENSE_RANK: Same rank for ties, no gaps
+      SELECT
+          product_name,
+          sales,
+          DENSE_RANK() OVER (ORDER BY sales DESC) AS dense_rank
+      FROM products;
+      -- With ties: 1, 2, 2, 3 (no skip)
+
+      -- NTILE: Divide into N buckets
+      SELECT
+          product_name,
+          sales,
+          NTILE(4) OVER (ORDER BY sales DESC) AS quartile
+      FROM products;
+      -- Result: 1, 1, 1, 2, 2, 2, 3, 3, 4, 4 (divides into quartiles)
+
+  aggregate_windows:
+    postgresql: |
+      -- Running total
+      SELECT
+          date,
+          amount,
+          SUM(amount) OVER (ORDER BY date) AS running_total
+      FROM transactions;
+      -- date       amount  running_total
+      -- 2024-01-01   100        100
+      -- 2024-01-02   200        300
+      -- 2024-01-03   150        450
+
+      -- Running total per category
+      SELECT
+          date,
+          category,
+          amount,
+          SUM(amount) OVER (
+              PARTITION BY category
+              ORDER BY date
+          ) AS category_running_total
+      FROM transactions;
+
+      -- Moving average (last 7 days)
+      SELECT
+          date,
+          amount,
+          AVG(amount) OVER (
+              ORDER BY date
+              ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
+          ) AS moving_avg_7day
+      FROM daily_sales;
+
+      -- Percentage of total
+      SELECT
+          product_name,
+          sales,
+          sales * 100.0 / SUM(sales) OVER () AS pct_of_total
+      FROM products;
+
+      -- Percentage within category
+      SELECT
+          product_name,
+          category,
+          sales,
+          sales * 100.0 / SUM(sales) OVER (PARTITION BY category) AS pct_of_category
+      FROM products;
+
+  navigation_functions:
+    postgresql: |
+      -- LAG: Previous row value
+      SELECT
+          date,
+          sales,
+          LAG(sales) OVER (ORDER BY date) AS prev_day_sales,
+          sales - LAG(sales) OVER (ORDER BY date) AS day_over_day_change
+      FROM daily_sales;
+
+      -- LEAD: Next row value
+      SELECT
+          date,
+          price,
+          LEAD(price) OVER (ORDER BY date) AS next_price,
+          LEAD(price) OVER (ORDER BY date) - price AS price_change
+      FROM stock_prices;
+
+      -- LAG with default value (for first row)
+      SELECT
+          date,
+          sales,
+          LAG(sales, 1, 0) OVER (ORDER BY date) AS prev_sales
+      FROM daily_sales;
+      -- First row gets 0 instead of NULL
+
+      -- FIRST_VALUE / LAST_VALUE
+      SELECT
+          date,
+          price,
+          FIRST_VALUE(price) OVER (
+              PARTITION BY extract(month FROM date)
+              ORDER BY date
+          ) AS month_open_price,
+          price - FIRST_VALUE(price) OVER (
+              PARTITION BY extract(month FROM date)
+              ORDER BY date
+          ) AS change_from_open
+      FROM stock_prices;
+
+  frame_clauses:
+    postgresql: |
+      -- Default frame: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+      -- (All rows from start to current)
+
+      -- ROWS: Physical row count
+      SELECT
+          date,
+          value,
+          AVG(value) OVER (
+              ORDER BY date
+              ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+          ) AS avg_last_3_rows
+      FROM metrics;
+
+      -- RANGE: Logical range of values
+      SELECT
+          date,
+          value,
+          AVG(value) OVER (
+              ORDER BY date
+              RANGE BETWEEN INTERVAL '7 days' PRECEDING AND CURRENT ROW
+          ) AS avg_last_7_days
+      FROM metrics;
+
+      -- Centered window (for smoothing)
+      SELECT
+          date,
+          value,
+          AVG(value) OVER (
+              ORDER BY date
+              ROWS BETWEEN 2 PRECEDING AND 2 FOLLOWING
+          ) AS centered_avg
+      FROM metrics;
+
+      -- Full partition
+      SELECT
+          category,
+          value,
+          MAX(value) OVER (
+              PARTITION BY category
+              ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+          ) AS category_max
+      FROM products;
+
+  practical_examples:
+    top_n_per_group: |
+      -- Top 3 products per category
+      WITH ranked AS (
+          SELECT
+              product_name,
+              category,
+              sales,
+              ROW_NUMBER() OVER (
+                  PARTITION BY category
+                  ORDER BY sales DESC
+              ) AS rank
+          FROM products
+      )
+      SELECT * FROM ranked WHERE rank <= 3;
+
+    month_over_month_growth: |
+      -- Calculate month-over-month growth rate
+      WITH monthly_sales AS (
+          SELECT
+              date_trunc('month', date) AS month,
+              SUM(amount) AS total_sales
+          FROM orders
+          GROUP BY date_trunc('month', date)
+      )
+      SELECT
+          month,
+          total_sales,
+          LAG(total_sales) OVER (ORDER BY month) AS prev_month,
+          (total_sales - LAG(total_sales) OVER (ORDER BY month))
+              / NULLIF(LAG(total_sales) OVER (ORDER BY month), 0)
+              * 100 AS growth_pct
+      FROM monthly_sales;
+
+    gap_detection: |
+      -- Find gaps in sequence
+      SELECT
+          id,
+          LAG(id) OVER (ORDER BY id) AS prev_id,
+          id - LAG(id) OVER (ORDER BY id) AS gap
+      FROM orders
+      WHERE id - LAG(id) OVER (ORDER BY id) > 1;
+
+    sessionization: |
+      -- Group events into sessions (30 min gap = new session)
+      WITH events_with_gaps AS (
+          SELECT
+              user_id,
+              timestamp,
+              EXTRACT(EPOCH FROM (
+                  timestamp - LAG(timestamp) OVER (
+                      PARTITION BY user_id
+                      ORDER BY timestamp
+                  )
+              )) / 60 AS minutes_since_last
+          FROM events
+      )
+      SELECT
+          user_id,
+          timestamp,
+          SUM(CASE WHEN minutes_since_last > 30 OR minutes_since_last IS NULL
+                   THEN 1 ELSE 0 END)
+              OVER (PARTITION BY user_id ORDER BY timestamp) AS session_id
+      FROM events_with_gaps;
+
+    deduplication: |
+      -- Keep most recent record per user (dedup)
+      WITH ranked AS (
+          SELECT
+              *,
+              ROW_NUMBER() OVER (
+                  PARTITION BY user_id
+                  ORDER BY updated_at DESC
+              ) AS rn
+          FROM user_records
+      )
+      SELECT * FROM ranked WHERE rn = 1;
+
+performance_tips:
+  - name: "Index ORDER BY columns"
+    example: |
+      -- Window functions sort by ORDER BY
+      CREATE INDEX idx_orders_date ON orders(date);
+      CREATE INDEX idx_orders_category_date ON orders(category, date);
+
+  - name: "Reuse window definitions"
+    example: |
+      SELECT
+          date,
+          amount,
+          SUM(amount) OVER w AS running_total,
+          AVG(amount) OVER w AS running_avg,
+          COUNT(*) OVER w AS running_count
+      FROM transactions
+      WINDOW w AS (ORDER BY date);
+
+  - name: "Filter after window calculation"
+    example: |
+      -- Window functions compute BEFORE WHERE
+      -- Use CTE or subquery to filter after
+      WITH ranked AS (
+          SELECT *, ROW_NUMBER() OVER (...) AS rn
+          FROM table
+      )
+      SELECT * FROM ranked WHERE rn = 1;
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Window functions are like looking at a spreadsheet:
+      - GROUP BY: Collapses rows, shows only totals (hides detail)
+      - Window function: Keeps all rows, adds a column with "running total so far"
+      You see both the individual values AND the aggregates!
+
+  intermediate:
+    focus: "Common window function patterns"
+    key_points:
+      - "Ranking: ROW_NUMBER, RANK, DENSE_RANK"
+      - "Running totals and moving averages"
+      - "LAG/LEAD for comparisons"
+      - "Top-N per group pattern"
+
+  advanced:
+    focus: "Advanced frames and performance"
+    key_points:
+      - "ROWS vs RANGE frame specifications"
+      - "Sessionization and gap detection"
+      - "Window function performance optimization"
+      - "Combining multiple windows efficiently"

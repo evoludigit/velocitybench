@@ -1,0 +1,28 @@
+id: cloud-integration
+name: Cloud Integration
+category: comprehensive
+type: standard
+tags:
+- cloud
+summary:
+  short: Cloud Integration and implementation guidelines
+  long: Complete guide to cloud integration
+problem:
+  description: Challenges without proper cloud integration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement cloud integration
+key_concepts:
+  concept: Cloud Integration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

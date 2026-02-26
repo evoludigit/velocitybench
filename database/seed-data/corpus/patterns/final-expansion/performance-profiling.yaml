@@ -1,0 +1,28 @@
+id: performance-profiling
+name: Performance Profiling
+category: comprehensive
+type: standard
+tags:
+- performance
+summary:
+  short: Performance Profiling and implementation guidelines
+  long: Complete guide to performance profiling
+problem:
+  description: Challenges without proper performance profiling
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement performance profiling
+key_concepts:
+  concept: Performance Profiling
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

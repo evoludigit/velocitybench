@@ -1,11 +1,12 @@
 # Multi-stage build for FastAPI REST framework
 # Stage 1: Build dependencies
-FROM python:3.11-slim AS builder
+FROM python:3.13-slim AS builder
 
 # Install system dependencies for building
 RUN apt-get update && apt-get install -y \
     gcc \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean \
+    && rm -rf /var/cache/apt/archives/* /var/lib/apt/lists/*
 
 # Create virtual environment
 RUN python -m venv /opt/venv
@@ -16,7 +17,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Stage 2: Runtime image
-FROM python:3.11-slim AS runtime
+FROM python:3.13-slim AS runtime
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \

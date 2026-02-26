@@ -1,0 +1,144 @@
+id: service-discovery
+name: "Service Discovery & Load Balancing"
+category: infrastructure
+type: pattern
+tags:
+  - microservices
+  - service-discovery
+  - load-balancing
+  - routing
+  - infrastructure
+
+summary:
+  short: "Dynamically finding and connecting to available service instances in distributed systems"
+  long: |
+    In microservices, services may have dozens of instances constantly starting/stopping. Service discovery automatically tracks instance locations (IP, port); clients query the registry to find healthy instances. Load balancing distributes requests across instances.
+
+problem:
+  description: "Hardcoding service IPs breaks when instances change; finding healthy instances is manual"
+  symptoms:
+    - name: "Stale endpoints"
+      description: "Client connects to instance that crashed"
+    - name: "Manual updates"
+      description: "Ops must update configuration when services move"
+    - name: "Uneven load"
+      description: "Some instances receive more requests than others"
+    - name: "No health awareness"
+      description: "Routing to unhealthy instances"
+
+solution:
+  approach: "Register services with discovery system; clients query registry for healthy instances"
+  key_points:
+    - "Services register/deregister dynamically"
+    - "Health checks validate instance health"
+    - "Clients query discovery service for instances"
+    - "Load balancer distributes traffic"
+    - "DNS or API-based discovery"
+
+service_discovery_patterns:
+  - name: "Server-Side Discovery"
+    flow: "Client → Load Balancer → Service Registry lookup → Route to instance"
+    control: "Load balancer controls routing"
+    advantage: "Clients don't need to know about discovery"
+    example: "AWS ELB, Kubernetes Service"
+
+  - name: "Client-Side Discovery"
+    flow: "Client → Query registry → Connect directly to instance"
+    control: "Client controls routing"
+    advantage: "Direct connection, no load balancer hop"
+    example: "Eureka (Spring), Consul DNS"
+
+  - name: "DNS-Based Discovery"
+    flow: "Client → DNS query for service name → Get instance IPs → Connect"
+    control: "DNS server provides instance list"
+    advantage: "Works with any client library"
+    example: "Kubernetes DNS, Consul DNS"
+
+discovery_tools:
+  - "Consul: HashiCorp service discovery with health checks"
+  - "Eureka: Netflix service discovery (deprecated but still used)"
+  - "Kubernetes: Built-in service discovery via DNS"
+  - "ZooKeeper: General-purpose service coordination"
+  - "etcd: Distributed configuration and service registry"
+  - "AWS Route 53: Cloud-based service discovery"
+
+health_checking:
+  http_check: "GET /health → 200 OK = healthy"
+  tcp_check: "TCP connection successful = healthy"
+  script_check: "Custom script returns success = healthy"
+  ttl_check: "Service must ping endpoint periodically (TTL-based)"
+
+  interval: "Every 5-10 seconds"
+  timeout: "2-5 seconds"
+  threshold: "Mark unhealthy after 3 failed checks"
+
+load_balancing_algorithms:
+  - name: "Round Robin"
+    logic: "Cycle through instances in order"
+    fairness: "Equal distribution if all equal capacity"
+    use_case: "Simple, predictable distribution"
+
+  - name: "Least Connections"
+    logic: "Route to instance with fewest active connections"
+    fairness: "Accounts for long-lived connections"
+    use_case: "WebSocket, streaming, persistent connections"
+
+  - name: "Weighted Round Robin"
+    logic: "Route more traffic to higher-capacity instances"
+    weight: "Specify capacity ratio (e.g., 1:2:1)"
+    use_case: "Heterogeneous instance types"
+
+  - name: "IP Hash"
+    logic: "Hash client IP to consistent instance"
+    stickiness: "Same client always goes to same instance"
+    use_case: "Session affinity, connection pooling"
+
+  - name: "Consistent Hashing"
+    logic: "Hash request key to ring; minimal redistribution on change"
+    rebalancing: "When instance added/removed, only ~1/N requests rerouted"
+    use_case: "Cache servers, distributed systems"
+
+  - name: "Resource-Based"
+    logic: "Route to instance with most available resources"
+    metrics: "CPU, memory, custom metric"
+    use_case: "CPU-intensive or memory-intensive services"
+
+session_affinity:
+  sticky_sessions: "Route same user to same instance (remember session)"
+  cookie_based: "Include instance ID in cookie; routing layer reads it"
+  ip_based: "Route based on client IP hash"
+  trade_off: "Better session locality, but prevents scaling down instance"
+
+connection_pooling:
+  benefit: "Reuse connections to service instances"
+  pool_size: "Typically 10-100 connections per instance"
+  timeout: "Reap idle connections after 5-10 minutes"
+  implementation: "HTTP connection pools, database connection pools"
+
+service_deregistration:
+  graceful_shutdown: "Remove from registry before stopping"
+  drain_timeout: "Wait for existing connections to complete (30-60s)"
+  force_timeout: "Hard-kill after timeout (force new connections to healthy instances)"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Service discovery is like a restaurant phone system:
+      - Without: Memorize all chef phone numbers (breaks when they move)
+      - With: Call central number; receptionist routes to available chef
+
+      Receptionist (discovery) handles routing; you only need one number.
+
+  intermediate:
+    focus: "Implementing service discovery"
+    key_points:
+      - "Registering services dynamically"
+      - "Health check configuration"
+      - "Load balancing algorithm selection"
+
+  advanced:
+    focus: "Distributed service discovery"
+    key_points:
+      - "Consistent hashing for cache servers"
+      - "Session affinity tradeoffs"
+      - "Multi-region service discovery"

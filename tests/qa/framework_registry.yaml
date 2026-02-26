@@ -318,6 +318,194 @@ frameworks:
       orm: jpa
       note: naive implementation without optimizations
 
+  # Additional Python GraphQL Frameworks
+  - name: ariadne
+    language: python
+    type: graphql
+    port: 8025
+    endpoint: /graphql
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    features:
+      dataloader: supported
+      statement_caching: true
+
+  - name: asgi-graphql
+    language: python
+    type: graphql
+    port: 8026
+    endpoint: /graphql
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    features:
+      dataloader: supported
+      async: true
+
+  # Additional TypeScript GraphQL Frameworks
+  - name: express-graphql
+    language: typescript
+    type: graphql
+    port: 8027
+    endpoint: /graphql
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    features:
+      dataloader: graphql-dataloader
+
+  - name: graphql-yoga
+    language: typescript
+    type: graphql
+    port: 8029
+    endpoint: /graphql
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    features:
+      dataloader: native
+      subscription: ws
+
+  - name: mercurius
+    language: typescript
+    type: graphql
+    port: 8030
+    endpoint: /graphql
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    features:
+      dataloader: native
+      subscription: native
+
+  - name: postgraphile
+    language: typescript
+    type: graphql
+    port: 8031
+    endpoint: /graphql
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    features:
+      auto_generated: true
+      dataloader: native
+      note: auto-generates API from PostgreSQL schema
+
+  # Additional Go GraphQL Framework
+  - name: graphql-go
+    language: go
+    type: graphql
+    port: 8032
+    endpoint: /graphql
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    features:
+      dataloader: graphql-go
+      statement_caching: false
+
+  # Additional Rust GraphQL Framework
+  - name: juniper
+    language: rust
+    type: graphql
+    port: 8033
+    endpoint: /graphql
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    features:
+      dataloader: supported
+      async: true
+
+  # Additional PHP GraphQL Framework
+  - name: webonyx-graphql-php
+    language: php
+    type: graphql
+    port: 8034
+    endpoint: /graphql
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    features:
+      dataloader: native
+      statement_caching: true
+
+  # Additional Ruby Framework
+  - name: hanami
+    language: ruby
+    type: rest
+    port: 8037
+    endpoint: /api/users
+    health_check: /api/health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    features:
+      orm: rom
+      dry_validation: true
+
+  # Additional Java Frameworks
+  - name: micronaut-graphql
+    language: java
+    type: graphql
+    port: 8039
+    endpoint: /graphql
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    features:
+      dataloader: micronaut-data
+
+  - name: quarkus-graphql
+    language: java
+    type: graphql
+    port: 8040
+    endpoint: /graphql
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    features:
+      dataloader: smallrye-graphql
+      native_image: true
+
+  - name: play-graphql
+    language: scala
+    type: graphql
+    port: 8041
+    endpoint: /graphql
+    health_check: /health
+    expected_tables:
+      - benchmark.tb_user
+      - benchmark.tb_post
+      - benchmark.tb_comment
+    features:
+      dataloader: sangria-dataloader
+      note: Play Framework with Sangria GraphQL
+
   # Hasura (Database-first GraphQL)
   - name: hasura
     language: haskell

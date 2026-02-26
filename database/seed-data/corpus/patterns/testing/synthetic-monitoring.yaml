@@ -1,0 +1,148 @@
+id: synthetic-monitoring
+name: "Synthetic Monitoring & End-to-End Testing"
+category: testing
+type: pattern
+tags:
+  - testing
+  - monitoring
+  - e2e
+  - synthetic
+  - observability
+
+summary:
+  short: "Proactively monitoring application health through automated synthetic user journeys"
+  long: |
+    Synthetic monitoring simulates real user interactions (login, purchase, etc.) from external vantage points. Unlike passive monitoring (alerts on failure), synthetic monitoring is proactive—detecting issues before users do by continuously executing critical user paths.
+
+problem:
+  description: "Detecting issues only after users report them; missing early warning signs"
+  symptoms:
+    - name: "Downtime surprises"
+      description: "Application down for minutes before anyone notices"
+    - name: "Regional blindness"
+      description: "Issues in specific regions unknown to central team"
+    - name: "Hidden regressions"
+      description: "Critical feature breaks but isn't caught in testing"
+    - name: "Third-party failures"
+      description: "External API broken, affecting application"
+
+solution:
+  approach: "Define synthetic user journeys; execute automatically from multiple locations; alert on deviation"
+  key_points:
+    - "Create automated workflows mimicking real user actions"
+    - "Execute from multiple geographic locations"
+    - "Monitor response time, correctness, and availability"
+    - "Alert on anomalies and thresholds"
+    - "Maintain dashboards of critical paths"
+
+synthetic_monitoring_flow:
+  step_1: "Define critical user journeys (e.g., checkout, login, search)"
+  step_2: "Create synthetic test scripts (Selenium, Puppeteer, custom)"
+  step_3: "Schedule periodic execution (every 5 minutes, etc.)"
+  step_4: "Execute from multiple locations (US, EU, APAC)"
+  step_5: "Measure response time, availability, correctness"
+  step_6: "Compare against baseline"
+  step_7: "Alert if deviation exceeds threshold"
+  step_8: "Log detailed failure for debugging"
+
+synthetic_test_examples:
+  login_flow: |
+    1. GET /login page
+    2. POST /api/login with credentials
+    3. Verify session cookie set
+    4. GET /dashboard
+    5. Assert user name displayed
+
+  checkout_flow: |
+    1. GET /products
+    2. POST /api/cart (add item)
+    3. GET /checkout
+    4. POST /api/payment (simulate payment)
+    5. Verify order confirmation page
+
+  search_flow: |
+    1. GET /search
+    2. POST /api/search?q=test
+    3. Parse results
+    4. Verify at least 10 results
+    5. Click first result
+
+tools:
+  - "Datadog Synthetic Monitoring: Cloud-hosted synthetic tests"
+  - "New Relic Synthetics: Browser and API synthetic monitoring"
+  - "Pingdom: Uptime monitoring + synthetic transactions"
+  - "Checkly: Synthetic monitoring with alerting"
+  - "Custom: Selenium + cron, Puppeteer + AWS Lambda"
+
+critical_path_selection:
+  revenue_impact: "Checkout, payment processing, subscription"
+  user_impact: "Login, search, content delivery"
+  infrastructure: "DNS, CDN health, API gateway"
+  third_party: "Payment processor, auth provider, analytics"
+
+monitoring_dimensions:
+  availability: "Did the operation succeed? (% success rate)"
+  latency: "How long did it take? (p50, p95, p99)"
+  correctness: "Did it return expected data? (assertions)"
+  error_rate: "What % of requests failed?"
+  regional_variance: "Differences between geographies?"
+
+alert_thresholds:
+  critical: "Availability < 99% (down for > 14 min/day)"
+  warning: "Latency p95 > 2x baseline"
+  info: "Latency p95 > 1.5x baseline"
+
+  dimensionality: "Alerts should be alert-on-availability (severity: critical) not alert-on-latency (noisy)"
+
+multi_region_testing:
+  rationale: "Issues often regional (CDN, DNS, local ISP)"
+  locations: "US East, US West, EU, APAC"
+  frequency: "Every 5-10 minutes from each location"
+  correlation: "If all regions fail = central issue; if one region fails = regional issue"
+
+synthetic_vs_real_user_monitoring:
+  synthetic:
+    benefits: ["Proactive", "Consistent", "No privacy concerns"]
+    limitations: ["Doesn't capture real user behavior", "Happy path only"]
+    best_for: "Critical paths, early detection"
+
+  real_user_monitoring:
+    benefits: ["Actual user experience", "Full behavior spectrum"]
+    limitations: ["Reactive", "Privacy considerations", "Requires analytics"]
+    best_for: "Understanding real impact, user insights"
+
+  both: "Synthetic catches issues early; RUM confirms impact"
+
+alert_fatigue:
+  risk: "Too many alerts = ignored alerts"
+  solution: "Use composite alerts (e.g., 3 of 4 regions failing)"
+  example: "Alert only if 2+ locations fail simultaneously"
+
+integration_with_ci_cd:
+  - "Run synthetic tests post-deployment"
+  - "Block deployment if synthetic tests fail"
+  - "Canary deployment: synthetic tests on 5% before rollout"
+  - "Monitor synthetic metrics in production dashboards"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Synthetic monitoring is like store quality assurance:
+      - Real user monitoring: Customers report broken door
+      - Synthetic monitoring: Inspector checks door daily before customers arrive
+
+      Proactive detection beats reactive complaints.
+
+  intermediate:
+    focus: "Building effective synthetic tests"
+    key_points:
+      - "Choosing critical user journeys"
+      - "Multi-region monitoring strategy"
+      - "Alert tuning and noise reduction"
+
+  advanced:
+    focus: "Synthetic monitoring at scale"
+    key_points:
+      - "Correlation across regions and services"
+      - "Using synthetic as deployment gate"
+      - "Combining synthetic + RUM for full observability"

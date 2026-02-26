@@ -1,0 +1,28 @@
+id: practice-release-management
+name: Release Management Practices
+category: specialized
+type: standard
+tags:
+- practice
+summary:
+  short: Patterns and practices for release management practices
+  long: Comprehensive guide to release management practices
+problem:
+  description: Challenges with release management practices
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement release management practices
+key_concepts:
+  concept: Understanding Release Management Practices
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Release Management Practices
+  intermediate:
+    focus: Implementing Release Management Practices
+  advanced:
+    focus: Advanced Release Management Practices

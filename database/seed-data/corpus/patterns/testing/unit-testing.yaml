@@ -1,0 +1,316 @@
+id: unit-testing
+name: "Unit Testing Best Practices"
+category: testing
+type: standard
+tags:
+  - testing
+  - unit-tests
+  - code-quality
+  - tdd
+
+summary:
+  short: "Writing effective unit tests that catch bugs and enable refactoring with confidence"
+  long: |
+    Unit tests verify individual functions or classes in isolation. Well-written unit tests serve as documentation, catch regressions, and enable safe refactoring. Poor unit tests provide false confidence and slow down development.
+
+problem:
+  description: "Low-quality or missing unit tests lead to bugs in production and fear of refactoring"
+  symptoms:
+    - "Tests pass but code still has bugs (tests don't validate behavior)"
+    - "Adding tests slows down development"
+    - "Cannot refactor safely; tests break"
+    - "Tests are brittle; fail for unrelated changes"
+    - "Test code is harder to maintain than production code"
+  impact: "Bugs in production, slow refactoring, low developer confidence"
+
+solution:
+  description: "Follow proven unit testing principles and patterns"
+
+test_structure:
+  arrange_act_assert:
+    description: "Each test has three sections"
+    arrangement: "Set up test data and mocks"
+    action: "Call the function being tested"
+    assertion: "Verify the output"
+
+    example: |
+      def test_calculate_discount():
+        # ARRANGE
+        cart = Cart()
+        cart.add_item(Item(price=100))
+        customer = Customer(tier='gold')
+
+        # ACT
+        discount = cart.calculate_discount(customer)
+
+        # ASSERT
+        assert discount == 20  # Gold members get 20% off
+
+  single_assertion:
+    description: "Each test verifies one thing"
+    good_example: |
+      def test_user_email_must_be_valid():
+        with pytest.raises(ValueError):
+          User(email='invalid')
+
+    bad_example: |
+      def test_user_creation():
+        user = User(email='test@example.com')
+        assert user.email == 'test@example.com'
+        assert user.created_at is not None
+        assert user.is_active == True
+        # Testing multiple things; one fail obscures others
+
+  descriptive_names:
+    description: "Test names describe what they test"
+    good_names:
+      - test_discount_applied_for_gold_members
+      - test_email_validation_rejects_invalid_format
+      - test_order_total_includes_tax
+
+    bad_names:
+      - test_discount
+      - test_email
+      - test_order
+
+test_doubles:
+  mocks:
+    description: "Simulate behavior of external dependencies"
+    when_to_use: "External services, databases, APIs"
+    example: |
+      def test_process_payment():
+        payment_gateway = Mock()
+        payment_gateway.charge = Mock(return_value=True)
+
+        service = PaymentService(payment_gateway)
+        result = service.process(amount=100)
+
+        assert result == True
+        payment_gateway.charge.assert_called_once_with(100)
+
+  stubs:
+    description: "Return fixed values; don't verify calls"
+    when_to_use: "Queries, reads"
+    example: |
+      def test_order_total_with_tax():
+        tax_service = Stub()
+        tax_service.get_tax_rate = lambda: 0.08
+
+        order = Order(price=100, tax_service)
+        assert order.total == 108
+
+  spies:
+    description: "Record calls while passing through"
+    when_to_use: "Verify calls while using real dependency"
+    example: |
+      real_cache = Cache()
+      spy = Spy(real_cache)
+
+      service = UserService(cache=spy)
+      user = service.get_user(123)
+
+      spy.assert_called_with('user:123')
+
+  fakes:
+    description: "Lightweight working implementation"
+    when_to_use: "Simple replacements for external services"
+    example: |
+      class FakeDatabase:
+        def __init__(self):
+          self.data = {}
+
+        def get(self, key):
+          return self.data.get(key)
+
+        def set(self, key, value):
+          self.data[key] = value
+
+isolation_techniques:
+  dependency_injection:
+    description: "Pass dependencies to be tested"
+    good_example: |
+      def process_order(order, payment_service):
+        payment_service.charge(order.total)
+        return order.complete()
+
+    bad_example: |
+      def process_order(order):
+        payment_service = PaymentService()  # Creates dependency
+        payment_service.charge(order.total)
+        return order.complete()
+
+  setting_up_state:
+    description: "Use setup/teardown for shared test data"
+    pattern: |
+      def setup_method():
+        self.user = User(name='John')
+        self.cart = Cart(owner=self.user)
+
+      def teardown_method():
+        self.user.delete()
+        self.cart.delete()
+
+      def test_cart_belongs_to_user():
+        assert self.cart.owner == self.user
+
+  freezing_time:
+    description: "Control time for reproducible tests"
+    example: |
+      @freeze_time('2024-01-10 12:00:00')
+      def test_expiration_date():
+        token = Token()
+        assert not token.is_expired()
+
+        # Move time forward 1 hour
+        travel_to('2024-01-10 13:00:01')
+        assert token.is_expired()
+
+test_readability:
+  self_documenting:
+    description: "Test code should explain expected behavior"
+    readable: |
+      def test_premium_users_get_free_shipping():
+        user = User(tier='premium')
+        order = Order(user=user, items=[...])
+        assert order.shipping_cost == 0
+
+    unclear: |
+      def test_order():
+        u = User(t='p')
+        o = Order(u=u, i=[...])
+        assert o.s == 0
+
+  avoiding_test_logic:
+    description: "Tests should not have logic (if/for/while)"
+    bad: |
+      def test_prices():
+        items = [Item(10), Item(20), Item(30)]
+        total = 0
+        for item in items:  # Logic in test!
+          total += item.price
+        assert total == 60
+
+    good: |
+      def test_price_total():
+        assert sum_prices([10, 20, 30]) == 60
+
+test_scope_and_coverage:
+  happy_path:
+    description: "Normal, expected usage"
+    example: "User submits valid form; gets success"
+
+  edge_cases:
+    description: "Boundary conditions"
+    examples:
+      - "Empty input"
+      - "Very large input"
+      - "Null/None values"
+      - "Zero"
+
+  error_cases:
+    description: "Things that can go wrong"
+    examples:
+      - "Invalid input format"
+      - "Permission denied"
+      - "Resource not found"
+      - "External service fails"
+
+  coverage_metrics:
+    line_coverage: "% of lines executed"
+    branch_coverage: "% of if/else branches taken"
+    caution: "100% coverage doesn't mean full testing"
+    goal: "High coverage of critical paths; test what matters"
+
+common_mistakes:
+  - name: "Testing implementation instead of behavior"
+    consequence: "Tests break on refactoring"
+    fix: "Test what function does, not how it does it"
+
+  - name: "Tests too tightly coupled to external services"
+    consequence: "Tests fail when services change"
+    fix: "Use mocks/stubs for external dependencies"
+
+  - name: "Large setup; unclear what each test needs"
+    consequence: "Hard to understand test intent"
+    fix: "Setup only what the test needs"
+
+  - name: "Testing private implementation details"
+    consequence: "Tests prevent safe refactoring"
+    fix: "Test public interfaces"
+
+  - name: "Flaky tests that sometimes pass/fail"
+    consequence: "Developers ignore test failures"
+    fix: "Eliminate timing issues, randomness"
+
+  - name: "Tests slower than needed"
+    consequence: "Developers skip running tests"
+    fix: "Optimize; use mocks to avoid slow operations"
+
+best_practices:
+  - name: "Test behavior, not implementation"
+    description: "Verify what function does; not how it does it"
+
+  - name: "Use descriptive test names"
+    description: "Test name should explain what's being tested"
+
+  - name: "One assertion per test"
+    description: "Makes failures clear and specific"
+
+  - name: "Keep tests simple"
+    description: "Test code shouldn't need tests"
+
+  - name: "Use test doubles appropriately"
+    description: "Mock external, stub queries, test logic"
+
+  - name: "Test edge cases and errors"
+    description: "Not just happy path"
+
+  - name: "Avoid test interdependencies"
+    description: "Tests should pass in any order"
+
+  - name: "Fast feedback"
+    description: "Unit tests should run in seconds"
+
+  - name: "Keep tests maintainable"
+    description: "Refactor tests; DRY applies to tests too"
+
+  - name: "Use setup/teardown for common code"
+    description: "Reduce duplication in test setup"
+
+frameworks:
+  - name: "Python: pytest"
+    features: "Fixtures, parametrized tests, great assertions"
+
+  - name: "JavaScript: Jest"
+    features: "Snapshots, automatic mocking, great DX"
+
+  - name: "Java: JUnit"
+    features: "Standard, mature, many extensions"
+
+  - name: "Go: testing package"
+    features: "Built-in, simple, good for table-driven tests"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Unit tests are like testing a car engine in isolation:
+      - Don't test whole car (too complex)
+      - Test engine by itself with fake wheels, transmission
+      - If engine works in isolation, likely works in car
+      - Easy to spot engine problems; hard to spot in full car
+
+  intermediate:
+    focus: "Effective unit testing patterns"
+    key_points:
+      - "Arrange/Act/Assert structure"
+      - "Test doubles: mocks, stubs, spies, fakes"
+      - "Isolation through dependency injection"
+      - "Edge cases and error conditions"
+
+  advanced:
+    focus: "Unit testing at scale"
+    key_points:
+      - "Maintaining test suites across large codebases"
+      - "Optimizing test performance"
+      - "Parametrized tests and data-driven testing"
+      - "Avoiding flaky tests in CI/CD"

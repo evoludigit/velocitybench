@@ -1,0 +1,28 @@
+id: scaling-best-practices
+name: Scaling Best Practices
+category: comprehensive
+type: standard
+tags:
+- scaling
+summary:
+  short: Scaling Best Practices and implementation guidelines
+  long: Complete guide to scaling best practices
+problem:
+  description: Challenges without proper scaling best practices
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement scaling best practices
+key_concepts:
+  concept: Scaling Best Practices
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

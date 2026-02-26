@@ -1,0 +1,28 @@
+id: efficiency-monitoring
+name: Efficiency Monitoring
+category: comprehensive
+type: standard
+tags:
+- efficiency
+summary:
+  short: Efficiency Monitoring and implementation guidelines
+  long: Complete guide to efficiency monitoring
+problem:
+  description: Challenges without proper efficiency monitoring
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement efficiency monitoring
+key_concepts:
+  concept: Efficiency Monitoring
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

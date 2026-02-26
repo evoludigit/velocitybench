@@ -1,36 +1,35 @@
 services:
   postgres:
-    image: postgres:15-alpine
+    build:
+      context: ./database
+      dockerfile: Dockerfile
     environment:
       POSTGRES_DB: velocitybench_benchmark
       POSTGRES_USER: benchmark
       POSTGRES_PASSWORD: benchmark123
-      # Data volume selector: small, medium, large, xlarge
-      DATA_VOLUME: ${DATA_VOLUME:-small}
-      TMPDIR: /data/tmp
+      # Data volume selector: xs (default), medium, large
+      # Pass as: DATA_VOLUME=medium docker compose up postgres
+      DATA_VOLUME: ${DATA_VOLUME:-xs}
     ports:
       - "${POSTGRES_PORT:-5434}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/01-extensions.sql:/docker-entrypoint-initdb.d/01-extensions.sql
-      - ./database/velocitybench_cqrs_schema.sql:/docker-entrypoint-initdb.d/02-velocitybench-cqrs.sql
+      - ./database/fraiseql_cqrs_schema.sql:/docker-entrypoint-initdb.d/02-fraiseql-cqrs.sql
       - ./database/04-cqrs-extensions.sql:/docker-entrypoint-initdb.d/03-cqrs-extensions.sql
-      # Large dataset loaded conditionally via startup script
-      - ./database/05-large-dataset.sql:/scripts/05-large-dataset.sql:ro
-      # Mount /data/tmp to avoid filling /tmp
-      - /data/tmp:/data/tmp
-    # Temporarily disable health check - PostgreSQL is working
-    # healthcheck:
-    #   test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/5432 && echo 'PostgreSQL is listening'"]
-    #   interval: 30s
-    #   timeout: 10s
-    #   retries: 3
-    #   start_period: 10s
+      - ./database/05-medium-seed.sql:/docker-entrypoint-initdb.d/04-medium-seed.sql
+      - ./frameworks/fraiseql/database/extensions.sql:/docker-entrypoint-initdb.d/05-fraiseql-views.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U benchmark -d velocitybench_benchmark"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     networks:
       - velocitybench-benchmark
     command: >
       postgres
-      -c shared_preload_libraries=pg_stat_statements,pg_buffercache
+      -c shared_preload_libraries=pg_stat_statements,pg_buffercache,pg_tviews
       -c pg_stat_statements.max=10000
       -c pg_stat_statements.track=all
       -c shared_buffers=${DB_SHARED_BUFFERS:-8GB}
@@ -44,29 +43,94 @@ services:
       -c max_wal_size=${DB_MAX_WAL_SIZE:-4GB}
       -c wal_buffers=${DB_WAL_BUFFERS:-16MB}
       -c random_page_cost=${DB_RANDOM_PAGE_COST:-1.1}
+      -c benchmark.data_volume=${DATA_VOLUME:-xs}
 
-  # Framework containers
+  # ============================================================================
+  # Benchmark frameworks — start all 8 with: docker compose --profile benchmark up
+  # ============================================================================
+
   fraiseql:
-    build: ./frameworks/fraiseql
+    # FraiseQL v2.0.0-beta.3 — Variant A: v_* on-the-fly JSONB views
+    build:
+      context: ./frameworks/fraiseql
+      args:
+        SCHEMA_FILE: schema.py
     ports:
-      - "4000:4000"
+      - "8815:8815"
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_NAME=velocitybench_benchmark
-      - DB_USER=benchmark
-      - DB_PASSWORD=benchmark123
-      - DB_POOL_MIN=20
-      - DB_POOL_MAX=100
-      - DB_STATEMENT_CACHE_SIZE=100
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
+      - RUST_LOG=info
+      - FRAISEQL_CONFIG=fraiseql.toml
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8007/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8815/health"]
       interval: 30s
-      timeout: 15s
+      timeout: 10s
       retries: 3
+      start_period: 15s
+    profiles:
+      - benchmark
+      - fraiseql
+    networks:
+      - velocitybench-benchmark
+
+  fraiseql-tv:
+    # FraiseQL v2.0.0-beta.3 — Variant B: tv_* pre-computed JSONB tables
+    build:
+      context: ./frameworks/fraiseql
+      args:
+        SCHEMA_FILE: schema_tv.py
+    ports:
+      - "8816:8815"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./frameworks/fraiseql/fraiseql-tv.toml:/app/fraiseql-tv.toml
+    environment:
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
+      - RUST_LOG=info
+      - FRAISEQL_CONFIG=fraiseql-tv.toml
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8815/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    profiles:
+      - benchmark
+      - fraiseql
+    networks:
+      - velocitybench-benchmark
+
+  fraiseql-tv-nocache:
+    # FraiseQL v2 — Variant B (tv_*), cache disabled — Phase 1 cold-read baseline
+    build:
+      context: ./frameworks/fraiseql
+      args:
+        SCHEMA_FILE: schema_tv.py
+    ports:
+      - "8817:8815"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./frameworks/fraiseql/fraiseql-tv-nocache.toml:/app/fraiseql-tv-nocache.toml
+    environment:
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
+      - RUST_LOG=info
+      - FRAISEQL_CONFIG=fraiseql-tv-nocache.toml
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8815/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    profiles:
+      - benchmark
+      - fraiseql
     networks:
       - velocitybench-benchmark
 
@@ -76,45 +140,53 @@ services:
       - "8011:8000"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_NAME=velocitybench_benchmark
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
-      - DB_POOL_MIN=10
-      - DB_POOL_MAX=50
-      - DB_STATEMENT_CACHE_SIZE=100
+      - DB_POOL_MIN_SIZE=10
+      - DB_POOL_MAX_SIZE=50
+      - DB_POOL_STATEMENT_CACHE_SIZE=100
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 60s
-      timeout: 15s
+      interval: 30s
+      timeout: 10s
       retries: 3
+      start_period: 30s
+    profiles:
+      - benchmark
     networks:
       - velocitybench-benchmark
 
   graphene:
-    build: ./frameworks/graphene
+    build:
+      context: ./frameworks
+      dockerfile: graphene/Dockerfile
     ports:
       - "8002:8000"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_NAME=velocitybench_benchmark
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
-      - DB_POOL_MIN=10
-      - DB_POOL_MAX=50
-      - DB_STATEMENT_CACHE_SIZE=100
+      - DB_POOL_MIN_SIZE=10
+      - DB_POOL_MAX_SIZE=50
+      - DB_POOL_STATEMENT_CACHE_SIZE=100
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 60s
-      timeout: 15s
+      interval: 30s
+      timeout: 10s
       retries: 3
+      start_period: 30s
+    profiles:
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -124,9 +196,10 @@ services:
       - "8010:8010"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - SPRING_PROFILES_ACTIVE=prod
+      - SERVER_PORT=8010
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/velocitybench_benchmark
       - SPRING_DATASOURCE_USERNAME=benchmark
       - SPRING_DATASOURCE_PASSWORD=benchmark123
@@ -135,6 +208,10 @@ services:
       interval: 30s
       timeout: 15s
       retries: 3
+      start_period: 60s
+    profiles:
+      - spring-boot
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -144,10 +221,10 @@ services:
       - "8013:8010"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - SPRING_PROFILES_ACTIVE=prod
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/velocitybench_benchmark
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/velocitybench_benchmark?currentSchema=benchmark
       - SPRING_DATASOURCE_USERNAME=benchmark
       - SPRING_DATASOURCE_PASSWORD=benchmark123
     healthcheck:
@@ -155,6 +232,10 @@ services:
       interval: 30s
       timeout: 15s
       retries: 3
+      start_period: 60s
+    profiles:
+      - spring-boot-orm
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -164,35 +245,47 @@ services:
       - "8014:8010"
     depends_on:
       postgres:
-         condition: service_started
+        condition: service_healthy
     environment:
       - SPRING_PROFILES_ACTIVE=prod
+      - SERVER_PORT=8010
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/velocitybench_benchmark
       - SPRING_DATASOURCE_USERNAME=benchmark
       - SPRING_DATASOURCE_PASSWORD=benchmark123
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8010/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8010/health"]
       interval: 30s
       timeout: 15s
       retries: 3
+      start_period: 60s
+    profiles:
+      - spring-boot-orm-naive
+      - benchmark
     networks:
       - velocitybench-benchmark
 
   apollo:
     build: ./frameworks/apollo-server
     ports:
-      - "4001:4001"
       - "4002:4002"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4002/health"]
-      interval: 30s
-      timeout: 15s
-      retries: 3
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4002/health', r => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - apollo
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -203,35 +296,383 @@ services:
       - "4005:4005"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4005/health"]
-      interval: 30s
-      timeout: 15s
-      retries: 3
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4005/health', r => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - apollo-orm
+      - benchmark
     networks:
       - velocitybench-benchmark
 
   hasura:
     image: hasura/graphql-engine:v2.36.0
     ports:
-      - "8081:8080"
+      - "4000:8080"  # Standardized GraphQL port
     depends_on:
       postgres:
         condition: service_started
     environment:
       - HASURA_GRAPHQL_DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
-      - HASURA_GRAPHQL_ENABLE_CONSOLE=true
-      - HASURA_GRAPHQL_DEV_MODE=true
-      - HASURA_GRAPHQL_ADMIN_SECRET=admin_secret_key
-      - HASURA_GRAPHQL_JWT_SECRET={"type":"HS256","key":"this_is_a_longer_secret_key_for_hasura_jwt"}
+      - HASURA_GRAPHQL_ENABLE_CONSOLE=false  # Disabled for benchmarks
+      - HASURA_GRAPHQL_DEV_MODE=false
+      - HASURA_GRAPHQL_ADMIN_SECRET=benchmark-admin
+      - HASURA_GRAPHQL_UNAUTHORIZED_ROLE=public
+    volumes:
+      - ./frameworks/hasura/metadata:/hasura-metadata
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
-      interval: 30s
-      timeout: 15s
-      retries: 3
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - hasura
+    networks:
+      - velocitybench-benchmark
+
+  postgraphile:
+    build: ./frameworks/postgraphile
+    ports:
+      - "4014:4000"  # PostGraphile port
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/health', r => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - postgraphile
+      - benchmark
+    networks:
+      - velocitybench-benchmark
+
+  ariadne:
+    build:
+      context: ./frameworks
+      dockerfile: ariadne/Dockerfile
+    ports:
+      - "4000:4000"  # Standardized GraphQL port
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - ariadne
+      - benchmark
+    networks:
+      - velocitybench-benchmark
+
+  asgi-graphql:
+    build:
+      context: ./frameworks
+      dockerfile: asgi-graphql/Dockerfile
+    ports:
+      - "4000:4000"  # Standardized GraphQL port
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - asgi-graphql
+      - benchmark
+    networks:
+       - velocitybench-benchmark
+
+  graphql-yoga:
+    build: ./frameworks/graphql-yoga
+    ports:
+      - "4012:4000"  # GraphQL-Yoga port
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/health', r => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - graphql-yoga
+      - benchmark
+    networks:
+      - velocitybench-benchmark
+
+  mercurius:
+    build: ./frameworks/mercurius
+    ports:
+      - "4008:4000"  # Mercurius GraphQL port
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/health', r => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - mercurius
+      - benchmark
+    networks:
+       - velocitybench-benchmark
+
+  express-graphql:
+    build: ./frameworks/express-graphql
+    ports:
+      - "4010:4000"  # Express-GraphQL port
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/health', r => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - express-graphql
+      - benchmark
+    networks:
+      - velocitybench-benchmark
+
+  graphql-go:
+    build: ./frameworks/graphql-go
+    ports:
+      - "4011:4011"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+      - PORT=4011
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://localhost:4011/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - graphql-go
+      - benchmark
+    networks:
+      - velocitybench-benchmark
+
+  juniper:
+    build: ./frameworks/juniper
+    ports:
+      - "4000:4000"  # Standardized GraphQL port
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+      - RUST_LOG=info
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - juniper
+      - benchmark
+    networks:
+      - velocitybench-benchmark
+
+  hanami:
+    build: ./frameworks/hanami
+    ports:
+      - "4000:4000"  # Standardized GraphQL port
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+      - DB_POOL_MIN=10
+      - DB_POOL_MAX=50
+      - RACK_ENV=production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - hanami
+      - benchmark
+    networks:
+      - velocitybench-benchmark
+
+  webonyx-graphql-php:
+    build: ./frameworks/webonyx-graphql-php
+    ports:
+      - "4000:4000"  # Standardized GraphQL port
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    profiles:
+      - webonyx-graphql-php
+      - benchmark
+    networks:
+      - velocitybench-benchmark
+
+  micronaut-graphql:
+    build: ./frameworks/micronaut-graphql
+    ports:
+      - "4000:4000"  # Standardized GraphQL port
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    profiles:
+      - micronaut-graphql
+      - benchmark
+    networks:
+      - velocitybench-benchmark
+
+  quarkus-graphql:
+    build: ./frameworks/quarkus-graphql
+    ports:
+      - "4000:4000"  # Standardized GraphQL port
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    profiles:
+      - quarkus-graphql
+      - benchmark
+    networks:
+      - velocitybench-benchmark
+
+  play-graphql:
+    build: ./frameworks/play-graphql
+    ports:
+      - "4000:4000"  # Standardized GraphQL port
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
+      - APPLICATION_SECRET=benchmark-secret-key
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    profiles:
+      - play-graphql
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -241,7 +682,7 @@ services:
       - "8003:8003"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -249,10 +690,13 @@ services:
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8003/health')"]
+      test: ["CMD", "curl", "-f", "-s", "http://localhost:8003/health"]
       interval: 30s
-      timeout: 15s
+      timeout: 10s
       retries: 3
+      start_period: 30s
+    profiles:
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -262,7 +706,7 @@ services:
       - "8015:8002"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -270,10 +714,13 @@ services:
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8001/health"]
+      test: ["CMD", "curl", "-f", "-s", "http://localhost:8002/health"]
       interval: 30s
-      timeout: 15s
+      timeout: 10s
       retries: 3
+      start_period: 15s
+    profiles:
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -283,14 +730,21 @@ services:
       - "8016:8000"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_USER=benchmark
+      - DATABASE_PASSWORD=benchmark123
+      - DATABASE_NAME=velocitybench_benchmark
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/health"]
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:8000/health"]
       interval: 30s
-      timeout: 15s
+      timeout: 10s
       retries: 3
+      start_period: 15s
+    profiles:
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -300,15 +754,23 @@ services:
       - "8005:8005"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
       - PORT=8005
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8005/health"]
-      interval: 30s
-      timeout: 15s
-      retries: 3
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8005/health', r => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - express-rest
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -318,145 +780,35 @@ services:
       - "8007:8007"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
       - PORT=8007
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8001/health"]
-      interval: 30s
-      timeout: 15s
-      retries: 3
-    networks:
-      - velocitybench-benchmark
-
-  # Naive ORM Implementations (Educational - N+1 Query Demonstrations)
-  strawberry-orm-naive:
-    build: ./frameworks-orm/strawberry-orm-naive
-    ports:
-      - "8019:8000"
-    depends_on:
-      postgres:
-        condition: service_started
-    environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_NAME=velocitybench_benchmark
-      - DB_USER=benchmark
-      - DB_PASSWORD=benchmark123
-    healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 60s
-      timeout: 15s
-      retries: 3
-    networks:
-      - velocitybench-benchmark
-
-  fastapi-orm-naive:
-    build: ./frameworks-orm/fastapi-orm-naive
-    ports:
-      - "8020:8000"
-    depends_on:
-      postgres:
-        condition: service_started
-    environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_NAME=velocitybench_benchmark
-      - DB_USER=benchmark
-      - DB_PASSWORD=benchmark123
-    healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 60s
-      timeout: 15s
-      retries: 3
-    networks:
-      - velocitybench-benchmark
-
-  apollo-orm-naive:
-    build: ./frameworks-orm/apollo-orm-naive
-    ports:
-      - "8021:4000"
-    depends_on:
-      postgres:
-        condition: service_started
-    environment:
-      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4000/health"]
-      interval: 30s
-      timeout: 15s
-      retries: 3
-    networks:
-      - velocitybench-benchmark
-
-  express-orm-naive:
-    build: ./frameworks-orm/express-orm-naive
-    ports:
-      - "8022:8000"
-    depends_on:
-      postgres:
-        condition: service_started
-    environment:
-      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
-      - PORT=8000
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 15s
-      retries: 3
-    networks:
-      - velocitybench-benchmark
-
-  gqlgen-orm-naive:
-    build: ./frameworks-orm/gqlgen-orm-naive
-    ports:
-      - "8023:8080"
-    depends_on:
-      postgres:
-        condition: service_started
-    environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_NAME=velocitybench_benchmark
-      - DB_USER=benchmark
-      - DB_PASSWORD=benchmark123
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 15s
-      retries: 3
-    networks:
-      - velocitybench-benchmark
-
-  gin-orm-naive:
-    build: ./frameworks-orm/gin-orm-naive
-    ports:
-      - "8024:8080"
-    depends_on:
-      postgres:
-        condition: service_started
-    environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_NAME=velocitybench_benchmark
-      - DB_USER=benchmark
-      - DB_PASSWORD=benchmark123
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 15s
-      retries: 3
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8007/health', r => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - express-orm
+      - benchmark
     networks:
       - velocitybench-benchmark
 
   flask-rest:
-    build: ./frameworks/flask-rest
+    build:
+      context: ./frameworks
+      dockerfile: flask-rest/Dockerfile
     ports:
       - "8004:8004"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -464,20 +816,24 @@ services:
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles:
+      - flask-rest
+      - benchmark
     networks:
       - velocitybench-benchmark
 
   go-graphql-go:
     build: ./frameworks/go-graphql-go
     ports:
-      - "8008:8007"
+      - "8008:8008"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -485,10 +841,14 @@ services:
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8007/health"]
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://localhost:8008/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 30s
+    profiles:
+      - go-graphql-go
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -498,7 +858,7 @@ services:
       - "8006:8006"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -506,10 +866,14 @@ services:
       - DB_USER=benchmark
       - DB_PASSWORD=benchmark123
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8006/health"]
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://localhost:8006/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 30s
+    profiles:
+      - gin-rest
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -519,19 +883,25 @@ services:
       - "8009:8009"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
+      - DB_CONNECTION=pgsql
       - DB_HOST=postgres
       - DB_PORT=5432
-      - DB_NAME=velocitybench_benchmark
-      - DB_USER=benchmark
+      - DB_DATABASE=velocitybench_benchmark
+      - DB_USERNAME=benchmark
       - DB_PASSWORD=benchmark123
       - APP_ENV=production
+      - APP_KEY=base64:TFcpbZlWNEUUqqoRjCIDgOfeMxf8jaYlYTudoiR0YyY=
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8009/api/health"]
       interval: 30s
       timeout: 15s
       retries: 3
+      start_period: 30s
+    profiles:
+      - php-laravel
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -541,15 +911,24 @@ services:
       - "8012:8000"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=velocitybench_benchmark
+      - DB_USER=benchmark
+      - DB_PASSWORD=benchmark123
       - RAILS_ENV=production
+      - SECRET_KEY_BASE=velocitybench_secret_key_base_for_benchmarking_only
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 30s
       timeout: 15s
       retries: 3
+      start_period: 30s
+    profiles:
+      - ruby-rails
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -559,9 +938,9 @@ services:
       - "8025:8080"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
-      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=velocitybench_benchmark;Username=benchmark;Password=benchmark123
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=velocitybench_benchmark;Username=benchmark;Password=benchmark123;Search Path=benchmark
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
     healthcheck:
@@ -569,28 +948,10 @@ services:
       interval: 30s
       timeout: 15s
       retries: 3
-    networks:
-      - velocitybench-benchmark
-
-  go-gqlgen-alt:
-    build: ./frameworks/go-gqlgen.broken
-    ports:
-      - "4003:4009"
-    depends_on:
-      postgres:
-        condition: service_started
-    environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_NAME=velocitybench_benchmark
-      - DB_USER=benchmark
-      - DB_PASSWORD=benchmark123
-      - PORT=4009
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:4009/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      start_period: 30s
+    profiles:
+      - csharp-dotnet
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -600,7 +961,7 @@ services:
       - "4010:4009"
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -609,10 +970,13 @@ services:
       - DB_PASSWORD=benchmark123
       - PORT=4009
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4009/health"]
+      test: ["CMD", "curl", "-f", "-s", "http://localhost:4009/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 30s
+    profiles:
+      - benchmark
     networks:
       - velocitybench-benchmark
 
@@ -644,6 +1008,7 @@ services:
 
   jmeter-master:
     image: jmeter:5.6-jdk11-alpine
+    profiles: [jmeter]
     ports:
       - "1099:1099"
       - "50500:50500"

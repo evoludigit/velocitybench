@@ -1,0 +1,28 @@
+id: compliance-standards
+name: Compliance Standards
+category: comprehensive
+type: standard
+tags:
+- compliance
+summary:
+  short: Compliance Standards and implementation guidelines
+  long: Complete guide to compliance standards
+problem:
+  description: Challenges without proper compliance standards
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement compliance standards
+key_concepts:
+  concept: Compliance Standards
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

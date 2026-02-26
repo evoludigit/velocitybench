@@ -1,7 +1,8 @@
 use crate::error::ApiError;
 use crate::metrics;
 use crate::AppState;
-use actix_web::{get, web, HttpResponse, Result};
+use actix_web::{get, put, web, HttpResponse, Result};
+use serde::Deserialize;
 use serde_json::json;
 
 // Health check endpoint
@@ -78,6 +79,24 @@ pub async fn get_post(
     }
 }
 
+// Update user bio
+#[derive(Deserialize)]
+pub struct UpdateUserPayload {
+    pub bio: Option<String>,
+}
+
+#[put("/users/{user_id}")]
+pub async fn update_user(
+    user_id: web::Path<String>,
+    body: web::Json<UpdateUserPayload>,
+    state: web::Data<AppState>,
+) -> Result<HttpResponse, ApiError> {
+    let user_id = user_id.into_inner();
+    let bio = body.bio.as_deref().unwrap_or("");
+    let user = state.user_repository.update_bio(&user_id, bio).await?;
+    Ok(HttpResponse::Ok().json(user))
+}
+
 // List posts with pagination, eager-loaded authors, and optional comments
 #[get("/posts")]
 pub async fn list_posts(
@@ -95,7 +114,13 @@ pub async fn list_posts(
         .and_then(|s| s.parse().ok())
         .unwrap_or(0);
 
-    let posts = state.post_repository.find_all(limit, offset).await?;
+    let include_author = query.get("include").map(|s| s == "author").unwrap_or(false);
+
+    let posts = if include_author {
+        state.post_repository.find_all_with_author(limit, offset).await?
+    } else {
+        state.post_repository.find_all_simple(limit, offset).await?
+    };
 
     Ok(HttpResponse::Ok().json(posts))
 }

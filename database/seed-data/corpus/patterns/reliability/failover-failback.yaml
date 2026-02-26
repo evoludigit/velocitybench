@@ -1,0 +1,308 @@
+id: failover-failback
+name: "Failover & Failback Patterns"
+category: reliability
+type: standard
+tags:
+  - reliability
+  - failover
+  - high-availability
+  - disaster-recovery
+
+summary:
+  short: "Automatically switching to backup systems when primary fails and recovering gracefully"
+  long: |
+    Failover automatically detects failures and switches traffic to backup systems. Failback returns traffic to primary after recovery. Proper failover/failback prevents cascading failures and minimizes downtime. Poor implementation can cause data loss or double-processing.
+
+problem:
+  description: "Primary system fails; service is unavailable while manually switching to backup"
+  symptoms:
+    - "Database fails; manual promotion of replica takes 30 minutes"
+    - "Load balancer fails; all traffic lost"
+    - "Automatic failover switches too eagerly on minor issues"
+    - "After recovery, traffic stuck on backup; primary ignored"
+    - "Failover causes split-brain (both acting as primary)"
+  impact: "Extended downtime, cascading failures, data consistency issues"
+
+solution:
+  description: "Automatic failover with human oversight, careful failback process"
+
+failover_patterns:
+  health_checks: |
+    Continuously monitor primary health:
+
+    Active Health Check:
+    Every 5 seconds:
+    - Send HTTP GET /health to primary
+    - Expect: 200 OK
+    - Primary responds: OK
+
+    If 3 consecutive checks fail:
+    - Mark as down
+    - Initiate failover
+
+    Passive Health Check:
+    Monitor actual traffic:
+    - Track success/failure of requests
+    - If 5 consecutive failures
+    - Mark as down
+    - Initiate failover
+
+  failover_conditions: |
+    Primary is considered failed if:
+    - Health check fails repeatedly (3+ failures)
+    - Response time > threshold (10 seconds)
+    - Error rate > threshold (>5%)
+    - Service returns 5xx errors
+
+    Each should be tuned for your system:
+    - Too aggressive: Failover on transient errors
+    - Too lenient: Slow to detect failures
+
+automatic_failover:
+  dns_based: |
+    Slow DNS failover (minutes):
+    Primary:    db1.example.com → 192.168.1.1
+    Secondary:  db2.example.com → 192.168.1.2
+
+    If primary fails:
+    1. DNS is updated to point to secondary
+    2. But DNS caches (TTL) take time to refresh
+    3. Some clients still try primary (stale cache)
+
+    Use: Non-critical services (DNS is too slow)
+
+  load_balancer_based: |
+    Fast failover (seconds):
+
+    Request flow:
+    Client → Load Balancer → Primary (healthy)
+
+    When primary fails:
+    Client → Load Balancer → Secondary (backup)
+
+    Failover is automatic and fast (health check detects within 5-15 seconds)
+
+    Use: Critical services (fast failover needed)
+
+  connection_pooling: |
+    Application detects failure, switches pool:
+
+    Pool has 2 databases:
+    - Primary: db1.example.com
+    - Secondary: db2.example.com
+
+    When primary fails:
+    - Pool marks it unhealthy
+    - New connections go to secondary
+    - Existing connections to primary close
+
+  database_replication: |
+    Replicated database failover:
+
+    Primary → Replication Stream → Replica
+
+    When primary fails:
+    1. Replica detects no heartbeat
+    2. Replica promotes to primary
+    3. Points become available on replica
+
+    Danger: Brief write-loss possible during failover
+
+failback_process:
+  why_failback_matters: |
+    After primary recovers, don't automatically switch back:
+
+    Bad approach:
+    1. Primary recovers
+    2. Traffic automatically switches back
+    3. But primary might have stale data (writes happened on replica)
+
+    Good approach:
+    1. Primary recovers
+    2. Admin verifies health
+    3. Admin manually initiates failback
+    4. Synchronize data before accepting writes
+
+  careful_failback_steps: |
+    1. Verify primary is healthy
+       - Run diagnostics
+       - Check logs for issues
+       - Verify data consistency
+
+    2. Synchronize primary with backup
+       - If primary was down, backup received writes
+       - Backfill primary with new data
+
+    3. Switch writes to primary
+       - Gradual: 10% → 50% → 100%
+       - Monitor for issues
+
+    4. Monitor for stability
+       - If issues detected, failback to backup
+       - Once stable, remove backup
+
+  synchronization: |
+    When primary has been down:
+
+    Primary:  {data up to time T}
+    Backup:   {data up to time T + writes during failover}
+
+    To synchronize:
+    1. Identify writes on backup after primary went down
+    2. Replay those writes on primary (or use log shipping)
+    3. Verify data matches
+    4. Switch back to primary
+
+split_brain_prevention:
+  problem: |
+    Both primary and backup think they're primary:
+
+    Network partition:
+    [Primary]  ←→ (network down) ←→ [Backup]
+
+    Primary thinks: "I'm still primary"
+    Backup thinks: "Primary is down, I'll be primary"
+
+    Result: Both accepting writes
+    Clients write to both
+    Data diverges
+    Disaster!
+
+  quorum_based: |
+    Use quorum to decide who's actually primary:
+
+    Setup: Primary + 2 replicas (3 total)
+
+    If primary and 1 replica can talk (2/3 quorum):
+    - Cluster can continue (has majority)
+    - Primary remains primary
+
+    If 2 replicas isolated from primary:
+    - They cannot reach quorum without primary
+    - They refuse to serve writes
+    - Prevents split-brain
+
+  fencing: |
+    If primary doesn't respond:
+    - Backup wants to take over
+    - But what if primary is just unreachable?
+
+    Fencing: Force primary to stop writing
+
+    Methods:
+    - Power off primary server (physical)
+    - Revoke IP address (network)
+    - Close disk access (storage)
+
+    Backup can only promote after primary is fenced
+
+  consensus_algorithm: |
+    Use Raft or Paxos for consensus:
+
+    Each server votes on who's primary:
+    - Node A votes for itself
+    - Node B votes for itself
+    - Node C votes for whoever has newer data
+
+    Majority wins (consensus)
+    Prevents split-brain through algorithm
+
+testing_failover:
+  manual_tests: |
+    Regularly practice failover:
+
+    Test 1: Kill primary
+    - Verify failover happens automatically
+    - Verify traffic switches to backup
+    - Verify backup can handle traffic
+    - Monitor for performance degradation
+
+    Test 2: Recover primary
+    - Bring primary back
+    - Verify it synchronizes with backup
+    - Manually switch back
+    - Verify all data consistent
+
+  chaos_engineering: |
+    Inject failures:
+    - Kill database randomly
+    - Kill load balancer
+    - Simulate network partition
+    - Simulate slow responses
+
+    See what breaks, fix it
+
+  monitoring: |
+    Alert on:
+    - Failover events (happened? why?)
+    - Time to failover (was it fast enough?)
+    - Data loss during failover (any??)
+    - Failback issues (why can't we switch back?)
+
+best_practices:
+  - name: "Monitor proactively"
+    description: "Detect failures before traffic is impacted"
+
+  - name: "Failover should be automatic"
+    description: "No manual intervention during incident"
+
+  - name: "Failback should be manual"
+    description: "Require human verification before switching back"
+
+  - name: "Test failover regularly"
+    description: "Practice during non-peak hours"
+
+  - name: "Prevent split-brain"
+    description: "Use quorum, fencing, or consensus"
+
+  - name: "Synchronize before failback"
+    description: "Ensure primary has all writes before switching"
+
+  - name: "Monitor during failover"
+    description: "Track metrics to identify issues"
+
+  - name: "Have rollback plan"
+    description: "If failover causes issues, can we failback quickly?"
+
+anti_patterns:
+  - name: "Automatic failback without verification"
+    consequence: "Primary takes over while stale; causes data loss"
+    fix: "Manual failback with synchronization"
+
+  - name: "No health checks"
+    consequence: "Traffic routes to failed primary; doesn't failover"
+    fix: "Continuous health monitoring"
+
+  - name: "Failover too sensitive"
+    consequence: "Failover on every transient error; flapping"
+    fix: "Require multiple failures before failover"
+
+  - name: "No split-brain protection"
+    consequence: "Both systems become primary; data divergence"
+    fix: "Use quorum or fencing"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Failover is like a backup power generator:
+      - Power fails → generator automatically starts
+      - Power restored → wait, verify → manually switch back
+      - Both running → confusion about which is real (split-brain)
+
+      Failover is automatic, but failback is careful!
+
+  intermediate:
+    focus: "Implementing failover and failback"
+    key_points:
+      - "Health check mechanisms"
+      - "Automatic failover triggers"
+      - "Careful failback process"
+      - "Preventing split-brain scenarios"
+
+  advanced:
+    focus: "Complex failover scenarios"
+    key_points:
+      - "Quorum-based consensus"
+      - "Fencing and cluster management"
+      - "Data synchronization during failover"
+      - "Testing failover reliability"

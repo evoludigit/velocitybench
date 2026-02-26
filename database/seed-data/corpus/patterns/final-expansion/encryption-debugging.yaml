@@ -1,0 +1,28 @@
+id: encryption-debugging
+name: Encryption Debugging
+category: comprehensive
+type: standard
+tags:
+- encryption
+summary:
+  short: Encryption Debugging and implementation guidelines
+  long: Complete guide to encryption debugging
+problem:
+  description: Challenges without proper encryption debugging
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement encryption debugging
+key_concepts:
+  concept: Encryption Debugging
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

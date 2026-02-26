@@ -1,0 +1,28 @@
+id: practice-change-management
+name: Change Management Practices
+category: specialized
+type: standard
+tags:
+- practice
+summary:
+  short: Patterns and practices for change management practices
+  long: Comprehensive guide to change management practices
+problem:
+  description: Challenges with change management practices
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement change management practices
+key_concepts:
+  concept: Understanding Change Management Practices
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Change Management Practices
+  intermediate:
+    focus: Implementing Change Management Practices
+  advanced:
+    focus: Advanced Change Management Practices

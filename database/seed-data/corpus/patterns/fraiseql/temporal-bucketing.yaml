@@ -1,0 +1,361 @@
+# Temporal Bucketing (FraiseQL)
+# VelocityBench Knowledge Corpus
+
+id: temporal-bucketing
+name: "Temporal Bucketing for Time-Series Analytics"
+category: fraiseql
+type: pattern
+severity: high
+tags:
+  - fraiseql
+  - analytics
+  - time-series
+  - date-functions
+  - aggregation
+  - performance
+
+summary:
+  short: "Group time-series data by day, week, month, quarter, year"
+  long: |
+    Temporal bucketing groups timestamped data into time periods using database functions
+    like DATE_TRUNC (PostgreSQL), DATE_FORMAT (MySQL), strftime (SQLite), DATEPART (SQL Server).
+    Essential for time-series analytics: daily sales, weekly active users, monthly recurring revenue.
+    Performance: ~5-10ms for 1M rows with index on timestamp column.
+
+problem:
+  description: |
+    Time-series data needs aggregation at different granularities:
+    - Per-second raw data → daily trend charts
+    - Hourly metrics → weekly rollups
+    - Daily transactions → monthly revenue reports
+    - Raw timestamps → fiscal quarters/years
+
+    Without temporal bucketing, you'd need separate aggregate tables or application-side grouping.
+
+  symptoms:
+    - name: "Slow time-series queries"
+      description: "Full table scan for daily aggregations"
+      detection: "Multi-second queries for simple daily totals"
+
+    - name: "Multiple aggregate tables"
+      description: "Separate tables for hourly, daily, weekly rollups"
+      detection: "5+ aggregate tables with duplicated aggregation logic"
+
+    - name: "Application-side grouping"
+      description: "Fetching raw timestamps, grouping by day in code"
+      detection: "Large result sets, timestamp math in application"
+
+solution:
+  principle: "Use database date/time functions to bucket timestamps during GROUP BY"
+
+  components:
+    - name: "DATE_TRUNC (PostgreSQL)"
+      type: "Function"
+      purpose: "Truncate timestamp to second, minute, hour, day, week, month, quarter, year"
+
+    - name: "DATE_FORMAT (MySQL)"
+      type: "Function"
+      purpose: "Format date as string with year/month/day pattern"
+
+    - name: "strftime (SQLite)"
+      type: "Function"
+      purpose: "Format timestamp with % directives"
+
+    - name: "DATEPART (SQL Server)"
+      type: "Function"
+      purpose: "Extract year, month, day, hour components"
+
+implementation:
+  daily_bucketing:
+    graphql: |
+      query {
+        sales_aggregate(
+          groupBy: { occurred_at_day: true }
+        ) {
+          occurred_at_day
+          revenue_sum
+          count
+        }
+      }
+
+    postgresql: |
+      SELECT
+          DATE_TRUNC('day', occurred_at) AS occurred_at_day,
+          SUM(revenue) AS revenue_sum,
+          COUNT(*) AS count
+      FROM tf_sales
+      GROUP BY DATE_TRUNC('day', occurred_at)
+      ORDER BY occurred_at_day;
+
+    mysql: |
+      SELECT
+          DATE_FORMAT(occurred_at, '%Y-%m-%d') AS occurred_at_day,
+          SUM(revenue) AS revenue_sum,
+          COUNT(*) AS count
+      FROM tf_sales
+      GROUP BY DATE_FORMAT(occurred_at, '%Y-%m-%d')
+      ORDER BY occurred_at_day;
+
+    sqlite: |
+      SELECT
+          strftime('%Y-%m-%d', occurred_at) AS occurred_at_day,
+          SUM(revenue) AS revenue_sum,
+          COUNT(*) AS count
+      FROM tf_sales
+      GROUP BY strftime('%Y-%m-%d', occurred_at)
+      ORDER BY occurred_at_day;
+
+    performance: "~5-10ms for 1M rows (with index on occurred_at)"
+
+  weekly_bucketing:
+    postgresql: |
+      SELECT
+          DATE_TRUNC('week', occurred_at) AS occurred_at_week,
+          SUM(revenue) AS revenue_sum,
+          COUNT(*) AS count
+      FROM tf_sales
+      GROUP BY DATE_TRUNC('week', occurred_at)
+      ORDER BY occurred_at_week;
+
+    mysql: |
+      SELECT
+          DATE_FORMAT(occurred_at, '%Y-%u') AS occurred_at_week,
+          SUM(revenue) AS revenue_sum,
+          COUNT(*) AS count
+      FROM tf_sales
+      GROUP BY DATE_FORMAT(occurred_at, '%Y-%u')
+      ORDER BY occurred_at_week;
+
+    sqlite: |
+      SELECT
+          strftime('%Y-W%W', occurred_at) AS occurred_at_week,
+          SUM(revenue) AS revenue_sum,
+          COUNT(*) AS count
+      FROM tf_sales
+      GROUP BY strftime('%Y-W%W', occurred_at)
+      ORDER BY occurred_at_week;
+
+  monthly_bucketing:
+    postgresql: |
+      SELECT
+          DATE_TRUNC('month', occurred_at) AS occurred_at_month,
+          SUM(revenue) AS revenue_sum,
+          COUNT(*) AS count
+      FROM tf_sales
+      GROUP BY DATE_TRUNC('month', occurred_at)
+      ORDER BY occurred_at_month;
+
+    mysql: |
+      SELECT
+          DATE_FORMAT(occurred_at, '%Y-%m') AS occurred_at_month,
+          SUM(revenue) AS revenue_sum,
+          COUNT(*) AS count
+      FROM tf_sales
+      GROUP BY DATE_FORMAT(occurred_at, '%Y-%m')
+      ORDER BY occurred_at_month;
+
+    sqlite: |
+      SELECT
+          strftime('%Y-%m', occurred_at) AS occurred_at_month,
+          SUM(revenue) AS revenue_sum,
+          COUNT(*) AS count
+      FROM tf_sales
+      GROUP BY strftime('%Y-%m', occurred_at)
+      ORDER BY occurred_at_month;
+
+  combined_temporal_and_dimension:
+    graphql: |
+      query {
+        sales_aggregate(
+          groupBy: {
+            occurred_at_day: true,
+            category: true
+          }
+        ) {
+          occurred_at_day
+          category
+          revenue_sum
+          count
+        }
+      }
+
+    postgresql: |
+      SELECT
+          DATE_TRUNC('day', occurred_at) AS occurred_at_day,
+          data->>'category' AS category,
+          SUM(revenue) AS revenue_sum,
+          COUNT(*) AS count
+      FROM tf_sales
+      GROUP BY
+          DATE_TRUNC('day', occurred_at),
+          data->>'category'
+      ORDER BY occurred_at_day, revenue_sum DESC;
+
+    use_case: "Daily revenue breakdown by category"
+
+database_functions:
+  postgresql:
+    function: "DATE_TRUNC"
+    granularities:
+      - "second"
+      - "minute"
+      - "hour"
+      - "day"
+      - "week"
+      - "month"
+      - "quarter"
+      - "year"
+    example: "DATE_TRUNC('month', timestamp_column)"
+    notes: "Most flexible, returns TIMESTAMP type"
+
+  mysql:
+    function: "DATE_FORMAT"
+    patterns:
+      - pattern: "%Y-%m-%d"
+        granularity: "day"
+      - pattern: "%Y-%m"
+        granularity: "month"
+      - pattern: "%Y-W%u"
+        granularity: "week"
+      - pattern: "%Y"
+        granularity: "year"
+    example: "DATE_FORMAT(timestamp_column, '%Y-%m-%d')"
+    notes: "Returns string, flexible formatting"
+
+  sqlite:
+    function: "strftime"
+    patterns:
+      - pattern: "%Y-%m-%d"
+        granularity: "day"
+      - pattern: "%Y-%m"
+        granularity: "month"
+      - pattern: "%Y-W%W"
+        granularity: "week"
+      - pattern: "%Y"
+        granularity: "year"
+    example: "strftime('%Y-%m-%d', timestamp_column)"
+    notes: "Returns string, similar to DATE_FORMAT"
+
+  sqlserver:
+    function: "DATEPART / CAST / FORMAT"
+    methods:
+      - method: "CAST(occurred_at AS DATE)"
+        granularity: "day"
+      - method: "FORMAT(occurred_at, 'yyyy-MM')"
+        granularity: "month"
+      - method: "DATEPART(year, occurred_at)"
+        granularity: "year"
+    example: "CAST(occurred_at AS DATE)"
+    notes: "Multiple approaches, CAST most performant"
+
+indexing_strategy:
+  basic_index:
+    creation: "CREATE INDEX idx_sales_occurred ON tf_sales(occurred_at);"
+    benefit: "Fast scanning in date order, supports range queries"
+    use_case: "Essential for all temporal bucketing queries"
+
+  composite_index:
+    creation: "CREATE INDEX idx_sales_occurred_category ON tf_sales(occurred_at, (data->>'category'));"
+    benefit: "Optimizes temporal + dimension grouping"
+    use_case: "Daily revenue by category queries"
+
+  brin_index:
+    creation: "CREATE INDEX idx_sales_occurred_brin ON tf_sales USING BRIN(occurred_at);"
+    benefit: "Tiny index size for time-series data"
+    use_case: "Large fact tables with chronological inserts (append-only)"
+    notes: "PostgreSQL only, 100-1000x smaller than B-tree"
+
+best_practices:
+  - name: "Always index timestamp columns"
+    description: "CREATE INDEX on occurred_at, created_at, etc."
+    rationale: "5-10ms with index vs 500ms+ without"
+
+  - name: "Use BRIN for large time-series tables"
+    description: "BRIN index for chronologically-inserted data"
+    rationale: "1000x smaller index, nearly same performance for time ranges"
+
+  - name: "Choose appropriate granularity"
+    description: "Daily for reports, hourly for real-time dashboards"
+    rationale: "Balance between detail and performance"
+
+  - name: "Combine temporal with WHERE filters"
+    description: "WHERE occurred_at >= '2024-01-01' before GROUP BY"
+    rationale: "Narrow time range before expensive aggregation"
+
+  - name: "Consider aggregate tables for common buckets"
+    description: "Pre-compute daily/monthly rollups in ta_* tables"
+    rationale: "Instant queries for frequently-accessed time periods"
+
+anti_patterns:
+  - name: "No index on timestamp column"
+    consequence: "Full table scan, 500ms+ queries"
+    example: "GROUP BY DATE_TRUNC(...) without index on occurred_at"
+
+  - name: "Application-side bucketing"
+    consequence: "Transferring all raw data over network"
+    example: "Fetch all timestamps, group by day in JavaScript/Python"
+
+  - name: "Overly-granular bucketing"
+    consequence: "Too many groups, slow aggregation, huge result sets"
+    example: "GROUP BY second for 6-month analysis (millions of groups)"
+
+  - name: "Wrong timezone handling"
+    consequence: "Off-by-one-day errors in reports"
+    example: "Not converting UTC to user timezone before bucketing"
+
+use_cases:
+  - scenario: "E-commerce: Daily sales trend"
+    query: "Revenue per day for last 30 days"
+    granularity: "day"
+    performance: "~5-10ms for 1M orders"
+
+  - scenario: "SaaS: Monthly recurring revenue"
+    query: "Total subscriptions by month"
+    granularity: "month"
+    performance: "~10-20ms for 5M subscription events"
+
+  - scenario: "Monitoring: Hourly error rate"
+    query: "Error count per hour, last 7 days"
+    granularity: "hour"
+    performance: "~20-30ms for 100M log events"
+
+  - scenario: "Finance: Quarterly revenue"
+    query: "Total revenue by fiscal quarter"
+    granularity: "quarter"
+    performance: "~5ms for 10M transactions"
+
+related_patterns:
+  - id: "aggregation-model"
+    description: "Aggregate functions used with temporal bucketing"
+
+  - id: "groupby-jsonb-dimensions"
+    description: "Combining temporal and dimensional grouping"
+
+  - id: "aggregate-table-strategy"
+    description: "Pre-computed temporal rollups (ta_sales_by_day)"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Temporal bucketing is like organizing photos into albums:
+      - Raw timestamps = exact photo timestamps (2024-03-15 14:32:18)
+      - Daily bucket = "March 15 album" (all photos from that day)
+      - Monthly bucket = "March 2024 album" (all photos from that month)
+
+      You don't create separate folders - just group when viewing!
+
+  intermediate:
+    focus: "Database-specific functions and indexing"
+    key_points:
+      - "DATE_TRUNC (PostgreSQL), DATE_FORMAT (MySQL), strftime (SQLite)"
+      - "Index timestamp columns for fast range scans"
+      - "Combine temporal + dimensional grouping"
+      - "5-10ms performance with proper indexes"
+
+  advanced:
+    focus: "Optimization strategies for billion-row time-series"
+    key_points:
+      - "BRIN indexes for append-only time-series (1000x smaller)"
+      - "Partitioning by time range (monthly partitions)"
+      - "Aggregate tables for pre-computed daily/monthly rollups"
+      - "Query optimizer index selection for temporal queries"

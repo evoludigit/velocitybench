@@ -1,0 +1,59 @@
+id: kubernetes-deployment-pattern
+name: Kubernetes Deployment Pattern
+category: fraiseql
+type: standard
+tags:
+- deployment
+- kubernetes
+- infrastructure
+- scaling
+- production
+summary:
+  short: Production Kubernetes deployment with HPA, Pod Security, and Network Policies
+  long: FraiseQL provides production-ready Kubernetes deployment configuration with
+    Horizontal Pod Autoscaling (3-20 replicas), Pod Security Standards, Network Policies,
+    proper resource limits, and health probe configuration.
+problem:
+  description: Development deployment configuration not production-ready
+  symptoms:
+  - No autoscaling causes capacity issues
+  - Missing security policies
+  - Improper resource limits cause OOMKills
+  - Network exposed unnecessarily
+  impact: Production instability and security vulnerabilities
+solution:
+  description: Implement Kubernetes Deployment Pattern effectively
+key_concepts:
+  concept_1: HPA for CPU-based autoscaling (3-20 replicas)
+  concept_2: Pod Security Standards (restricted)
+  concept_3: Network Policies for ingress/egress
+  concept_4: Resource requests and limits
+  concept_5: Rolling update strategy
+implementation_considerations:
+  consideration_1: Resource request sizing
+  consideration_2: HPA metrics and thresholds
+  consideration_3: Pod disruption budgets
+  consideration_4: Affinity and anti-affinity rules
+best_practices:
+- name: Use HPA
+  description: Autoscale based on CPU/memory
+- name: Set limits
+  description: Define resource requests and limits
+- name: Restrict security
+  description: Use restricted Pod Security Standard
+- name: Network policies
+  description: Limit ingress/egress traffic
+anti_patterns:
+- name: No autoscaling
+  consequence: Manual scaling and capacity issues
+- name: Privileged pods
+  consequence: Security vulnerabilities
+- name: No resource limits
+  consequence: Resource contention and OOMKills
+blog_hooks:
+  beginner:
+    focus: Introduction to Kubernetes Deployment Pattern
+  intermediate:
+    focus: Implementing HPA and security policies
+  advanced:
+    focus: Advanced scaling strategies and multi-cluster deployment

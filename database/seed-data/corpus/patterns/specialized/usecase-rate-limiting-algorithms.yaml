@@ -1,0 +1,28 @@
+id: usecase-rate-limiting-algorithms
+name: Rate Limiting Algorithms Patterns
+category: specialized
+type: standard
+tags:
+- usecase
+summary:
+  short: Patterns and practices for rate limiting algorithms patterns
+  long: Comprehensive guide to rate limiting algorithms patterns
+problem:
+  description: Challenges with rate limiting algorithms patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement rate limiting algorithms patterns
+key_concepts:
+  concept: Understanding Rate Limiting Algorithms Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Rate Limiting Algorithms Patterns
+  intermediate:
+    focus: Implementing Rate Limiting Algorithms Patterns
+  advanced:
+    focus: Advanced Rate Limiting Algorithms Patterns

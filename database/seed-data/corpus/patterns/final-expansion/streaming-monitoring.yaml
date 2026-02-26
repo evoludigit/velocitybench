@@ -1,0 +1,28 @@
+id: streaming-monitoring
+name: Streaming Monitoring
+category: comprehensive
+type: standard
+tags:
+- streaming
+summary:
+  short: Streaming Monitoring and implementation guidelines
+  long: Complete guide to streaming monitoring
+problem:
+  description: Challenges without proper streaming monitoring
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement streaming monitoring
+key_concepts:
+  concept: Streaming Monitoring
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

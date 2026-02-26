@@ -44,6 +44,7 @@ func main() {
 	// Posts
 	r.GET("/posts", handlers.GetPosts)
 	r.GET("/posts/:id", handlers.GetPost)
+	r.GET("/posts/:id/comments", handlers.GetPostComments)
 
 	port := os.Getenv("PORT")
 	if port == "" {

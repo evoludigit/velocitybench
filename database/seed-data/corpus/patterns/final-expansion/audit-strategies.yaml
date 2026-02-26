@@ -1,0 +1,28 @@
+id: audit-strategies
+name: Audit Strategies
+category: comprehensive
+type: standard
+tags:
+- audit
+summary:
+  short: Audit Strategies and implementation guidelines
+  long: Complete guide to audit strategies
+problem:
+  description: Challenges without proper audit strategies
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement audit strategies
+key_concepts:
+  concept: Audit Strategies
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

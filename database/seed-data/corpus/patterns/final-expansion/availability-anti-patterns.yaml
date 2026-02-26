@@ -1,0 +1,28 @@
+id: availability-anti-patterns
+name: Availability Anti Patterns
+category: comprehensive
+type: standard
+tags:
+- availability
+summary:
+  short: Availability Anti Patterns and implementation guidelines
+  long: Complete guide to availability anti patterns
+problem:
+  description: Challenges without proper availability anti patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement availability anti patterns
+key_concepts:
+  concept: Availability Anti Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

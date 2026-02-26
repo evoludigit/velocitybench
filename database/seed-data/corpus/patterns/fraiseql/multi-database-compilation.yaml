@@ -1,0 +1,50 @@
+id: multi-database-compilation
+name: Multi-Database Compilation
+category: fraiseql
+type: standard
+tags:
+- compilation
+- multi-database
+- database-agnostic
+- optimization
+summary:
+  short: Database-agnostic compilation with optional per-database optimizations
+  long: FraiseQL compiles once to a database-agnostic CompiledSchema, which can then
+    be targeted to PostgreSQL, SQLite, Oracle, MySQL, or SQL Server with optional
+    optimizations.
+problem:
+  description: Separate compilation and schema per database
+  symptoms:
+  - Managing multiple schema versions
+  - Inconsistent behavior across databases
+  - Wasted compilation effort
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Multi-Database Compilation effectively
+key_concepts:
+  concept_1: Database-agnostic contracts
+  concept_2: Capability matching and selection
+  concept_3: Per-database optimization strategies
+implementation_considerations:
+  consideration_1: Feature parity across databases
+  consideration_2: Performance trade-offs
+  consideration_3: Testing multi-database setups
+best_practices:
+- name: Compile once
+  description: Single schema for all databases
+- name: Optimize per database
+  description: Use best features of each DB
+- name: Test all variants
+  description: Run tests on every target database
+anti_patterns:
+- name: Database-specific schemas
+  consequence: Maintenance nightmare
+- name: No optimization
+  consequence: Poor performance on capable databases
+blog_hooks:
+  beginner:
+    focus: Introduction to Multi-Database Compilation
+  intermediate:
+    focus: Implementing Multi-Database Compilation
+  advanced:
+    focus: Advanced Multi-Database Compilation techniques

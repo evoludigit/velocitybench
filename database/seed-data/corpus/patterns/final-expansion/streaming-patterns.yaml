@@ -1,0 +1,28 @@
+id: streaming-patterns
+name: Streaming Patterns
+category: comprehensive
+type: standard
+tags:
+- streaming
+summary:
+  short: Streaming Patterns and implementation guidelines
+  long: Complete guide to streaming patterns
+problem:
+  description: Challenges without proper streaming patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement streaming patterns
+key_concepts:
+  concept: Streaming Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

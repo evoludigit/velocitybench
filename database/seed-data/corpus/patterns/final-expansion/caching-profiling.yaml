@@ -1,0 +1,28 @@
+id: caching-profiling
+name: Caching Profiling
+category: comprehensive
+type: standard
+tags:
+- caching
+summary:
+  short: Caching Profiling and implementation guidelines
+  long: Complete guide to caching profiling
+problem:
+  description: Challenges without proper caching profiling
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement caching profiling
+key_concepts:
+  concept: Caching Profiling
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

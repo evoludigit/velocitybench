@@ -1,0 +1,44 @@
+id: execution-phase-instrumentation
+name: Execution Phase Instrumentation
+category: fraiseql
+type: standard
+tags:
+- fraiseql
+- execution
+summary:
+  short: Timing each execution phase
+  long: Timing each execution phase
+problem:
+  description: Without execution phase instrumentation, systems face challenges
+  symptoms:
+  - Issue with timing each execution phase
+  impact: Reduced FraiseQL effectiveness
+solution:
+  description: Implement Execution Phase Instrumentation effectively
+key_concepts:
+  concept_1: Execution Phase Instrumentation fundamentals
+  concept_2: Implementation patterns
+  concept_3: Best practices
+implementation_considerations:
+  consideration_1: Requirements gathering
+  consideration_2: Design decisions
+  consideration_3: Implementation approach
+best_practices:
+- name: Plan carefully
+  description: Think through Execution Phase Instrumentation design
+- name: Test thoroughly
+  description: Validate Execution Phase Instrumentation works
+- name: Monitor
+  description: Track Execution Phase Instrumentation performance
+anti_patterns:
+- name: Ignoring pattern
+  consequence: Execution Phase Instrumentation fails
+- name: Incomplete implementation
+  consequence: Partial benefits only
+blog_hooks:
+  beginner:
+    focus: Introduction to Execution Phase Instrumentation
+  intermediate:
+    focus: Implementing Execution Phase Instrumentation
+  advanced:
+    focus: Advanced Execution Phase Instrumentation techniques

@@ -1,0 +1,102 @@
+{
+  "types": {
+    "User": {
+      "name": "User",
+      "fields": {
+        "id": {
+          "type": "ID",
+          "required": true
+        },
+        "name": {
+          "type": "String",
+          "required": true
+        },
+        "email": {
+          "type": "String",
+          "required": true
+        },
+        "created_at": {
+          "type": "DateTime",
+          "required": false
+        },
+        "is_active": {
+          "type": "Boolean",
+          "required": false
+        }
+      }
+    },
+    "Post": {
+      "name": "Post",
+      "fields": {
+        "id": {
+          "type": "ID",
+          "required": true
+        },
+        "title": {
+          "type": "String",
+          "required": true
+        },
+        "content": {
+          "type": "String",
+          "required": true
+        },
+        "author_id": {
+          "type": "ID",
+          "required": true
+        },
+        "published": {
+          "type": "Boolean",
+          "required": false
+        },
+        "created_at": {
+          "type": "DateTime",
+          "required": false
+        }
+      }
+    },
+    "Comment": {
+      "name": "Comment",
+      "fields": {
+        "id": {
+          "type": "ID",
+          "required": true
+        },
+        "content": {
+          "type": "String",
+          "required": true
+        },
+        "post_id": {
+          "type": "ID",
+          "required": true
+        },
+        "author_id": {
+          "type": "ID",
+          "required": true
+        },
+        "created_at": {
+          "type": "DateTime",
+          "required": false
+        }
+      }
+    }
+  },
+  "query": {
+    "users": {
+      "type": "[User]",
+      "arguments": {}
+    },
+    "posts": {
+      "type": "[Post]",
+      "arguments": {}
+    }
+  },
+  "mutation": {
+    "create_user": {
+      "type": "User",
+      "arguments": {
+        "name": "String!",
+        "email": "String!"
+      }
+    }
+  }
+}

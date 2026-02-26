@@ -1,0 +1,161 @@
+# Blog Posts Dataset
+# VelocityBench Knowledge Corpus
+
+id: blog
+name: "Blog Posts"
+description: "Generated blog posts for VelocityBench framework benchmarking"
+
+counts:
+  users: 5000        # Faker-generated users (most are commenters, not blog authors)
+  posts: 2243        # All generated blog posts
+  comments: 0        # No comments (yet - future enhancement)
+  categories: 20     # Pattern categories (from corpus/patterns)
+  fraiseql_posts: ~500  # FraiseQL architecture + wire + optimization content
+  analytics_posts: ~425  # Analytics patterns: schema, temporal, dimensions, optimization
+
+distributions:
+  posts_by_type:
+    tutorials: ~750       # beginner/intermediate/advanced
+    reference: ~750
+    troubleshooting: ~750
+
+  posts_by_difficulty:
+    beginner: ~750
+    intermediate: ~750
+    advanced: ~750
+
+  fraiseql_specific_distribution:
+    architecture: ~200    # Compiled execution, three-phase design
+    streaming: ~150       # fraiseql-wire, JSON streaming
+    performance: ~100     # Optimization, benchmarks
+    integration: ~50      # Backend patterns, best practices
+
+  analytics_specific_distribution:
+    schema_conventions: ~150  # Fact/aggregate table naming and structure
+    temporal_optimization: ~100  # date_info pattern and temporal bucketing
+    dimension_design: ~100    # Flat dimensions JSON structure
+    column_naming: ~50        # Column naming best practices (dimensions vs data)
+    query_optimization: ~75   # Index strategies, GIN/B-tree/BRIN
+
+  core_capabilities_distribution:
+    query_capabilities: ~21       # Window functions, query optimization, prepared statements (7 posts × 3 patterns)
+    streaming_capabilities: ~21   # Streaming performance, memory efficiency, result streaming (7 posts × 3 patterns)
+    production_capabilities: ~21  # Connection pooling, query caching, error handling (7 posts × 3 patterns)
+    performance_capabilities: ~21 # Latency optimization, throughput optimization, memory optimization (7 posts × 3 patterns)
+    capabilities_total: ~84       # Total posts for core capabilities (new, plus existing FraiseQL/analytics)
+
+  posts_per_user:
+    average: 0.45     # 2243 posts / 5000 users ≈ 0.45 posts/user
+    note: "Most users (4700+) have 0 posts - they are future commenters"
+    blog_authors: ~300  # Rough estimate of users with 1+ posts (round-robin distribution)
+
+  user_distribution:
+    with_posts: ~300     # Users who have written 1+ blog posts
+    commenters_only: ~4700  # Users with 0 posts (ready for future comment generation)
+
+performance_expectations:
+  load_time: "30-45 seconds"
+  database_size: "~150 MB"  # ~100 MB for 5K users with bios + ~50 MB for posts
+  users_tsv_size: "~2 MB"
+  posts_tsv_size: "~50 MB"
+
+use_cases:
+  - scenario: "Framework speed comparison"
+    benefit: "Realistic dataset for GraphQL framework benchmarking"
+
+  - scenario: "Comment generation foundation"
+    benefit: "Large user pool (5000) enables realistic comment distribution"
+
+  - scenario: "Search and filtering benchmarks"
+    benefit: "2243 posts with full-text content for search performance testing"
+
+  - scenario: "FraiseQL architecture documentation"
+    benefit: "~500 posts covering compiled execution, optimization, and streaming"
+
+  - scenario: "fraiseql-wire performance benchmarking"
+    benefit: "Real-world use cases for JSON streaming with 1000x memory efficiency"
+
+  - scenario: "Comparative framework analysis"
+    benefit: "FraiseQL vs Apollo, PostGraphile, Strawberry, and others"
+
+  - scenario: "Analytics at scale (fact tables with 100M+ rows)"
+    benefit: "date_info pre-computation saves 7-10x on temporal queries"
+
+  - scenario: "Multi-dimensional reporting and dashboards"
+    benefit: "Flat dimension structure enables fast GROUP BY operations"
+
+  - scenario: "Time-series analytics (daily/weekly/monthly aggregations)"
+    benefit: "Pre-computed temporal buckets eliminate DATE_TRUNC overhead"
+
+  - scenario: "Schema design and self-documenting column naming"
+    benefit: "Best practices for fact table column semantics (dimensions vs data)"
+
+notes:
+  - "Users generated with Faker (reproducible with seed 42)"
+  - "Blog posts parsed from markdown files in output/blog/"
+  - "Authors assigned via round-robin (most users have 0 posts)"
+  - "Ready for future comment generation (large user pool)"
+
+fraiseql_specific:
+  architecture:
+    - "Three-phase design: authoring → compilation → runtime"
+    - "Compiled execution reduces latency from 50-200ms to 1-5ms"
+    - "Zero N+1 queries through compiler-driven SQL generation"
+    - "Single binary deployment with zero runtime dependencies"
+
+  fraiseql_wire:
+    - "Specialized streaming JSON engine for Postgres 17"
+    - "Memory efficiency: 1.3 KB vs 26 MB for 100K rows (1000x-20000x savings)"
+    - "Time-to-first-row: 2-5 ms (comparable to tokio-postgres)"
+    - "Throughput: 100K-500K rows/sec (I/O limited)"
+    - "Zero unsafe code, 34/34 tests passing"
+
+  performance:
+    - "FraiseQL 10-100x faster than traditional GraphQL servers"
+    - "Predictable latency: queries known at compile-time"
+    - "Connection pooling optimizations built-in"
+    - "Query result caching with coherency checks"
+
+  benchmarking_data:
+    - "Real performance data from fraiseql-wire benchmarks available"
+    - "Comparison benchmarks: tokio-postgres, sqlx, others"
+    - "36+ benchmarks across micro, integration, and comparison tiers"
+    - "Security audit: zero vulnerabilities, comprehensive test coverage"
+
+analytics_enrichment:
+  date_info_pattern:
+    - "Pre-computed temporal dimensions: year, quarter, month, week, day, hour"
+    - "Performance improvement: 7-10x faster temporal grouping queries"
+    - "Eliminates repeated DATE_TRUNC function calls at query time"
+    - "Enables indexing on temporal buckets (day, week, month)"
+    - "Perfect for time-series analytics and reporting"
+
+  dimensions_optimization:
+    - "Flat JSON structure with no deep nesting (anti-pattern avoidance)"
+    - "Prefixed keys for clarity: product_*, customer_*, sales_*, operations_*, marketing_*"
+    - "30+ dimension attributes across organized categories"
+    - "Optimized for GIN indexing and GROUP BY operations"
+    - "Fast extraction with data->>'key' syntax"
+
+  complete_fact_table_design:
+    - "Hybrid approach: date_info + dimensions + strategic filter columns"
+    - "Denormalized filter columns for fast WHERE clause execution"
+    - "Composite indexes on common query patterns"
+    - "10M-row benchmarks: 1-5s for complex multi-dimension analytics queries"
+    - "Scales to 100M+ rows with BRIN indexing on timestamps"
+
+  index_strategy:
+    - "GIN indexes on date_info and dimensions JSONB columns"
+    - "B-tree indexes on filter columns (customer_id, product_id, status)"
+    - "BRIN indexes for large time-series tables (1000x smaller than B-tree)"
+    - "Composite indexes for multi-column WHERE + ORDER BY patterns"
+    - "Trade-offs: storage cost vs query performance"
+
+  column_naming_convention:
+    - "Default JSONB column naming: 'data' vs 'dimensions' (proposed change)"
+    - "Current: dimension_column parameter defaults to 'data' (generic, confusing)"
+    - "Proposed: rename to 'dimensions' (semantic, self-documenting)"
+    - "Aligns with business intelligence terminology (measures, dimensions, filters)"
+    - "4-phase deprecation path: v1.x warning → v2.0 new default → v3.0 removal"
+    - "Backward compatibility: dimension_column parameter accepts custom names"
+    - "Benefits: improved schema clarity, better developer experience, industry alignment"

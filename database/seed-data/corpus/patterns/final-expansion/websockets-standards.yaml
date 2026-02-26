@@ -1,0 +1,28 @@
+id: websockets-standards
+name: Websockets Standards
+category: comprehensive
+type: standard
+tags:
+- websockets
+summary:
+  short: Websockets Standards and implementation guidelines
+  long: Complete guide to websockets standards
+problem:
+  description: Challenges without proper websockets standards
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement websockets standards
+key_concepts:
+  concept: Websockets Standards
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

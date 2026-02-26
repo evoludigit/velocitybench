@@ -1,0 +1,28 @@
+id: performance-patterns
+name: Performance Patterns
+category: comprehensive
+type: standard
+tags:
+- performance
+summary:
+  short: Performance Patterns and implementation guidelines
+  long: Complete guide to performance patterns
+problem:
+  description: Challenges without proper performance patterns
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement performance patterns
+key_concepts:
+  concept: Performance Patterns
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

@@ -1,0 +1,28 @@
+id: mobile-progressive-web-apps
+name: Progressive Web Apps Patterns
+category: specialized
+type: standard
+tags:
+- mobile
+summary:
+  short: Patterns and practices for progressive web apps patterns
+  long: Comprehensive guide to progressive web apps patterns
+problem:
+  description: Challenges with progressive web apps patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement progressive web apps patterns
+key_concepts:
+  concept: Understanding Progressive Web Apps Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Progressive Web Apps Patterns
+  intermediate:
+    focus: Implementing Progressive Web Apps Patterns
+  advanced:
+    focus: Advanced Progressive Web Apps Patterns

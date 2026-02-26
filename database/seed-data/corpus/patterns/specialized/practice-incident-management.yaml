@@ -1,0 +1,28 @@
+id: practice-incident-management
+name: Incident Management Practices
+category: specialized
+type: standard
+tags:
+- practice
+summary:
+  short: Patterns and practices for incident management practices
+  long: Comprehensive guide to incident management practices
+problem:
+  description: Challenges with incident management practices
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement incident management practices
+key_concepts:
+  concept: Understanding Incident Management Practices
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Incident Management Practices
+  intermediate:
+    focus: Implementing Incident Management Practices
+  advanced:
+    focus: Advanced Incident Management Practices

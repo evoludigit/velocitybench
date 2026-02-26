@@ -1,0 +1,293 @@
+# Evolution of Backend Architecture
+# VelocityBench Knowledge Corpus
+
+id: evolution-of-backend-architecture
+name: "The Evolution of Backend Architecture: From Mainframes to Serverless"
+category: history
+type: timeline
+tags:
+  - history
+  - architecture
+  - microservices
+  - serverless
+  - monolith
+
+summary:
+  short: "How backend architectures evolved from monoliths to microservices to serverless"
+  long: |
+    Backend architecture has transformed from centralized mainframes to distributed
+    cloud-native systems over six decades. Each architectural style emerged to solve
+    specific problems: monoliths for simplicity, SOA for reuse, microservices for
+    scalability, serverless for operational efficiency. Understanding this evolution
+    helps architects make informed decisions.
+
+timeline:
+  - era: "1960s-1970s: Mainframe Era"
+    year_range: "1960-1980"
+    description: |
+      Computing was centralized. Mainframes ran batch jobs and served dumb terminals.
+      All code, data, and logic lived on one powerful machine. Operations were scheduled,
+      not real-time.
+    characteristics:
+      - "Centralized computing"
+      - "Batch processing"
+      - "Dumb terminals"
+      - "COBOL, Fortran, Assembly"
+      - "Operator-managed deployments"
+    technologies:
+      - name: "IBM System/360"
+        year: 1964
+        note: "Dominant mainframe family"
+      - name: "CICS"
+        year: 1969
+        note: "Transaction processing monitor"
+      - name: "IMS"
+        year: 1966
+        note: "Database and transaction manager"
+    problems:
+      - "Expensive hardware"
+      - "Single point of failure"
+      - "Batch delays"
+      - "Limited interactivity"
+
+  - era: "1980s-1990s: Client-Server Architecture"
+    year_range: "1980-2000"
+    description: |
+      PCs distributed computing to users. Two-tier architecture separated presentation
+      (client) from data (server). Three-tier added a middle layer for business logic.
+      This enabled richer applications and better scalability.
+    characteristics:
+      - "Fat clients with business logic"
+      - "Database servers"
+      - "LAN networking"
+      - "SQL databases dominant"
+      - "GUI applications"
+    architectures:
+      - name: "Two-Tier"
+        description: "Client → Database"
+        example: "Desktop app with SQL Server"
+      - name: "Three-Tier"
+        description: "Client → Application Server → Database"
+        example: "Browser → J2EE → Oracle"
+    technologies:
+      - name: "Oracle"
+        year: 1979
+        note: "Enterprise database"
+      - name: "Windows NT"
+        year: 1993
+        note: "Server operating system"
+      - name: "Java (J2EE)"
+        year: 1999
+        note: "Enterprise Java platform"
+    problems:
+      - "Fat client deployment headaches"
+      - "Version compatibility issues"
+      - "Network dependency"
+      - "Limited scalability"
+
+  - era: "1990s-2000s: Monolithic Web Applications"
+    year_range: "1995-2010"
+    description: |
+      The web moved logic to servers. PHP, ASP, Java servlets powered dynamic websites.
+      Monolithic architectures bundled all functionality in one deployable unit.
+      Simple to develop and deploy, but hard to scale and maintain.
+    characteristics:
+      - "Single deployable unit"
+      - "Shared database"
+      - "Vertical scaling"
+      - "MVC frameworks"
+      - "Session state on server"
+    technologies:
+      - name: "PHP"
+        year: 1995
+        note: "Server-side scripting"
+      - name: "ASP"
+        year: 1996
+        note: "Microsoft web framework"
+      - name: "Java Servlets"
+        year: 1997
+        note: "Enterprise Java web"
+      - name: "Ruby on Rails"
+        year: 2004
+        note: "Rapid development framework"
+      - name: "Django"
+        year: 2005
+        note: "Python web framework"
+    monolith_structure: |
+      ┌─────────────────────────────────┐
+      │         Monolithic App          │
+      │  ┌─────┬─────┬─────┬─────┐     │
+      │  │ UI  │Users│Orders│ ... │     │
+      │  └─────┴─────┴─────┴─────┘     │
+      │         Single Database         │
+      └─────────────────────────────────┘
+    problems:
+      - "Deploy all or nothing"
+      - "One bug can crash everything"
+      - "Scaling requires scaling everything"
+      - "Long deployment cycles"
+      - "Technology lock-in"
+
+  - era: "2000s-2010s: Service-Oriented Architecture (SOA)"
+    year_range: "2000-2015"
+    description: |
+      Enterprises decomposed monoliths into services for reuse and integration.
+      SOAP, XML, and ESBs (Enterprise Service Buses) connected services. SOA promised
+      agility but often delivered complexity.
+    characteristics:
+      - "Reusable services"
+      - "SOAP/XML protocols"
+      - "Enterprise Service Bus (ESB)"
+      - "Service contracts (WSDL)"
+      - "Centralized governance"
+    technologies:
+      - name: "SOAP"
+        year: 1999
+        note: "XML messaging protocol"
+      - name: "ESB (MuleSoft, IBM)"
+        year: "2000s"
+        note: "Integration middleware"
+      - name: "BPM (Business Process Management)"
+        year: "2000s"
+        note: "Workflow orchestration"
+    soa_structure: |
+      ┌─────────────────────────────────────┐
+      │           Enterprise Service Bus    │
+      │  ┌─────────────────────────────┐   │
+      │  │  Service  │  Service  │ ... │   │
+      │  └─────────────────────────────┘   │
+      │         Central Registry            │
+      └─────────────────────────────────────┘
+    problems:
+      - "ESB became bottleneck"
+      - "XML overhead"
+      - "Complex governance"
+      - "Vendor lock-in"
+      - "Waterfall mindset persisted"
+
+  - era: "2010s: Microservices Revolution"
+    year_range: "2010-2020"
+    description: |
+      Netflix, Amazon, and others pioneered microservices: small, independent services
+      owning their data. Enabled by containers (Docker) and orchestration (Kubernetes).
+      Teams deploy independently, scale independently, fail independently.
+    characteristics:
+      - "Small, focused services"
+      - "Own their data (no shared DB)"
+      - "Independent deployment"
+      - "Containerized"
+      - "API-first communication"
+      - "Decentralized governance"
+    technologies:
+      - name: "Docker"
+        year: 2013
+        note: "Container runtime"
+      - name: "Kubernetes"
+        year: 2014
+        note: "Container orchestration"
+      - name: "Netflix OSS"
+        year: "2012-2015"
+        note: "Eureka, Zuul, Hystrix"
+      - name: "Istio"
+        year: 2017
+        note: "Service mesh"
+    microservices_structure: |
+      ┌──────┐  ┌──────┐  ┌──────┐
+      │User  │  │Order │  │Payment│
+      │Svc   │  │Svc   │  │Svc   │
+      └──┬───┘  └──┬───┘  └──┬───┘
+         │         │         │
+      ┌──┴───┐  ┌──┴───┐  ┌──┴───┐
+      │User  │  │Order │  │Payment│
+      │  DB  │  │  DB  │  │  DB  │
+      └──────┘  └──────┘  └──────┘
+    problems:
+      - "Distributed system complexity"
+      - "Network latency"
+      - "Data consistency challenges"
+      - "Operational overhead"
+      - "Testing complexity"
+
+  - era: "2015s-Present: Serverless and Edge"
+    year_range: "2015-present"
+    description: |
+      Serverless (FaaS) abstracts servers entirely. Developers write functions,
+      cloud handles scaling. Edge computing pushes logic closer to users.
+      Pay-per-execution, zero operations.
+    characteristics:
+      - "Functions as deployment unit"
+      - "Event-driven execution"
+      - "Auto-scaling to zero"
+      - "Pay per invocation"
+      - "Managed infrastructure"
+    technologies:
+      - name: "AWS Lambda"
+        year: 2014
+        note: "First major FaaS"
+      - name: "Cloudflare Workers"
+        year: 2017
+        note: "Edge computing"
+      - name: "Vercel"
+        year: 2020
+        note: "Frontend/backend edge platform"
+      - name: "Deno Deploy"
+        year: 2021
+        note: "Edge runtime"
+    serverless_structure: |
+      ┌─────────────────────────────────┐
+      │         API Gateway             │
+      └──────────┬──────────────────────┘
+                 │
+      ┌──────────┼──────────────────────┐
+      │   ┌──────▼──────┐               │
+      │   │  Function   │  ← Event      │
+      │   └─────────────┘               │
+      │   ┌─────────────┐               │
+      │   │  Function   │  ← Event      │
+      │   └─────────────┘               │
+      │        Cloud Provider           │
+      └─────────────────────────────────┘
+    problems:
+      - "Cold starts"
+      - "Vendor lock-in"
+      - "Debugging difficulty"
+      - "State management"
+      - "Cost unpredictability at scale"
+
+architecture_selection:
+  - name: "Monolith"
+    when: "New projects, small teams, simple domains"
+    avoid: "Large teams, complex domains, high scale"
+
+  - name: "Microservices"
+    when: "Large teams, complex domains, independent scaling"
+    avoid: "Small teams, unclear boundaries, premature optimization"
+
+  - name: "Serverless"
+    when: "Event-driven, variable load, operational simplicity"
+    avoid: "Long-running processes, predictable high load"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Backend evolution is like restaurant organization:
+      - Monolith: One chef does everything (simple but doesn't scale)
+      - SOA: Kitchen stations (prep, grill, sauce) share a big central counter
+      - Microservices: Independent food trucks, each with own kitchen
+      - Serverless: Ghost kitchen - you order, magic happens, food appears
+
+  intermediate:
+    focus: "Understanding architectural tradeoffs"
+    key_points:
+      - "Why monoliths aren't always bad"
+      - "Microservices prerequisites (Conway's Law)"
+      - "When serverless makes sense"
+      - "Hybrid architectures"
+
+  advanced:
+    focus: "Modern architectural patterns"
+    key_points:
+      - "Domain-Driven Design and bounded contexts"
+      - "Event sourcing and CQRS"
+      - "Service mesh patterns"
+      - "Multi-region and edge architectures"

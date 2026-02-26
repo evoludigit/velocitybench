@@ -1,0 +1,28 @@
+id: ops-resource-allocation
+name: Resource Allocation Patterns
+category: specialized
+type: standard
+tags:
+- ops
+summary:
+  short: Patterns and practices for resource allocation patterns
+  long: Comprehensive guide to resource allocation patterns
+problem:
+  description: Challenges with resource allocation patterns
+  symptoms:
+  - Issues arise without proper practices
+  impact: System problems
+solution:
+  description: Implement resource allocation patterns
+key_concepts:
+  concept: Understanding Resource Allocation Patterns
+best_practices:
+- name: Best practice
+  description: Follow established patterns
+blog_hooks:
+  beginner:
+    focus: Intro to Resource Allocation Patterns
+  intermediate:
+    focus: Implementing Resource Allocation Patterns
+  advanced:
+    focus: Advanced Resource Allocation Patterns

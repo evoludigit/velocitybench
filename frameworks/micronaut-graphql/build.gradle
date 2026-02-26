@@ -1,0 +1,59 @@
+plugins {
+    id("io.micronaut.application") version "4.2.1"
+    id("com.gradleup.shadow") version "8.3.0"
+}
+
+version = "0.1"
+group = "com.velocitybench"
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Micronaut
+    annotationProcessor("io.micronaut:micronaut-http-validation")
+    annotationProcessor("io.micronaut.serde:micronaut-serde-processor")
+
+    implementation("io.micronaut:micronaut-http-client")
+    implementation("io.micronaut.serde:micronaut-serde-jackson")
+
+    // GraphQL
+    implementation("io.micronaut.graphql:micronaut-graphql")
+    implementation("com.graphql-java:graphql-java:21.3")
+    implementation("com.graphql-java:java-dataloader:3.2.2")
+
+    // Database
+    implementation("io.micronaut.sql:micronaut-jdbc-hikari")
+    implementation("org.postgresql:postgresql:42.7.1")
+
+    // Runtime
+    runtimeOnly("ch.qos.logback:logback-classic")
+    runtimeOnly("org.yaml:snakeyaml")
+
+    // Testing
+    testImplementation("io.micronaut:micronaut-http-client")
+}
+
+application {
+    mainClass.set("com.velocitybench.Application")
+}
+
+java {
+    sourceCompatibility = JavaVersion.toVersion("21")
+    targetCompatibility = JavaVersion.toVersion("21")
+}
+
+shadowJar {
+    archiveFileName.set("app.jar")
+}
+
+micronaut {
+    version("4.2.1")
+    runtime("netty")
+    testRuntime("junit5")
+    processing {
+        incremental(true)
+        annotations("com.velocitybench.*")
+    }
+}

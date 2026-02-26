@@ -11,12 +11,12 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface PostRepository extends JpaRepository<Post, String> {
+public interface PostRepository extends JpaRepository<Post, Integer> {
 
-    List<Post> findByAuthorIdAndStatusOrderByCreatedAtDesc(String authorId, String status, Pageable pageable);
+    List<Post> findByFkAuthorAndPublishedOrderByCreatedAtDesc(Integer fkAuthor, Boolean published, Pageable pageable);
 
-    @Query("SELECT p FROM Post p LEFT JOIN FETCH p.author WHERE p.id = :id")
-    Optional<Post> findByIdWithAuthor(@Param("id") String id);
+    @Query("SELECT p FROM Post p WHERE p.id = :uuid")
+    Optional<Post> findByUuid(@Param("uuid") String uuid);
 
-    List<Post> findByStatusOrderByCreatedAtDesc(String status, Pageable pageable);
+    List<Post> findByPublishedOrderByCreatedAtDesc(Boolean published, Pageable pageable);
 }

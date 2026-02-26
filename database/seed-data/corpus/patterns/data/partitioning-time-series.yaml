@@ -1,0 +1,114 @@
+id: partitioning-time-series
+name: "Partitioning & Time-Series Data"
+category: data
+type: pattern
+tags:
+  - database
+  - partitioning
+  - time-series
+  - performance
+  - scalability
+
+summary:
+  short: "Partitioning strategies for managing large-scale time-series and historical data"
+  long: |
+    As datasets grow, monolithic tables become unwieldy. Partitioning distributes data across multiple storage units, enabling efficient querying, maintenance, and lifecycle management. Time-series data benefits particularly from time-based partitioning.
+
+problem:
+  description: "Large tables become slow and hard to maintain; archival and purging are expensive"
+  symptoms:
+    - name: "Full table scans"
+      description: "Queries scan years of data even when only recent data is needed"
+    - name: "Vacuum/maintenance lockups"
+      description: "Index maintenance blocks queries on huge tables"
+    - name: "Slow inserts"
+      description: "Writing to tables with billions of rows experiences latency"
+    - name: "Storage explosion"
+      description: "Cannot efficiently archive or delete old data"
+
+solution:
+  approach: "Partition tables by time, range, or hash to distribute data and enable targeted maintenance"
+  key_points:
+    - "Choose partition key that aligns with query patterns"
+    - "Implement automated partition creation and management"
+    - "Design queries to use partition pruning (WHERE on partition key)"
+    - "Manage partition lifecycle (archival, deletion, compression)"
+    - "Monitor partition sizes and query performance"
+
+partitioning_strategies:
+  - name: "Time-Based Partitioning"
+    key: "Timestamp or date column"
+    unit: "Daily, weekly, monthly, or yearly"
+    best_for: "Logs, events, metrics, time-series data"
+    example: "events_2024_01, events_2024_02, etc."
+    advantages: ["Natural for time-series", "Easy archival", "Clear retention policy"]
+    disadvantages: ["Requires active partition management", "Future data needs planning"]
+
+  - name: "Range Partitioning"
+    key: "Numeric range (e.g., user_id 1-1000000)"
+    unit: "Configurable ranges"
+    best_for: "Sharding, data with natural ranges"
+    example: "users_1000000_to_2000000"
+    advantages: ["Even distribution", "Easy to understand"]
+    disadvantages: ["Requires rebalancing as ranges fill", "Potential hotspots"]
+
+  - name: "Hash Partitioning"
+    key: "Hash of column (e.g., HASH(user_id))"
+    unit: "Fixed number of partitions"
+    best_for: "Distributing load evenly"
+    example: "orders_hash_0, orders_hash_1, etc."
+    advantages: ["Even distribution", "No manual rebalancing"]
+    disadvantages: ["Less intuitive", "Harder to query specific partitions"]
+
+  - name: "List Partitioning"
+    key: "Explicit values (e.g., country codes)"
+    unit: "Discrete values"
+    best_for: "Categorical data with clear groups"
+    example: "orders_us, orders_eu, orders_asia"
+    advantages: ["Clear semantics", "Easy routing"]
+    disadvantages: ["Requires maintaining value lists", "Uneven distribution possible"]
+
+time_series_considerations:
+  - "Partition size: 1-100GB optimal for most systems"
+  - "Retention: Automatically drop old partitions instead of deleting"
+  - "Compression: Compress or archive old partitions"
+  - "Query design: Always include partition key in WHERE clause"
+  - "Indexing: Index hot partitions separately from cold"
+
+partition_management:
+  - "Automatic creation: Trigger-based or stored procedures"
+  - "Sliding window: Pre-create next period, drop oldest period"
+  - "Overflow partitions: Default partition for data outside ranges"
+  - "Monitoring: Track partition sizes, query latency per partition"
+  - "Tools: pg_partman, MySQL Partitioning, specialized time-series DBs"
+
+time_series_databases:
+  - "InfluxDB: Optimized for metrics and events"
+  - "TimescaleDB: PostgreSQL extension for time-series"
+  - "Prometheus: Metrics storage with retention policies"
+  - "QuestDB: High-performance time-series"
+  - "ClickHouse: Columnar storage for analytics"
+
+blog_hooks:
+  beginner:
+    analogy: |
+      Partitioning is like organizing a filing cabinet:
+      - No partitioning: All files in one drawer (slow to find)
+      - Time-based: Separate drawers by month (quick to find recent files)
+      - Range-based: Organize by name (A-M, N-Z)
+
+      Smaller drawers are easier to search and maintain.
+
+  intermediate:
+    focus: "Designing partition schemes"
+    key_points:
+      - "Choosing partition keys and granularity"
+      - "Query design for partition pruning"
+      - "Automated partition lifecycle management"
+
+  advanced:
+    focus: "Large-scale time-series architecture"
+    key_points:
+      - "Sharding and distributed partitioning"
+      - "Compaction and compression strategies"
+      - "Balancing query performance vs retention"

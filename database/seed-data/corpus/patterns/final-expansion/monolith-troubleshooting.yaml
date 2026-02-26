@@ -1,0 +1,28 @@
+id: monolith-troubleshooting
+name: Monolith Troubleshooting
+category: comprehensive
+type: standard
+tags:
+- monolith
+summary:
+  short: Monolith Troubleshooting and implementation guidelines
+  long: Complete guide to monolith troubleshooting
+problem:
+  description: Challenges without proper monolith troubleshooting
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement monolith troubleshooting
+key_concepts:
+  concept: Monolith Troubleshooting
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

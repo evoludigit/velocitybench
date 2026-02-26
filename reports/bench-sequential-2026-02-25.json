@@ -1,0 +1,41 @@
+[
+  {
+    "framework": "php-laravel",
+    "query": "Q1",
+    "rps": 76.6,
+    "p50_ms": 572.57,
+    "p95_ms": 649.66,
+    "p99_ms": 680.58,
+    "requests": 383,
+    "errors": 0,
+    "error_breakdown": {},
+    "skipped": false,
+    "skip_reason": ""
+  },
+  {
+    "framework": "php-laravel",
+    "query": "Q2",
+    "rps": 69.6,
+    "p50_ms": 645.58,
+    "p95_ms": 743.19,
+    "p99_ms": 756.48,
+    "requests": 348,
+    "errors": 0,
+    "error_breakdown": {},
+    "skipped": false,
+    "skip_reason": ""
+  },
+  {
+    "framework": "php-laravel",
+    "query": "Q2b",
+    "rps": 69.4,
+    "p50_ms": 646.33,
+    "p95_ms": 706.12,
+    "p99_ms": 722.9,
+    "requests": 347,
+    "errors": 0,
+    "error_breakdown": {},
+    "skipped": false,
+    "skip_reason": ""
+  }
+]

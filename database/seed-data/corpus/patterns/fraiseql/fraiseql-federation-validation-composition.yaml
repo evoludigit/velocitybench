@@ -1,0 +1,419 @@
+id: fraiseql-federation-validation-composition
+name: "FraiseQL Federation Validation and Supergraph Composition"
+category: fraiseql
+type: standard
+tags:
+  - fraiseql
+  - federation
+  - validation
+  - composition
+  - supergraph
+  - error-handling
+
+summary:
+  short: "Compile-time validation, circular dependency detection, and supergraph composition"
+  long: |
+    Federation schemas must be validated at compile time to catch errors before runtime.
+    FraiseQL validates @requires/@provides directives, detects circular dependencies,
+    and validates @external/@key decorators. Multiple subgraphs are then composed into
+    a unified supergraph for Apollo Router/Gateway. Understanding composition rules and
+    conflict detection is critical for multi-service architectures.
+
+problem:
+  description: |
+    Composing multiple federated services creates validation challenges:
+    - @requires referencing non-existent fields
+    - Circular @requires dependencies (A requires B requires A)
+    - @external on non-extended types
+    - Conflicting @key definitions across subgraphs
+    - Type conflicts when same type in multiple subgraphs
+    - Field type mismatches between subgraphs
+
+    Without compile-time validation, composition fails at runtime.
+
+  symptoms:
+    - name: "Circular dependency error"
+      description: "Order requires User, User requires Order"
+      detection: "Composition fails with cycle error"
+
+    - name: "Field reference error"
+      description: "@requires('non_existent_field')"
+      consequence: "Validation fails, can't compose"
+
+    - name: "External field on non-extends type"
+      description: "@external() on type without @extends"
+      consequence: "Compilation error"
+
+    - name: "Key mismatch"
+      description: "User @key(id) in one subgraph, @key(email) in another"
+      consequence: "Composition fails"
+
+  impact: |
+    Schema composition failures, deployment blockers, runtime field resolution errors
+
+solution:
+  principle: "Strict compile-time validation of federation directives"
+
+  components:
+    - name: "Field Validation"
+      type: "Validation mechanism"
+      purpose: "Ensure @requires/@provides reference valid fields"
+      mechanism: |
+        Before composition, validate all directives:
+        - @requires("field"): Field must exist in type
+        - @requires("nested.field"): Support nested field paths
+        - @provides("Type.field"): Target type must exist
+        - No empty field paths (validation error)
+
+        Example validation flow:
+        1. Parse @requires(["email", "phone"])
+        2. Check email exists in User type
+        3. Check phone exists in User type
+        4. If any missing: error "Field not found"
+
+    - name: "Circular Dependency Detection"
+      type: "Dependency analysis"
+      purpose: "Detect cycles in @requires chains"
+      mechanism: |
+        Build dependency graph from @requires directives:
+        - User.orders @requires Order.user_id
+        - Order.user_id @requires User.id
+        - Result: No cycle (one-way dependency)
+
+        Cycle detection:
+        - A.f1 @requires B.f2
+        - B.f2 @requires C.f3
+        - C.f3 @requires A.f1
+        - Result: Cycle detected! (A → B → C → A)
+
+        DFS traversal detects cycles, reports them clearly.
+
+    - name: "@external Field Validation"
+      type: "Type consistency check"
+      purpose: "Ensure @external only on @extends types"
+      validation: |
+        1. If field marked @external:
+           - Type must have @extends decorator
+           - If not: error "Can't mark field @external on non-extended type"
+
+        2. @external fields indicate "this field is owned by another service"
+           - Only makes sense on extended types
+           - On defining type, all fields are owned (no @external needed)
+
+    - name: "@key Consistency Validation"
+      type: "Federation contract check"
+      purpose: "Ensure @key definitions match across subgraphs"
+      rules: |
+        1. If type defined in multiple subgraphs:
+           - Owning definition (@extends=false): Declares @key(fields)
+           - Extended definitions (@extends=true): Must have SAME @key fields
+           - If different: error "Type User has conflicting keys"
+
+        2. Key immutability:
+           - @key fields never change (they're federation contracts)
+           - Breaking a @key breaks all references from other services
+
+    - name: "Supergraph Composition"
+      type: "Schema merging"
+      purpose: "Compose multiple subgraph schemas into unified supergraph"
+      process: |
+        Composition steps:
+        1. **Collect Types**: Gather types from all subgraphs
+           - Users service: User type (is_extends=false)
+           - Orders service: User type (is_extends=true), Order type
+           - Products service: Product type
+
+        2. **Merge by Ownership**:
+           - For each type, find owner (is_extends=false)
+           - Owner defines canonical type definition
+           - Extensions add fields but don't redefine existing
+
+        3. **Validate Consistency**:
+           - Field types match across subgraphs
+           - @key directives match
+           - No conflicting @external/@shareable
+
+        4. **Build Supergraph**:
+           - Single schema with all types
+           - Composition metadata (which service owns what)
+           - Ready for Apollo Router
+
+    - name: "Type Extension Merging"
+      type: "Type composition"
+      purpose: "Merge extended types from multiple subgraphs"
+      pattern: |
+        Users service (owner):
+        ```
+        @key("id")
+        class User:
+            id: ID
+            email: str
+        ```
+
+        Orders service (extends):
+        ```
+        @extends
+        @key("id")
+        class User:
+            id: ID = external()
+            email: str = external()
+            orders: list[Order]  # NEW field
+        ```
+
+        Composed result:
+        ```
+        type User @key(fields: "id") {
+          id: ID!
+          email: String!
+          orders: [Order!]!  # from Orders service
+        }
+        ```
+
+    - name: "Field Type Conflict Detection"
+      type: "Validation check"
+      purpose: "Detect incompatible field types across subgraphs"
+      detection: |
+        If same field appears in multiple subgraphs with different types:
+        - User.email: String in Users service
+        - User.email: Int in Analytics service (extending)
+        - ERROR: "Conflicting field types for User.email"
+
+        Resolution: Services must agree on field types
+        (Use @requires/@provides to compute derived fields instead)
+
+    - name: "Conflict Resolution Strategies"
+      type: "Error handling"
+      purpose: "Handle composition conflicts"
+      strategies: |
+        **Strict Mode** (default):
+        - Composition fails on ANY conflict
+        - Requires explicit fixing before deployment
+        - Safe but requires discipline
+
+        **Lenient Mode** (if enabled):
+        - Warns about conflicts but allows composition
+        - Uses first subgraph's definition as canonical
+        - Risk: Silent type inconsistencies
+
+        **Merge Strategy** (for compatible conflicts):
+        - Combine type definitions intelligently
+        - E.g., merge field sets if no conflicts
+        - Requires careful implementation
+
+    - name: "Composition Validation Reporting"
+      type: "Error reporting"
+      purpose: "Clear error messages for composition failures"
+      reporting: |
+        When validation fails, report:
+        1. What failed (e.g., "Circular dependency detected")
+        2. Where it failed (e.g., "Order.shippingEstimate")
+        3. Why it failed (e.g., "Requires User.email")
+        4. How to fix it (e.g., "Break circular dependency")
+
+        Example error:
+        ```
+        ERROR: Circular @requires dependency
+
+        Type: Order
+        Field: shippingEstimate
+        Path: Order.shippingEstimate → User.location → Order.shippingEstimate
+
+        Issue: Circular @requires chain detected
+        Suggestion: Remove one @requires to break the cycle
+        ```
+
+key_concepts:
+  concept_1: "Compile-time validation catches federation errors early"
+  concept_2: "Circular @requires dependencies must be detected and rejected"
+  concept_3: "Field validation ensures @requires/@provides reference valid paths"
+  concept_4: "@external only valid on @extends types"
+  concept_5: "@key fields must be consistent across type definitions"
+  concept_6: "Supergraph composes multiple subgraphs into unified schema"
+  concept_7: "Type ownership determined by @extends=false"
+  concept_8: "Conflict detection prevents runtime field resolution errors"
+
+best_practices:
+  - name: "Enable strict composition validation"
+    description: "Catch errors early, before deployment"
+
+  - name: "Validate federation schemas before publishing"
+    description: "Run compose command in CI/CD pipeline"
+
+  - name: "Document @requires/@provides dependencies"
+    description: "Explain why fields depend on each other"
+
+  - name: "Avoid deep @requires chains"
+    description: "Keep dependency depth < 5 levels for performance"
+
+  - name: "Test circular dependency scenarios"
+    description: "Verify validator catches common cycles"
+
+  - name: "Use consistent @key fields"
+    description: "All subgraphs must agree on keys"
+
+  - name: "Validate field type consistency"
+    description: "Same field must have same type across subgraphs"
+
+  - name: "Generate supergraph early"
+    description: "Compose frequently to catch issues"
+
+anti_patterns:
+  - name: "No validation before composition"
+    description: "Compose without validating directives"
+    consequence: "Runtime errors during composition"
+    fix: "Run federation validation first"
+
+  - name: "Ignoring circular dependencies"
+    description: "Allow circular @requires in schema"
+    consequence: "Infinite loops, query hangs"
+    fix: "Validator rejects circular dependencies"
+
+  - name: "@external on non-extends types"
+    description: "Mark field external without @extends"
+    consequence: "Composition validation error"
+    fix: "Only use @external on @extends types"
+
+  - name: "Conflicting @key definitions"
+    description: "Different @key fields in different subgraphs"
+    consequence: "Composition fails, references break"
+    fix: "Keep @key fields identical across subgraphs"
+
+  - name: "Deep @requires chains"
+    description: "@requires chain > 5 levels deep"
+    consequence: "Poor performance, potential cycles"
+    fix: "Keep chains shallow, reuse computed fields"
+
+examples:
+  example_1:
+    title: "Valid Composition"
+    description: "Three subgraphs compose successfully"
+    code: |
+      # Users Service (owner)
+      @key("id")
+      class User:
+          id: ID
+          email: str
+
+      # Orders Service (extends)
+      @extends
+      @key("id")
+      class User:
+          id: ID = external()
+          email: str = external()
+          orders: list[Order] = requires("email")
+
+      # Products Service (independent)
+      @key("id")
+      class Product:
+          id: ID
+          name: str
+
+      # Composition succeeds
+      $ fraiseql compose \
+        --subgraph users:users.json \
+        --subgraph orders:orders.json \
+        --subgraph products:products.json
+
+      Result: Unified supergraph with User, Order, Product
+
+  example_2:
+    title: "Circular Dependency Detection"
+    description: "Validator catches circular @requires"
+    code: |
+      # User Service
+      class User:
+          id: ID
+          profile: str = requires("account")
+
+      # Account Service
+      class Account:
+          id: ID
+          owner: User = requires("profile")
+
+      # Composition attempt
+      $ fraiseql compose \
+        --subgraph users:users.json \
+        --subgraph accounts:accounts.json
+
+      ERROR: Circular @requires dependency
+
+      Path: User.profile → Account.owner → User.profile
+
+      Issue: Circular dependency detected
+      Suggestion: Remove one @requires directive
+
+  example_3:
+    title: "Field Type Conflict"
+    description: "Validator detects field type mismatch"
+    code: |
+      # Orders Service (owner)
+      @key("id")
+      class User:
+          id: ID
+          email: str  # String type
+
+      # Analytics Service (extends)
+      @extends
+      @key("id")
+      class User:
+          id: ID = external()
+          email: int = external()  # Int type (conflict!)
+
+      # Composition attempt
+      $ fraiseql compose \
+        --subgraph orders:orders.json \
+        --subgraph analytics:analytics.json
+
+      ERROR: Type mismatch for User.email
+
+      Orders service: email: String
+      Analytics service: email: Int
+
+      Issue: Field types must match across subgraphs
+      Suggestion: Use @requires to compute derived types
+
+comparison_matrix:
+  aspect:
+    validation_enabled: "Federation validation active"
+    validation_disabled: "No validation (risky)"
+
+  error_detection:
+    validation_enabled: "Compile-time (before deployment)"
+    validation_disabled: "Runtime (after deployment)"
+
+  circular_deps:
+    validation_enabled: "Rejected with clear error"
+    validation_disabled: "Causes query hangs"
+
+  field_conflicts:
+    validation_enabled: "Detected, composition fails"
+    validation_disabled: "Silent type inconsistencies"
+
+  composition_safety:
+    validation_enabled: "Guaranteed valid supergraph"
+    validation_disabled: "Uncertain, risky"
+
+blog_hooks:
+  beginner:
+    focus: "Understanding federation validation"
+    key_points:
+      - "Validation catches errors before runtime"
+      - "Circular @requires dependencies must be avoided"
+      - "@external only on @extends types"
+      - "Field types must match across subgraphs"
+
+  intermediate:
+    focus: "Supergraph composition process"
+    key_points:
+      - "Compose multiple subgraphs into unified schema"
+      - "Type ownership (one owner, multiple extensions)"
+      - "Conflict detection and reporting"
+      - "Key consistency across subgraphs"
+
+  advanced:
+    focus: "Validation algorithms and composition strategies"
+    key_points:
+      - "Dependency graph construction and cycle detection"
+      - "Field path validation with nested paths"
+      - "Conflict resolution strategies"
+      - "Performance implications of deep @requires chains"

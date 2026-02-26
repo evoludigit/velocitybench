@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.13-slim
 
 # Set TMPDIR to use /data/tmp for builds to avoid /tmp filling up
 ENV TMPDIR=/data/tmp

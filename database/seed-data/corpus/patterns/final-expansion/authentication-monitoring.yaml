@@ -1,0 +1,28 @@
+id: authentication-monitoring
+name: Authentication Monitoring
+category: comprehensive
+type: standard
+tags:
+- authentication
+summary:
+  short: Authentication Monitoring and implementation guidelines
+  long: Complete guide to authentication monitoring
+problem:
+  description: Challenges without proper authentication monitoring
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement authentication monitoring
+key_concepts:
+  concept: Authentication Monitoring
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

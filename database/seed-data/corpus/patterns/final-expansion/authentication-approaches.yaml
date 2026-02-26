@@ -1,0 +1,28 @@
+id: authentication-approaches
+name: Authentication Approaches
+category: comprehensive
+type: standard
+tags:
+- authentication
+summary:
+  short: Authentication Approaches and implementation guidelines
+  long: Complete guide to authentication approaches
+problem:
+  description: Challenges without proper authentication approaches
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement authentication approaches
+key_concepts:
+  concept: Authentication Approaches
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

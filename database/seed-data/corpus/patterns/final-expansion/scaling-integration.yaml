@@ -1,0 +1,28 @@
+id: scaling-integration
+name: Scaling Integration
+category: comprehensive
+type: standard
+tags:
+- scaling
+summary:
+  short: Scaling Integration and implementation guidelines
+  long: Complete guide to scaling integration
+problem:
+  description: Challenges without proper scaling integration
+  symptoms:
+  - System issues
+  impact: Problems arise
+solution:
+  description: Implement scaling integration
+key_concepts:
+  concept: Scaling Integration
+best_practices:
+- name: Practice
+  description: Follow guidelines
+blog_hooks:
+  beginner:
+    focus: Intro
+  intermediate:
+    focus: Implementation
+  advanced:
+    focus: Advanced

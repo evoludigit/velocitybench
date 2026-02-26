@@ -1,0 +1,50 @@
+id: authorization-rule-compilation
+name: Authorization Rule Compilation
+category: fraiseql
+type: standard
+tags:
+- compilation
+- authorization
+- security
+- metadata
+summary:
+  short: Pre-compiling authorization metadata during schema compilation
+  long: Authorization rules are compiled into metadata during schema compilation,
+    not evaluated at runtime, ensuring they can't be bypassed and enabling static
+    analysis.
+problem:
+  description: Authorization logic in resolver code
+  symptoms:
+  - Authorization logic can be bypassed
+  - No way to audit authorization decisions
+  - Difficult to ensure consistent auth
+  impact: Reduced effectiveness of compiled GraphQL execution
+solution:
+  description: Implement Authorization Rule Compilation effectively
+key_concepts:
+  concept_1: Rule metadata structure
+  concept_2: Authorization metadata compilation
+  concept_3: Field vs query vs mutation auth
+implementation_considerations:
+  consideration_1: Rule expressiveness
+  consideration_2: Rule composition
+  consideration_3: Runtime rule evaluation
+best_practices:
+- name: Compile rules upfront
+  description: Generate auth metadata during compilation
+- name: Audit metadata
+  description: Inspect auth decisions
+- name: Consistent enforcement
+  description: Same rules everywhere
+anti_patterns:
+- name: Runtime auth checks
+  consequence: Can be bypassed
+- name: Ad-hoc rules
+  consequence: Inconsistent enforcement
+blog_hooks:
+  beginner:
+    focus: Introduction to Authorization Rule Compilation
+  intermediate:
+    focus: Implementing Authorization Rule Compilation
+  advanced:
+    focus: Advanced Authorization Rule Compilation techniques

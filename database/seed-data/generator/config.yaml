@@ -1,0 +1,148 @@
+# VelocityBench Dataset Scaling Configuration
+# Used by scale_dataset.py to configure profiles and safety settings
+
+# Preset profiles for different environments
+profiles:
+  # Tiny profile: 100 posts (instant, for testing)
+  tiny:
+    posts: 100
+    users: 10
+    comments: 500
+    description: "Instant test profile (100 posts)"
+
+  # Dev profile: 5K posts, 500 users, 25K comments
+  dev:
+    posts: 5000
+    users: 500
+    comments: 25000
+    description: "Development profile (5K posts, fast)"
+
+  # Staging profile: 50K posts, 5K users, 250K comments
+  staging:
+    posts: 50000
+    users: 5000
+    comments: 250000
+    description: "Staging profile (50K posts)"
+
+  # Production profile: 1M posts, 100K users, 5M comments
+  production:
+    posts: 1000000
+    users: 100000
+    comments: 5000000
+    description: "Production profile (1M posts, 200x multiplier)"
+
+# Safety and performance settings
+safety:
+  # Disk space: keep this much free (GB)
+  safety_margin_gb: 0.5
+
+  # Disk space: warn at this % usage
+  warn_threshold_pct: 80
+
+  # Disk space: fail at this % usage
+  critical_threshold_pct: 95
+
+  # Memory: fail if system memory exceeds this %
+  max_memory_pct: 85
+
+  # Memory: fail if process exceeds this (MB)
+  max_process_memory_mb: 2048
+
+  # Batch size for variant generation
+  batch_size: 1000
+
+  # Checkpoint interval (validate every N items)
+  checkpoint_interval: 10000
+
+  # Database connection timeout (seconds)
+  db_connection_timeout_sec: 5
+
+# Output settings
+output:
+  # Default output directory
+  output_dir: /tmp/velocitybench
+
+  # Keep generated files after loading (true = keep, false = delete)
+  keep_tsv_files: true
+
+  # Generate TSV files (faster loading)
+  generate_tsv: true
+
+  # Generate SQL files (for compatibility)
+  generate_sql: false
+
+# Variant generation settings
+variants:
+  # Number of title mutations to choose from
+  title_suffixes:
+    - "(2026)"
+    - "(2025)"
+    - "(2024)"
+    - "(2023)"
+    - "(Beginner)"
+    - "(Intermediate)"
+    - "(Advanced)"
+    - "(Quick Guide)"
+    - "(Deep Dive)"
+    - "(Cheat Sheet)"
+    - "(Best Practices)"
+    - "(Gotchas)"
+    - "(Performance)"
+    - "(Testing)"
+    - "(Debugging)"
+    - "(Integration)"
+    - "(Migration)"
+    - "(Refactor)"
+    - "(Case Study)"
+    - "(FAQ)"
+    - "(Tutorial)"
+    - "(Reference)"
+
+  # Status distribution: % published vs draft
+  status_distribution:
+    published: 0.70
+    draft: 0.30
+
+  # Date spreading: span dates over N years
+  date_span_years: 10
+
+  # Content mutation rate (0 = exact copy, 1 = full regeneration)
+  # For now, we keep content identical (0) for efficiency
+  content_mutation_rate: 0
+
+# Logging settings
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR
+  level: INFO
+
+  # Log to file (set to null for stdout only)
+  file: null
+
+  # Include timestamps in logs
+  timestamps: true
+
+# Performance tuning
+performance:
+  # Number of worker processes for variant generation
+  # Set to 1 for single-threaded, > 1 for parallel (increases memory usage)
+  num_workers: 1
+
+  # Chunk size for writing TSV files
+  tsv_chunk_size: 10000
+
+  # Buffer size for reading/writing (bytes)
+  buffer_size: 8388608  # 8 MB
+
+# Features (experimental)
+features:
+  # Enable compression for generated files
+  enable_compression: false
+
+  # Enable validation after generation
+  enable_validation: true
+
+  # Enable checksums for integrity checking
+  enable_checksums: true
+
+  # Enable dry-run mode by default
+  default_dry_run: false

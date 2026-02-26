@@ -4,9 +4,12 @@ Async GraphQL Benchmarking Server for Graphene with DataLoader
 Uses asyncpg connection pooling and aiodataloader to prevent N+1 queries.
 """
 
+import json
 import os
 import sys
+from pathlib import Path
 
+import asyncpg
 import graphene
 from aiodataloader import DataLoader
 from fastapi import FastAPI, Request
@@ -14,7 +17,9 @@ from fastapi.responses import JSONResponse
 from graphene import ID, Field, Int, ObjectType, String
 from graphene import List as GrapheneList
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from common.health_check import HealthCheckManager
+
 from common.async_db import AsyncDatabase
 
 
@@ -26,9 +31,10 @@ class UserLoader(DataLoader):
 
     async def batch_load_fn(self, keys: list[str]) -> list[dict | None]:
         result = await self.db.fetch(
-            "SELECT id, username, full_name, bio FROM benchmark.tb_user WHERE id = ANY($1)", keys
+            "SELECT id, username, full_name, bio FROM benchmark.tb_user WHERE id = ANY($1)",
+            keys,
         )
-        user_map = {user["id"]: user for user in result}
+        user_map = {str(user["id"]): user for user in result}
         return [user_map.get(key) for key in keys]
 
 
@@ -47,7 +53,7 @@ class PostLoader(DataLoader):
             """,
             keys,
         )
-        post_map = {post["id"]: post for post in result}
+        post_map = {str(post["id"]): post for post in result}
         return [post_map.get(key) for key in keys]
 
 
@@ -69,7 +75,9 @@ class PostsByAuthorLoader(DataLoader):
         )
         posts_by_author = {key: [] for key in keys}
         for post in result:
-            posts_by_author[post["author_id"]].append(post)
+            author_id = str(post["author_id"])
+            if author_id in posts_by_author:
+                posts_by_author[author_id].append(post)
         return [posts_by_author[key] for key in keys]
 
 
@@ -92,7 +100,9 @@ class CommentsByPostLoader(DataLoader):
         )
         comments_by_post = {key: [] for key in keys}
         for comment in result:
-            comments_by_post[comment["post_id"]].append(comment)
+            post_id = str(comment["post_id"])
+            if post_id in comments_by_post:
+                comments_by_post[post_id].append(comment)
         return [comments_by_post[key][:5] for key in keys]  # Limit 5 per post
 
 
@@ -210,7 +220,8 @@ class Query(ObjectType):
     async def resolve_user(self, info, id):
         db = info.context["db"]
         result = await db.fetchrow(
-            "SELECT id, username, full_name, bio FROM benchmark.tb_user WHERE id = $1", id
+            "SELECT id, username, full_name, bio FROM benchmark.tb_user WHERE id = $1",
+            id,
         )
         if not result:
             return None
@@ -313,7 +324,9 @@ class UpdateUser(graphene.Mutation):
         # Basic input validation
         if bio is not None and (not isinstance(bio, str) or len(bio) > 1000):
             raise ValueError("Bio must be a string with maximum length 1000")
-        if full_name is not None and (not isinstance(full_name, str) or len(full_name) > 255):
+        if full_name is not None and (
+            not isinstance(full_name, str) or len(full_name) > 255
+        ):
             raise ValueError("Full name must be a string with maximum length 255")
 
         db = info.context["db"]
@@ -340,7 +353,8 @@ class UpdateUser(graphene.Mutation):
 
         # Return updated user
         result = await db.fetchrow(
-            "SELECT id, username, full_name, bio FROM benchmark.tb_user WHERE id = $1", id
+            "SELECT id, username, full_name, bio FROM benchmark.tb_user WHERE id = $1",
+            id,
         )
         if result:
             return UpdateUser(
@@ -367,14 +381,62 @@ app = FastAPI()
 async def startup_event():
     """Initialize database pool on startup."""
     db = AsyncDatabase()
-    await db.connect(min_size=10, max_size=50, statement_cache_size=100)
+
+    # Get pool configuration from environment or use defaults
+    pool_min_size = int(os.getenv("DB_POOL_MIN_SIZE", "10"))
+    pool_max_size = int(os.getenv("DB_POOL_MAX_SIZE", "50"))
+    pool_statement_cache = int(os.getenv("DB_POOL_STATEMENT_CACHE_SIZE", "100"))
+
+    await db.connect(
+        min_size=pool_min_size,
+        max_size=pool_max_size,
+        statement_cache_size=pool_statement_cache,
+    )
     app.state.db = db
+
+    # Initialize health check manager
+    health_manager = HealthCheckManager(
+        service_name="graphene-graphql",
+        version="1.0.0",
+        database=db,
+        environment=os.getenv("ENVIRONMENT", "development"),
+    )
+    app.state.health = health_manager
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Close database pool on shutdown."""
     await app.state.db.close()
+
+
+# Health check endpoints
+@app.get("/health")
+async def health():
+    """Combined health check (defaults to readiness)"""
+    result = await app.state.health.probe("readiness")
+    return result.to_dict()
+
+
+@app.get("/health/live")
+async def health_live():
+    """Liveness probe - Is the process alive?"""
+    result = await app.state.health.probe("liveness")
+    return result.to_dict()
+
+
+@app.get("/health/ready")
+async def health_ready():
+    """Readiness probe - Can the service handle traffic?"""
+    result = await app.state.health.probe("readiness")
+    return result.to_dict()
+
+
+@app.get("/health/startup")
+async def health_startup():
+    """Startup probe - Has initialization completed?"""
+    result = await app.state.health.probe("startup")
+    return result.to_dict()
 
 
 @app.post("/graphql")
@@ -396,20 +458,23 @@ async def graphql_endpoint(request: Request):
         }
 
         # Execute GraphQL query
-        result = await schema.execute_async(query, context_value=context, variable_values=variables)
+        result = await schema.execute_async(
+            query, context_value=context, variable_values=variables
+        )
 
         response_data = {"data": result.data}
         if result.errors:
             response_data["errors"] = [{"message": str(e)} for e in result.errors]
 
         return JSONResponse(content=response_data)
-    except Exception as e:
+    except (
+        asyncpg.PostgresError,
+        json.JSONDecodeError,
+        ValueError,
+        ConnectionError,
+        OSError,
+    ) as e:
         return JSONResponse(status_code=400, content={"errors": [{"message": str(e)}]})
-
-
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy", "framework": "graphene"}
 
 
 if __name__ == "__main__":
