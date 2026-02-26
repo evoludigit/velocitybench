@@ -118,7 +118,7 @@ func TestGetUserDetailEndpoint(t *testing.T) {
 			var userID string
 			if !tt.expectErr {
 				user := factory.CreateTestUser(tt.username, tt.username+"@example.com", tt.fullName, tt.bio)
-				userID = user.ID
+				userID = user.ID.String()
 			} else {
 				userID = "nonexistent-id"
 			}
@@ -184,7 +184,7 @@ func TestGetPostsEndpoint(t *testing.T) {
 			author := factory.CreateTestUser("author", "author@example.com", "Author", "")
 
 			for i := 0; i < tt.postCount; i++ {
-				factory.CreateTestPost(author.ID, "Post "+string(rune(48+i%10)), "Content")
+				factory.CreateTestPost(author.ID.String(), "Post "+string(rune(48+i%10)), "Content")
 			}
 
 			// Act
@@ -244,8 +244,8 @@ func TestGetPostDetailEndpoint(t *testing.T) {
 			var postID string
 			if !tt.expectErr {
 				author := factory.CreateTestUser("author", "author@example.com", "Author", "")
-				post := factory.CreateTestPost(author.ID, tt.title, tt.content)
-				postID = post.ID
+				post := factory.CreateTestPost(author.ID.String(), tt.title, tt.content)
+				postID = post.ID.String()
 			} else {
 				postID = "nonexistent-id"
 			}
@@ -313,7 +313,7 @@ func TestGetPostsByAuthorEndpoint(t *testing.T) {
 				)
 
 				for j := 0; j < tt.postsPerAuthor; j++ {
-					factory.CreateTestPost(author.ID, "Post "+string(rune(48+j)), "Content")
+					factory.CreateTestPost(author.ID.String(), "Post "+string(rune(48+j)), "Content")
 				}
 			}
 
@@ -472,8 +472,8 @@ func TestEndpointDataConsistency(t *testing.T) {
 				user := factory.CreateTestUser("alice", "alice@example.com", "Alice", "Bio")
 
 				// Act
-				listUser := factory.GetUser(user.ID)
-				detailUser := factory.GetUser(user.ID)
+				listUser := factory.GetUser(user.ID.String())
+				detailUser := factory.GetUser(user.ID.String())
 
 				// Assert
 				if listUser == nil || detailUser == nil {
@@ -487,8 +487,8 @@ func TestEndpointDataConsistency(t *testing.T) {
 				user := factory.CreateTestUser("alice", "alice@example.com", "Alice", "")
 
 				// Act
-				retrieved1 := factory.GetUser(user.ID)
-				retrieved2 := factory.GetUser(user.ID)
+				retrieved1 := factory.GetUser(user.ID.String())
+				retrieved2 := factory.GetUser(user.ID.String())
 
 				// Assert
 				if retrieved1 == nil || retrieved2 == nil {

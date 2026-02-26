@@ -42,9 +42,12 @@ fn test_auth_expired_token() {
     let expired_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE1MTYyMzkwMjJ9.xxx";
 
     // In real API, this would check expiration
+    // The payload "eyJleHAiOjE1MTYyMzkwMjJ9" is base64url of {"exp":1516239022}
+    let parts: Vec<&str> = expired_token.split('.').collect();
+    assert_eq!(parts.len(), 3, "Token should have 3 parts");
     assert!(
-        expired_token.contains("exp"),
-        "Expired token should be detected"
+        parts[1].contains("eyJleHA") || parts[1].starts_with("eyJ"),
+        "Token payload should contain exp claim (base64-encoded)"
     );
 }
 

@@ -1332,24 +1332,20 @@ func (ec *executionContext) fieldContext_Query_post(ctx context.Context, field g
 }
 
 func (ec *executionContext) _Query_posts(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc := &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (any, error) {
-			return ec.fieldContext_Query_posts(ctx, field)
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_posts,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.resolvers.Query().Posts(ctx, fc.Args["limit"].(*int32))
 		},
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	fc.Result = ec.resolvers.Query().Posts(ctx, fc.Args["limit"].(*int32))
-	return ec.marshalNPost2ᚕᚖgithubᚗcomᚋbenchmarkᚋgoᚑgqlgenᚋgraphᚋmodelᚐPostᚄ(ctx, field.Selections, fc.Result)
+		nil,
+		ec.marshalNPost2ᚕᚖgithubᚗcomᚋbenchmarkᚋgoᚑgqlgenᚋgraphᚋmodelᚐPostᚄ,
+		true,
+		true,
+	)
 }
 
 func (ec *executionContext) _Query_comments(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {

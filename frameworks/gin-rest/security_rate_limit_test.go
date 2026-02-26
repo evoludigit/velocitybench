@@ -109,7 +109,7 @@ func TestSecurityPerUserRateLimit(t *testing.T) {
 					"user"+string(rune(48+u))+"@example.com",
 					"User",
 					"",
-				).ID
+				).ID.String()
 
 				allowedCount := 0
 				for r := 0; r < tt.reqPerUser; r++ {

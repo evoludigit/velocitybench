@@ -70,7 +70,7 @@ func TestSecurityInjection(t *testing.T) {
 
 			// Act - Attempt to query with injection payload
 			// In real implementation, this would send payload to API
-			result := factory.GetUser(user.ID)
+			result := factory.GetUser(user.ID.String())
 
 			// Assert - User should be retrieved safely
 			if result == nil {
@@ -134,7 +134,7 @@ func TestSecurityInputValidation(t *testing.T) {
 			}
 
 			// Verify data is stored as-is (not executed)
-			retrieved := factory.GetUser(user.ID)
+			retrieved := factory.GetUser(user.ID.String())
 			if retrieved == nil {
 				t.Errorf("User retrieval failed")
 			}
@@ -227,7 +227,7 @@ func TestSecurityDataTypeEnforcement(t *testing.T) {
 				return
 			}
 
-			retrieved := factory.GetUser(user.ID)
+			retrieved := factory.GetUser(user.ID.String())
 			if retrieved == nil {
 				t.Errorf("User retrieval failed")
 				return

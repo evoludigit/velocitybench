@@ -126,7 +126,9 @@ func TestSecurityAuthorization(t *testing.T) {
 			requester := factory.CreateTestUser("requester", "requester@example.com", "Requester", "")
 
 			// Act - Simulate authorization check
-			allowed := checkAuthorization(owner.ID, requester.ID, tt.action)
+			_ = owner
+			_ = requester
+			allowed := checkAuthorization(tt.resourceOwner, tt.requestingUser, tt.action)
 
 			// Assert
 			if allowed != tt.expectAllowed {

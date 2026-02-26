@@ -181,14 +181,14 @@ func TestUUIDValidation(t *testing.T) {
 						"User",
 						"",
 					)
-					validator.AssertUUID(users[i].ID)
+					validator.AssertUUID(users[i].ID.String())
 				}
 			} else if tt.testType == "post_uuid" {
 				author := factory.CreateTestUser("author", "author@example.com", "Author", "")
 				posts := make([]*models.Post, 3)
 				for i := 0; i < 3; i++ {
-					posts[i] = factory.CreateTestPost(author.ID, "Post "+string(rune(48+i)), "Content")
-					validator.AssertUUID(posts[i].ID)
+					posts[i] = factory.CreateTestPost(author.ID.String(), "Post "+string(rune(48+i)), "Content")
+					validator.AssertUUID(posts[i].ID.String())
 				}
 			}
 		})
@@ -241,14 +241,15 @@ func TestSpecialCharacterHandling(t *testing.T) {
 			defer factory.Reset()
 
 			// Act
-			post := factory.CreateTestPost("user-id", "Title", tt.content)
+			author := factory.CreateTestUser("author", "author@example.com", "Author", "")
+			post := factory.CreateTestPost(author.ID.String(), "Title", tt.content)
 
 			// Assert
 			if post == nil {
 				t.Errorf("Post creation failed")
 				return
 			}
-			retrieved := factory.GetPost(post.ID)
+			retrieved := factory.GetPost(post.ID.String())
 			if retrieved == nil {
 				t.Errorf("Post not found")
 				return
@@ -391,13 +392,13 @@ func TestRelationshipValidation(t *testing.T) {
 
 			if tt.name == "post author ID is valid UUID" {
 				author := factory.CreateTestUser("author", "author@example.com", "Author", "")
-				post := factory.CreateTestPost(author.ID, "Post", "Content")
+				post := factory.CreateTestPost(author.ID.String(), "Post", "Content")
 
 				// Assert
-				validator.AssertUUID(post.AuthorID)
+				validator.AssertUUID(post.AuthorID.String())
 			} else if tt.name == "post references correct author" {
 				author := factory.CreateTestUser("author", "author@example.com", "Author", "")
-				post := factory.CreateTestPost(author.ID, "Post", "Content")
+				post := factory.CreateTestPost(author.ID.String(), "Post", "Content")
 
 				// Assert
 				if post.AuthorID != author.ID {
@@ -407,8 +408,8 @@ func TestRelationshipValidation(t *testing.T) {
 				author1 := factory.CreateTestUser("author1", "author1@example.com", "Author1", "")
 				author2 := factory.CreateTestUser("author2", "author2@example.com", "Author2", "")
 
-				post1 := factory.CreateTestPost(author1.ID, "Post1", "Content")
-				post2 := factory.CreateTestPost(author2.ID, "Post2", "Content")
+				post1 := factory.CreateTestPost(author1.ID.String(), "Post1", "Content")
+				post2 := factory.CreateTestPost(author2.ID.String(), "Post2", "Content")
 
 				// Assert
 				if post1.AuthorID == post2.AuthorID {
@@ -455,7 +456,7 @@ func TestDataTypeValidation(t *testing.T) {
 				}
 			} else if tt.testType == "string_title" {
 				author := factory.CreateTestUser("author", "author@example.com", "Author", "")
-				post := factory.CreateTestPost(author.ID, "Test Post", "Content")
+				post := factory.CreateTestPost(author.ID.String(), "Test Post", "Content")
 				if post.Title != "Test Post" {
 					t.Errorf("Title not a string")
 				}
@@ -497,9 +498,9 @@ func TestUniquenessConstraints(t *testing.T) {
 				}
 			} else if tt.name == "multiple posts have unique IDs" {
 				author := factory.CreateTestUser("author", "author@example.com", "Author", "")
-				post1 := factory.CreateTestPost(author.ID, "Post1", "Content1")
-				post2 := factory.CreateTestPost(author.ID, "Post2", "Content2")
-				post3 := factory.CreateTestPost(author.ID, "Post3", "Content3")
+				post1 := factory.CreateTestPost(author.ID.String(), "Post1", "Content1")
+				post2 := factory.CreateTestPost(author.ID.String(), "Post2", "Content2")
+				post3 := factory.CreateTestPost(author.ID.String(), "Post3", "Content3")
 
 				// Assert
 				if post1.ID == post2.ID || post2.ID == post3.ID || post1.ID == post3.ID {
