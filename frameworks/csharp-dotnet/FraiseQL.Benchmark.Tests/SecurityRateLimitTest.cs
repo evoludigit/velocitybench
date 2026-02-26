@@ -329,8 +329,9 @@ public class SecurityRateLimitTest
 
     private int GetRateLimitCount(string userId)
     {
-        var key = $"{userId}:query";
-        return _rateLimitStorage.ContainsKey(key) ? _rateLimitStorage[key] : 0;
+        return _rateLimitStorage
+            .Where(kvp => kvp.Key.StartsWith(userId + ":"))
+            .Sum(kvp => kvp.Value);
     }
 
     private int GetRemainingRequests(string userId, int limit)

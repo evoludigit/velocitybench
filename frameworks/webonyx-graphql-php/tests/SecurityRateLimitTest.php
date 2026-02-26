@@ -265,8 +265,13 @@ class SecurityRateLimitTest extends TestCase
 
     private function getRateLimitCount(string $userId): int
     {
-        $key = "{$userId}:query";
-        return $this->rateLimitStorage[$key] ?? 0;
+        $total = 0;
+        foreach ($this->rateLimitStorage as $key => $count) {
+            if (str_starts_with($key, $userId . ':')) {
+                $total += $count;
+            }
+        }
+        return $total;
     }
 
     private function getRemainingRequests(string $userId, int $limit): int

@@ -40,6 +40,12 @@ public class Comment {
     @Column(name = "updated_at", nullable = false)
     private java.time.LocalDateTime updatedAt;
 
+    @Transient
+    private User author;
+
+    @Transient
+    private Post post;
+
     // Getters and setters
     public Integer getPkComment() { return pkComment; }
     public void setPkComment(Integer pkComment) { this.pkComment = pkComment; }
@@ -70,4 +76,10 @@ public class Comment {
 
     public java.time.LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(java.time.LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public User getAuthor() { return author; }
+    public void setAuthor(User author) { this.author = author; }
+
+    public Post getPost() { return post; }
+    public void setPost(Post post) { this.post = post; }
 }

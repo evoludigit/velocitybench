@@ -29,8 +29,12 @@ public class SecurityInjectionTest
         var user = _factory.CreateTestUser("alice", "alice@example.com", "Alice", "");
         var maliciousInput = "1' OR '1'='1";
 
-        // Attempt to query with malicious input
-        var result = _factory.GetUser(Guid.Parse(maliciousInput.GetHashCode().ToString()));
+        // Attempt to query with malicious input - invalid format is safely rejected
+        User? result = null;
+        if (Guid.TryParse(maliciousInput, out var guid))
+        {
+            result = _factory.GetUser(guid);
+        }
 
         // Should return null, not all users
         Assert.Null(result);

@@ -43,6 +43,7 @@ class TestPost
     public string $id;
     public int $pkPost;
     public int $fkAuthor;
+    public string $authorId;
     public string $title;
     public string $content;
     public DateTimeImmutable $createdAt;
@@ -53,6 +54,7 @@ class TestPost
         string $id,
         int $pkPost,
         int $fkAuthor,
+        string $authorId,
         string $title,
         string $content,
         ?TestUser $author = null
@@ -60,6 +62,7 @@ class TestPost
         $this->id = $id;
         $this->pkPost = $pkPost;
         $this->fkAuthor = $fkAuthor;
+        $this->authorId = $authorId;
         $this->title = $title;
         $this->content = $content;
         $this->author = $author;
@@ -74,6 +77,8 @@ class TestComment
     public int $pkComment;
     public int $fkPost;
     public int $fkAuthor;
+    public string $postId;
+    public string $authorId;
     public string $content;
     public DateTimeImmutable $createdAt;
     public ?TestUser $author;
@@ -84,6 +89,8 @@ class TestComment
         int $pkComment,
         int $fkPost,
         int $fkAuthor,
+        string $postId,
+        string $authorId,
         string $content,
         ?TestUser $author = null,
         ?TestPost $post = null
@@ -92,6 +99,8 @@ class TestComment
         $this->pkComment = $pkComment;
         $this->fkPost = $fkPost;
         $this->fkAuthor = $fkAuthor;
+        $this->postId = $postId;
+        $this->authorId = $authorId;
         $this->content = $content;
         $this->author = $author;
         $this->post = $post;
@@ -120,7 +129,7 @@ class TestFactory
     public function createUser(
         string $username,
         string $email,
-        string $fullName,
+        string $fullName = 'Test User',
         ?string $bio = null
     ): TestUser {
         $this->userCounter++;
@@ -150,6 +159,7 @@ class TestFactory
             Uuid::uuid4()->toString(),
             $this->postCounter,
             $author->pkUser,
+            $author->id,
             $title,
             $content,
             $author
@@ -159,8 +169,8 @@ class TestFactory
     }
 
     public function createComment(
-        string $authorId,
         string $postId,
+        string $authorId,
         string $content
     ): TestComment {
         $author = $this->users[$authorId] ?? null;
@@ -179,6 +189,8 @@ class TestFactory
             $this->commentCounter,
             $post->pkPost,
             $author->pkUser,
+            $post->id,
+            $author->id,
             $content,
             $author,
             $post
@@ -230,6 +242,46 @@ class TestFactory
             $this->comments,
             fn(TestComment $c) => $c->fkPost === $postPk
         ));
+    }
+
+    /**
+     * @return TestPost[]
+     */
+    public function getAllPosts(): array
+    {
+        return array_values($this->posts);
+    }
+
+    public function updateUser(string $id, ?string $bio, string $fullName = 'Test User'): ?TestUser
+    {
+        if (!isset($this->users[$id])) {
+            return null;
+        }
+        $this->users[$id]->bio = $bio;
+        $this->users[$id]->fullName = $fullName;
+        $this->users[$id]->updatedAt = new DateTimeImmutable();
+        return $this->users[$id];
+    }
+
+    public function updatePost(string $id, string $title, string $content): ?TestPost
+    {
+        if (!isset($this->posts[$id])) {
+            return null;
+        }
+        $this->posts[$id]->title = $title;
+        $this->posts[$id]->content = $content;
+        $this->posts[$id]->updatedAt = new DateTimeImmutable();
+        return $this->posts[$id];
+    }
+
+    public function deleteUser(string $id): void
+    {
+        unset($this->users[$id]);
+    }
+
+    public function deletePost(string $id): void
+    {
+        unset($this->posts[$id]);
     }
 
     public function reset(): void
