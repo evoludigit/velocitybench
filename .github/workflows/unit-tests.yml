@@ -112,6 +112,7 @@ jobs:
         with:
           go-version-file: 'frameworks/${{ matrix.framework }}/go.mod'
           cache: true
+          cache-dependency-path: 'frameworks/${{ matrix.framework }}/go.sum'
 
       - name: Run tests with coverage
         working-directory: frameworks/${{ matrix.framework }}
@@ -122,6 +123,7 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         if: always()
+        continue-on-error: true
         with:
           files: ./frameworks/${{ matrix.framework }}/coverage.out
           flags: go-${{ matrix.framework }}
