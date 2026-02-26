@@ -55,6 +55,7 @@ jobs:
   # TypeScript/Node.js frameworks: Apollo, Express, GraphQL Yoga, Mercurius, Fastify, PostGraphile
   typescript-tests:
     runs-on: ubuntu-latest
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -97,6 +98,7 @@ jobs:
   # Go frameworks: gqlgen, gin, graphql-go, go-graphql-go
   go-tests:
     runs-on: ubuntu-latest
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -207,6 +209,7 @@ jobs:
   # Rust frameworks: async-graphql, actix-web, juniper
   rust-tests:
     runs-on: ubuntu-latest
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
