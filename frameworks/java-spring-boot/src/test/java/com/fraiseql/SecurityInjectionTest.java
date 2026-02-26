@@ -52,12 +52,11 @@ class SecurityInjectionTest {
 
         String injectionAttempt = "'; DROP TABLE users;--";
 
-        // Should not execute the DROP statement
-        assertThrows(Exception.class, () -> {
-            factory.getUser(injectionAttempt);
-        });
+        // Should not find user with injection string as ID (parameterized lookup)
+        User result = factory.getUser(injectionAttempt);
+        assertNull(result);
 
-        // Verify data is still intact
+        // Verify data is still intact - DROP was not executed
         assertEquals(1, factory.getUserCount());
     }
 
@@ -102,12 +101,15 @@ class SecurityInjectionTest {
 
     @Test
     void testSecondOrderInjection() {
-        // Create user with malicious content
+        // Create user with malicious content in username
         String maliciousUsername = "user'; DROP TABLE posts;--";
 
-        assertThrows(Exception.class, () -> {
-            factory.createTestUser(maliciousUsername, "mal@example.com", "Malicious", "");
-        });
+        // Data should be stored as literal string (SQL not executed)
+        User user = factory.createTestUser(maliciousUsername, "mal@example.com", "Malicious", "");
+        assertNotNull(user);
+        assertEquals(maliciousUsername, user.getUsername());
+        // Verify posts table is intact - injection did not execute
+        assertEquals(0, factory.getPostCount());
     }
 
     @Test

@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.Instant;
 import java.util.Base64;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Authentication Validation Test Suite
@@ -15,10 +17,12 @@ import java.util.Base64;
  */
 class SecurityAuthTest {
     private TestFactory factory;
+    private final Set<String> invalidatedTokens = new HashSet<>();
 
     @BeforeEach
     void setUp() {
         factory = new TestFactory();
+        invalidatedTokens.clear();
     }
 
     // ============================================================================
@@ -169,10 +173,13 @@ class SecurityAuthTest {
 
         String token = generateMockToken(user.getId(), Instant.now().plusSeconds(3600).getEpochSecond());
 
-        // Simulate logout
+        // Token should be valid before logout
+        assertDoesNotThrow(() -> validateToken(token));
+
+        // Simulate logout - invalidate the token
         invalidateToken(token);
 
-        // Token should no longer be valid
+        // Token should no longer be valid after invalidation
         assertThrows(SecurityException.class, () -> {
             validateToken(token);
         });
@@ -211,6 +218,10 @@ class SecurityAuthTest {
 
         if (!token.matches("^[A-Za-z0-9+/=]+$")) {
             throw new SecurityException("Invalid token format");
+        }
+
+        if (invalidatedTokens.contains(token)) {
+            throw new SecurityException("Token has been invalidated");
         }
 
         try {
@@ -257,7 +268,6 @@ class SecurityAuthTest {
     }
 
     private void invalidateToken(String token) {
-        // Mock token invalidation (in real app, would add to blacklist)
-        // For testing, we'll track invalidated tokens
+        invalidatedTokens.add(token);
     }
 }

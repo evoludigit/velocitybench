@@ -125,6 +125,14 @@ export class TestFactory {
     return Array.from(this.comments.values());
   }
 
+  getPostsByAuthor(authorPk: number): TestPost[] {
+    return Array.from(this.posts.values()).filter(p => p.fk_author === authorPk);
+  }
+
+  getCommentsByPost(postPk: number): TestComment[] {
+    return Array.from(this.comments.values()).filter(c => c.fk_post === postPk);
+  }
+
   getUserCount(): number {
     return this.users.size;
   }

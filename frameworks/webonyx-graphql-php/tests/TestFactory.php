@@ -16,6 +16,7 @@ class TestUser
     public string $id;
     public int $pkUser;
     public string $username;
+    public string $email;
     public string $fullName;
     public ?string $bio;
     public DateTimeImmutable $createdAt;
@@ -25,12 +26,14 @@ class TestUser
         string $id,
         int $pkUser,
         string $username,
+        string $email,
         string $fullName,
         ?string $bio = null
     ) {
         $this->id = $id;
         $this->pkUser = $pkUser;
         $this->username = $username;
+        $this->email = $email;
         $this->fullName = $fullName;
         $this->bio = $bio;
         $this->createdAt = new DateTimeImmutable();
@@ -132,11 +135,33 @@ class TestFactory
         string $fullName = 'Test User',
         ?string $bio = null
     ): TestUser {
+        if (empty($username)) {
+            throw new \InvalidArgumentException('Username cannot be empty');
+        }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new \InvalidArgumentException("Invalid email address: {$email}");
+        }
+        if (strlen($fullName) > 255) {
+            throw new \InvalidArgumentException('Full name exceeds 255 character limit');
+        }
+        if ($bio !== null && strlen($bio) > 1000) {
+            throw new \InvalidArgumentException('Bio exceeds 1000 character limit');
+        }
+        foreach ($this->users as $existing) {
+            if ($existing->username === $username) {
+                throw new \RuntimeException("Username already taken: {$username}");
+            }
+            if (isset($existing->email) && $existing->email === $email) {
+                throw new \RuntimeException("Email already in use: {$email}");
+            }
+        }
+
         $this->userCounter++;
         $user = new TestUser(
             Uuid::uuid4()->toString(),
             $this->userCounter,
             $username,
+            $email,
             $fullName,
             $bio
         );
@@ -152,6 +177,12 @@ class TestFactory
         $author = $this->users[$authorId] ?? null;
         if ($author === null) {
             throw new \RuntimeException("Author not found: {$authorId}");
+        }
+        if (empty($title)) {
+            throw new \InvalidArgumentException('Title cannot be empty');
+        }
+        if (strlen($title) > 255) {
+            throw new \InvalidArgumentException('Title exceeds 255 character limit');
         }
 
         $this->postCounter++;
@@ -181,6 +212,9 @@ class TestFactory
         }
         if ($post === null) {
             throw new \RuntimeException("Post not found");
+        }
+        if (empty($content)) {
+            throw new \InvalidArgumentException('Comment content cannot be empty');
         }
 
         $this->commentCounter++;
