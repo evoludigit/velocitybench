@@ -4,9 +4,9 @@ Extensive pattern generator - creates hundreds of patterns across all categories
 to reach 5K+ blog posts.
 """
 
-import os
-import yaml
 from pathlib import Path
+
+import yaml
 
 BASE_PATTERNS_DIR = Path(__file__).parent.parent / "corpus" / "patterns"
 

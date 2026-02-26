@@ -5,9 +5,8 @@ Bulk Loader for Dataset Scaling
 Loads generated TSV files to PostgreSQL using COPY (10-100x faster than INSERT).
 """
 
-from pathlib import Path
-from typing import Tuple, Optional
 import logging
+from pathlib import Path
 
 try:
     import psycopg

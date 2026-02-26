@@ -24,7 +24,6 @@ The benchmark uses four queries at increasing nesting depth:
 
 import argparse
 import json
-import os
 import statistics
 import time
 import urllib.error
@@ -200,7 +199,7 @@ def format_report(
     lines: list[str] = []
 
     lines.append("# FraiseQL v_* vs tv_* Comparison Report")
-    lines.append(f"")
+    lines.append("")
     lines.append(f"**Date**: {now}  ")
     lines.append(f"**Duration per query**: {args.duration}s  ")
     lines.append(f"**Concurrency**: {args.concurrency}  ")

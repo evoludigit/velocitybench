@@ -30,23 +30,24 @@ Environment:
 """
 
 import argparse
+import logging
 import sys
-import yaml
+import time
 from pathlib import Path
 from typing import Any
-import logging
+
+import yaml
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 logger = logging.getLogger(__name__)
 
 # Import our modules
-from variant_generator import VariantGenerator
 from bulk_loader import BulkLoader
+from data_validator import DataValidator
 from disk_space_checker import DiskSpaceChecker
 from resource_monitor import ResourceMonitor
-from database_safety_checker import DatabaseSafetyChecker
-from data_validator import DataValidator
+from variant_generator import VariantGenerator
 
 
 class ScaleDatasetConfig:

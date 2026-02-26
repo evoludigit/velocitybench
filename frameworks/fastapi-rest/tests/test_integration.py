@@ -3,7 +3,6 @@
 Tests actual HTTP endpoints and full request/response flows.
 """
 
-import pytest
 
 
 # ============================================================================

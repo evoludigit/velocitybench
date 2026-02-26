@@ -6,10 +6,10 @@ Monitors system resources (memory, CPU) during generation.
 Prevents memory exhaustion and excessive CPU usage.
 """
 
-import os
-import psutil
-from typing import Tuple
 import logging
+import os
+
+import psutil
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ class ResourceMonitor:
             msg = f"Process Memory: {process_mem_mb:.1f} MB (limit: {limit_mb} MB)"
 
             if process_mem_mb >= limit_mb:
-                msg += f"\n  ❌ CRITICAL: Process memory exceeds limit"
+                msg += "\n  ❌ CRITICAL: Process memory exceeds limit"
                 return (False, msg)
 
             if process_mem_mb >= (limit_mb * 0.8):

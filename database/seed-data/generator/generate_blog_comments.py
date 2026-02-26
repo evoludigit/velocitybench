@@ -17,20 +17,17 @@ from __future__ import annotations
 
 import argparse
 import json
-import logging
 import random
+import re
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Tuple
-import re
 
 import requests
-import yaml
-
 from logger_config import setup_logging
-from .exceptions import VLLMTimeoutError, VLLMConnectionError, VLLMError
+
+from .exceptions import VLLMConnectionError, VLLMError, VLLMTimeoutError
 
 # ============================================================================
 # Configuration
@@ -315,12 +312,10 @@ class CommentGenerator:
         exp_level = persona.get("experience_level", "").lower()
         if blog_type == "tutorial":
             # Tutorials benefit from diverse perspectives
-            if "beginner" in blog_type.lower() and exp_level in ["junior", "mid"]:
-                score += 1.5
-            elif "advanced" in blog_type.lower() and exp_level in [
+            if ("beginner" in blog_type.lower() and exp_level in ["junior", "mid"]) or ("advanced" in blog_type.lower() and exp_level in [
                 "senior",
                 "principal",
-            ]:
+            ]):
                 score += 1.5
         elif blog_type == "reference":
             # Reference docs benefit from senior reviewers
@@ -608,7 +603,7 @@ Guidelines:
         }
 
         print(f"\n{'=' * 70}")
-        print(f"BLOG COMMENT GENERATION (PERSONA-BASED)")
+        print("BLOG COMMENT GENERATION (PERSONA-BASED)")
         print(f"{'=' * 70}")
         print(f"Posts to process: {len(post_paths)}")
         print(
@@ -649,7 +644,7 @@ Guidelines:
                 # Save comments
                 self._save_comments(post_path, comments)
 
-                print(f" ✓")
+                print(" ✓")
 
                 results["posts_processed"] += 1
                 results["total_comments"] += len(comments)
@@ -722,7 +717,7 @@ def analyze_distribution(num_samples: int = 1000) -> None:
     print(
         f"Target: Gaussian (μ={COMMENTS_MEAN}, σ={COMMENTS_STDDEV}), clipped [{COMMENTS_MIN}, {COMMENTS_MAX}]"
     )
-    print(f"\nStatistics:")
+    print("\nStatistics:")
     print(f"  Mean:     {sum(samples) / len(samples):.2f}")
     print(f"  Median:   {sorted(samples)[len(samples) // 2]:.2f}")
     print(f"  Min:      {min(samples)}")
@@ -732,7 +727,7 @@ def analyze_distribution(num_samples: int = 1000) -> None:
     )
 
     # Histogram
-    print(f"\nDistribution:")
+    print("\nDistribution:")
     buckets = {}
     for count in samples:
         bucket = (count // 5) * 5

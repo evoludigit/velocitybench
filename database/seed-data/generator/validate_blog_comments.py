@@ -19,9 +19,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
-from collections import Counter
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 from logger_config import setup_logging
 
@@ -287,10 +285,9 @@ class CommentValidator:
             # Strict: reject if >50% likely hallucinated
             if hallucination_score > 0.5:
                 return f"likely hallucinated (score: {hallucination_score:.2f})"
-        else:
-            # Lenient: reject only if >80% likely hallucinated
-            if hallucination_score > 0.8:
-                return f"likely hallucinated (score: {hallucination_score:.2f})"
+        # Lenient: reject only if >80% likely hallucinated
+        elif hallucination_score > 0.8:
+            return f"likely hallucinated (score: {hallucination_score:.2f})"
 
         return None
 
@@ -392,7 +389,7 @@ def filter_comments_directory(comments_dir: Path, strict: bool = False) -> dict:
         else 0
     )
     print(f"\nAcceptance rate:            {acceptance_rate:.1f}%")
-    print(f"\nOutput directories:")
+    print("\nOutput directories:")
     print(f"  Accepted comments:  {accepted_dir}")
     print(f"  Rejected comments:  {rejected_dir}")
     print(f"{'=' * 70}\n")

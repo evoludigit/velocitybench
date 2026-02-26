@@ -9,12 +9,9 @@ Usage:
     python scripts/generate_security_tests.py --all
 """
 
-import os
 import sys
-import json
 import argparse
-from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Optional
 
 # Framework registry with metadata
 FRAMEWORKS = {

@@ -9,19 +9,20 @@ Provides unified health check functionality with support for:
 """
 
 import asyncio
-import asyncpg
 import logging
-import psutil
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
+import asyncpg
+import psutil
 
 from .async_db import AsyncDatabase
 from .types import (
-    HealthStatus,
-    ProbeType,
+    ChecksDict,
     HealthCheck,
     HealthCheckResponse,
-    ChecksDict,
+    HealthStatus,
+    ProbeType,
 )
 
 logger = logging.getLogger(__name__)
@@ -267,7 +268,7 @@ class HealthCheckManager:
                 },
             )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return HealthCheck(
                 status=HealthStatus.DOWN,
                 error="Database query timeout (>3s)",
@@ -276,7 +277,7 @@ class HealthCheckManager:
             logger.exception("Database health check failed")
             return HealthCheck(
                 status=HealthStatus.DOWN,
-                error=f"Database connection error: {str(e)}",
+                error=f"Database connection error: {e!s}",
             )
 
     def _check_memory(self) -> HealthCheck:
@@ -324,7 +325,7 @@ class HealthCheckManager:
             logger.exception("Memory check failed")
             return HealthCheck(
                 status=HealthStatus.DEGRADED,
-                warning=f"Memory check error: {str(e)}",
+                warning=f"Memory check error: {e!s}",
             )
 
     def _check_warmup(self) -> HealthCheck:
@@ -371,7 +372,7 @@ class HealthCheckManager:
 
     def _get_timestamp(self) -> str:
         """Get current timestamp in ISO 8601 format (UTC)."""
-        return datetime.now(timezone.utc).isoformat()
+        return datetime.now(UTC).isoformat()
 
     def _get_uptime_ms(self) -> int:
         """Get service uptime in milliseconds."""

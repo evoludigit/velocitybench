@@ -19,11 +19,11 @@ Usage:
     python database/incremental-generator.py [vllm_endpoint]
 """
 
-import sqlite3
-import uuid
 import random
-import time
+import sqlite3
 import sys
+import time
+import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 

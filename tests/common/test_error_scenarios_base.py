@@ -18,7 +18,6 @@ These tests are shared across all frameworks. Framework-specific test wrappers
 (if needed for async/class-based patterns) should import these tests.
 """
 
-import pytest
 
 
 # ============================================================================

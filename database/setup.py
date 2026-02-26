@@ -33,14 +33,13 @@ Environment variables:
 
 from __future__ import annotations
 
-import os
-import sys
-import subprocess
 import json
-from pathlib import Path
-from typing import List, Dict
+import os
+import subprocess
+import sys
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 
 # List of all frameworks in the benchmark suite
 FRAMEWORKS = [
@@ -220,13 +219,13 @@ class DatabaseSetup:
             )
 
             if result.returncode != 0:
-                print(f"  ⚠️  Seed data generation failed:")
+                print("  ⚠️  Seed data generation failed:")
                 print(f"     {result.stderr[:200]}")
                 return False
 
             return output_path.exists()
         except subprocess.TimeoutExpired:
-            print(f"  ⚠️  Seed data generation timed out")
+            print("  ⚠️  Seed data generation timed out")
             return False
         except Exception as e:
             print(f"  ⚠️  Seed data generation error: {e}")
@@ -282,45 +281,45 @@ class DatabaseSetup:
         print(f"  Database: {db_name}")
 
         # Step 1: Drop existing database
-        print(f"  1️⃣  Dropping existing database (if present)...")
+        print("  1️⃣  Dropping existing database (if present)...")
         drop_sql = f"DROP DATABASE IF EXISTS {db_name};"
         if not self._run_sql(drop_sql, admin_conn):
-            print(f"  ❌ Failed to drop database")
+            print("  ❌ Failed to drop database")
             return self._log_failure(framework, "drop_database")
 
         # Step 2: Create fresh database
-        print(f"  2️⃣  Creating fresh database...")
+        print("  2️⃣  Creating fresh database...")
         create_sql = f"CREATE DATABASE {db_name} OWNER {self.config.test_user};"
         if not self._run_sql(create_sql, admin_conn):
-            print(f"  ❌ Failed to create database")
+            print("  ❌ Failed to create database")
             return self._log_failure(framework, "create_database")
 
         # Step 3: Apply PostgreSQL extensions (uuid-ossp, pg_stat_statements, etc.)
-        print(f"  3️⃣  Applying PostgreSQL extensions...")
+        print("  3️⃣  Applying PostgreSQL extensions...")
         if not self._apply_sql_file(db_name, "database/01-extensions.sql"):
-            print(f"  ❌ Failed to apply extensions")
+            print("  ❌ Failed to apply extensions")
             return self._log_failure(framework, "apply_extensions")
 
         # Step 4: Apply shared Trinity Pattern schema
-        print(f"  4️⃣  Applying Trinity Pattern schema...")
+        print("  4️⃣  Applying Trinity Pattern schema...")
         if not self._apply_sql_file(db_name, "database/schema-template.sql"):
-            print(f"  ❌ Failed to apply schema template")
+            print("  ❌ Failed to apply schema template")
             return self._log_failure(framework, "apply_schema")
 
         # Step 5: Apply framework-specific extensions
         extensions_file = f"frameworks/{framework}/database/extensions.sql"
         extensions_path = self.project_root / extensions_file
         if extensions_path.exists():
-            print(f"  5️⃣  Applying framework-specific extensions...")
+            print("  5️⃣  Applying framework-specific extensions...")
             if not self._apply_sql_file(db_name, extensions_file):
-                print(f"  ⚠️  Failed to apply framework extensions (continuing anyway)")
+                print("  ⚠️  Failed to apply framework extensions (continuing anyway)")
         else:
-            print(f"  5️⃣  No framework-specific extensions found (skipping)")
+            print("  5️⃣  No framework-specific extensions found (skipping)")
 
         # Step 6: Load seed data (size-appropriate from corpus)
         if self.config.seed_size == "blog":
             # Use blog post loader (generates Faker users + loads blog posts)
-            print(f"  6️⃣  Loading blog dataset (5000 users, ~2500 posts)...")
+            print("  6️⃣  Loading blog dataset (5000 users, ~2500 posts)...")
             loader_path = (
                 self.project_root
                 / "database"
@@ -331,7 +330,7 @@ class DatabaseSetup:
 
             if not loader_path.exists():
                 print(f"  ❌ Blog loader not found: {loader_path}")
-                print(f"  ⚠️  Failed to load blog data")
+                print("  ⚠️  Failed to load blog data")
             else:
                 try:
                     # Use uv run to execute with the database/.venv environment
@@ -352,11 +351,11 @@ class DatabaseSetup:
                     )
 
                     if result.returncode != 0:
-                        print(f"  ❌ Blog post loading failed:")
+                        print("  ❌ Blog post loading failed:")
                         print(f"     {result.stderr}")
-                        print(f"  ⚠️  Failed to load seed data (continuing anyway)")
+                        print("  ⚠️  Failed to load seed data (continuing anyway)")
                     else:
-                        print(f"  ✓ Blog posts loaded successfully")
+                        print("  ✓ Blog posts loaded successfully")
                         # Print summary from loader
                         if "SUMMARY" in result.stdout:
                             summary_lines = result.stdout.split("SUMMARY")[1].split(
@@ -365,7 +364,7 @@ class DatabaseSetup:
                             print(f"     {summary_lines.strip()}")
 
                 except subprocess.TimeoutExpired:
-                    print(f"  ⚠️  Blog loading timed out (continuing anyway)")
+                    print("  ⚠️  Blog loading timed out (continuing anyway)")
                 except Exception as e:
                     print(f"  ⚠️  Blog loading error: {e}")
         else:
@@ -381,11 +380,11 @@ class DatabaseSetup:
                 if not self._generate_seed_data(self.config.seed_size):
                     # Fall back to legacy seed file if generation fails
                     seed_file = "database/03-data.sql"
-                    print(f"  ⚠️  Generation failed, trying legacy seed file...")
+                    print("  ⚠️  Generation failed, trying legacy seed file...")
 
             print(f"  6️⃣  Loading seed data ({self.config.seed_size})...")
             if not self._apply_sql_file(db_name, seed_file):
-                print(f"  ⚠️  Failed to load seed data (continuing anyway)")
+                print("  ⚠️  Failed to load seed data (continuing anyway)")
 
         # Success
         print(f"✅ {framework} database ready ({db_name})")
@@ -399,7 +398,7 @@ class DatabaseSetup:
             print("❌ No frameworks to setup")
             return False
 
-        print(f"\n🚀 VelocityBench Database Setup")
+        print("\n🚀 VelocityBench Database Setup")
         print(f"   Frameworks to setup: {', '.join(to_setup)}")
         print(f"   PostgreSQL: {self.config.host}:{self.config.port}")
 
@@ -446,13 +445,13 @@ class DatabaseSetup:
         failed_count = len(frameworks) - success_count
 
         print(f"\n{'=' * 70}")
-        print(f"SUMMARY")
+        print("SUMMARY")
         print(f"{'=' * 70}")
         print(f"  ✅ Successful: {success_count}/{len(frameworks)}")
         print(f"  ❌ Failed: {failed_count}/{len(frameworks)}")
 
         if failed_count > 0:
-            print(f"\n  Failed frameworks:")
+            print("\n  Failed frameworks:")
             for entry in self.setup_log:
                 if entry["status"] == "failure":
                     print(
@@ -511,7 +510,7 @@ def main():
             )
             sys.exit(0)
         else:
-            print(f"❌ Failed to generate seed data")
+            print("❌ Failed to generate seed data")
             sys.exit(1)
 
     # Create config with seed size

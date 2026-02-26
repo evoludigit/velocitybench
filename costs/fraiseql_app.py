@@ -21,9 +21,7 @@ from typing import Any
 
 # FraiseQL imports
 import fraiseql
-import prometheus_client
 import uvicorn
-from fastapi import Request
 from fraiseql.fastapi import FraiseQLConfig, create_fraiseql_app
 from fraiseql.fastapi.config import IntrospectionPolicy
 from fraiseql.types import UUID

@@ -13,11 +13,9 @@ import os
 import uuid
 from pathlib import Path
 from datetime import datetime, timedelta
-from decimal import Decimal
 
 import pytest
 import psycopg
-from psycopg import sql
 
 # Add costs directory to path
 COSTS_DIR = Path(__file__).parent.parent
@@ -25,20 +23,9 @@ sys.path.insert(0, str(COSTS_DIR))
 
 from fraiseql_types import (
     Framework,
-    BenchmarkSuite,
-    Workload,
-    LoadProfile,
     BenchmarkRun,
-    PerformanceMetrics,
-    ResourceProfile,
     CostAnalysisResult,
     CloudCostBreakdown,
-    EfficiencyRanking,
-    LanguageFamily,
-    LoadProfileName,
-    BenchmarkStatus,
-    QueryComplexity,
-    CloudProvider,
 )
 from resolvers import BenchmarkResolvers
 

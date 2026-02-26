@@ -4,11 +4,9 @@ Tests actual GraphQL queries and mutations against the schema.
 Uses async test client to execute queries through the GraphQL API.
 """
 
-import pytest
-import json
-from starlette.testclient import TestClient
-from asgi_lifespan import LifespanManager
 
+import pytest
+from starlette.testclient import TestClient
 
 # GraphQL query strings
 QUERY_PING = """
@@ -106,7 +104,7 @@ def client(db):
     For now, we'll test the schema layer directly.
     """
     # Import the app here to avoid circular imports
-    from main import app, schema
+    from main import app
 
     # Create test client
     client = TestClient(app)

@@ -33,7 +33,6 @@ from pathlib import Path
 from typing import List, Optional, Dict
 from dataclasses import dataclass, asdict
 from datetime import datetime
-import traceback
 
 # List of all frameworks in the benchmark suite
 FRAMEWORKS = [
@@ -173,7 +172,7 @@ class BenchmarkRunner:
             print("❌ No frameworks to test")
             return False
 
-        print(f"\n🚀 VelocityBench Sequential Test Runner")
+        print("\n🚀 VelocityBench Sequential Test Runner")
         print(f"   Frameworks to test: {', '.join(to_run)}")
         print(f"   Sequential mode: {'ON' if not self.parallel else 'OFF (PARALLEL)'}")
         print(f"   Timeout per framework: {self.timeout}s")
@@ -270,14 +269,14 @@ class BenchmarkRunner:
         total_duration = (datetime.now() - self.start_time).total_seconds()
 
         print(f"\n{'='*70}")
-        print(f"BENCHMARK SUMMARY")
+        print("BENCHMARK SUMMARY")
         print(f"{'='*70}")
         print(f"  Total Frameworks: {len(self.results)}")
         print(f"  ✅ Passed: {passed}/{len(self.results)}")
         print(f"  ❌ Failed: {failed}/{len(self.results)}")
         print(f"  Total Duration: {total_duration:.1f}s")
 
-        print(f"\n  Framework Results:")
+        print("\n  Framework Results:")
         for framework in frameworks:
             if framework in self.results:
                 result = self.results[framework]
@@ -287,7 +286,7 @@ class BenchmarkRunner:
 
         # Detailed failures
         if failed > 0:
-            print(f"\n  Failed Frameworks:")
+            print("\n  Failed Frameworks:")
             for framework, result in self.results.items():
                 if result.status != 'passed':
                     print(f"    - {framework}: {result.status}")

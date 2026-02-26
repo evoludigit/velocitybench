@@ -16,14 +16,13 @@ Usage:
     python main.py --config fraiseql.toml   # Use custom config
 """
 
+import logging
 import os
 import signal
 import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Optional
-import logging
 
 # Setup logging
 logging.basicConfig(
@@ -41,11 +40,11 @@ class FraiseQLServer:
 
     def __init__(
         self,
-        schema_file: Optional[str] = None,
-        config_file: Optional[str] = None,
-        database_url: Optional[str] = None,
+        schema_file: str | None = None,
+        config_file: str | None = None,
+        database_url: str | None = None,
         port: int = DEFAULT_PORT,
-        fraiseql_root: Optional[str] = None,
+        fraiseql_root: str | None = None,
     ):
         """Initialize FraiseQL v2 server manager.
 
@@ -61,14 +60,14 @@ class FraiseQLServer:
         self.config_file = config_file or "fraiseql.toml"
         self.database_url = database_url
         self.port = port
-        self.process: Optional[subprocess.Popen] = None
+        self.process: subprocess.Popen | None = None
 
         # Locate fraiseql binaries - check multiple locations
         self.fraiseql_root = self._find_fraiseql_root(fraiseql_root)
         self.fraiseql_cli = self._find_binary("fraiseql-cli")
         self.fraiseql_server = self._find_binary("fraiseql-server")
 
-    def _find_fraiseql_root(self, explicit_root: Optional[str]) -> Path:
+    def _find_fraiseql_root(self, explicit_root: str | None) -> Path:
         """Find the FraiseQL installation root."""
         # Check explicit path first
         if explicit_root:
@@ -283,7 +282,7 @@ class FraiseQLServer:
                 logger.warning("Server did not stop gracefully, killing...")
                 self.process.kill()
 
-    def query(self, query: str, variables: Optional[dict] = None) -> Optional[dict]:
+    def query(self, query: str, variables: dict | None = None) -> dict | None:
         """Send GraphQL query to server.
 
         Args:

@@ -16,10 +16,10 @@ Examples:
     python database/database-sampler.py fraiseql_xxlarge.db fraiseql_xlarge.db 50.0
 """
 
+import random
 import sqlite3
 import sys
 import time
-import random
 from pathlib import Path
 
 

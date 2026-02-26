@@ -7,7 +7,6 @@ queries by design, providing strong protection against SQL injection.
 """
 
 import pytest
-import os
 from test_factory import TestFactory
 
 

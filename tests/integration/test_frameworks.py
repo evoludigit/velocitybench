@@ -242,7 +242,7 @@ class IntegrationTester:
                     duration_ms=duration,
                     error_message=f"HTTP {response.status_code}",
                 )
-        except Exception as e:
+        except Exception:
             duration = (time.time() - start) * 1000
             # Metrics is optional, so timeout is acceptable
             return TestResult(
@@ -262,7 +262,7 @@ class IntegrationTester:
         print(f"{'='*70}")
 
         # Test 1: Health check
-        print(f"  → Testing health endpoint...")
+        print("  → Testing health endpoint...")
         health_result = self.test_health(framework)
         results.append(health_result)
 
@@ -270,15 +270,15 @@ class IntegrationTester:
             print(f"    ✓ Health check passed ({health_result.duration_ms:.1f}ms)")
         else:
             print(f"    ✗ Health check failed: {health_result.error_message}")
-            print(f"    → Skipping remaining tests (framework not running)")
+            print("    → Skipping remaining tests (framework not running)")
             return results
 
         # Test 2: API endpoint (type-specific)
         if framework.type == "graphql":
-            print(f"  → Testing GraphQL introspection...")
+            print("  → Testing GraphQL introspection...")
             api_result = self.test_graphql_introspection(framework)
         else:
-            print(f"  → Testing REST endpoint...")
+            print("  → Testing REST endpoint...")
             api_result = self.test_rest_endpoint(framework)
 
         results.append(api_result)
@@ -289,7 +289,7 @@ class IntegrationTester:
             print(f"    ✗ API test failed: {api_result.error_message}")
 
         # Test 3: Metrics endpoint
-        print(f"  → Testing metrics endpoint...")
+        print("  → Testing metrics endpoint...")
         metrics_result = self.test_metrics(framework)
         results.append(metrics_result)
 

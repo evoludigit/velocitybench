@@ -9,15 +9,13 @@ Usage:
 
 import argparse
 import random
-import uuid
-import json
-from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
 import sys
+import uuid
+from datetime import datetime, timedelta
 
 try:
-    from faker import Faker
     import psycopg
+    from faker import Faker
 except ImportError:
     print("Error: Required packages not installed")
     print("Install with: pip install faker psycopg[binary]")
@@ -378,7 +376,7 @@ class DataGenerator:
     def run(self, config: dict[str, int]):
         """Run full data generation."""
         print(f"\n{'=' * 60}")
-        print(f"Starting data generation")
+        print("Starting data generation")
         print(f"{'=' * 60}")
         print(f"Seed: {self.seed}")
         print(f"Config: {config}\n")

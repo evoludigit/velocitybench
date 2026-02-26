@@ -346,9 +346,8 @@ class AsyncDatabase:
         if not self.pool:
             raise RuntimeError("Database pool not connected")
 
-        async with self.pool.acquire() as conn:
-            async with conn.transaction():
-                yield conn
+        async with self.pool.acquire() as conn, conn.transaction():
+            yield conn
 
     def get_metrics(self) -> dict[str, Any]:
         """Get current metrics snapshot."""

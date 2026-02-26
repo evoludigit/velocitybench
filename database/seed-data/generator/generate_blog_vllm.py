@@ -11,7 +11,6 @@ Usage:
 """
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
@@ -212,7 +211,7 @@ Write complete, publishable blog posts in markdown format."""
         problem_section = f"\n## The Problem\n{pattern['problem']['description']}"
     elif "timeline" in pattern:
         # For history patterns
-        problem_section = f"\n## Context\nSee timeline below for the evolution and challenges that arose."
+        problem_section = "\n## Context\nSee timeline below for the evolution and challenges that arose."
 
     prompt = f"""Write a tutorial blog post about the "{pattern["name"]}" pattern.
 
@@ -418,7 +417,7 @@ def generate_all():
     depths = ["beginner", "intermediate", "advanced"]
 
     print(f"\n{'=' * 70}")
-    print(f"BLOG POST GENERATION STATUS")
+    print("BLOG POST GENERATION STATUS")
     print(f"{'=' * 70}")
     print(f"Total patterns discovered: {len(all_patterns)}")
     print(f"Patterns with existing posts: {len(existing_posts)}")
@@ -435,26 +434,26 @@ def generate_all():
         print(f"\n=== Processing: {pattern_id} ({category}) ===")
         pattern = find_pattern(pattern_id)
         if not pattern:
-            print(f"  ERROR: Pattern not found")
+            print("  ERROR: Pattern not found")
             continue
 
         is_comparison = is_comparison_pattern(pattern)
 
         if is_comparison:
             # Generate comparison articles at each depth
-            print(f"  Type: Comparison pattern")
+            print("  Type: Comparison pattern")
             for depth in depths:
                 output_path = OUTPUT_DIR / "comparisons" / f"{pattern_id}-{depth}.md"
                 print(f"  Generating comparison ({depth})...")
                 content = generate_comparison(pattern, depth)
                 if content:
                     save_blog(content, output_path)
-                    print(f"    ✓ Saved")
+                    print("    ✓ Saved")
                 else:
-                    print(f"    ✗ FAILED")
+                    print("    ✗ FAILED")
         else:
             # Generate standard content (tutorial, reference, troubleshooting)
-            print(f"  Type: Standard pattern")
+            print("  Type: Standard pattern")
 
             # Tutorials
             for depth in depths:
@@ -465,34 +464,34 @@ def generate_all():
                 content = generate_tutorial(pattern, depth)
                 if content:
                     save_blog(content, output_path)
-                    print(f"    ✓ Saved")
+                    print("    ✓ Saved")
                 else:
-                    print(f"    ✗ FAILED")
+                    print("    ✗ FAILED")
 
             # Troubleshooting
             output_path = (
                 OUTPUT_DIR / "troubleshooting" / f"{pattern_id}-troubleshooting.md"
             )
-            print(f"  Generating troubleshooting guide...")
+            print("  Generating troubleshooting guide...")
             content = generate_troubleshooting(pattern)
             if content:
                 save_blog(content, output_path)
-                print(f"    ✓ Saved")
+                print("    ✓ Saved")
             else:
-                print(f"    ✗ FAILED")
+                print("    ✗ FAILED")
 
             # Reference
             output_path = OUTPUT_DIR / "reference" / f"{pattern_id}-reference.md"
-            print(f"  Generating reference...")
+            print("  Generating reference...")
             content = generate_reference(pattern)
             if content:
                 save_blog(content, output_path)
-                print(f"    ✓ Saved")
+                print("    ✓ Saved")
             else:
-                print(f"    ✗ FAILED")
+                print("    ✗ FAILED")
 
     print(f"\n{'=' * 70}")
-    print(f"Blog generation complete!")
+    print("Blog generation complete!")
     print(f"{'=' * 70}")
 
 

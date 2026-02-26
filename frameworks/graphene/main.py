@@ -4,7 +4,6 @@ Async GraphQL Benchmarking Server for Graphene with DataLoader
 Uses asyncpg connection pooling and aiodataloader to prevent N+1 queries.
 """
 
-import asyncio
 import json
 import os
 import sys
@@ -19,8 +18,9 @@ from graphene import ID, Field, Int, ObjectType, String
 from graphene import List as GrapheneList
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from common.async_db import AsyncDatabase
 from common.health_check import HealthCheckManager
+
+from common.async_db import AsyncDatabase
 
 
 # DataLoader classes for batching

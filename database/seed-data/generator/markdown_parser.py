@@ -6,10 +6,10 @@ Extracts frontmatter (YAML), converts markdown to plain text, and generates exce
 """
 
 import re
-import yaml
-from pathlib import Path
 from datetime import datetime
-from typing import Tuple
+from pathlib import Path
+
+import yaml
 
 
 def parse_frontmatter(content: str) -> tuple[dict, str]:

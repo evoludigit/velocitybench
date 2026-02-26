@@ -9,7 +9,7 @@ def analyze_comments(comments_dir: Path):
     """Analyze comments in a directory."""
     if not comments_dir.exists():
         print("No comments found.")
-        print(f"Run: make comments-test")
+        print("Run: make comments-test")
         return
 
     files = list(comments_dir.glob("*_comments.json"))
@@ -35,17 +35,17 @@ def analyze_comments(comments_dir: Path):
                 author_count[author] = author_count.get(author, 0) + 1
 
     if total_posts > 0:
-        print(f"\nSample Analysis (first 10 files):")
+        print("\nSample Analysis (first 10 files):")
         print(f"  Total comments: {total_comments}")
         print(f"  Total posts: {total_posts}")
         print(f"  Avg comments/post: {total_comments / total_posts:.1f}")
 
-        print(f"\nComment Types:")
+        print("\nComment Types:")
         for ctype, count in sorted(comment_types.items(), key=lambda x: -x[1]):
             pct = 100 * count / total_comments
             print(f"  {ctype:20s}: {count:4d} ({pct:5.1f}%)")
 
-        print(f"\nTop Authors:")
+        print("\nTop Authors:")
         for author, count in sorted(author_count.items(), key=lambda x: -x[1])[:10]:
             print(f"  {author:20s}: {count:3d} comments")
 
@@ -54,7 +54,7 @@ def analyze_comments(comments_dir: Path):
             data = json.load(f)
             if data.get("comments"):
                 comment = data["comments"][0]
-                print(f"\nSample Comment Fields:")
+                print("\nSample Comment Fields:")
                 print(f"  {list(comment.keys())}")
 
 

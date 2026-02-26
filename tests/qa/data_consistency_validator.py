@@ -15,7 +15,6 @@ Outputs:
 
 import httpx
 from typing import Dict, List, Any
-import json
 
 
 # Standard test data for consistency testing

@@ -352,13 +352,13 @@ async def main():
         print(f"Testing {framework['name']}...")
         result = await validator.verify_query_support(framework, test_ids)
 
-        print(f"\nSupported Queries:")
+        print("\nSupported Queries:")
         for query, status in result['supported_queries'].items():
             icon = "✅" if status == 'pass' else ("⚠️" if status == 'warning' else "❌")
             print(f"  {icon} {query}: {status}")
 
         if result['issues']:
-            print(f"\nIssues:")
+            print("\nIssues:")
             for issue in result['issues']:
                 print(f"  - {issue}")
 

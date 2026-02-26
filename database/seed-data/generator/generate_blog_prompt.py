@@ -25,7 +25,6 @@ Multi-Model Strategy:
 """
 
 import argparse
-import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -118,7 +117,7 @@ def generate_tutorial_prompt(pattern: dict, depth: str = "beginner") -> str:
 """
 
     if "common_mistakes" in blog_hooks:
-        prompt += f"""
+        prompt += """
 ### Common Mistakes to Address
 """
         for mistake in blog_hooks["common_mistakes"]:

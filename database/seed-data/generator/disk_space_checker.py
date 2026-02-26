@@ -6,10 +6,9 @@ Validates available disk space before generation.
 Provides pre-generation checks, monitoring, and graceful failure.
 """
 
+import logging
 import shutil
 from pathlib import Path
-from typing import Tuple
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +103,7 @@ class DiskSpaceChecker:
         required_gb = estimated_gb + self.SAFETY_MARGIN_GB
 
         # Check available space
-        msg = f"Disk Space Check:\n"
+        msg = "Disk Space Check:\n"
         msg += f"  Required: {required_gb:.2f} GB\n"
         msg += f"  Available: {available_gb:.2f} GB\n"
         msg += f"  Used: {used_pct:.1f}%"
@@ -148,7 +147,7 @@ class DiskSpaceChecker:
             test_file = self.output_dir / ".write_test"
             test_file.write_text("test")
             test_file.unlink()
-            return (True, f"Write permission check: ✅ OK")
+            return (True, "Write permission check: ✅ OK")
         except Exception as e:
             return (False, f"Write permission check: ❌ {e}")
 

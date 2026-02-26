@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger(__name__)
 
 sys.path.insert(0, str(PathlibPath(__file__).parent.parent))
+from common.async_db import AsyncDatabase  # noqa: E402
 from common.config import ConfigurationError, get_db_config  # noqa: E402
 from common.errors import (  # noqa: E402
     AppError,
@@ -30,8 +31,6 @@ from common.errors import (  # noqa: E402
 from common.health_check import HealthCheckManager  # noqa: E402
 from common.logging_middleware import FastAPILoggingMiddleware  # noqa: E402
 from common.validators import Validator  # noqa: E402
-
-from common.async_db import AsyncDatabase  # noqa: E402
 
 # Metrics disabled for multi-worker compatibility
 REQUEST_COUNT = None

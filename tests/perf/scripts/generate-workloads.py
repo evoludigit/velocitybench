@@ -4,7 +4,6 @@ Generate JMeter workload test plans and supporting files.
 """
 
 import json
-import os
 from pathlib import Path
 from jinja2 import Template
 

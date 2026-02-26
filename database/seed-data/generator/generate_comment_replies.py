@@ -24,14 +24,12 @@ import json
 import random
 import sys
 import time
-import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List
 
 import requests
 
-from .exceptions import VLLMTimeoutError, VLLMConnectionError, VLLMError
+from .exceptions import VLLMConnectionError, VLLMError, VLLMTimeoutError
 
 # ============================================================================
 # Configuration
@@ -307,7 +305,7 @@ Do not use markdown formatting."""
             comment_files = comment_files[:num_posts]
 
         print(f"\n{'=' * 70}")
-        print(f"COMMENT REPLY GENERATION")
+        print("COMMENT REPLY GENERATION")
         print(f"{'=' * 70}")
         print(f"Comment files to process: {len(comment_files)}")
         print(f"Reply generation probability: {REPLY_PROBABILITY * 100:.0f}%")
@@ -342,7 +340,7 @@ Do not use markdown formatting."""
             )
 
             if stats.get("failed"):
-                print(f" ✗")
+                print(" ✗")
                 total_stats["failed"] += 1
             else:
                 print(

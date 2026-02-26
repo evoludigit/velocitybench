@@ -18,7 +18,6 @@ Usage:
 import argparse
 import re
 from pathlib import Path
-from typing import Tuple
 
 
 def fix_markdown_wrapper(content: str) -> tuple[str, bool]:
@@ -214,10 +213,10 @@ def print_summary(stats: dict, dry_run: bool):
             print(f"  - {change_type}: {count}")
 
     if dry_run:
-        print(f"\n⚠️  DRY RUN - No files were modified")
+        print("\n⚠️  DRY RUN - No files were modified")
         print("Run without --dry-run to apply changes")
     else:
-        print(f"\n✅ All changes applied successfully!")
+        print("\n✅ All changes applied successfully!")
 
 
 def main():

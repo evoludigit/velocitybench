@@ -6,11 +6,9 @@ Traditional synchronous REST API using psycopg3 connection pool
 """
 
 import os
-import sys
 import time
 from contextlib import contextmanager
 from datetime import UTC, datetime
-from pathlib import Path as PathlibPath
 from typing import Any
 
 import prometheus_client
@@ -85,7 +83,7 @@ class Validator:
         try:
             int_value = int(value)
         except (ValueError, TypeError):
-            raise InputValidationError(f"Limit must be an integer")
+            raise InputValidationError("Limit must be an integer")
 
         if int_value < min_val or int_value > max_val:
             raise InputValidationError(f"Limit must be between {min_val} and {max_val}")

@@ -16,16 +16,15 @@ from __future__ import annotations
 
 import argparse
 import random
+import sys
 import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import List
-import sys
 
 try:
-    from faker import Faker
     import psycopg
+    from faker import Faker
 except ImportError as e:
     print(f"Error: Required packages not installed: {e}")
     print("Install with: pip install faker psycopg")
@@ -199,7 +198,7 @@ class BlogPostLoader:
         Returns:
             Path to generated TSV file
         """
-        print(f"Generating users TSV file...", flush=True)
+        print("Generating users TSV file...", flush=True)
 
         tsv_path = self.output_dir / "blog_users.tsv"
 
@@ -237,7 +236,7 @@ class BlogPostLoader:
         Returns:
             Path to generated TSV file
         """
-        print(f"Generating posts TSV file...", flush=True)
+        print("Generating posts TSV file...", flush=True)
 
         tsv_path = self.output_dir / "blog_posts.tsv"
 
@@ -300,7 +299,7 @@ class BlogPostLoader:
         Returns:
             True if successful, False otherwise
         """
-        print(f"Loading data to PostgreSQL...", flush=True)
+        print("Loading data to PostgreSQL...", flush=True)
 
         try:
             with psycopg.connect(connection_string) as conn:
@@ -418,7 +417,7 @@ class BlogPostLoader:
         if connection_string and not dry_run:
             print(f"Posts loaded: {self.stats['loaded']:,}")
         print(f"Duration: {self.stats['duration']:.2f}s")
-        print(f"\nTSV files:")
+        print("\nTSV files:")
         print(f"  Users: {users_tsv}")
         print(f"  Posts: {posts_tsv}")
 

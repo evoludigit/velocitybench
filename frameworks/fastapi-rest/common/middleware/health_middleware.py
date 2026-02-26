@@ -5,10 +5,10 @@ Intercepts requests to /health* endpoints and routes them to the
 HealthCheckManager without requiring framework-specific endpoint definitions.
 """
 
-import asyncio
 import json
 import logging
-from typing import Any, Callable, Awaitable
+from collections.abc import Callable
+from typing import Any
 
 from ..health_check import HealthCheckManager
 from ..types import ProbeType
@@ -106,14 +106,14 @@ class HealthCheckMiddleware:
                 body=result.to_dict(),
             )
 
-        except (OSError, asyncio.TimeoutError) as e:
+        except (TimeoutError, OSError) as e:
             logger.exception(f"Health check failed: {e}")
             await self._send_response(
                 send,
                 status=503,
                 body={
                     "status": "down",
-                    "error": f"Health check error: {str(e)}",
+                    "error": f"Health check error: {e!s}",
                 },
             )
 

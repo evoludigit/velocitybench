@@ -7,7 +7,6 @@ for each framework with standardized structure and framework-specific informatio
 """
 
 import json
-import os
 import sys
 from pathlib import Path
 from datetime import datetime

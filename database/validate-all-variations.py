@@ -12,6 +12,7 @@ Checks:
 import sqlite3
 import sys
 from pathlib import Path
+
 from tabulate import tabulate
 
 try:
@@ -78,7 +79,7 @@ class VariationValidator:
         ]
         try:
             print(tabulate(results, headers=headers, tablefmt="grid"))
-        except (NameError, Exception) as e:
+        except (NameError, Exception):
             print(headers)
             for row in results:
                 print(row)

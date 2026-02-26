@@ -20,7 +20,6 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Dict, Tuple
 
 import requests
 
@@ -393,13 +392,12 @@ realism, and internal alignment. Be critical but fair. Focus on semantic coheren
                 # vLLM found issues
                 self.refined_count += 1
                 return False, f"⚠ vLLM found issues - {vllm_analysis}"
+        # No vLLM, just local checks
+        elif is_local_coherent:
+            self.validated_count += 1
+            return True, "✓ Coherent"
         else:
-            # No vLLM, just local checks
-            if is_local_coherent:
-                self.validated_count += 1
-                return True, "✓ Coherent"
-            else:
-                return False, f"✗ {local_issue}"
+            return False, f"✗ {local_issue}"
 
     def validate_all(
         self,
@@ -467,7 +465,7 @@ realism, and internal alignment. Be critical but fair. Focus on semantic coheren
         print(f"Refined:                   {results['refined']}")
         print(f"Failed:                    {results['failed']}")
         if use_vllm and not dry_run:
-            print(f"vLLM analysis performed:   yes")
+            print("vLLM analysis performed:   yes")
         print(f"{'=' * 70}\n")
 
         if results["issues_found"] and results["incoherent"] <= 20:

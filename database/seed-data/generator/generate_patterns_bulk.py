@@ -4,10 +4,9 @@ Bulk pattern generator - creates many software engineering patterns efficiently.
 Generates patterns across multiple categories to reach content targets.
 """
 
-import os
-import yaml
 from pathlib import Path
-from datetime import datetime
+
+import yaml
 
 BASE_PATTERNS_DIR = Path(__file__).parent.parent / "corpus" / "patterns"
 

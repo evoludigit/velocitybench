@@ -3,10 +3,10 @@
 Simple benchmark runner for pg_tviews
 """
 
-import subprocess
 import statistics
-from dataclasses import dataclass
+import subprocess
 import time
+from dataclasses import dataclass
 from datetime import datetime
 
 

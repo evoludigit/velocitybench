@@ -4,7 +4,6 @@ Tests actual GraphQL queries and mutations against the schema.
 Uses async test client to execute queries through the GraphQL API.
 """
 
-import pytest
 
 
 # ============================================================================

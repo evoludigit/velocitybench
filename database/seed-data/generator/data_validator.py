@@ -7,9 +7,8 @@ Validates generated data integrity (checksums, row counts, file consistency).
 
 import hashlib
 import json
-from pathlib import Path
-from typing import Tuple, Optional, Dict
 import logging
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 

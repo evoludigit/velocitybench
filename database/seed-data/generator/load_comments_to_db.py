@@ -18,6 +18,7 @@ Usage:
 import argparse
 import json
 import random
+import time
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -158,7 +159,7 @@ class BlogCommentLoader:
 
         Returns: (total_comments_count, tsv_file_path)
         """
-        print(f"\nPreparing comments TSV file...", flush=True)
+        print("\nPreparing comments TSV file...", flush=True)
 
         comment_files = self.discover_comment_files(comments_dir)
         if not comment_files:
@@ -237,13 +238,13 @@ class BlogCommentLoader:
         1. Load comments with NULL fk_post values
         2. Update fk_post by matching comment identifier to post filename
         """
-        print(f"\nLoading comments to PostgreSQL...", flush=True)
+        print("\nLoading comments to PostgreSQL...", flush=True)
 
         try:
             with psycopg.connect(connection_string) as conn:
                 with conn.cursor() as cur:
                     # Load comments initially with NULL fk_post, then update in batch
-                    print(f"  Loading comments (without post associations)...")
+                    print("  Loading comments (without post associations)...")
                     with open(comments_tsv, encoding="utf-8") as f:
                         with cur.copy(
                             "COPY benchmark.tb_comment (id, fk_post, fk_author, fk_parent, content, is_approved, created_at, updated_at) FROM STDIN"
@@ -257,7 +258,7 @@ class BlogCommentLoader:
                     print(f"  ✓ Loaded {count:,} comments")
 
                     # Update fk_post by matching post titles
-                    print(f"  Associating comments with posts...")
+                    print("  Associating comments with posts...")
                     comment_files = self.discover_comment_files(comments_dir)
 
                     updates_made = 0
@@ -356,7 +357,7 @@ class BlogCommentLoader:
             output_tsv = comments_dir.parent / "comments.tsv"
 
         print(f"\n{'=' * 70}")
-        print(f"BLOG COMMENTS DATABASE LOADER")
+        print("BLOG COMMENTS DATABASE LOADER")
         print(f"{'=' * 70}")
         print(f"Comments directory:  {comments_dir}")
         print(f"Output TSV:          {output_tsv}")
@@ -396,7 +397,7 @@ class BlogCommentLoader:
             print(f"Comments loaded:         {self.stats['comments_loaded']:,}")
         print(f"Failed posts:            {self.stats['failed_posts']:,}")
         print(f"Duration:                {self.stats['duration']:.1f}s")
-        print(f"\nOutput files:")
+        print("\nOutput files:")
         print(f"  TSV: {tsv_path}")
         print(f"{'=' * 70}\n")
 

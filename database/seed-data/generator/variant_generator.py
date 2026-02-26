@@ -17,12 +17,12 @@ Variants differ in:
 Body stays identical (or lightly mutated at 2% rate for larger scales).
 """
 
+import logging
 import random
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Optional, List
-import logging
+from typing import Any
 
 try:
     from faker import Faker

@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Import XS SQLite database to PostgreSQL"""
 
+import atexit
 import sqlite3
-import psycopg
 import sys
 import time
-import atexit
 from pathlib import Path
+
+import psycopg
 
 try:
     import psycopg
@@ -131,7 +132,7 @@ def import_xs(sqlite_path: str, pg_conn_str: str):
             all_rows = cursor.fetchall()
 
             if not all_rows:
-                print(f"✓ (no data)")
+                print("✓ (no data)")
                 continue
 
             # Get column indices to extract from SQLite rows
@@ -157,7 +158,7 @@ def import_xs(sqlite_path: str, pg_conn_str: str):
                     try:
                         cur.executemany(insert_sql, batch)
                         pg_conn.commit()
-                    except Exception as e:
+                    except Exception:
                         # Rollback and skip this batch
                         pg_conn.rollback()
                         continue

@@ -8,7 +8,6 @@ Implements resolver functions that:
 Uses psycopg3 with synchronous connection pool.
 """
 
-from datetime import datetime
 from typing import Any
 import uuid
 
@@ -135,14 +134,14 @@ class BenchmarkResolvers:
 
         if language:
             params.append(language)
-            query += f" AND language = %s"
+            query += " AND language = %s"
 
         if language_family:
             params.append(language_family)
-            query += f" AND language_family = %s"
+            query += " AND language_family = %s"
 
         params.extend([limit, offset])
-        query += f" LIMIT %s OFFSET %s"
+        query += " LIMIT %s OFFSET %s"
 
         if hasattr(self.db, "cursor"):
             # Synchronous interface
@@ -252,18 +251,18 @@ class BenchmarkResolvers:
 
         if framework_id:
             params.append(framework_id)
-            query += f" AND r.framework->>'id' = %s"
+            query += " AND r.framework->>'id' = %s"
 
         if workload_id:
             params.append(workload_id)
-            query += f" AND r.workload->>'id' = %s"
+            query += " AND r.workload->>'id' = %s"
 
         if status:
             params.append(status)
-            query += f" AND r.status = %s"
+            query += " AND r.status = %s"
 
         params.append(limit)
-        query += f" LIMIT %s"
+        query += " LIMIT %s"
 
         if hasattr(self.db, "cursor"):
             # Synchronous interface

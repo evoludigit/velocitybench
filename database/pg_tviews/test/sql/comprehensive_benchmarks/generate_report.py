@@ -3,11 +3,11 @@
 Generate comprehensive benchmark report with visualizations
 """
 
-import psycopg
 import sys
 from datetime import datetime
-from typing import List, Dict, Any
-import json
+from typing import Any
+
+import psycopg
 
 DB_NAME = "pg_tviews_benchmark"
 
@@ -19,7 +19,7 @@ def connect_db():
         print(f"Error connecting to database: {e}")
         sys.exit(1)
 
-def fetch_results(conn) -> List[Dict[str, Any]]:
+def fetch_results(conn) -> list[dict[str, Any]]:
     """Fetch all benchmark results"""
     with conn.cursor() as cur:
         cur.execute("""
@@ -38,7 +38,7 @@ def fetch_results(conn) -> List[Dict[str, Any]]:
         columns = [desc[0] for desc in cur.description]
         return [dict(zip(columns, row)) for row in cur.fetchall()]
 
-def fetch_comparisons(conn) -> List[Dict[str, Any]]:
+def fetch_comparisons(conn) -> list[dict[str, Any]]:
     """Fetch performance comparison data"""
     with conn.cursor() as cur:
         cur.execute("""
@@ -59,7 +59,7 @@ def fetch_comparisons(conn) -> List[Dict[str, Any]]:
         columns = [desc[0] for desc in cur.description]
         return [dict(zip(columns, row)) for row in cur.fetchall()]
 
-def generate_markdown_report(results: List[Dict], comparisons: List[Dict]) -> str:
+def generate_markdown_report(results: list[dict], comparisons: list[dict]) -> str:
     """Generate markdown report"""
     report = []
 

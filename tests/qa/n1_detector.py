@@ -21,8 +21,6 @@ Outputs:
 import asyncpg
 import httpx
 from typing import Dict, List
-import re
-import time
 
 
 # Test cases for N+1 detection

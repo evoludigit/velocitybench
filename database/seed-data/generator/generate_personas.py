@@ -27,14 +27,13 @@ import sys
 import time
 import uuid
 from pathlib import Path
-from typing import Dict, List
 
 import requests
 import yaml
 from jsonschema import Draft7Validator, ValidationError
-
 from logger_config import setup_logging
-from .exceptions import VLLMTimeoutError, VLLMConnectionError, VLLMError
+
+from .exceptions import VLLMConnectionError, VLLMError, VLLMTimeoutError
 
 # ============================================================================
 # Configuration
@@ -645,12 +644,12 @@ class PersonaGenerator:
 
             # Debug: Print raw field values
             if False:  # Set to True to debug
-                print(f"\n  DEBUG - Raw fields:")
-                print(f"    name: {repr(name)}")
-                print(f"    title: {repr(title)}")
-                print(f"    comment_types: {repr(comment_types)}")
-                print(f"    traits: {repr(traits)}")
-                print(f"    expertise: {repr(expertise)}")
+                print("\n  DEBUG - Raw fields:")
+                print(f"    name: {name!r}")
+                print(f"    title: {title!r}")
+                print(f"    comment_types: {comment_types!r}")
+                print(f"    traits: {traits!r}")
+                print(f"    expertise: {expertise!r}")
 
             # Assemble into persona dict
             persona = {
@@ -754,7 +753,7 @@ class PersonaGenerator:
                     latest_id + count
                 )  # count is now the number of ADDITIONAL personas
                 print(f"\n{'=' * 70}")
-                print(f"RESUMING PERSONA GENERATION")
+                print("RESUMING PERSONA GENERATION")
                 print(f"{'=' * 70}")
                 print(f"Found {latest_id} existing personas")
                 print(f"Resuming from persona ID: {start_id}")
@@ -771,7 +770,7 @@ class PersonaGenerator:
         }
 
         print(f"\n{'=' * 70}")
-        print(f"PERSONA GENERATION")
+        print("PERSONA GENERATION")
         print(f"{'=' * 70}")
         print(f"Target personas: {end_id}")
         print(f"Starting from: {start_id}")
@@ -791,7 +790,7 @@ class PersonaGenerator:
                 print(f" ✓ ({persona.get('title', 'Unknown')})")
             else:
                 results["failed"] += 1
-                print(f" ✗")
+                print(" ✗")
 
             # Checkpoint every 100 personas
             if i % 100 == 0:
@@ -989,7 +988,7 @@ class PersonaGenerator:
         for area in all_areas:
             area_counts[area] = area_counts.get(area, 0) + 1
 
-        print(f"\nTop expertise areas:")
+        print("\nTop expertise areas:")
         for area, count in sorted(
             area_counts.items(), key=lambda x: x[1], reverse=True
         )[:10]:
@@ -1002,7 +1001,7 @@ class PersonaGenerator:
             style = persona.get("communication_style", "unknown")
             styles[style] = styles.get(style, 0) + 1
 
-        print(f"\nCommunication styles:")
+        print("\nCommunication styles:")
         for style, count in sorted(styles.items(), key=lambda x: x[1], reverse=True)[
             :5
         ]:
@@ -1013,13 +1012,13 @@ class PersonaGenerator:
         experiences = [p.get("years_experience", 0) for p in personas]
         avg_exp = sum(experiences) / len(experiences) if experiences else 0
 
-        print(f"\nExperience levels:")
+        print("\nExperience levels:")
         print(f"  Average:  {avg_exp:.1f} years")
         print(f"  Min:      {min(experiences)} years")
         print(f"  Max:      {max(experiences)} years")
 
         # Sample personas
-        print(f"\nSample personas:")
+        print("\nSample personas:")
         for persona in personas[:3]:
             print(f"\n  {persona['name']} ({persona['title']})")
             print(f"    Experience: {persona['years_experience']} years")

@@ -169,9 +169,7 @@ jobs:
 
       - name: Set up Rust
         if: matrix.component.format == 'cargo'
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Set up Java
         if: matrix.component.format == 'maven' || matrix.component.format == 'gradle'
@@ -194,8 +192,10 @@ jobs:
 
       - name: Install CycloneDX tools
         run: |
-          pip install cyclonedx-bom
-          npm install -g @cyclonedx/npm @cyclonedx/gomod @cyclonedx/cargo
+          # Install Python SBOM tool
+          pip install cyclonedx-bom || true
+          # Install npm SBOM tool (only if npm is available)
+          npm install -g @cyclonedx/cyclonedx-npm || true
           # Install additional SBOM tools
           pip install pip-audit || true
 

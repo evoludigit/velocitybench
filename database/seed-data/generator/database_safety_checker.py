@@ -5,7 +5,6 @@ Database Safety Checker for Dataset Loading
 Validates database connectivity, schema, and available space before loading.
 """
 
-from typing import Tuple, List, Optional
 import logging
 
 try:
@@ -65,24 +64,23 @@ class DatabaseSafetyChecker:
             (is_ok: bool, message: str)
         """
         if not psycopg:
-            return (True, f"Schema check: ⊘ skipped (psycopg not installed)")
+            return (True, "Schema check: ⊘ skipped (psycopg not installed)")
 
         try:
             with psycopg.connect(
                 self.connection_string, connect_timeout=self.timeout_sec
-            ) as conn:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        f"SELECT 1 FROM information_schema.schemata WHERE schema_name = %s;",
-                        (schema,),
+            ) as conn, conn.cursor() as cur:
+                cur.execute(
+                    "SELECT 1 FROM information_schema.schemata WHERE schema_name = %s;",
+                    (schema,),
+                )
+                if cur.fetchone():
+                    return (True, f"Schema check: ✅ Schema '{schema}' exists")
+                else:
+                    return (
+                        False,
+                        f"Schema check: ❌ Schema '{schema}' does not exist",
                     )
-                    if cur.fetchone():
-                        return (True, f"Schema check: ✅ Schema '{schema}' exists")
-                    else:
-                        return (
-                            False,
-                            f"Schema check: ❌ Schema '{schema}' does not exist",
-                        )
         except Exception as e:
             return (False, f"Schema check: ❌ {e}")
 
@@ -105,7 +103,7 @@ class DatabaseSafetyChecker:
             ) as conn:
                 with conn.cursor() as cur:
                     cur.execute(
-                        f"""
+                        """
                         SELECT tablename, pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename))
                         FROM pg_tables
                         WHERE schemaname = %s
@@ -119,7 +117,7 @@ class DatabaseSafetyChecker:
                         sizes[tablename] = size
 
                     return (True, sizes)
-        except Exception as e:
+        except Exception:
             return (False, {})
 
     def check_available_disk_on_database(self) -> tuple[bool, str]:

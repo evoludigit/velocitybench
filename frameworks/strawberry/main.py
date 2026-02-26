@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
+
 """
 Async GraphQL Benchmarking Server for Strawberry with DataLoader
 Uses connection pooling and DataLoader to prevent N+1 queries.
@@ -14,7 +15,6 @@ Best practices implemented:
 - Field descriptions for GraphQL introspection
 """
 
-import asyncio
 import logging
 import os
 import sys
@@ -27,7 +27,6 @@ import strawberry
 from fastapi import FastAPI, Request
 from strawberry.dataloader import DataLoader
 from strawberry.fastapi import BaseContext, GraphQLRouter
-from strawberry.types import ExecutionResult
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from common.async_db import AsyncDatabase
@@ -62,7 +61,7 @@ async def load_users_batch(keys: list[str], db: AsyncDatabase) -> list[dict | No
         user_map = {str(user["id"]): user for user in result}
         # Return in the same order as keys
         return [user_map.get(key) for key in keys]
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.error(f"Timeout loading users: {keys}")
         return [None] * len(keys)
     except (asyncpg.PostgresError, KeyError, ValueError, TypeError) as e:
@@ -85,7 +84,7 @@ async def load_posts_batch(keys: list[str], db: AsyncDatabase) -> list[dict | No
         )
         post_map = {str(post["id"]): post for post in result}
         return [post_map.get(key) for key in keys]
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.error(f"Timeout loading posts: {keys}")
         return [None] * len(keys)
     except (asyncpg.PostgresError, KeyError, ValueError, TypeError) as e:
@@ -114,7 +113,7 @@ async def load_posts_by_author_batch(
         for post in result:
             posts_by_author[str(post["author_id"])].append(post)
         return [posts_by_author[key] for key in keys]
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.error(f"Timeout loading posts by author: {keys}")
         return [[] for _ in keys]
     except (asyncpg.PostgresError, KeyError, ValueError, TypeError) as e:
@@ -145,7 +144,7 @@ async def load_comments_by_post_batch(
         for comment in result:
             comments_by_post[str(comment["post_id"])].append(comment)
         return [comments_by_post[key] for key in keys]
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.error(f"Timeout loading comments by post: {keys}")
         return [[] for _ in keys]
     except (asyncpg.PostgresError, KeyError, ValueError, TypeError) as e:
@@ -238,9 +237,8 @@ class Post:
         self,
         info,
         limit: int = strawberry.field(default=50, description="Max 50 comments"),
-    ) -> list["Comment"]:
-        if limit > 50:
-            limit = 50  # Server-side limit
+    ) -> list[Comment]:
+        limit = min(limit, 50)  # Server-side limit
         try:
             comments_data = await info.context.comments_by_post_loader.load(
                 str(self.id)
@@ -285,8 +283,7 @@ class User:
         info,
         limit: int = strawberry.field(default=50, description="Max 50 posts"),
     ) -> list[Post]:
-        if limit > 50:
-            limit = 50  # Server-side limit
+        limit = min(limit, 50)  # Server-side limit
         try:
             posts_data = await info.context.posts_by_author_loader.load(str(self.id))
             return [
@@ -342,7 +339,7 @@ class Query:
         except ValueError as e:
             logger.warning(f"Invalid input for user query: {e}")
             raise
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(f"Timeout fetching user {id}")
             raise
         except (asyncpg.PostgresError, ConnectionError, OSError) as e:
@@ -357,10 +354,8 @@ class Query:
     ) -> list[User]:
         """Fetch a list of users with pagination."""
         try:
-            if limit > 100:
-                limit = 100  # Server-side limit
-            if limit < 1:
-                limit = 1
+            limit = min(limit, 100)  # Server-side limit
+            limit = max(limit, 1)
 
             db = info.context.db
             result = await db.fetch(
@@ -377,7 +372,7 @@ class Query:
                 )
                 for row in result
             ]
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(f"Timeout fetching users with limit {limit}")
             raise
         except (asyncpg.PostgresError, ConnectionError, OSError) as e:
@@ -418,7 +413,7 @@ class Query:
         except ValueError as e:
             logger.warning(f"Invalid input for post query: {e}")
             raise
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(f"Timeout fetching post {id}")
             raise
         except (asyncpg.PostgresError, ConnectionError, OSError) as e:
@@ -433,10 +428,8 @@ class Query:
     ) -> list[Post]:
         """Fetch a list of posts ordered by creation date (newest first)."""
         try:
-            if limit > 100:
-                limit = 100  # Server-side limit
-            if limit < 1:
-                limit = 1
+            limit = min(limit, 100)  # Server-side limit
+            limit = max(limit, 1)
 
             db = info.context.db
             result = await db.fetch(
@@ -461,7 +454,7 @@ class Query:
                 )
                 for row in result
             ]
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(f"Timeout fetching posts with limit {limit}")
             raise
         except (asyncpg.PostgresError, ConnectionError, OSError) as e:
@@ -507,7 +500,7 @@ class Query:
         except ValueError as e:
             logger.warning(f"Invalid input for comment query: {e}")
             raise
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(f"Timeout fetching comment {id}")
             raise
         except (asyncpg.PostgresError, ConnectionError, OSError) as e:
@@ -582,7 +575,7 @@ class Mutation:
         except ValueError as e:
             logger.warning(f"Invalid input for update_user mutation: {e}")
             raise
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(f"Timeout updating user {id}")
             raise
         except (asyncpg.PostgresError, ConnectionError, OSError) as e:

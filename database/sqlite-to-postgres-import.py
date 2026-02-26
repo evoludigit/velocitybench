@@ -227,7 +227,7 @@ def import_sqlite_to_postgres(db_name: str):
                     ),
                 )
                 comment_count += 1
-            except (ValueError, psycopg.Error) as e:
+            except (ValueError, psycopg.Error):
                 skipped_count += 1
                 continue
 

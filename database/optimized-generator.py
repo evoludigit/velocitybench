@@ -12,11 +12,11 @@ Usage:
     python database/optimized-generator.py [output_db_path] [vllm_endpoint]
 """
 
-import sqlite3
-import uuid
 import random
-import time
+import sqlite3
 import sys
+import time
+import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -340,7 +340,7 @@ Format: One title per line, no numbering""",
         results = []
 
         if not self.vllm_available:
-            return [f"Content for post. " * 50 for i in range(count)]
+            return ["Content for post. " * 50 for i in range(count)]
 
         for batch_start in range(0, count, batch_size):
             batch_count = min(batch_size, count - batch_start)
@@ -386,7 +386,7 @@ Separate each post with "---" on its own line.""",
         results = []
 
         if not self.vllm_available:
-            return [f"Great post! Thanks for sharing." for i in range(count)]
+            return ["Great post! Thanks for sharing." for i in range(count)]
 
         for batch_start in range(0, count, batch_size):
             batch_count = min(batch_size, count - batch_start)

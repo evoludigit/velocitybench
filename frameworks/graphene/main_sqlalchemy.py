@@ -4,7 +4,6 @@ Async GraphQL Benchmarking Server for Graphene with SQLAlchemy ORM
 Uses SQLAlchemy async ORM with aiodataloader for N+1 prevention.
 """
 
-import asyncio
 import json
 import os
 from datetime import datetime

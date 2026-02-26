@@ -6,7 +6,8 @@ request duration tracking, and slow query/request detection.
 
 import logging
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)

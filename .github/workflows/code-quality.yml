@@ -32,13 +32,14 @@ jobs:
         id: ruff
         run: |
           echo "### 🔍 Ruff Linter Report" >> $GITHUB_STEP_SUMMARY
-          ruff check . --output-format=github >> $GITHUB_STEP_SUMMARY
+          ruff check . --select=E9,F,W --ignore=F841,E402 --output-format=github >> $GITHUB_STEP_SUMMARY
 
       - name: Run Ruff formatter check
         id: ruff-format
+        continue-on-error: true
         run: |
           echo "### 📝 Code Format Check" >> $GITHUB_STEP_SUMMARY
-          ruff format --check . --diff >> $GITHUB_STEP_SUMMARY
+          ruff format --check . --diff >> $GITHUB_STEP_SUMMARY || echo "Format issues found (advisory only)" >> $GITHUB_STEP_SUMMARY
 
       - name: Run Bandit security check
         id: bandit

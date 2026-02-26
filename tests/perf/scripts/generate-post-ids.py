@@ -35,7 +35,7 @@ def generate_post_ids(count: int, output_path: str):
     """Fetch random post IDs from database and write to CSV."""
     conn_string = get_connection_string()
 
-    print(f"Connecting to database...")
+    print("Connecting to database...")
     print(f"Connection: {conn_string.replace(os.getenv('DATABASE_PASSWORD', 'benchmark123'), '***')}")
 
     try:

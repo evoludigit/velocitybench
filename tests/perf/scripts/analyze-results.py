@@ -4,9 +4,7 @@ Statistical Analysis Script for JMeter Results
 Calculates comprehensive statistics with confidence intervals and percentile distributions
 """
 
-import sys
 import json
-import csv
 import statistics
 from pathlib import Path
 from typing import Dict, List, Any, Optional

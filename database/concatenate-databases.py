@@ -61,7 +61,7 @@ def concatenate_databases(db1_path: str, db2_path: str, output_path: str):
             max_pk = cursor1.fetchone()[0] or 0
             pk_map[table] = max_pk
 
-        print(f"\nMax primary keys from first database:")
+        print("\nMax primary keys from first database:")
         for table, max_pk in pk_map.items():
             print(f"  {table}: {max_pk}")
 
@@ -109,16 +109,12 @@ def concatenate_databases(db1_path: str, db2_path: str, output_path: str):
                     if col[5] > 0:  # pk > 0 means primary key
                         pk_idx = i
                     # Check for UNIQUE constraints
-                    if table == "users" and col_name in [
+                    if (table == "users" and col_name in [
                         "id",
                         "identifier",
                         "email",
                         "username",
-                    ]:
-                        unique_indices[col_name] = i
-                    elif table == "posts" and col_name in ["id", "identifier"]:
-                        unique_indices[col_name] = i
-                    elif table == "comments" and col_name == "id":
+                    ]) or (table == "posts" and col_name in ["id", "identifier"]) or (table == "comments" and col_name == "id"):
                         unique_indices[col_name] = i
 
                 # Adjust rows

@@ -8,13 +8,13 @@ for performance, then re-enables them for testing.
 Timing results show how import performance scales with data volume.
 """
 
-import sqlite3
-import psycopg
-import sys
-import time
 import atexit
 import os
+import sqlite3
+import time
 from pathlib import Path
+
+import psycopg
 
 
 class BulkImporter:

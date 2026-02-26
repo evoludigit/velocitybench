@@ -1,7 +1,6 @@
 """Tests for Hasura GraphQL resolvers (integration test pattern)."""
 
 import pytest
-from uuid import UUID
 from test_factory import TestFactory, ValidationHelper, DataGenerator
 
 

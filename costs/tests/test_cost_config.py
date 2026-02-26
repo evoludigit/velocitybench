@@ -3,7 +3,6 @@
 import sys
 from pathlib import Path
 
-import pytest
 
 COSTS_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(COSTS_DIR))
@@ -12,8 +11,6 @@ from cost_config import (
     CostConfiguration,
     InstancePricing,
     DatabasePricing,
-    StoragePricing,
-    DataTransferPricing,
 )
 
 

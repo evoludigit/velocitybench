@@ -14,9 +14,7 @@ Usage:
 
 import argparse
 import asyncio
-import json
 import os
-import subprocess
 import sys
 import time
 from dataclasses import dataclass
@@ -616,10 +614,8 @@ def save_result(result: GenerationResult) -> bool:
 
     # Clean up markdown code fence wrapper if present
     content = result.content
-    if content.startswith("```markdown\n"):
-        content = content[len("```markdown\n") :]
-    if content.endswith("\n```"):
-        content = content[:-4]
+    content = content.removeprefix("```markdown\n")
+    content = content.removesuffix("\n```")
 
     with open(result.task.output_path, "w") as f:
         f.write(content)
@@ -638,7 +634,7 @@ async def run_parallel_generation(
         backend_tasks[backend].append(task)
 
     print(f"\n{'=' * 60}")
-    print(f"Parallel Blog Generation")
+    print("Parallel Blog Generation")
     print(f"{'=' * 60}")
     print(f"Total tasks: {len(tasks)}")
     for backend, btasks in backend_tasks.items():

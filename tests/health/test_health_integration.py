@@ -9,8 +9,6 @@ Tests validate:
 - Probe type differentiation
 """
 
-import asyncio
-import json
 from typing import Any, Dict, List
 
 import httpx

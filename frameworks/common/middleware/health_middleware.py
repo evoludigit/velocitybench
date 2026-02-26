@@ -8,7 +8,7 @@ HealthCheckManager without requiring framework-specific endpoint definitions.
 import asyncio
 import json
 import logging
-from typing import Any, Callable, Awaitable
+from typing import Any, Callable
 
 from ..health_check import HealthCheckManager
 from ..types import ProbeType

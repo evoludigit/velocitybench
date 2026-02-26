@@ -118,6 +118,6 @@ def wrap_database_error(
     import asyncio
 
     if isinstance(e, asyncio.TimeoutError):
-        return DatabaseTimeoutError(f"Database query timeout: {str(e)}")
+        return DatabaseTimeoutError(f"Database query timeout: {e!s}")
     else:
-        return DatabaseError(f"Database error: {str(e)}")
+        return DatabaseError(f"Database error: {e!s}")
