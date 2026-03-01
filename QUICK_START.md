@@ -1,191 +1,168 @@
-# VelocityBench Multi-Database Architecture - Quick Start
+# VelocityBench — Quick Start
 
-## TL;DR
-
-```bash
-# Setup isolated databases for all frameworks
-python database/setup.py
-
-# Run tests sequentially
-python scripts/run-benchmarks.py
-
-# View results
-cat benchmark-results.json
-open benchmark-results.html
-```
-
-## What's New
-
-✅ **schema-template.sql** - Universal Trinity Pattern schema (shared foundation)
-✅ **database/setup.py** - Automated per-framework database setup
-✅ **frameworks/{framework}/database/extensions.sql** - Framework-specific features
-✅ **scripts/run-benchmarks.py** - Sequential test harness
-✅ **POSTGRAPHILE_TEST_ARCHITECTURE.md** - Transaction isolation details
-✅ **DATABASE_ARCHITECTURE.md** - Full architecture design
-✅ **IMPLEMENTATION_GUIDE.md** - Detailed implementation guide
-
-## Architecture in One Picture
-
-```
-Before: 1 Shared Database (polluted)
-postgraphile_test
-└── benchmark schema
-    ├── tb_* (Trinity Pattern)
-    ├── v_* views (FraiseQL)
-    ├── tv_* views (FraiseQL)
-    ├── Smart tags (PostGraphile)
-    ├── Rails migrations
-    ├── Triggers and functions (FraiseQL)
-    └── Mix of 26 frameworks' features ❌
-
-After: Per-Framework Databases (isolated)
-postgraphile_test            fraiseql_test             rails_test
-└── benchmark schema         └── benchmark schema      └── benchmark schema
-    ├── tb_* only                ├── tb_*                  ├── tb_*
-    └── Smart tags               ├── v_* views             └── AR config
-                                 └── tv_* views
-                                 
-✅ Clean isolation ✅ No conflicts ✅ Fair benchmarks
-```
-
-## Core Concept: Trinity Pattern
-
-Every table follows this structure:
-```sql
-CREATE TABLE tb_user (
-    pk_user SERIAL PRIMARY KEY,   -- Internal, hidden
-    id UUID UNIQUE,                -- Public API identifier  
-    ... data ...
-);
-```
-
-Why? Performance + API safety + Framework agnostic
-
-## Quick Commands
-
-### Setup
-```bash
-# All frameworks
-python database/setup.py
-
-# Specific frameworks
-python database/setup.py postgraphile fraiseql
-```
-
-### Test
-```bash
-# All frameworks (sequential)
-python scripts/run-benchmarks.py
-
-# Specific frameworks
-python scripts/run-benchmarks.py postgraphile fraiseql
-```
-
-### Debug
-```bash
-# Check a framework's database
-psql postgresql://velocitybench:password@localhost/postgraphile_test
-
-# List tables
-\dt benchmark.*
-
-# View a table
-SELECT * FROM benchmark.tb_user LIMIT 5;
-
-# Test FraiseQL views
-SELECT * FROM benchmark.tv_user LIMIT 1;
-```
-
-## Files Structure
-
-```
-database/
-├── schema-template.sql        ← Universal foundation (Trinity Pattern only)
-└── setup.py                   ← Orchestration script
-
-frameworks/
-├── postgraphile/database/extensions.sql   ← Smart tags
-├── fraiseql/database/extensions.sql       ← v_*/tv_* views
-└── [24 more frameworks]/database/extensions.sql
-
-scripts/
-└── run-benchmarks.py          ← Sequential test runner
-
-docs/
-├── POSTGRAPHILE_TEST_ARCHITECTURE.md     ← Transaction isolation
-├── DATABASE_ARCHITECTURE.md               ← Full design
-├── IMPLEMENTATION_GUIDE.md                ← Detailed guide
-└── QUICK_START.md (this file)
-```
-
-## Environment Variables
-
-```bash
-# Database setup
-DB_HOST=localhost
-DB_PORT=5432
-DB_ADMIN_USER=postgres
-DB_ADMIN_PASSWORD=postgres
-DB_TEST_USER=velocitybench
-DB_TEST_PASSWORD=password
-
-# Test runner
-BENCHMARK_TIMEOUT=300          # Seconds per framework
-BENCHMARK_VERBOSE=false        # More output
-```
-
-## What Changed from Before
-
-| Aspect | Before | After |
-|--------|--------|-------|
-| Databases | 1 shared (postgraphile_test) | 26 isolated ({framework}_test) |
-| Schema | Mixed features | Trinity Pattern + extensions |
-| Testing | Parallel (contended) | Sequential (fair) |
-| Isolation | Table cleanup | Transaction rollback |
-| Extensions | Hard to manage | Per-framework files |
-
-## Next Steps
-
-1. **Test the setup**
-   ```bash
-   python database/setup.py postgraphile
-   psql postgresql://velocitybench:password@localhost/postgraphile_test
-   \d benchmark.tb_user  # Check smart tags
-   ```
-
-2. **Run a test**
-   ```bash
-   python scripts/run-benchmarks.py postgraphile
-   cat benchmark-results.json
-   ```
-
-3. **Add another framework**
-   ```bash
-   mkdir -p frameworks/fraiseql/database
-   python database/setup.py fraiseql
-   ```
-
-## Resources
-
-- **Full Architecture**: See `DATABASE_ARCHITECTURE.md`
-- **Setup Details**: See `IMPLEMENTATION_GUIDE.md`  
-- **Transaction Isolation**: See `POSTGRAPHILE_TEST_ARCHITECTURE.md`
-
-## Troubleshooting
-
-**Q: `psql: error: could not translate host name "localhost" to address`**
-A: PostgreSQL not running. Start it: `brew services start postgresql` (macOS)
-
-**Q: `permission denied` when running setup**
-A: Check `DB_TEST_USER` and `DB_TEST_PASSWORD` environment variables
-
-**Q: Tests timing out**
-A: Increase timeout: `BENCHMARK_TIMEOUT=600 python scripts/run-benchmarks.py`
-
-**Q: No test results**
-A: Check framework has test runner (package.json, requirements.txt, etc.)
+Everything you need to run your first benchmark in 15 minutes.
 
 ---
 
-**Architecture Design Completed**: 2026-01-10
-**Status**: Ready for implementation and testing
+## Prerequisites
+
+| Requirement | Version | Notes |
+|-------------|---------|-------|
+| Docker | 24+ | with Compose v2 |
+| RAM | 8 GB minimum | 16 GB recommended for full suite |
+| Disk | 15 GB free | containers + dataset |
+
+No other local tooling required — Python, Go, Rust, etc. all run inside Docker.
+
+---
+
+## 1. Clone and start the stack
+
+```bash
+git clone https://github.com/evoludigit/velocitybench.git
+cd velocitybench
+
+# Start PostgreSQL + all benchmark frameworks with a medium dataset
+# (10 000 users / 50 000 posts / 200 000 comments)
+make up-medium
+```
+
+This pulls and starts all containers. First run takes a few minutes to download images and seed the database.
+
+**Smaller dataset** (faster startup, less representative):
+```bash
+make up   # xs dataset — good for verifying setup
+```
+
+---
+
+## 2. Verify health (optional but recommended)
+
+```bash
+make smoke-test
+```
+
+This runs health checks and basic queries against all frameworks. Frameworks that fail will be reported — don't worry if some are unhealthy, not all are fully functional yet (see the status table in [README.md](README.md)).
+
+Quick status dashboard:
+```bash
+make status
+```
+
+---
+
+## 3. Run the benchmark
+
+```bash
+make bench-sequential
+```
+
+Each framework runs alone for 20 seconds (after a 5-second warmup), with a 5-second cooldown between them. Results are written to `reports/bench-sequential-YYYY-MM-DD.md` and `.json`.
+
+**Customise the run:**
+
+```bash
+# Fewer frameworks, quicker run (~5 min)
+make bench-sequential FRAMEWORKS="gin-rest actix-web-rest go-gqlgen async-graphql juniper"
+
+# Shorter measurement window
+make bench-sequential DURATION=10 CONCURRENCY=20
+
+# Single framework
+make bench-one FRAMEWORK=strawberry
+```
+
+---
+
+## 4. Read the results
+
+```bash
+cat reports/bench-sequential-$(date +%Y-%m-%d).md
+```
+
+Or open the `.json` file for programmatic processing. The Markdown report contains three tables (Q1, Q2, Q2b) and a cross-framework summary sorted by RPS.
+
+Previous runs are in `reports/archive/`.
+
+---
+
+## 5. Tear down
+
+```bash
+make down
+```
+
+---
+
+## Common Tasks
+
+### Check what frameworks are available
+
+```bash
+make framework-list
+```
+
+### Start / stop a single framework
+
+```bash
+make framework-start FRAMEWORK=fraiseql
+make framework-stop FRAMEWORK=fraiseql
+```
+
+### Run parity check (verify all frameworks return identical data)
+
+```bash
+make parity-test
+```
+
+### Run N+1 regression guard
+
+```bash
+make n1-guard
+```
+
+### Full pre-benchmark validation gate
+
+```bash
+make validate   # smoke-test + parity-test + n1-guard
+```
+
+---
+
+## Troubleshooting
+
+**Containers don't start / immediately exit**
+```bash
+docker compose logs <service-name>   # check specific container logs
+```
+
+**Seed data missing or incorrect row counts**
+```bash
+make test-seed
+```
+
+**A framework reports unhealthy**
+
+Check the known-broken list in [README.md](README.md). If it's not listed there, check its container logs:
+```bash
+docker compose logs <framework-name>
+```
+
+**Out of memory during benchmark**
+
+Reduce concurrency:
+```bash
+make bench-sequential CONCURRENCY=10
+```
+
+Or benchmark fewer frameworks at once.
+
+---
+
+## Next Steps
+
+- **Add a framework**: [docs/ADD_FRAMEWORK_GUIDE.md](docs/ADD_FRAMEWORK_GUIDE.md)
+- **Understand the methodology**: [docs/SCOPE_AND_LIMITATIONS.md](docs/SCOPE_AND_LIMITATIONS.md)
+- **Architecture deep-dive**: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- **Database schema**: [docs/DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md)
+- **All docs**: [docs/MASTER_INDEX.md](docs/MASTER_INDEX.md)

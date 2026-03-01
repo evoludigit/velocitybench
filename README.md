@@ -1,165 +1,178 @@
 # VelocityBench
 
-Comprehensive GraphQL & REST Framework Performance Benchmarking Suite
+GraphQL & REST framework performance benchmarks — 8 languages, reproducible methodology, real PostgreSQL data.
 
-**35 frameworks tested in CI** across 8 languages. Measure throughput, latency, and resources with publication-ready methodology.
-
-## Overview
-
-VelocityBench helps developers choose the right framework with real performance data.
-
-- ✅ 35 framework implementations tested in CI across 8 languages
-- ✅ 450+ comprehensive tests (schema, query, N+1, performance)
-- ✅ Production-ready health checks (Kubernetes-compatible probes)
-- ✅ Automated regression detection (statistical analysis)
-- ✅ Throughput, latency, and resource analysis
-- ✅ Multi-language support (Python, Node.js, Go, Java, Rust, PHP, Ruby, C#)
-- ✅ Publication-ready benchmarking methodology
-
-## ⚠️ Intended Use & Security Model
-
-VelocityBench is a **development and benchmarking tool**, optimized for:
-- Local framework performance evaluation
-- Architectural decision-making with real data
-- Educational learning about design patterns
-- Publication-ready benchmarking research
-
-**This is NOT a production service.** It intentionally includes:
-- Hardcoded test credentials (reduces setup friction)
-- No authentication (ensures "testable by anyone")
-- No rate limiting (measures true throughput)
-- Generated test data only (no sensitive information)
-
-**Security Assumptions:**
-- Runs on trusted local machines or private networks
-- Not exposed to the internet without additional security layers
-- All users have repository access (can modify code/queries)
-
-**Why This Design?** Adding production security features (authentication, rate limiting, TLS) would confound benchmark results with security overhead and defeat the core goal: enabling anyone to clone and benchmark frameworks fairly.
-
-**⚠️ Important:** If you expose `docker-compose` to the internet, you'll have an unauthenticated API. Don't do this. Instead, use VelocityBench locally for benchmarking, then implement production security separately.
-
-## Quick Start
-
-```bash
-# Clone repository
-git clone https://github.com/velocitybench/velocitybench.git
-cd velocitybench
-
-# Start all frameworks
-docker-compose up -d
-
-# Run integration tests
-./tests/integration/test-all-frameworks.sh
-
-# Execute performance suite
-make perf
-```
-
-## Documentation
-
-### Core Documentation
-- **[SCOPE_AND_LIMITATIONS.md](SCOPE_AND_LIMITATIONS.md)** - What we test and what we don't (benchmark methodology)
-- **[TESTING_STANDARDS.md](TESTING_STANDARDS.md)** - Universal testing standards and best practices
-- **[SECURITY.md](SECURITY.md)** - Security model and intended use
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - How to contribute to VelocityBench
-- **[docs/FRAMEWORK_SELECTION_GUIDE.md](docs/FRAMEWORK_SELECTION_GUIDE.md)** - Choose the right framework for your needs
-- **[docs/ADD_FRAMEWORK_GUIDE.md](docs/ADD_FRAMEWORK_GUIDE.md)** - Complete tutorial for adding new frameworks
-
-### Production Readiness
-- **[docs/HEALTH_CHECKS.md](docs/HEALTH_CHECKS.md)** - Health check implementation guide (Kubernetes probes)
-- **[docs/REGRESSION_DETECTION_GUIDE.md](docs/REGRESSION_DETECTION_GUIDE.md)** - Performance regression detection system
-- **[docs/DEPENDENCY_AUDIT_GUIDE.md](docs/DEPENDENCY_AUDIT_GUIDE.md)** - Security vulnerability scanning
-- **[docs/VERSIONING.md](docs/VERSIONING.md)** - Semantic versioning scheme and release process
-
-### Architecture & Design
-- **[docs/adr/](docs/adr/)** - Architecture Decision Records (12 ADRs)
-- **[docs/api/](docs/api/)** - API documentation and schema reference
-- **[docs/DOCKER_COMPOSE.md](docs/DOCKER_COMPOSE.md)** - Docker orchestration guide
-
-### Testing & Quality
-- **[testing-templates/](testing-templates/)** - Reusable test templates for all languages
-- **[docs/PYTEST_CONFIGURATION.md](docs/PYTEST_CONFIGURATION.md)** - Pytest configuration guide
-- **[docs/TEST_COVERAGE_VERIFICATION.md](docs/TEST_COVERAGE_VERIFICATION.md)** - Test infrastructure and coverage report
-- **[phase-plans/](phase-plans/)** - Implementation phases and roadmaps
-
-### Future Considerations
-- **[docs/SUBSCRIPTION_SUPPORT.md](docs/SUBSCRIPTION_SUPPORT.md)** - GraphQL subscriptions assessment
-
-## Frameworks Included
-
-### GraphQL Frameworks
-- Python: Strawberry, Graphene
-- TypeScript: Apollo Server, PostGraphile
-- Go: gqlgen
-- Rust: Async-graphql
-- PHP: Laravel (Lighthouse)
-- Ruby: Rails (GraphQL)
-
-### REST Frameworks
-- Python: FastAPI, Flask
-- TypeScript: Express.js
-- Go: gin, graphql-go
-- Java: Spring Boot
-- Rust: Actix
-- C#: .NET
-
-### Managed Services
-- Hasura (GraphQL)
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:
-- Adding new frameworks
-- Improving tests
-- Reporting issues
-- Code of conduct
-
-## License
-
-MIT License - See [LICENSE](LICENSE) for details
-
-## Community
-
-- **GitHub Issues**: Report bugs or suggest features
-- **Discussions**: Ask questions and share insights
-- **Twitter**: [@VelocityBench](https://twitter.com/velocitybench)
+> **Latest run**: February 2026 · sequential isolation · 40 workers · 20s per framework · dataset: 10 000 users / 50 000 posts / 200 000 comments
 
 ---
 
-**Status**: Beta (Health checks, regression detection, and comprehensive documentation complete)
-**Latest Release**: v0.2.0
-**Last Updated**: 2026-01-30
+## Results
 
-## Features
+Full tables: [reports/bench-sequential-2026-02-22.md](reports/bench-sequential-2026-02-22.md)
 
-### ✅ Benchmarking
-- 35 frameworks tested in CI across 8 languages (Python, TypeScript, Go, Rust, Java, PHP, Ruby, C#)
-- 45+ framework configurations (including ORM variations and N+1 demonstration patterns)
-- REST and GraphQL API benchmarking
-- Trinity Pattern database architecture (optimized for read-heavy workloads)
-- JMeter-based load testing with multiple workload profiles
+### Q1 — `users(limit: 20) { id username fullName }`
 
-### ✅ Quality Assurance
-- 6-dimensional QA testing (Schema, Query, N+1, Consistency, Config, Performance)
-- 450+ comprehensive tests across all frameworks
-- Automated CI/CD validation
+| Framework | Language | Type | RPS | p50 | p99 | Errors |
+|-----------|----------|------|----:|----:|----:|--------|
+| gin-rest | Go | REST | 5 850 | 6.6 ms | 11.6 ms | 0% |
+| actix-web-rest | Rust | REST | 5 501 | 7.0 ms | 12.0 ms | 0% |
+| go-gqlgen | Go | GraphQL | 5 019 | 7.7 ms | 13.4 ms | 0% |
+| quarkus-graphql | Java | GraphQL | 4 913 | 7.5 ms | 20.7 ms | 0% |
+| spring-boot-orm | Java | REST | 4 693 | 7.7 ms | 20.1 ms | 0% |
+| mercurius | Node.js | GraphQL | 4 681 | 7.6 ms | 14.8 ms | 0% |
+| juniper | Rust | GraphQL | 4 658 | 8.3 ms | 15.0 ms | 0% |
+| async-graphql | Rust | GraphQL | 4 038 | 8.7 ms | 29.8 ms | 0% |
+| fastapi-rest | Python | REST | 1 707 | 12.9 ms | 21.2 ms | 47% |
+| strawberry | Python | GraphQL | 906 | 42.3 ms | 53.1 ms | 0% |
+| webonyx-graphql-php | PHP | GraphQL | 63 | 644 ms | 813 ms | 0% |
 
-### ✅ Production Observability
-- Kubernetes-compatible health checks (liveness, readiness, startup probes)
-- Standardized health check libraries for all languages
-- Database connectivity and memory monitoring
+### Q2b — `posts(limit: 10) { id title author { username fullName } }` (nested join)
 
-### ✅ Performance Analysis
-- Automated regression detection with statistical analysis
-- Baseline management and versioning
-- Multiple output formats (CLI, JSON, Markdown for PR comments)
-- Configurable thresholds and severity levels
+| Framework | Language | Type | RPS | p50 | p99 | Errors |
+|-----------|----------|------|----:|----:|----:|--------|
+| actix-web-rest | Rust | REST | 5 752 | 6.6 ms | 14.2 ms | 0% |
+| juniper | Rust | GraphQL | 3 417 | 11.5 ms | 16.6 ms | 0% |
+| quarkus-graphql | Java | GraphQL | 3 414 | 11.0 ms | 25.3 ms | 0% |
+| async-graphql | Rust | GraphQL | 2 992 | 11.8 ms | 34.2 ms | 0% |
+| gin-rest | Go | REST | 2 881 | 12.8 ms | 33.3 ms | 0% |
+| strawberry | Python | GraphQL | 431 | 54.5 ms | 70.1 ms | 78% |
 
-### ✅ Documentation
-- 12 Architecture Decision Records (ADRs)
-- Comprehensive implementation guides
-- API documentation and schema reference
-- Security model documentation
+> **Not included in summary:** apollo-server, express-rest, flask-rest, ruby-rails, ariadne, graphene, and several others did not become healthy in this run. Contributions to fix them are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-For more information, see [docs/](docs/)
+---
+
+## What We Benchmark
+
+Three query scenarios on a shared PostgreSQL dataset, each revealing different characteristics:
+
+| Scenario | Query | What it tests |
+|----------|-------|---------------|
+| **Q1** | `users(limit: 20) { id username fullName }` | Simple list read |
+| **Q2** | `posts(limit: 10) { id title }` | Simple list, different table |
+| **Q2b** | `posts(limit: 10) { id title author { … } }` | Nested join — exposes N+1 risks |
+
+**Metrics**: RPS (requests per second), p50 / p95 / p99 latency, error rate.
+
+**Method**: Sequential isolation — each framework runs alone against PostgreSQL. No resource contention between frameworks. Each scenario runs for 20 seconds after a 5-second warmup.
+
+---
+
+## Running the Benchmarks
+
+### Requirements
+
+| Requirement | Minimum | Recommended |
+|-------------|---------|-------------|
+| RAM | 8 GB | 16 GB |
+| Disk | 15 GB free | 25 GB |
+| Docker | 24+ | latest |
+| Time | ~20 min (subset) | ~60 min (full suite) |
+
+### Quick start
+
+```bash
+git clone https://github.com/evoludigit/velocitybench.git
+cd velocitybench
+
+# Start PostgreSQL + seed medium dataset (10K users, 50K posts, 200K comments)
+make up-medium
+
+# Optional: verify frameworks are healthy before benchmarking
+make smoke-test
+
+# Run the canonical sequential benchmark
+make bench-sequential
+
+# Results are written to reports/bench-sequential-YYYY-MM-DD.md
+```
+
+### Partial run (faster)
+
+```bash
+# Test a subset of frameworks
+make bench-sequential FRAMEWORKS="gin-rest actix-web-rest go-gqlgen async-graphql"
+
+# Shorter measurement window (10s instead of 20s)
+make bench-sequential DURATION=10 CONCURRENCY=20
+```
+
+### Benchmark a single framework
+
+```bash
+make bench-one FRAMEWORK=strawberry
+```
+
+### Tear down
+
+```bash
+make down
+```
+
+---
+
+## Frameworks
+
+### GraphQL
+
+| Framework | Language | Status |
+|-----------|----------|--------|
+| async-graphql | Rust | ✅ |
+| juniper | Rust | ✅ |
+| go-gqlgen | Go | ✅ |
+| mercurius | Node.js | ✅ |
+| quarkus-graphql | Java | ✅ |
+| strawberry | Python | ✅ |
+| fraiseql | Python | ✅ |
+| apollo-server | Node.js | ⚠️ needs fix |
+| graphene | Python | ⚠️ needs fix |
+| ariadne | Python | ⚠️ needs fix |
+| webonyx-graphql-php | PHP | ✅ |
+| ruby-rails (graphql-ruby) | Ruby | ⚠️ needs fix |
+| hasura | — | managed |
+
+### REST
+
+| Framework | Language | Status |
+|-----------|----------|--------|
+| gin-rest | Go | ✅ |
+| actix-web-rest | Rust | ✅ |
+| spring-boot-orm | Java | ✅ |
+| fastapi-rest | Python | ⚠️ high error rate |
+| flask-rest | Python | ⚠️ needs fix |
+| express-rest | Node.js | ⚠️ needs fix |
+| csharp-dotnet | C# | ⚠️ needs fix |
+
+---
+
+## Security Model
+
+VelocityBench is a **local benchmarking tool**, not a production service. It uses hardcoded test credentials, no authentication, and no rate limiting — intentionally, to remove overhead that would confound results.
+
+**Do not expose the Docker Compose stack to the internet.**
+
+See [SECURITY.md](SECURITY.md) for the full security model.
+
+---
+
+## Contributing
+
+- **Fix a broken framework**: see the ⚠️ entries above — PRs welcome
+- **Add a new framework**: see [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/ADD_FRAMEWORK_GUIDE.md](docs/ADD_FRAMEWORK_GUIDE.md)
+- **Improve methodology**: open an issue to discuss before implementing
+
+---
+
+## Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [CONTRIBUTING.md](CONTRIBUTING.md) | How to add frameworks or fix issues |
+| [DEVELOPMENT.md](DEVELOPMENT.md) | Local dev setup, architecture details |
+| [SECURITY.md](SECURITY.md) | Security model and intended use |
+| [docs/ADD_FRAMEWORK_GUIDE.md](docs/ADD_FRAMEWORK_GUIDE.md) | Step-by-step guide to add a new framework |
+| [docs/FRAMEWORK_SELECTION_GUIDE.md](docs/FRAMEWORK_SELECTION_GUIDE.md) | How to choose a framework for your project |
+| [docs/adr/](docs/adr/) | Architecture Decision Records |
+
+---
+
+**Version**: v0.2.0 · **License**: MIT

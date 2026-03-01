@@ -94,7 +94,6 @@ velocitybench/
 ├── docker-compose.yml          # Multi-container orchestration
 ├── README.md                   # Project overview
 ├── DEVELOPMENT.md              # This file
-├── VLLM_SETUP.md              # vLLM configuration
 └── .github/workflows/         # CI/CD pipeline
 ```
 
@@ -648,7 +647,7 @@ pytest --pdb tests/  # Drops to pdb on failure
 ## Resources
 
 - **[README.md](README.md)** - Project overview
-- **[SCOPE_AND_LIMITATIONS.md](SCOPE_AND_LIMITATIONS.md)** - Benchmark methodology
+- **[SCOPE_AND_LIMITATIONS.md](docs/SCOPE_AND_LIMITATIONS.md)** - Benchmark methodology
 - **[docs/README_ARCHITECTURE.md](docs/README_ARCHITECTURE.md)** - Architecture guide
 - **[tests/qa/](tests/qa/)** - Integration validators
 - **[Makefile](Makefile)** - All available commands

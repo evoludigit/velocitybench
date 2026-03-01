@@ -44,7 +44,7 @@ Each framework implementation must provide endpoints for querying a standardized
 ### Knowledge
 - Your framework's basic setup (how to create a project, add dependencies, run locally)
 - Understanding of the Trinity Pattern schema (see [docs/api/SCHEMA.md](../docs/api/SCHEMA.md))
-- Understanding of VelocityBench API specifications (see [docs/api/REST.md](../docs/api/REST.md) and [docs/api/GraphQL.md](../docs/api/GraphQL.md))
+- Understanding of VelocityBench API specifications (see [docs/api/REST.md](../docs/api/REST.md) and [docs/api/GRAPHQL.md](../docs/api/GRAPHQL.md))
 
 ### Time Required
 - **REST framework**: 3-4 hours
@@ -316,7 +316,7 @@ type Mutation {
 }
 ```
 
-See [docs/api/GraphQL.md](../docs/api/GraphQL.md) for full specification.
+See [docs/api/GRAPHQL.md](../docs/api/GRAPHQL.md) for full specification.
 
 ### 2d. Database Connection
 
