@@ -92,7 +92,7 @@ services:
     ports:
       - "9187:9187"
     environment:
-      DATA_SOURCE_NAME: "postgresql://benchmark:benchmark@postgres:5432/fraiseql_benchmark?sslmode=disable"
+      DATA_SOURCE_NAME: "postgresql://benchmark:benchmark@postgres:5432/velocitybench_benchmark?sslmode=disable"
     networks:
       - fraiseql-benchmark
     restart: unless-stopped

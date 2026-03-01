@@ -1,7 +1,7 @@
 # Validation configuration and thresholds
 
 database:
-  url: postgresql://benchmark:benchmark123@localhost:5434/fraiseql_benchmark
+  url: postgresql://benchmark:benchmark123@localhost:5434/velocitybench_benchmark
   test_user_id: "{{WILL_BE_FETCHED}}"  # Fetch first user from database
   test_post_id: "{{WILL_BE_FETCHED}}"
   test_comment_id: "{{WILL_BE_FETCHED}}"

@@ -410,7 +410,7 @@ def main():
         epilog="""
 Examples:
   python seed-generator.py --preset large
-  python seed-generator.py --preset large --db postgresql://user:pass@localhost:5432/fraiseql_benchmark
+  python seed-generator.py --preset large --db postgresql://user:pass@localhost:5432/velocitybench_benchmark
   python seed-generator.py --preset xlarge --seed 12345
         """,
     )
