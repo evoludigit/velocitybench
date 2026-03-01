@@ -39,6 +39,9 @@ RUN cp .env.example .env || true
 # Generate application key if not exists
 RUN php artisan key:generate --no-interaction || true
 
+# Cache configuration for faster startup
+RUN php artisan config:cache --no-interaction || true
+
 # Build stage complete
 FROM base AS production
 

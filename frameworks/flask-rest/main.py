@@ -178,7 +178,7 @@ def init_pool() -> ConnectionPool:
     conninfo = psycopg.conninfo.make_conninfo(
         host=os.getenv("DB_HOST", "postgres"),
         port=int(os.getenv("DB_PORT", "5432")),
-        dbname=os.getenv("DB_NAME", "fraiseql_benchmark"),
+        dbname=os.getenv("DB_NAME", "velocitybench_benchmark"),
         user=os.getenv("DB_USER", "benchmark"),
         password=password,
     )

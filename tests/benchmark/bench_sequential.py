@@ -113,13 +113,13 @@ FRAMEWORKS: dict[str, dict] = {
         "language": "Go",
         "category": "graphql",
         "queries": {
-            "Q1": ("http://localhost:8010/graphql", _GQL_Q1),
-            "Q2": ("http://localhost:8010/graphql", _GQL_Q2),
-            "Q2b": ("http://localhost:8010/graphql", _GQL_Q2b),
+            "Q1": ("http://localhost:4010/graphql", _GQL_Q1),
+            "Q2": ("http://localhost:4010/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:4010/graphql", _GQL_Q2b),
             "Q3": None,  # Q3: comments query not implemented
             "M1": "M1",  # resolved at runtime with discovered user UUID
         },
-        "health_url": "http://localhost:8010/health",
+        "health_url": "http://localhost:4010/health",
     },
     "gin-rest": {
         "compose_service": "gin-rest",
@@ -215,11 +215,11 @@ FRAMEWORKS: dict[str, dict] = {
         "language": "Node.js",
         "category": "graphql",
         "queries": {
-            "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
-            "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
-            "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
+            "Q1": ("http://localhost:4010/graphql", _GQL_Q1),
+            "Q2": ("http://localhost:4010/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:4010/graphql", _GQL_Q2b),
         },
-        "health_url": "http://localhost:4000/health",
+        "health_url": "http://localhost:4010/health",
     },
     "graphql-yoga": {
         "compose_service": "graphql-yoga",
@@ -227,11 +227,11 @@ FRAMEWORKS: dict[str, dict] = {
         "language": "Node.js",
         "category": "graphql",
         "queries": {
-            "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
-            "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
-            "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
+            "Q1": ("http://localhost:4012/graphql", _GQL_Q1),
+            "Q2": ("http://localhost:4012/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:4012/graphql", _GQL_Q2b),
         },
-        "health_url": "http://localhost:4000/health",
+        "health_url": "http://localhost:4012/health",
     },
     "mercurius": {
         "compose_service": "mercurius",
@@ -239,11 +239,11 @@ FRAMEWORKS: dict[str, dict] = {
         "language": "Node.js",
         "category": "graphql",
         "queries": {
-            "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
-            "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
-            "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
+            "Q1": ("http://localhost:4008/graphql", _GQL_Q1),
+            "Q2": ("http://localhost:4008/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:4008/graphql", _GQL_Q2b),
         },
-        "health_url": "http://localhost:4000/health",
+        "health_url": "http://localhost:4008/health",
     },
     # ------------------------------------------------------------------
     # Python frameworks

@@ -41,4 +41,4 @@ EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
     CMD wget -qO- http://localhost:4000/health || exit 1
 
-CMD ["bin/play-graphql", "-Dplay.http.secret.key=${APPLICATION_SECRET}"]
+CMD ["sh", "-c", "bin/play-graphql -Dplay.http.secret.key=${APPLICATION_SECRET:-benchmark-secret-key}"]
