@@ -17,7 +17,7 @@ impl Database {
         );
         pg_config.user(&env::var("DB_USER").unwrap_or_else(|_| "benchmark".to_string()));
         pg_config.password(&env::var("DB_PASSWORD").unwrap_or_else(|_| "benchmark123".to_string()));
-        pg_config.dbname(&env::var("DB_NAME").unwrap_or_else(|_| "fraiseql_benchmark".to_string()));
+        pg_config.dbname(&env::var("DB_NAME").unwrap_or_else(|_| "velocitybench_benchmark".to_string()));
 
         let mgr_config = ManagerConfig {
             recycling_method: RecyclingMethod::Fast,

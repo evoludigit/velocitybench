@@ -6,11 +6,11 @@ ENV TMPDIR=/data/tmp
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 COPY tsconfig.json ./
 COPY src ./src
-RUN npm run build
+RUN npm run build && test -f dist/index.js || (echo "TypeScript build failed: dist/index.js missing" && exit 1)
 RUN npm prune --production
 
 EXPOSE 4002

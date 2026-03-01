@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Gemfile and install dependencies
-COPY Gemfile Gemfile.lock* ./
+COPY Gemfile Gemfile.lock ./
 RUN bundle config set --local path 'vendor/bundle' && \
     bundle config set --local without 'development test' && \
     bundle install --jobs 4

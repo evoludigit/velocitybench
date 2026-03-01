@@ -18,7 +18,7 @@ func Init() error {
 		getEnv("DB_PASSWORD", "benchmark123"),
 		getEnv("DB_HOST", "postgres"),
 		getEnv("DB_PORT", "5432"),
-		getEnv("DB_NAME", "fraiseql_benchmark"),
+		getEnv("DB_NAME", "velocitybench_benchmark"),
 	)
 
 	config, err := pgxpool.ParseConfig(connStr)

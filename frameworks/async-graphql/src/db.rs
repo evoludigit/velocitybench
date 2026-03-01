@@ -14,7 +14,7 @@ impl Database {
             .parse()?);
         pg_config.user(std::env::var("DATABASE_USER").unwrap_or_else(|_| "benchmark".to_string()));
         pg_config.password(std::env::var("DATABASE_PASSWORD").unwrap_or_else(|_| "benchmark123".to_string()));
-        pg_config.dbname(std::env::var("DATABASE_NAME").unwrap_or_else(|_| "fraiseql_benchmark".to_string()));
+        pg_config.dbname(std::env::var("DATABASE_NAME").unwrap_or_else(|_| "velocitybench_benchmark".to_string()));
 
         let mgr_config = ManagerConfig {
             recycling_method: RecyclingMethod::Fast,

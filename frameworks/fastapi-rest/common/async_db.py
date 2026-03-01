@@ -120,7 +120,7 @@ class AsyncDatabase:
         # Get connection parameters from args or environment
         host = host or os.getenv("DB_HOST", "postgres")
         port = port or int(os.getenv("DB_PORT", "5432"))
-        database = database or os.getenv("DB_NAME", "fraiseql_benchmark")
+        database = database or os.getenv("DB_NAME", "velocitybench_benchmark")
         user = user or os.getenv("DB_USER", "benchmark")
 
         # Password is REQUIRED - fail fast if not provided

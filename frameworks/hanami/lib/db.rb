@@ -12,7 +12,7 @@ module VelocityBench
           adapter: "postgres",
           host: ENV.fetch("DB_HOST", "localhost"),
           port: ENV.fetch("DB_PORT", "5432").to_i,
-          database: ENV.fetch("DB_NAME", "fraiseql_benchmark"),
+          database: ENV.fetch("DB_NAME", "velocitybench_benchmark"),
           user: ENV.fetch("DB_USER", "benchmark"),
           password: ENV.fetch("DB_PASSWORD", "benchmark123"),
           max_connections: ENV.fetch("DB_POOL_MAX", "50").to_i,

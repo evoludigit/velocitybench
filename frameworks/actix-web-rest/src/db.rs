@@ -12,7 +12,7 @@ pub fn create_pool() -> DbPool {
         cfg.url = Some(db_url);
     } else {
         // Use individual environment variables (for docker-compose)
-        cfg.dbname = Some(env::var("DB_NAME").unwrap_or_else(|_| "fraiseql_benchmark".to_string()));
+        cfg.dbname = Some(env::var("DB_NAME").unwrap_or_else(|_| "velocitybench_benchmark".to_string()));
         cfg.user = Some(env::var("DB_USER").unwrap_or_else(|_| "benchmark".to_string()));
         cfg.password = Some(env::var("DB_PASSWORD").unwrap_or_else(|_| "benchmark123".to_string()));
         cfg.host = Some(env::var("DB_HOST").unwrap_or_else(|_| "localhost".to_string()));

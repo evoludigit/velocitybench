@@ -5,7 +5,7 @@ spring:
     active: ${SPRING_PROFILES_ACTIVE:development}
 
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5434}/${DB_NAME:fraiseql_benchmark}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5434}/${DB_NAME:velocitybench_benchmark}
     username: ${DB_USER:benchmark}
     password: ${DB_PASSWORD:benchmark123}
     driver-class-name: org.postgresql.Driver

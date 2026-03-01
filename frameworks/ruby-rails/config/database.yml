@@ -12,7 +12,7 @@ default: &default
 
 development:
   <<: *default
-  database: fraiseql_benchmark
+  database: velocitybench_benchmark
 
 test:
   <<: *default
@@ -20,4 +20,4 @@ test:
 
 production:
   <<: *default
-  database: <%= ENV['DB_NAME'] || 'fraiseql_benchmark' %>
+  database: <%= ENV['DB_NAME'] || 'velocitybench_benchmark' %>
