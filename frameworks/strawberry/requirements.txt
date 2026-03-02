@@ -6,7 +6,7 @@ fastapi==0.104.1
 uvicorn[standard]==0.24.0
 
 # GraphQL Framework (with Pydantic v2 support)
-strawberry-graphql[fastapi]==0.250.0
+strawberry-graphql[fastapi]==0.307.1
 pydantic==2.10.0
 
 # Database
