@@ -21,7 +21,7 @@ jobs:
       matrix:
         framework: [strawberry, graphene, fastapi-rest, flask-rest, ariadne, asgi-graphql]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -61,7 +61,7 @@ jobs:
       matrix:
         framework: [apollo-server, express-rest, express-orm, apollo-orm, express-graphql, graphql-yoga, mercurius, postgraphile]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -105,7 +105,7 @@ jobs:
       matrix:
         framework: [go-gqlgen, gin-rest, go-graphql-go, graphql-go]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Go
         uses: actions/setup-go@v6
@@ -138,7 +138,7 @@ jobs:
       matrix:
         framework: [java-spring-boot, spring-boot-orm, spring-boot-orm-naive]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Java
         uses: actions/setup-java@v5
@@ -177,7 +177,7 @@ jobs:
             build-tool: sbt
             java-version: '17'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Java
         uses: actions/setup-java@v5
@@ -227,7 +227,7 @@ jobs:
       matrix:
         framework: [async-graphql, actix-web-rest, juniper]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
@@ -257,7 +257,7 @@ jobs:
       matrix:
         framework: [php-laravel, webonyx-graphql-php]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
@@ -309,7 +309,7 @@ jobs:
       matrix:
         framework: [ruby-rails, hanami]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
@@ -341,7 +341,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -381,7 +381,7 @@ jobs:
       matrix:
         framework: [csharp-dotnet]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up .NET
         uses: actions/setup-dotnet@v3
@@ -417,7 +417,7 @@ jobs:
     runs-on: ubuntu-latest
     if: always()
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Check framework test results
         run: |
@@ -505,7 +505,7 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -543,7 +543,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Python
         uses: actions/setup-python@v6
