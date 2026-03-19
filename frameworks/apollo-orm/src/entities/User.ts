@@ -29,15 +29,4 @@ export class User {
 
   @OneToMany('Comment', 'author')
   comments?: any[];
-
-  @ManyToMany('User', 'followers')
-  @JoinTable({
-    name: 'benchmark.tb_user_follows',
-    joinColumn: { name: 'fk_following', referencedColumnName: 'pk_user' },
-    inverseJoinColumn: { name: 'fk_follower', referencedColumnName: 'pk_user' }
-  })
-  followers?: any[];
-
-  @ManyToMany('User', 'following')
-  following?: any[];
 }

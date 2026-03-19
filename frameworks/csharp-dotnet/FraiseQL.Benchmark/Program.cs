@@ -30,11 +30,13 @@ builder.Services.AddAutoMapper(typeof(MappingProfile));
 builder.Services
     .AddGraphQLServer()
     .AddQueryType<Query>()
+    .AddMutationType<Mutation>()
     .AddType<UserType>()
     .AddType<PostType>()
     .AddType<CommentType>()
     .AddType<PostResolvers>()
-    .AddType<CommentResolvers>();
+    .AddType<CommentResolvers>()
+    .ModifyRequestOptions(o => o.IncludeExceptionDetails = true);
 
 var app = builder.Build();
 

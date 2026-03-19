@@ -28,11 +28,12 @@ class UserRepository @Inject()(database: Database) {
 
     val conn = database.getConnection
     try {
-      val placeholders = pks.map(_ => "?").mkString(",")
+      val pkSeq = pks.toSeq
+      val placeholders = Seq.fill(pkSeq.size)("?").mkString(",")
       val stmt = conn.prepareStatement(
         s"SELECT pk_user, id, username, full_name, bio, created_at, updated_at FROM tb_user WHERE pk_user IN ($placeholders)"
       )
-      pks.zipWithIndex.foreach { case (pk, idx) => stmt.setInt(idx + 1, pk) }
+      pkSeq.zipWithIndex.foreach { case (pk, idx) => stmt.setInt(idx + 1, pk) }
       val rs = stmt.executeQuery()
       val result = mutable.Map[Int, User]()
       while (rs.next()) {

@@ -7,13 +7,11 @@ export const pool = new Pool({
   port: parseInt(process.env.DB_PORT || '5432'),
   database: process.env.DB_NAME || 'velocitybench_benchmark',
   user: process.env.DB_USER || 'benchmark',
-  password: process.env.DB_PASSWORD || 'benchmark123',
+  password: process.env.DB_PASSWORD ?? (() => { throw new Error('DB_PASSWORD env var is required'); })(),
   // Connection pool settings
   max: 50,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
-  // Statement caching
-  statement_timeout: 30000,
 });
 
 // Graceful shutdown

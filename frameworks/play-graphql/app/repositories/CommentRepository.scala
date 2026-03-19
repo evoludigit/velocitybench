@@ -13,7 +13,8 @@ class CommentRepository @Inject()(database: Database) {
 
     val conn = database.getConnection
     try {
-      val placeholders = postPks.map(_ => "?").mkString(",")
+      val postPkSeq = postPks.toSeq
+      val placeholders = Seq.fill(postPkSeq.size)("?").mkString(",")
       val sql =
         s"""SELECT * FROM (
            |  SELECT pk_comment, id, fk_post, fk_author, content, created_at, updated_at,
@@ -23,8 +24,8 @@ class CommentRepository @Inject()(database: Database) {
            |ORDER BY fk_post, pk_comment""".stripMargin
 
       val stmt = conn.prepareStatement(sql)
-      postPks.zipWithIndex.foreach { case (pk, idx) => stmt.setInt(idx + 1, pk) }
-      stmt.setInt(postPks.size + 1, limit)
+      postPkSeq.zipWithIndex.foreach { case (pk, idx) => stmt.setInt(idx + 1, pk) }
+      stmt.setInt(postPkSeq.size + 1, limit)
 
       val rs = stmt.executeQuery()
       val result = mutable.Map[Int, mutable.Buffer[Comment]]()

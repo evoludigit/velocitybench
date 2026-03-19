@@ -10,14 +10,11 @@ export const AppDataSource = new DataSource({
   port: parseInt(process.env.DB_PORT || '5432'),
   database: process.env.DB_NAME || 'velocitybench_benchmark',
   username: process.env.DB_USER || 'benchmark',
-  password: process.env.DB_PASSWORD || 'benchmark123',
+  password: process.env.DB_PASSWORD ?? (() => { throw new Error('DB_PASSWORD env var is required'); })(),
   entities: [User, Post, Comment],
   synchronize: false, // Don't auto-create tables, use existing schema
   logging: false,
-  poolSize: 10,
-  extra: {
-    statement_timeout: 30000,
-  },
+  poolSize: 50,
 });
 
 // Initialize database connection

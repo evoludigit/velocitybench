@@ -29,4 +29,16 @@ public class UserRepository : IUserRepository
             .Take(size)
             .ToListAsync();
     }
+
+    public async Task<User?> UpdateAsync(Guid id, string? bio)
+    {
+        if (bio is null)
+            return await GetByIdAsync(id);
+
+        var affected = await _context.Users
+            .Where(u => u.Id == id)
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.Bio, bio));
+
+        return affected > 0 ? await GetByIdAsync(id) : null;
+    }
 }

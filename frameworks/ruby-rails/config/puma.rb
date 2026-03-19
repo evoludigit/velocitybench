@@ -20,6 +20,11 @@ workers ENV.fetch('WEB_CONCURRENCY', 1)
 # Preload the application for better performance
 preload_app!
 
+# Re-establish database connections in each worker after fork
+on_worker_boot do
+  ActiveRecord::Base.establish_connection if defined?(ActiveRecord)
+end
+
 # Restart workers after this many requests (helps with memory leaks)
 worker_timeout 3600 if ENV.fetch('RAILS_ENV', 'development') == 'development'
 

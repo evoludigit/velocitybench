@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "bundler/setup"
-require "hanami"
 require "hanami/router"
 require "sequel"
 require "graphql"
@@ -19,10 +18,6 @@ require_relative "../app/actions/health_action"
 require_relative "../app/actions/metrics_action"
 
 module Hanami
-  class App < Hanami::App
-    config.root = File.expand_path("..", __dir__)
-  end
-
   def self.app
     @app ||= Hanami::Router.new do
       post "/graphql", to: Actions::GraphqlAction.new

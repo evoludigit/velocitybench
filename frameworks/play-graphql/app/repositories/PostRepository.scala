@@ -28,11 +28,12 @@ class PostRepository @Inject()(database: Database) {
 
     val conn = database.getConnection
     try {
-      val placeholders = pks.map(_ => "?").mkString(",")
+      val pkSeq = pks.toSeq
+      val placeholders = Seq.fill(pkSeq.size)("?").mkString(",")
       val stmt = conn.prepareStatement(
         s"SELECT pk_post, id, fk_author, title, content, created_at, updated_at FROM tb_post WHERE pk_post IN ($placeholders)"
       )
-      pks.zipWithIndex.foreach { case (pk, idx) => stmt.setInt(idx + 1, pk) }
+      pkSeq.zipWithIndex.foreach { case (pk, idx) => stmt.setInt(idx + 1, pk) }
       val rs = stmt.executeQuery()
       val result = mutable.Map[Int, Post]()
       while (rs.next()) {
@@ -50,7 +51,8 @@ class PostRepository @Inject()(database: Database) {
 
     val conn = database.getConnection
     try {
-      val placeholders = authorPks.map(_ => "?").mkString(",")
+      val authorPkSeq = authorPks.toSeq
+      val placeholders = Seq.fill(authorPkSeq.size)("?").mkString(",")
       val sql =
         s"""SELECT * FROM (
            |  SELECT pk_post, id, fk_author, title, content, created_at, updated_at,
@@ -60,8 +62,8 @@ class PostRepository @Inject()(database: Database) {
            |ORDER BY fk_author, pk_post""".stripMargin
 
       val stmt = conn.prepareStatement(sql)
-      authorPks.zipWithIndex.foreach { case (pk, idx) => stmt.setInt(idx + 1, pk) }
-      stmt.setInt(authorPks.size + 1, limit)
+      authorPkSeq.zipWithIndex.foreach { case (pk, idx) => stmt.setInt(idx + 1, pk) }
+      stmt.setInt(authorPkSeq.size + 1, limit)
 
       val rs = stmt.executeQuery()
       val result = mutable.Map[Int, mutable.Buffer[Post]]()

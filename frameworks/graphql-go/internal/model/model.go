@@ -14,6 +14,7 @@ type Post struct {
 	Title     string  `json:"title"`
 	Content   *string `json:"content,omitempty"`
 	AuthorID  string  `json:"-"` // Internal: for dataloader
+	Author    *User   `json:"-"` // pre-loaded from JOIN in posts resolver
 	CreatedAt string  `json:"createdAt"`
 }
 

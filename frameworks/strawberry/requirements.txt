@@ -2,8 +2,8 @@
 # Updated for latest stable versions with pytest-asyncio 1.0+
 
 # Web Framework
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
 
 # GraphQL Framework (with Pydantic v2 support)
 strawberry-graphql[fastapi]==0.250.0

@@ -6,7 +6,7 @@ export const sequelize = new Sequelize({
   port: parseInt(process.env.DB_PORT || '5432'),
   database: process.env.DB_NAME || 'velocitybench_benchmark',
   username: process.env.DB_USER || 'benchmark',
-  password: process.env.DB_PASSWORD || 'benchmark123',
+  password: process.env.DB_PASSWORD ?? (() => { throw new Error('DB_PASSWORD env var is required'); })(),
   pool: {
     min: 10,
     max: 50,
@@ -177,21 +177,6 @@ Post.hasMany(Comment, { foreignKey: 'fk_post', sourceKey: 'pk_post', as: 'commen
 Comment.belongsTo(Post, { foreignKey: 'fk_post', targetKey: 'pk_post', as: 'post' });
 
 Comment.belongsTo(User, { foreignKey: 'fk_author', targetKey: 'pk_user', as: 'author' });
-
-// Many-to-many relationships for followers
-User.belongsToMany(User, {
-  through: 'tb_user_follows',
-  as: 'followers',
-  foreignKey: 'fk_following',
-  otherKey: 'fk_follower',
-});
-
-User.belongsToMany(User, {
-  through: 'tb_user_follows',
-  as: 'following',
-  foreignKey: 'fk_follower',
-  otherKey: 'fk_following',
-});
 
 // Initialize database connection
 export async function initDatabase() {

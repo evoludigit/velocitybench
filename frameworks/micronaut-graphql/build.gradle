@@ -1,5 +1,5 @@
 plugins {
-    id("io.micronaut.application") version "4.2.1"
+    id("io.micronaut.application") version "4.4.0"
     id("com.gradleup.shadow") version "8.3.0"
 }
 
@@ -18,13 +18,12 @@ dependencies {
     implementation("io.micronaut:micronaut-http-client")
     implementation("io.micronaut.serde:micronaut-serde-jackson")
 
-    // GraphQL
-    implementation("io.micronaut.graphql:micronaut-graphql")
+    // GraphQL (using graphql-java directly, no micronaut-graphql integration to avoid Micronaut 4.x incompatibility)
     implementation("com.graphql-java:graphql-java:21.3")
     implementation("com.graphql-java:java-dataloader:3.2.2")
 
-    // Database
-    implementation("io.micronaut.sql:micronaut-jdbc-hikari")
+    // Database (using HikariCP directly to avoid micronaut-sql @EachProperty compatibility issues)
+    implementation("com.zaxxer:HikariCP:5.1.0")
     implementation("org.postgresql:postgresql:42.7.1")
 
     // Runtime
@@ -49,7 +48,7 @@ shadowJar {
 }
 
 micronaut {
-    version("4.2.1")
+    version("4.4.0")
     runtime("netty")
     testRuntime("junit5")
     processing {

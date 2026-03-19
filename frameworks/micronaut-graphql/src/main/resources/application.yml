@@ -6,16 +6,10 @@ micronaut:
 
 datasources:
   default:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:velocitybench_benchmark}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:velocitybench_benchmark}?currentSchema=benchmark
     username: ${DB_USER:benchmark}
     password: ${DB_PASSWORD:benchmark123}
     driver-class-name: org.postgresql.Driver
-    schema: benchmark
     minimum-idle: 10
     maximum-pool-size: 50
 
-graphql:
-  enabled: true
-  path: /graphql
-  graphiql:
-    enabled: false

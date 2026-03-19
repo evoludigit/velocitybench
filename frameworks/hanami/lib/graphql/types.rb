@@ -6,6 +6,9 @@ module VelocityBench
       class BaseObject < ::GraphQL::Schema::Object
       end
 
+      # Define all types with scalar fields first to avoid forward-reference NameErrors.
+      # Cross-type fields (author, posts, comments) are added after all types exist.
+
       class UserType < BaseObject
         graphql_name "User"
 
@@ -14,15 +17,6 @@ module VelocityBench
         field :full_name, String, null: true
         field :bio, String, null: true
         field :created_at, String, null: false
-        field :posts, [PostType], null: false do
-          argument :limit, Integer, required: false, default_value: 50
-        end
-        field :followers, [UserType], null: false do
-          argument :limit, Integer, required: false, default_value: 50
-        end
-        field :following, [UserType], null: false do
-          argument :limit, Integer, required: false, default_value: 50
-        end
 
         def id
           object.id.to_s
@@ -32,17 +26,11 @@ module VelocityBench
           object.created_at.iso8601
         end
 
-        def posts(limit:)
-          Loaders::PostsByAuthorLoader.for(limit: [limit, 50].min).load(object.pk_user)
-        end
-
         def followers(limit:)
-          # Followers relationship not implemented in benchmark schema
           []
         end
 
         def following(limit:)
-          # Following relationship not implemented in benchmark schema
           []
         end
       end
@@ -54,10 +42,6 @@ module VelocityBench
         field :title, String, null: false
         field :content, String, null: true
         field :created_at, String, null: false
-        field :author, UserType, null: false
-        field :comments, [CommentType], null: false do
-          argument :limit, Integer, required: false, default_value: 50
-        end
 
         def id
           object.id.to_s
@@ -65,6 +49,47 @@ module VelocityBench
 
         def created_at
           object.created_at.iso8601
+        end
+      end
+
+      class CommentType < BaseObject
+        graphql_name "Comment"
+
+        field :id, ID, null: false
+        field :content, String, null: false
+        field :created_at, String, null: false
+
+        def id
+          object.id.to_s
+        end
+
+        def created_at
+          object.created_at.iso8601
+        end
+      end
+
+      # Now add cross-type fields (all types are defined above)
+
+      class UserType
+        field :posts, [PostType], null: false do
+          argument :limit, Integer, required: false, default_value: 50
+        end
+        field :followers, [UserType], null: false do
+          argument :limit, Integer, required: false, default_value: 50
+        end
+        field :following, [UserType], null: false do
+          argument :limit, Integer, required: false, default_value: 50
+        end
+
+        def posts(limit:)
+          Loaders::PostsByAuthorLoader.for(limit: [limit, 50].min).load(object.pk_user)
+        end
+      end
+
+      class PostType
+        field :author, UserType, null: false
+        field :comments, [CommentType], null: false do
+          argument :limit, Integer, required: false, default_value: 50
         end
 
         def author
@@ -76,22 +101,9 @@ module VelocityBench
         end
       end
 
-      class CommentType < BaseObject
-        graphql_name "Comment"
-
-        field :id, ID, null: false
-        field :content, String, null: false
-        field :created_at, String, null: false
+      class CommentType
         field :author, UserType, null: true
         field :post, PostType, null: true
-
-        def id
-          object.id.to_s
-        end
-
-        def created_at
-          object.created_at.iso8601
-        end
 
         def author
           Loaders::UserLoader.for.load(object.fk_author)

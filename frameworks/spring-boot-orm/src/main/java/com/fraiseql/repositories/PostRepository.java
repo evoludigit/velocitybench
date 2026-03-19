@@ -13,9 +13,6 @@ public interface PostRepository extends JpaRepository<Post, Integer> {
 
     Post findById(String uuid);
 
-    @Query("SELECT p FROM Post p JOIN FETCH p.author WHERE p.published = true ORDER BY p.createdAt DESC")
-    List<Post> findPublishedPostsWithAuthor(Pageable pageable);
-
     @Query("SELECT p FROM Post p WHERE p.published = true ORDER BY p.createdAt DESC")
     List<Post> findPublishedPostsWithLimit(int limit);
 

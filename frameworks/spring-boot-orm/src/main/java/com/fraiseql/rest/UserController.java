@@ -6,14 +6,14 @@ import com.fraiseql.repositories.UserRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.LocalDateTime;
-import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -58,5 +58,27 @@ public class UserController {
         return ResponseEntity.ok(userDTOs);
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<UserDTO> updateUser(
+            @PathVariable String id,
+            @RequestBody Map<String, String> body) {
+        if (body.containsKey("bio")) {
+            int updated = userRepository.updateBioByUuid(id, body.get("bio"));
+            if (updated == 0) {
+                return ResponseEntity.notFound().build();
+            }
+        }
+        User user = userRepository.findByUuid(id);
+        if (user == null) {
+            return ResponseEntity.notFound().build();
+        }
+        UserDTO userDTO = new UserDTO(
+            user.getId(),
+            user.getUsername(),
+            user.getFullName(),
+            user.getBio()
+        );
+        return ResponseEntity.ok(userDTO);
+    }
 
 }

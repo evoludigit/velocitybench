@@ -53,7 +53,7 @@ class SchemaDefinition(
       Field("comments", ListType(CommentType),
         arguments = Argument("limit", OptionInputType(IntType), 50) :: Nil,
         resolve = ctx => {
-          val limit = ctx.arg[Option[Int]]("limit").getOrElse(50)
+          val limit = ctx.arg[Int]("limit")
           Future {
             ctx.ctx.commentRepository.findByPostPks(Set(ctx.value.pkPost), Math.min(limit, 50))
               .getOrElse(ctx.value.pkPost, Seq.empty)
@@ -73,7 +73,7 @@ class SchemaDefinition(
       Field("posts", ListType(PostType),
         arguments = Argument("limit", OptionInputType(IntType), 50) :: Nil,
         resolve = ctx => {
-          val limit = ctx.arg[Option[Int]]("limit").getOrElse(50)
+          val limit = ctx.arg[Int]("limit")
           Future {
             ctx.ctx.postRepository.findByAuthorPks(Set(ctx.value.pkUser), Math.min(limit, 50))
               .getOrElse(ctx.value.pkUser, Seq.empty)
@@ -97,13 +97,13 @@ class SchemaDefinition(
         resolve = ctx => ctx.ctx.userRepository.findById(ctx.arg[String]("id"))),
       Field("users", ListType(UserType),
         arguments = Argument("limit", OptionInputType(IntType), 10) :: Nil,
-        resolve = ctx => ctx.ctx.userRepository.findAll(Math.min(ctx.arg[Option[Int]]("limit").getOrElse(10), 100))),
+        resolve = ctx => ctx.ctx.userRepository.findAll(Math.min(ctx.arg[Int]("limit"), 100))),
       Field("post", OptionType(PostType),
         arguments = Argument("id", IDType) :: Nil,
         resolve = ctx => ctx.ctx.postRepository.findById(ctx.arg[String]("id"))),
       Field("posts", ListType(PostType),
         arguments = Argument("limit", OptionInputType(IntType), 10) :: Nil,
-        resolve = ctx => ctx.ctx.postRepository.findAll(Math.min(ctx.arg[Option[Int]]("limit").getOrElse(10), 100)))
+        resolve = ctx => ctx.ctx.postRepository.findAll(Math.min(ctx.arg[Int]("limit"), 100)))
     )
   )
 
