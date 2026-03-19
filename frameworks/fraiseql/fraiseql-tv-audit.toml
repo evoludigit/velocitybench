@@ -1,0 +1,78 @@
+# FraiseQL v2 Configuration — TV Tables + Audit Logging
+# VelocityBench Benchmark Environment
+#
+# Variant: TV tables (pre-computed JSONB) with audit_logging ENABLED.
+# Used for Phase 5 (Observer overhead) benchmarks:
+#   O1: createPost with audit_logging.enabled = true  ← this config
+#   O2: createPost with audit_logging.enabled = false ← fraiseql-tv.toml
+#
+# The compiled schema includes audit-logging hooks baked in.
+# Compare M1 p99 from fraiseql-tv vs fraiseql-tv-audit to measure overhead.
+
+# ============================================================================
+# Server Runtime Configuration
+# ============================================================================
+
+schema_path = "schema.compiled.json"
+database_url = "postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark"
+bind_addr = "0.0.0.0:8815"
+
+cors_enabled = false
+
+pool_min_size = 10
+pool_max_size = 50
+pool_timeout_secs = 30
+
+introspection_enabled = true
+introspection_require_auth = false
+
+playground_enabled = false
+
+metrics_enabled = false
+
+cache_enabled = true
+
+# Raise complexity limit to allow Q3 (comments with author+post nesting, complexity ~161)
+max_query_complexity = 1000
+
+# ============================================================================
+# JSONB Optimization Strategy
+# ============================================================================
+
+[jsonb_optimization]
+default_strategy = "project"
+auto_threshold_percent = 80
+
+# ============================================================================
+# Compiler Configuration
+# ============================================================================
+
+[project]
+name = "velocitybench-tv-audit"
+version = "1.0.0"
+description = "VelocityBench FraiseQL TV-tables variant with audit logging"
+
+[fraiseql]
+schema_file = "schema_tv.json"
+output_file = "schema.compiled.json"
+
+[fraiseql.validation]
+max_query_complexity = 1000
+max_query_depth = 20
+
+[fraiseql.security.audit_logging]
+# Audit logging ENABLED — measures observer overhead vs fraiseql-tv (disabled)
+enabled = true
+log_level = "info"
+include_sensitive_data = false
+async_logging = true
+
+[fraiseql.security.error_sanitization]
+enabled = true
+generic_messages = true
+
+[fraiseql.security.rate_limiting]
+enabled = false
+
+[fraiseql.security.state_encryption]
+enabled = false

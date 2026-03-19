@@ -24,9 +24,12 @@ Query suite:
     Q2b  — posts(limit:10) { id title author { ... } }       1-level nest
     Q3   — comments(limit:20) { id content author post }     2-level nest (GraphQL only)
     M1   — mutation updateUser(...)                           mutation (optional)
+    F1   — posts(published:true, limit:10) { id title }      published filter, no nesting
+    F2   — posts(published:true, limit:10) { id title author { ... } }  published filter + nest
 """
 
 import argparse
+import http.client
 import json
 import statistics
 import subprocess
@@ -38,6 +41,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
 
 # ---------------------------------------------------------------------------
 # Framework registry
@@ -60,6 +64,30 @@ _GQL_M1_TMPL = (
     'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "bench" }}) {{ id bio }} }}'
 )
 
+# Flat-args mutation template — no input wrapper. Most GraphQL frameworks (gqlgen, graphene,
+# strawberry, apollo, yoga, mercurius, go-graphql-go, graphql-go) use flat args directly.
+_GQL_M1_FLAT_TMPL = (
+    'mutation {{ updateUser(id: "{user_id}", bio: "bench") {{ id bio }} }}'
+)
+
+# FraiseQL-specific templates — flat args (no input wrapper), schema compiled differently.
+# FraiseQL reads mutation arguments exclusively from the GraphQL `variables` map, not from
+# inline literals. M1 is therefore stored as a 3-tuple (url, query, variables) and sent
+# as {"query": ..., "variables": {...}} — see _worker_graphql_with_vars below.
+_FRAISEQL_M1_QUERY = (
+    "mutation UpdateUser($id: ID!, $bio: String) { updateUser(id: $id, bio: $bio) { id bio } }"
+)
+_FRAISEQL_C3_TMPL = '{{ user(id: "{user_id}") {{ id username fullName }} }}'
+
+# Phase 3: Filtered query constants (FraiseQL WHERE / ORDER BY pushdown)
+_FRAISEQL_F1 = "{ posts(published: true, limit: 10) { id title } }"
+_FRAISEQL_F2 = "{ posts(published: true, limit: 10) { id title author { username fullName } } }"
+_FRAISEQL_F3 = "{ users(limit: 20) { id username fullName } }"  # baseline; extend with orderBy once syntax confirmed
+
+# Cross-framework filtered query constants (published=true filter, comparable to FraiseQL F1/F2)
+_GQL_F1 = _FRAISEQL_F1  # same query works for all standard GraphQL frameworks
+_GQL_F2 = _FRAISEQL_F2  # same query works for all standard GraphQL frameworks
+
 FRAMEWORKS: dict[str, dict] = {
     # ------------------------------------------------------------------
     # Rust frameworks
@@ -73,7 +101,9 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": "http://localhost:8015/users?limit=20",
             "Q2": "http://localhost:8015/posts?limit=10",
             "Q2b": "http://localhost:8015/posts?limit=10&include=author",  # includes author JOIN
-            "M1": None,  # M1: mutation not supported due to connection issues
+            "M1": "M1",
+            "F1": "http://localhost:8015/posts?published=true&limit=10",
+            "F2": "http://localhost:8015/posts?published=true&limit=10&include=author",
         },
         "health_url": "http://localhost:8015/health",
     },
@@ -87,7 +117,9 @@ FRAMEWORKS: dict[str, dict] = {
             "Q2": ("http://localhost:8016/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:8016/graphql", _GQL_Q2b),
             "Q3": ("http://localhost:8016/graphql", _GQL_Q3),
-            "M1": "M1",  # resolved at runtime with discovered user UUID
+            "M1": "M1",
+            "F1": ("http://localhost:8016/graphql", _GQL_F1),
+            "F2": ("http://localhost:8016/graphql", _GQL_F2),
         },
         "health_url": "http://localhost:8016/health",
     },
@@ -96,12 +128,18 @@ FRAMEWORKS: dict[str, dict] = {
         "type": "graphql",
         "language": "Rust",
         "category": "graphql",
+        "start_timeout": 600,
         "queries": {
             "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
             "Q3": ("http://localhost:4000/graphql", _GQL_Q3),
+            "M1": "M1",
+            "F1": ("http://localhost:4000/graphql", _GQL_F1),
+            "F2": ("http://localhost:4000/graphql", _GQL_F2),
         },
+        # Juniper wraps mutation args in input object: updateUser(id, input: {bio})
+        "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "bench" }}) {{ id bio }} }}',
         "health_url": "http://localhost:4000/health",
     },
     # ------------------------------------------------------------------
@@ -113,13 +151,16 @@ FRAMEWORKS: dict[str, dict] = {
         "language": "Go",
         "category": "graphql",
         "queries": {
-            "Q1": ("http://localhost:4010/graphql", _GQL_Q1),
-            "Q2": ("http://localhost:4010/graphql", _GQL_Q2),
-            "Q2b": ("http://localhost:4010/graphql", _GQL_Q2b),
+            "Q1": ("http://localhost:4010/query", _GQL_Q1),
+            "Q2": ("http://localhost:4010/query", _GQL_Q2),
+            "Q2b": ("http://localhost:4010/query", _GQL_Q2b),
             "Q3": None,  # Q3: comments query not implemented
-            "M1": "M1",  # resolved at runtime with discovered user UUID
+            "M1": "M1",
+            "F1": ("http://localhost:4010/query", _GQL_F1),
+            "F2": ("http://localhost:4010/query", _GQL_F2),
         },
         "health_url": "http://localhost:4010/health",
+        "m1_template": _GQL_M1_FLAT_TMPL,
     },
     "gin-rest": {
         "compose_service": "gin-rest",
@@ -130,7 +171,9 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": "http://localhost:8006/users?limit=20",
             "Q2": "http://localhost:8006/posts?limit=10",
             "Q2b": "http://localhost:8006/posts?limit=10&include=author",
-            "M1": None,  # M1: mutation not supported due to connection issues
+            "M1": "M1",
+            "F1": "http://localhost:8006/posts?published=true&limit=10",
+            "F2": "http://localhost:8006/posts?published=true&limit=10&include=author",
         },
         "health_url": "http://localhost:8006/health",
     },
@@ -143,8 +186,12 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": ("http://localhost:8008/graphql", _GQL_Q1),
             "Q2": ("http://localhost:8008/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:8008/graphql", _GQL_Q2b),
+            "M1": "M1",
+            "F1": ("http://localhost:8008/graphql", _GQL_F1),
+            "F2": ("http://localhost:8008/graphql", _GQL_F2),
         },
         "health_url": "http://localhost:8008/health",
+        "m1_template": _GQL_M1_FLAT_TMPL,
     },
     "graphql-go": {
         "compose_service": "graphql-go",
@@ -155,8 +202,12 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": ("http://localhost:4011/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4011/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:4011/graphql", _GQL_Q2b),
+            "M1": "M1",
+            "F1": ("http://localhost:4011/graphql", _GQL_F1),
+            "F2": ("http://localhost:4011/graphql", _GQL_F2),
         },
         "health_url": "http://localhost:4011/health",
+        "m1_template": _GQL_M1_FLAT_TMPL,
     },
     # ------------------------------------------------------------------
     # Node.js frameworks
@@ -170,8 +221,12 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": ("http://localhost:4002/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4002/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:4002/graphql", _GQL_Q2b),
+            "M1": "M1",
+            "F1": ("http://localhost:4002/graphql", _GQL_F1),
+            "F2": ("http://localhost:4002/graphql", _GQL_F2),
         },
         "health_url": "http://localhost:4002/health",
+        "m1_template": _GQL_M1_FLAT_TMPL,
     },
     "apollo-orm": {
         "compose_service": "apollo-orm",
@@ -182,6 +237,8 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": ("http://localhost:4004/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4004/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:4004/graphql", _GQL_Q2b),
+            "F1": ("http://localhost:4004/graphql", _GQL_F1),
+            "F2": ("http://localhost:4004/graphql", _GQL_F2),
         },
         "health_url": "http://localhost:4004/health",
     },
@@ -194,6 +251,8 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": "http://localhost:8005/users?limit=20",
             "Q2": "http://localhost:8005/posts?limit=10",
             "Q2b": "http://localhost:8005/posts?limit=10&include=author",
+            "F1": "http://localhost:8005/posts?published=true&limit=10",
+            "F2": "http://localhost:8005/posts?published=true&limit=10&include=author",
         },
         "health_url": "http://localhost:8005/health",
     },
@@ -206,6 +265,8 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": "http://localhost:8007/users?limit=20",
             "Q2": "http://localhost:8007/posts?limit=10",
             "Q2b": "http://localhost:8007/posts?limit=10&include=author",
+            "F1": "http://localhost:8007/posts?published=true&limit=10",
+            "F2": "http://localhost:8007/posts?published=true&limit=10&include=author",
         },
         "health_url": "http://localhost:8007/health",
     },
@@ -215,11 +276,15 @@ FRAMEWORKS: dict[str, dict] = {
         "language": "Node.js",
         "category": "graphql",
         "queries": {
-            "Q1": ("http://localhost:4010/graphql", _GQL_Q1),
-            "Q2": ("http://localhost:4010/graphql", _GQL_Q2),
-            "Q2b": ("http://localhost:4010/graphql", _GQL_Q2b),
+            "Q1": ("http://localhost:4011/graphql", _GQL_Q1),
+            "Q2": ("http://localhost:4011/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:4011/graphql", _GQL_Q2b),
+            "M1": "M1",
+            "F1": ("http://localhost:4011/graphql", _GQL_F1),
+            "F2": ("http://localhost:4011/graphql", _GQL_F2),
         },
-        "health_url": "http://localhost:4010/health",
+        "health_url": "http://localhost:4011/health",
+        "m1_template": _GQL_M1_FLAT_TMPL,
     },
     "graphql-yoga": {
         "compose_service": "graphql-yoga",
@@ -230,8 +295,12 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": ("http://localhost:4012/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4012/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:4012/graphql", _GQL_Q2b),
+            "M1": "M1",
+            "F1": ("http://localhost:4012/graphql", _GQL_F1),
+            "F2": ("http://localhost:4012/graphql", _GQL_F2),
         },
         "health_url": "http://localhost:4012/health",
+        "m1_template": _GQL_M1_FLAT_TMPL,
     },
     "mercurius": {
         "compose_service": "mercurius",
@@ -242,8 +311,12 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": ("http://localhost:4008/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4008/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:4008/graphql", _GQL_Q2b),
+            "M1": "M1",
+            "F1": ("http://localhost:4008/graphql", _GQL_F1),
+            "F2": ("http://localhost:4008/graphql", _GQL_F2),
         },
         "health_url": "http://localhost:4008/health",
+        "m1_template": _GQL_M1_FLAT_TMPL,
     },
     # ------------------------------------------------------------------
     # Python frameworks
@@ -257,8 +330,12 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": ("http://localhost:8011/graphql", _GQL_Q1),
             "Q2": ("http://localhost:8011/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:8011/graphql", _GQL_Q2b),
+            "M1": "M1",
+            "F1": ("http://localhost:8011/graphql", _GQL_F1),
+            "F2": ("http://localhost:8011/graphql", _GQL_F2),
         },
         "health_url": "http://localhost:8011/health",
+        "m1_template": _GQL_M1_FLAT_TMPL,
     },
     "graphene": {
         "compose_service": "graphene",
@@ -269,8 +346,12 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": ("http://localhost:8002/graphql", _GQL_Q1),
             "Q2": ("http://localhost:8002/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:8002/graphql", _GQL_Q2b),
+            "M1": "M1",
+            "F1": ("http://localhost:8002/graphql", _GQL_F1),
+            "F2": ("http://localhost:8002/graphql", _GQL_F2),
         },
         "health_url": "http://localhost:8002/health",
+        "m1_template": _GQL_M1_FLAT_TMPL,
     },
     "fastapi-rest": {
         "compose_service": "fastapi-rest",
@@ -281,6 +362,9 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": "http://localhost:8003/users?limit=20",
             "Q2": "http://localhost:8003/posts?limit=10",
             "Q2b": "http://localhost:8003/posts?limit=10&include=author",
+            "M1": "M1",
+            "F1": "http://localhost:8003/posts?published=true&limit=10",
+            "F2": "http://localhost:8003/posts?published=true&limit=10&include=author",
         },
         "health_url": "http://localhost:8003/health",
     },
@@ -290,9 +374,11 @@ FRAMEWORKS: dict[str, dict] = {
         "language": "Python",
         "category": "rest",
         "queries": {
-            "Q1": None,  # Flask: connection errors under load
-            "Q2": None,  # Flask: connection errors under load
-            "Q2b": None,  # Flask: connection errors under load
+            "Q1": "http://localhost:8004/users?limit=20",
+            "Q2": "http://localhost:8004/posts?limit=10",
+            "Q2b": "http://localhost:8004/posts?limit=10&include=author",
+            "F1": "http://localhost:8004/posts?limit=10&published=true",
+            "F2": "http://localhost:8004/posts?limit=10&published=true&include=author",
         },
         "health_url": "http://localhost:8004/health",
     },
@@ -305,6 +391,8 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
+            "F1": ("http://localhost:4000/graphql", _GQL_F1),
+            "F2": ("http://localhost:4000/graphql", _GQL_F2),
         },
         "health_url": "http://localhost:4000/health",
     },
@@ -317,6 +405,8 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
+            "F1": ("http://localhost:4000/graphql", _GQL_F1),
+            "F2": ("http://localhost:4000/graphql", _GQL_F2),
         },
         "health_url": "http://localhost:4000/health",
     },
@@ -333,7 +423,11 @@ FRAMEWORKS: dict[str, dict] = {
             # Spring Boot uses page/size pagination, not limit
             "Q1": "http://localhost:8010/api/users?page=0&size=20",
             "Q2": "http://localhost:8010/api/posts?page=0&size=10",
-            "Q2b": None,  # PostDTO has authorId only — no nested author object
+            "Q2b": "http://localhost:8010/api/posts/with-author?page=0&size=10",
+            # Q2/Q2b already hardcode published=true (JPA derived method), so F1 == Q2, F2 == Q2b
+            "F1": "http://localhost:8010/api/posts?page=0&size=10",
+            "F2": "http://localhost:8010/api/posts/with-author?page=0&size=10",
+            "M1": "M1",
         },
         "health_url": "http://localhost:8010/actuator/health",
     },
@@ -347,6 +441,10 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": "http://localhost:8013/api/users?page=0&size=20",
             "Q2": "http://localhost:8013/api/posts?size=10",
             "Q2b": None,  # Q2b: nested author queries - multiple calls approach causes connection issues
+            "M1": "M1",
+            # Q2 already hardcodes published=true (JPQL WHERE p.published = true), so F1 == Q2
+            "F1": "http://localhost:8013/api/posts?size=10",
+            "F2": None,
         },
         "health_url": "http://localhost:8013/actuator/health",
     },
@@ -372,8 +470,11 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
+            "M1": "M1",
         },
         "health_url": "http://localhost:4000/health",
+        # Micronaut wraps mutation args in input object: updateUser(id, input: {bio})
+        "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "bench" }}) {{ id bio }} }}',
     },
     "quarkus-graphql": {
         "compose_service": "quarkus-graphql",
@@ -386,8 +487,11 @@ FRAMEWORKS: dict[str, dict] = {
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
             "Q3": ("http://localhost:4000/graphql", _GQL_Q3),
+            "M1": "M1",
         },
         "health_url": "http://localhost:4000/health",
+        # Quarkus wraps mutation args in input object: updateUser(id, input: {bio})
+        "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "bench" }}) {{ id bio }} }}',
     },
     # ------------------------------------------------------------------
     # Scala frameworks
@@ -402,8 +506,10 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
+            "M1": "M1",
         },
         "health_url": "http://localhost:4000/health",
+        "m1_template": _GQL_M1_FLAT_TMPL,
     },
     # ------------------------------------------------------------------
     # Ruby frameworks
@@ -416,7 +522,10 @@ FRAMEWORKS: dict[str, dict] = {
         "queries": {
             "Q1": "http://localhost:8012/api/users?limit=20",
             "Q2": "http://localhost:8012/api/posts?limit=10",
-            "Q2b": None,  # no nested author embedding
+            "Q2b": "http://localhost:8012/api/posts?with_author=true",
+            "F1": "http://localhost:8012/api/posts?published=true&limit=10",
+            "F2": "http://localhost:8012/api/posts?published=true&with_author=true",
+            "M1": "M1",
         },
         "health_url": "http://localhost:8012/api/health",
     },
@@ -444,6 +553,8 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": "http://localhost:8009/api/users?limit=20",
             "Q2": "http://localhost:8009/api/posts?limit=10",
             "Q2b": "http://localhost:8009/api/posts?limit=10&include=author",
+            "F1": "http://localhost:8009/api/posts?published=true&limit=10",
+            "F2": "http://localhost:8009/api/posts?published=true&limit=10&include=author",
         },
         "health_url": "http://localhost:8009/api/health",
     },
@@ -456,7 +567,12 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
+            "F1": ("http://localhost:4000/graphql", _GQL_F1),
+            "F2": ("http://localhost:4000/graphql", _GQL_F2),
+            "M1": "M1",
         },
+        # webonyx uses input object wrapper: updateUser(id, input: {bio})
+        "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "bench" }}) {{ id bio }} }}',
         "health_url": "http://localhost:4000/health",
     },
     # ------------------------------------------------------------------
@@ -486,8 +602,12 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": ("http://localhost:8025/graphql", _GQL_Q1),
             "Q2": ("http://localhost:8025/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:8025/graphql", _GQL_Q2b),
+            "M1": "M1",
+            "F1": ("http://localhost:8025/graphql", _GQL_F1),
+            "F2": ("http://localhost:8025/graphql", _GQL_F2),
         },
         "health_url": "http://localhost:8025/health",
+        "m1_template": _GQL_M1_FLAT_TMPL,
     },
     # ------------------------------------------------------------------
     # FraiseQL variants (last — pending upstream fixes)
@@ -497,42 +617,90 @@ FRAMEWORKS: dict[str, dict] = {
         "type": "graphql",
         "language": "Python",
         "category": "graphql-precomputed",
+        "no_build": True,  # fraiseql copies local binaries; rebuild only when explicitly updating
         "queries": {
+            # Standard query suite
             "Q1": ("http://localhost:8816/graphql", _GQL_Q1),
             "Q2": ("http://localhost:8816/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:8816/graphql", _GQL_Q2b),
             "Q3": None,  # Q3: works for direct queries but fails under benchmark concurrent load
+            # Phase 1: Cache benchmarks — sentinel resolved to single-entity UUID at runtime
+            "C3": "C3",
+            # Phase 2: Mutation benchmark
+            "M1": "M1",
+            # Phase 3: Filtered query benchmarks
+            "F1": ("http://localhost:8816/graphql", _FRAISEQL_F1),
+            "F2": ("http://localhost:8816/graphql", _FRAISEQL_F2),
+            "F3": ("http://localhost:8816/graphql", _FRAISEQL_F3),
         },
         "health_url": "http://localhost:8816/health",
-        # LRU cache needs warmup to fill before measuring cache-hit throughput.
-        "warmup_secs": 10,
+        # Phase 1: LRU cache needs 30s warmup to fill before measuring cache-hit throughput.
+        "warmup_secs": 30,
+        "m1_template": "fraiseql",
+        "c3_template": _FRAISEQL_C3_TMPL,
     },
     "fraiseql-tv-nocache": {
         "compose_service": "fraiseql-tv-nocache",
         "type": "graphql",
         "language": "Python",
         "category": "graphql-precomputed",
+        "no_build": True,  # fraiseql copies local binaries; rebuild only when explicitly updating
         "queries": {
+            # Standard query suite
             "Q1": ("http://localhost:8817/graphql", _GQL_Q1),
             "Q2": ("http://localhost:8817/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:8817/graphql", _GQL_Q2b),
             "Q3": ("http://localhost:8817/graphql", _GQL_Q3),
+            # Phase 1: Cold-read baseline for C3 (no cache — every request hits DB)
+            "C3": "C3",
+            # Phase 2: Mutation benchmark
+            "M1": "M1",
+            # Phase 3: Filtered query benchmarks (same WHERE pushdown, no cache)
+            "F1": ("http://localhost:8817/graphql", _FRAISEQL_F1),
+            "F2": ("http://localhost:8817/graphql", _FRAISEQL_F2),
+            "F3": ("http://localhost:8817/graphql", _FRAISEQL_F3),
         },
         "health_url": "http://localhost:8817/health",
+        "m1_template": "fraiseql",
+        "c3_template": _FRAISEQL_C3_TMPL,
     },
     "fraiseql-v": {
         "compose_service": "fraiseql",
         "type": "graphql",
         "language": "Python",
         "category": "graphql-precomputed",
+        "no_build": True,  # fraiseql copies local binaries; rebuild only when explicitly updating
         "queries": {
+            # Standard query suite
             "Q1": ("http://localhost:8815/graphql", _GQL_Q1),
             "Q2": ("http://localhost:8815/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:8815/graphql", _GQL_Q2b),
             "Q3": ("http://localhost:8815/graphql", _GQL_Q3),
+            # Phase 2: Mutation benchmark
+            "M1": "M1",
+            # Phase 3: Filtered query benchmarks
+            "F1": ("http://localhost:8815/graphql", _FRAISEQL_F1),
+            "F2": ("http://localhost:8815/graphql", _FRAISEQL_F2),
         },
         "health_url": "http://localhost:8815/health",
         "warmup_secs": 30,
+        "m1_template": "fraiseql",
+    },
+    # Phase 5: Observer overhead — fraiseql-tv with audit logging enabled
+    "fraiseql-tv-audit": {
+        "compose_service": "fraiseql-tv-audit",
+        "type": "graphql",
+        "language": "Python",
+        "category": "graphql-precomputed",
+        "no_build": True,  # fraiseql copies local binaries; rebuild only when explicitly updating
+        "queries": {
+            "M1": "M1",
+        },
+        "health_url": "http://localhost:8818/health",
+        # graphql_url: used for UUID discovery and M1 endpoint when Q1 is absent
+        "graphql_url": "http://localhost:8818/graphql",
+        "warmup_secs": 10,
+        "m1_template": "fraiseql",
     },
 }
 
@@ -580,13 +748,21 @@ DEFAULT_FRAMEWORK_ORDER = [
     "webonyx-graphql-php",
     # C# / .NET
     "csharp-dotnet",
-    # FraiseQL (last — regression pending upstream fix)
-    "fraiseql-tv",
-    "fraiseql-tv-nocache",
-    "fraiseql-v",
+    # FraiseQL variants
+    "fraiseql-tv",           # TV tables, cache enabled  (Phase 1 warm, Phase 2 M1, Phase 3 F1-F3)
+    "fraiseql-tv-nocache",   # TV tables, cache disabled (Phase 1 cold baseline)
+    "fraiseql-v",            # On-the-fly JSONB views    (Phase 2 M1 comparison)
+    "fraiseql-tv-audit",     # TV tables, audit logging  (Phase 5 observer overhead)
 ]
 
 REPORTS_DIR = Path(__file__).parent.parent.parent / "reports"
+
+# Frameworks with known failures — targeted by --broken-only for fast iteration.
+BROKEN_FRAMEWORKS = [
+    "fraiseql-v",
+    "fraiseql-tv-nocache",
+    "fraiseql-tv",
+]
 
 # ---------------------------------------------------------------------------
 # Data structures
@@ -643,6 +819,140 @@ class BenchResult:
     def error_rate_pct(self) -> float:
         total = self.requests_sent + self.errors
         return (self.errors / total * 100) if total > 0 else 0.0
+
+
+# ---------------------------------------------------------------------------
+# Persistent HTTP connection (avoids TIME_WAIT exhaustion from per-request sockets)
+# ---------------------------------------------------------------------------
+
+
+class _PersistentConn:
+    """Per-worker persistent HTTP/1.1 connection. Reconnects on failure."""
+
+    def __init__(self, url: str, timeout: int = 10) -> None:
+        parsed = urlparse(url)
+        self._host = parsed.hostname or "localhost"
+        self._port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        self._path = parsed.path + ("?" + parsed.query if parsed.query else "")
+        self._timeout = timeout
+        self._conn: http.client.HTTPConnection | None = None
+
+    def _connect(self) -> None:
+        if self._conn is None:
+            self._conn = http.client.HTTPConnection(
+                self._host, self._port, timeout=self._timeout
+            )
+
+    def _reset(self) -> None:
+        if self._conn is not None:
+            try:
+                self._conn.close()
+            except Exception:
+                pass
+            self._conn = None
+
+    def get(self) -> tuple[bool, float, str, str]:
+        for attempt in range(2):
+            t0 = time.monotonic()
+            try:
+                self._connect()
+                assert self._conn is not None
+                self._conn.request("GET", self._path)
+                resp = self._conn.getresponse()
+                raw = resp.read()
+                elapsed = (time.monotonic() - t0) * 1000
+                if resp.status != 200:
+                    return False, elapsed, "http_error", f"HTTP {resp.status}"
+                try:
+                    body = json.loads(raw)
+                except json.JSONDecodeError:
+                    return False, elapsed, "json_error", raw[:200].decode(errors="replace")
+                if not isinstance(body, (dict, list)):
+                    return False, elapsed, "missing_data", f"unexpected type: {type(body).__name__}"
+                return True, elapsed, "", ""
+            except (
+                http.client.CannotSendRequest,
+                http.client.BadStatusLine,
+                ConnectionResetError,
+                BrokenPipeError,
+                OSError,
+            ):
+                self._reset()
+                if attempt == 1:
+                    elapsed = (time.monotonic() - t0) * 1000
+                    return False, elapsed, "connection_error", "reconnect failed"
+        return False, 0.0, "connection_error", "unreachable"
+
+    def post_graphql(self, payload: bytes) -> tuple[bool, float, str, str]:
+        for attempt in range(2):
+            t0 = time.monotonic()
+            try:
+                self._connect()
+                assert self._conn is not None
+                self._conn.request(
+                    "POST",
+                    self._path,
+                    body=payload,
+                    headers={"Content-Type": "application/json"},
+                )
+                resp = self._conn.getresponse()
+                raw = resp.read()
+                elapsed = (time.monotonic() - t0) * 1000
+                if resp.status != 200:
+                    return False, elapsed, "http_error", f"HTTP {resp.status}"
+                try:
+                    body = json.loads(raw)
+                except json.JSONDecodeError:
+                    return False, elapsed, "json_error", raw[:200].decode(errors="replace")
+                if body.get("errors"):
+                    msg = body["errors"][0].get("message", "unknown")[:200]
+                    return False, elapsed, "graphql_error", msg
+                if "data" not in body:
+                    return False, elapsed, "missing_data", str(body)[:200]
+                return True, elapsed, "", ""
+            except (
+                http.client.CannotSendRequest,
+                http.client.BadStatusLine,
+                ConnectionResetError,
+                BrokenPipeError,
+                OSError,
+            ):
+                self._reset()
+                if attempt == 1:
+                    elapsed = (time.monotonic() - t0) * 1000
+                    return False, elapsed, "connection_error", "reconnect failed"
+        return False, 0.0, "connection_error", "unreachable"
+
+    def put(self, payload: bytes) -> tuple[bool, float, str, str]:
+        for attempt in range(2):
+            t0 = time.monotonic()
+            try:
+                self._connect()
+                assert self._conn is not None
+                self._conn.request(
+                    "PUT",
+                    self._path,
+                    body=payload,
+                    headers={"Content-Type": "application/json"},
+                )
+                resp = self._conn.getresponse()
+                resp.read()
+                elapsed = (time.monotonic() - t0) * 1000
+                if resp.status in (200, 204):
+                    return True, elapsed, "", ""
+                return False, elapsed, "http_error", f"HTTP {resp.status}"
+            except (
+                http.client.CannotSendRequest,
+                http.client.BadStatusLine,
+                ConnectionResetError,
+                BrokenPipeError,
+                OSError,
+            ):
+                self._reset()
+                if attempt == 1:
+                    elapsed = (time.monotonic() - t0) * 1000
+                    return False, elapsed, "connection_error", "reconnect failed"
+        return False, 0.0, "connection_error", "unreachable"
 
 
 # ---------------------------------------------------------------------------
@@ -730,8 +1040,10 @@ def _worker_graphql(url: str, query: str, end_time: float) -> _WorkerResult:
     errors = 0
     breakdown: dict[str, int] = {}
     samples: list[tuple[str, str]] = []
+    conn = _PersistentConn(url)
+    payload = json.dumps({"query": query}).encode()
     while time.monotonic() < end_time:
-        ok, lat, cat, detail = _post_graphql(url, query)
+        ok, lat, cat, detail = conn.post_graphql(payload)
         if ok:
             latencies.append(lat)
         else:
@@ -747,8 +1059,9 @@ def _worker_rest(url: str, end_time: float) -> _WorkerResult:
     errors = 0
     breakdown: dict[str, int] = {}
     samples: list[tuple[str, str]] = []
+    conn = _PersistentConn(url)
     while time.monotonic() < end_time:
-        ok, lat, cat, detail = _get_rest(url)
+        ok, lat, cat, detail = conn.get()
         if ok:
             latencies.append(lat)
         else:
@@ -765,14 +1078,19 @@ def _worker_rest(url: str, end_time: float) -> _WorkerResult:
 
 
 def _discover_user_uuid(fw_config: dict) -> str | None:
-    """Fetch Q1 and extract the first user's id for mutation testing."""
+    """Fetch Q1 (or graphql_url fallback) and extract the first user's id."""
     q1_entry = fw_config["queries"].get("Q1")
-    if q1_entry is None:
-        return None
     fw_type = fw_config["type"]
     try:
         if fw_type == "graphql":
-            url, query = q1_entry
+            # Use explicit graphql_url + Q1 query when Q1 entry is absent (e.g. fraiseql-tv-audit)
+            if q1_entry is None:
+                gql_url = fw_config.get("graphql_url")
+                if not gql_url:
+                    return None
+                url, query = gql_url, _GQL_Q1
+            else:
+                url, query = q1_entry
             payload = json.dumps({"query": query}).encode()
             req = urllib.request.Request(
                 url,
@@ -793,13 +1111,35 @@ def _discover_user_uuid(fw_config: dict) -> str | None:
                 users = (
                     body
                     if isinstance(body, list)
-                    else body.get("content", body.get("data", []))
+                    else body.get("content", body.get("data", body.get("users", [])))
                 )
                 if users and isinstance(users, list):
                     return str(users[0].get("id", users[0].get("pk_user", "")))
     except (urllib.error.URLError, OSError, json.JSONDecodeError, KeyError, IndexError):
         pass
     return None
+
+
+def _worker_graphql_with_vars(
+    url: str, query: str, variables: dict, end_time: float
+) -> _WorkerResult:
+    """Worker for GraphQL requests that require a variables map (e.g. FraiseQL mutations)."""
+    payload = json.dumps({"query": query, "variables": variables}).encode()
+    latencies: list[float] = []
+    errors = 0
+    breakdown: dict[str, int] = {}
+    samples: list[tuple[str, str]] = []
+    conn = _PersistentConn(url)
+    while time.monotonic() < end_time:
+        ok, lat, cat, detail = conn.post_graphql(payload)
+        if ok:
+            latencies.append(lat)
+        else:
+            errors += 1
+            breakdown[cat] = breakdown.get(cat, 0) + 1
+            if len(samples) < _MAX_ERROR_SAMPLES:
+                samples.append((cat, detail))
+    return latencies, errors, breakdown, samples
 
 
 def _worker_mutation_graphql(url: str, query: str, end_time: float) -> _WorkerResult:
@@ -813,41 +1153,16 @@ def _worker_mutation_rest(url: str, payload: bytes, end_time: float) -> _WorkerR
     errors = 0
     breakdown: dict[str, int] = {}
     samples: list[tuple[str, str]] = []
+    conn = _PersistentConn(url)
     while time.monotonic() < end_time:
-        req = urllib.request.Request(
-            url,
-            data=payload,
-            headers={"Content-Type": "application/json"},
-            method="PUT",
-        )
-        t0 = time.monotonic()
-        try:
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                resp.read()
-                elapsed = (time.monotonic() - t0) * 1000
-                if resp.status in (200, 204):
-                    latencies.append(elapsed)
-                else:
-                    errors += 1
-                    cat = "http_error"
-                    breakdown[cat] = breakdown.get(cat, 0) + 1
-                    if len(samples) < _MAX_ERROR_SAMPLES:
-                        samples.append((cat, f"HTTP {resp.status}"))
-        except urllib.error.URLError as exc:
-            elapsed = (time.monotonic() - t0) * 1000
-            cat = "connection_error"
-            if isinstance(getattr(exc, "reason", None), ConnectionRefusedError):
-                cat = "connection_refused"
+        ok, lat, cat, detail = conn.put(payload)
+        if ok:
+            latencies.append(lat)
+        else:
             errors += 1
             breakdown[cat] = breakdown.get(cat, 0) + 1
             if len(samples) < _MAX_ERROR_SAMPLES:
-                samples.append((cat, str(exc.reason)[:200]))
-        except OSError as exc:
-            errors += 1
-            cat = "connection_error"
-            breakdown[cat] = breakdown.get(cat, 0) + 1
-            if len(samples) < _MAX_ERROR_SAMPLES:
-                samples.append((cat, str(exc)[:200]))
+                samples.append((cat, detail))
     return latencies, errors, breakdown, samples
 
 
@@ -867,8 +1182,23 @@ def run_diagnose(fw_name: str, fw_config: dict) -> None:
         print(f"    {query_name}:", flush=True)
         for i in range(5):
             if fw_type == "graphql":
-                url, query = entry
-                ok, lat, cat, detail = _post_graphql(url, query, timeout=15)
+                if len(entry) == 3:
+                    url, query, variables = entry
+                    payload = json.dumps({"query": query, "variables": variables}).encode()
+                    req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"}, method="POST")
+                    t0 = time.monotonic()
+                    try:
+                        with urllib.request.urlopen(req, timeout=15) as resp:
+                            raw = resp.read()
+                            elapsed = (time.monotonic() - t0) * 1000
+                            body = json.loads(raw)
+                            ok = "errors" not in body
+                            lat, cat, detail = elapsed, ("graphql_error" if not ok else ""), (str(body.get("errors", ""))[:200] if not ok else "")
+                    except Exception as exc:
+                        ok, lat, cat, detail = False, (time.monotonic() - t0) * 1000, "connection_error", str(exc)[:200]
+                else:
+                    url, query = entry
+                    ok, lat, cat, detail = _post_graphql(url, query, timeout=15)
             else:
                 url = entry
                 ok, lat, cat, detail = _get_rest(url, timeout=15)
@@ -919,11 +1249,18 @@ def run_scenario(
         all_samples: list[tuple[str, str]] = []
         with ThreadPoolExecutor(max_workers=concurrency) as pool:
             if fw_type == "graphql":
-                url, query = entry
-                futures = [
-                    pool.submit(_worker_graphql, url, query, end_time)
-                    for _ in range(concurrency)
-                ]
+                if len(entry) == 3:
+                    url, query, variables = entry
+                    futures = [
+                        pool.submit(_worker_graphql_with_vars, url, query, variables, end_time)
+                        for _ in range(concurrency)
+                    ]
+                else:
+                    url, query = entry
+                    futures = [
+                        pool.submit(_worker_graphql, url, query, end_time)
+                        for _ in range(concurrency)
+                    ]
             elif query_name == "M1":
                 url = entry
                 payload = json.dumps({"bio": "bench"}).encode()
@@ -992,9 +1329,12 @@ def _compose(*args: str, check: bool = True) -> subprocess.CompletedProcess:
     )
 
 
-def start_service(service: str, health_url: str, timeout_secs: int = 60) -> None:
+def start_service(service: str, health_url: str, timeout_secs: int = 60, *, no_build: bool = False) -> None:
     print(f"  starting {service}...", end=" ", flush=True)
-    _compose("up", "-d", service)
+    if no_build:
+        _compose("up", "-d", service)
+    else:
+        _compose("up", "-d", "--build", service)
     deadline = time.monotonic() + timeout_secs
     while time.monotonic() < deadline:
         try:
@@ -1010,21 +1350,31 @@ def start_service(service: str, health_url: str, timeout_secs: int = 60) -> None
 
 
 def start_service_or_skip(
-    service: str, health_url: str, timeout_secs: int = 60
+    service: str, health_url: str, timeout_secs: int = 60, *, no_build: bool = False
 ) -> bool:
     """Like start_service but returns False instead of raising on timeout."""
     try:
-        start_service(service, health_url, timeout_secs)
+        start_service(service, health_url, timeout_secs, no_build=no_build)
         return True
     except RuntimeError as exc:
         print(f"  WARN: {exc} — skipping", flush=True)
         _compose("stop", service, check=False)
+        _compose("rm", "-f", service, check=False)
+        return False
+    except subprocess.CalledProcessError as exc:
+        stderr = exc.stderr.strip() if exc.stderr else ""
+        print(f"  WARN: docker compose up failed (exit {exc.returncode}) — skipping", flush=True)
+        if stderr:
+            print(f"  stderr: {stderr[:300]}", flush=True)
+        _compose("stop", service, check=False)
+        _compose("rm", "-f", service, check=False)
         return False
 
 
 def stop_service(service: str) -> None:
     print(f"  stopping {service}...", end=" ", flush=True)
     _compose("stop", service)
+    _compose("rm", "-f", service, check=False)
     print("stopped", flush=True)
 
 
@@ -1065,6 +1415,11 @@ _QUERY_LABELS = {
     "Q2b": "`posts(limit: 10) { id title author { username fullName } }`",
     "Q3": "`comments(limit: 20) { id content author { username } post { title } }`",
     "M1": "`mutation { updateUser(...) { id bio } }`",
+    # Feature benchmark labels (published filter cross-framework, FraiseQL-specific extras)
+    "C3": "`user(id: UUID) { id username fullName }` — single entity by UUID (cache warm)",
+    "F1": "`posts(published: true, limit: 10) { id title }` — published filter, no nesting",
+    "F2": "`posts(published: true, limit: 10) { id title author { ... } }` — published filter + nesting",
+    "F3": "`users(limit: 20) { id username fullName }` — baseline for ORDER BY comparison",
 }
 
 
@@ -1241,7 +1596,15 @@ def main() -> None:
         action="store_true",
         help="Show error category breakdown in the Markdown report",
     )
+    parser.add_argument(
+        "--broken-only",
+        action="store_true",
+        help=f"Run only frameworks with known failures: {', '.join(BROKEN_FRAMEWORKS)}",
+    )
     args = parser.parse_args()
+
+    if args.broken_only:
+        args.frameworks = [fw for fw in BROKEN_FRAMEWORKS if fw in FRAMEWORKS]
 
     unknown = [fw for fw in args.frameworks if fw not in FRAMEWORKS]
     if unknown:
@@ -1274,19 +1637,9 @@ def main() -> None:
 
         if not args.no_isolation:
             timeout = fw_config.get("start_timeout", 60)
-            healthy = (
-                start_service_or_skip(
-                    fw_config["compose_service"], fw_config["health_url"], timeout
-                )
-                if args.skip_unhealthy
-                else (
-                    start_service(
-                        fw_config["compose_service"],
-                        fw_config["health_url"],
-                        timeout,
-                    )
-                    or True
-                )
+            healthy = start_service_or_skip(
+                fw_config["compose_service"], fw_config["health_url"], timeout,
+                no_build=fw_config.get("no_build", False),
             )
             if not healthy:
                 for query_name in query_names:
@@ -1306,23 +1659,62 @@ def main() -> None:
         if args.diagnose:
             run_diagnose(fw_name, fw_config)
 
-        # Resolve M1 mutation queries at runtime (need a real user UUID)
-        if "M1" in fw_config["queries"] and fw_config["queries"]["M1"] == "M1":
+        # Resolve M1 and C3 sentinel queries at runtime (need a real user UUID)
+        needs_user_id = (
+            fw_config["queries"].get("M1") == "M1"
+            or fw_config["queries"].get("C3") == "C3"
+        )
+        if needs_user_id:
             user_id = _discover_user_uuid(fw_config)
-            if user_id:
-                if fw_config["type"] == "graphql":
-                    q1_url = fw_config["queries"]["Q1"][0]  # reuse GraphQL endpoint
-                    mutation = _GQL_M1_TMPL.format(user_id=user_id)
-                    fw_config["queries"]["M1"] = (q1_url, mutation)
+
+            if fw_config["queries"].get("M1") == "M1":
+                if user_id:
+                    if fw_config["type"] == "graphql":
+                        q1_entry = fw_config["queries"].get("Q1")
+                        gql_url = (
+                            q1_entry[0]
+                            if q1_entry is not None
+                            else fw_config.get("graphql_url", "")
+                        )
+                        m1_tmpl = fw_config.get("m1_template")
+                        if m1_tmpl is None:
+                            # standard GraphQL: inline literal
+                            mutation = _GQL_M1_TMPL.format(user_id=user_id)
+                            fw_config["queries"]["M1"] = (gql_url, mutation)
+                        elif m1_tmpl == "fraiseql":
+                            # FraiseQL: must use variables (executor ignores inline args)
+                            fw_config["queries"]["M1"] = (
+                                gql_url,
+                                _FRAISEQL_M1_QUERY,
+                                {"id": user_id, "bio": "bench"},
+                            )
+                        else:
+                            mutation = m1_tmpl.format(user_id=user_id)
+                            fw_config["queries"]["M1"] = (gql_url, mutation)
+                    else:
+                        q1_url = fw_config["queries"]["Q1"]
+                        base = q1_url.rsplit("/users", 1)[0]
+                        fw_config["queries"]["M1"] = f"{base}/users/{user_id}"
+                    print(f"  M1: resolved user UUID {user_id[:8]}...", flush=True)
                 else:
-                    # REST: derive mutation URL from Q1 URL base
-                    q1_url = fw_config["queries"]["Q1"]
-                    base = q1_url.rsplit("/users", 1)[0]
-                    fw_config["queries"]["M1"] = f"{base}/users/{user_id}"
-                print(f"  M1: resolved user UUID {user_id[:8]}...", flush=True)
-            else:
-                fw_config["queries"]["M1"] = None  # skip if UUID discovery fails
-                print("  M1: could not discover user UUID — skipping", flush=True)
+                    fw_config["queries"]["M1"] = None
+                    print("  M1: could not discover user UUID — skipping", flush=True)
+
+            if fw_config["queries"].get("C3") == "C3":
+                if user_id:
+                    q1_entry = fw_config["queries"].get("Q1")
+                    gql_url = (
+                        q1_entry[0]
+                        if q1_entry is not None
+                        else fw_config.get("graphql_url", "")
+                    )
+                    c3_tmpl = fw_config.get("c3_template", _FRAISEQL_C3_TMPL)
+                    c3_query = c3_tmpl.format(user_id=user_id)
+                    fw_config["queries"]["C3"] = (gql_url, c3_query)
+                    print(f"  C3: resolved user UUID {user_id[:8]}...", flush=True)
+                else:
+                    fw_config["queries"]["C3"] = None
+                    print("  C3: could not discover user UUID — skipping", flush=True)
 
         for query_name in query_names:
             print(f"  {query_name}:")

@@ -135,6 +135,29 @@ def comment(id: ID) -> Comment | None:
 
 
 # ============================================================================
+# Mutation Definitions — write through tb_* CQRS command tables
+# pg_tviews triggers auto-cascade writes to tv_* pre-computed tables
+# ============================================================================
+
+
+@fraiseql.mutation(sql_source="benchmark.fn_update_user", operation="UPDATE")
+def updateUser(id: ID, bio: str | None = None) -> User | None:
+    """Update a user's bio. Returns the updated user."""
+    pass
+
+
+@fraiseql.mutation(sql_source="benchmark.fn_create_post", operation="CREATE")
+def createPost(
+    title: str,
+    content: str,
+    authorId: ID,
+    published: bool = False,
+) -> Post | None:
+    """Create a new post. Returns the created post."""
+    pass
+
+
+# ============================================================================
 # Schema Export
 # ============================================================================
 
