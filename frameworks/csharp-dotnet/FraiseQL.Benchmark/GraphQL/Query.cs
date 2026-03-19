@@ -28,9 +28,10 @@ public class Query
 
     public async Task<IEnumerable<Post>> GetPosts(
         [Service] IPostRepository postRepository,
-        int limit = 10)
+        int limit = 10,
+        bool? published = null)
     {
-        return await postRepository.GetAllAsync(0, limit);
+        return await postRepository.GetAllAsync(0, limit, published);
     }
 
     public async Task<IEnumerable<Post>> GetPostsByUser(

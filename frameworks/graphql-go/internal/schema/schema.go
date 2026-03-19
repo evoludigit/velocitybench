@@ -76,6 +76,9 @@ func init() {
 					Type: graphql.NewNonNull(userType),
 					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 						post := p.Source.(*model.Post)
+						if post.Author != nil {
+							return post.Author, nil
+						}
 						loaders := dataloader.GetLoaders(p.Context)
 						return loaders.UserLoader.Load(p.Context, post.AuthorID)()
 					},
@@ -271,6 +274,9 @@ func init() {
 						Type:         graphql.Int,
 						DefaultValue: 10,
 					},
+					"published": &graphql.ArgumentConfig{
+						Type: graphql.Boolean,
+					},
 				},
 				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 					limit := 10
@@ -278,13 +284,30 @@ func init() {
 						limit = l
 					}
 
-					rows, err := db.Pool.Query(p.Context, `
-						SELECT p.id, u.id as author_id, p.title, p.content, p.created_at
+					sqlQuery := `
+						SELECT p.id, p.title, p.content, p.created_at::text as created_at,
+						       u.id, u.username, u.full_name, u.bio
 						FROM benchmark.tb_post p
 						JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
 						ORDER BY p.created_at DESC
 						LIMIT $1
-					`, limit)
+					`
+					args := []interface{}{limit}
+
+					if pub, ok := p.Args["published"].(bool); ok {
+						sqlQuery = `
+							SELECT p.id, p.title, p.content, p.created_at::text as created_at,
+							       u.id, u.username, u.full_name, u.bio
+							FROM benchmark.tb_post p
+							JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+							WHERE p.published = $2
+							ORDER BY p.created_at DESC
+							LIMIT $1
+						`
+						args = append(args, pub)
+					}
+
+					rows, err := db.Pool.Query(p.Context, sqlQuery, args...)
 					if err != nil {
 						return nil, err
 					}
@@ -292,15 +315,22 @@ func init() {
 
 					var posts []*model.Post
 					for rows.Next() {
-						var p model.Post
+						var post model.Post
+						var author model.User
 						var content *string
 						var createdAt string
-						if err := rows.Scan(&p.ID, &p.AuthorID, &p.Title, &content, &createdAt); err != nil {
+						var fullName, bio *string
+						if err := rows.Scan(&post.ID, &post.Title, &content, &createdAt,
+							&author.ID, &author.Username, &fullName, &bio); err != nil {
 							continue
 						}
-						p.Content = content
-						p.CreatedAt = createdAt
-						posts = append(posts, &p)
+						post.Content = content
+						post.CreatedAt = createdAt
+						post.AuthorID = author.ID
+						author.FullName = fullName
+						author.Bio = bio
+						post.Author = &author
+						posts = append(posts, &post)
 					}
 
 					if posts == nil {

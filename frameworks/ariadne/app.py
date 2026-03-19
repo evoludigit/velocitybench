@@ -106,16 +106,26 @@ async def load_users_batch(keys: list[str], db: AsyncDatabase) -> list[dict | No
         return [None] * len(keys)
 
 
+async def load_users_by_pk_batch(keys: list[int], db: AsyncDatabase) -> list[dict | None]:
+    """Batch load users by integer pk_user."""
+    try:
+        result = await db.fetch(
+            "SELECT pk_user, id, username, full_name, bio FROM benchmark.tb_user WHERE pk_user = ANY($1)",
+            keys,
+            timeout=5.0
+        )
+        user_map = {user["pk_user"]: user for user in result}
+        return [user_map.get(key) for key in keys]
+    except (asyncpg.PostgresError, KeyError, ValueError, TypeError) as e:
+        logger.exception(f"Error loading users by pk batch: {e}")
+        return [None] * len(keys)
+
+
 async def load_posts_batch(keys: list[str], db: AsyncDatabase) -> list[dict | None]:
     """Batch load posts by IDs."""
     try:
         result = await db.fetch(
-            """
-            SELECT p.id, p.title, p.content, u.id as author_id
-            FROM benchmark.tb_post p
-            JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-            WHERE p.id = ANY($1)
-            """,
+            "SELECT id, fk_author, title, content FROM benchmark.tb_post WHERE id = ANY($1)",
             keys,
             timeout=5.0
         )
@@ -127,11 +137,11 @@ async def load_posts_batch(keys: list[str], db: AsyncDatabase) -> list[dict | No
 
 
 async def load_posts_by_author_batch(keys: list[str], db: AsyncDatabase) -> list[list[dict]]:
-    """Batch load posts by author IDs."""
+    """Batch load posts by author UUIDs (for User.posts field)."""
     try:
         result = await db.fetch(
             """
-            SELECT p.id, p.title, p.content, u.id as author_id
+            SELECT p.id, p.fk_author, u.id as author_uuid, p.title, p.content
             FROM benchmark.tb_post p
             JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
             WHERE u.id = ANY($1)
@@ -142,9 +152,9 @@ async def load_posts_by_author_batch(keys: list[str], db: AsyncDatabase) -> list
         )
         posts_by_author = {key: [] for key in keys}
         for post in result:
-            author_id = str(post["author_id"])
-            if author_id in posts_by_author:
-                posts_by_author[author_id].append(post)
+            author_uuid = str(post["author_uuid"])
+            if author_uuid in posts_by_author:
+                posts_by_author[author_uuid].append(post)
         return [posts_by_author[key] for key in keys]
     except (asyncpg.PostgresError, KeyError, ValueError, TypeError) as e:
         logger.exception(f"Error loading posts by author: {e}")
@@ -188,6 +198,7 @@ def create_context(db: AsyncDatabase):
         return {
             "db": db,
             "user_loader": DataLoader(lambda keys: load_users_batch(keys, db)),
+            "user_by_pk_loader": DataLoader(lambda keys: load_users_by_pk_batch(keys, db)),
             "post_loader": DataLoader(lambda keys: load_posts_batch(keys, db)),
             "posts_by_author_loader": DataLoader(lambda keys: load_posts_by_author_batch(keys, db)),
             "comments_by_post_loader": DataLoader(lambda keys: load_comments_by_post_batch(keys, db)),
@@ -269,12 +280,7 @@ async def resolve_post(_, info, id: str):
 
     db = info.context["db"]
     result = await db.fetchrow(
-        """
-        SELECT p.id, p.title, p.content, u.id as author_id
-        FROM benchmark.tb_post p
-        JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-        WHERE p.id = $1
-        """,
+        "SELECT id, fk_author, title, content FROM benchmark.tb_post WHERE id = $1",
         id,
         timeout=5.0
     )
@@ -283,32 +289,34 @@ async def resolve_post(_, info, id: str):
             "id": str(result["id"]),
             "title": result["title"],
             "content": result.get("content"),
-            "author_id": str(result["author_id"]) if result.get("author_id") else None,
+            "fk_author": result.get("fk_author"),
         }
     return None
 
 
 @query.field("posts")
-async def resolve_posts(_, info, limit: int = 10):
+async def resolve_posts(_, info, limit: int = 10, published: bool | None = None):
     limit = min(max(limit, 1), 100)
     db = info.context["db"]
-    result = await db.fetch(
-        """
-        SELECT p.id, p.title, p.content, u.id as author_id
-        FROM benchmark.tb_post p
-        JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-        ORDER BY p.created_at DESC
-        LIMIT $1
-        """,
-        limit,
-        timeout=5.0
-    )
+    if published is None:
+        result = await db.fetch(
+            "SELECT id, fk_author, title, content FROM benchmark.tb_post ORDER BY created_at DESC LIMIT $1",
+            limit,
+            timeout=5.0
+        )
+    else:
+        result = await db.fetch(
+            "SELECT id, fk_author, title, content FROM benchmark.tb_post WHERE published = $2 ORDER BY created_at DESC LIMIT $1",
+            limit,
+            published,
+            timeout=5.0
+        )
     return [
         {
             "id": str(row["id"]),
             "title": row["title"],
             "content": row.get("content"),
-            "author_id": str(row["author_id"]) if row.get("author_id") else None,
+            "fk_author": row.get("fk_author"),
         }
         for row in result
     ]
@@ -423,7 +431,7 @@ async def resolve_user_posts(obj, info, limit: int = 50):
             "id": str(post["id"]),
             "title": post["title"],
             "content": post.get("content"),
-            "author_id": str(post["author_id"]) if post.get("author_id") else None,
+            "fk_author": post.get("fk_author"),
         }
         for post in posts_data[:limit]
     ]
@@ -431,10 +439,10 @@ async def resolve_user_posts(obj, info, limit: int = 50):
 
 @post_type.field("author")
 async def resolve_post_author(obj, info):
-    author_id = obj.get("author_id")
-    if not author_id:
+    fk_author = obj.get("fk_author")
+    if not fk_author:
         return None
-    user_data = await info.context["user_loader"].load(author_id)
+    user_data = await info.context["user_by_pk_loader"].load(fk_author)
     if user_data:
         return {
             "id": str(user_data["id"]),
@@ -487,7 +495,7 @@ async def resolve_comment_post(obj, info):
             "id": str(post_data["id"]),
             "title": post_data["title"],
             "content": post_data.get("content"),
-            "author_id": str(post_data["author_id"]) if post_data.get("author_id") else None,
+            "fk_author": post_data.get("fk_author"),
         }
     return None
 
@@ -526,11 +534,20 @@ async def startup():
     pool_max_size = int(os.getenv("DB_POOL_MAX_SIZE", "50"))
     pool_statement_cache = int(os.getenv("DB_POOL_STATEMENT_CACHE_SIZE", "100"))
 
-    await db.connect(
-        min_size=pool_min_size,
-        max_size=pool_max_size,
-        statement_cache_size=pool_statement_cache
-    )
+    for attempt in range(10):
+        try:
+            await db.connect(
+                min_size=pool_min_size,
+                max_size=pool_max_size,
+                statement_cache_size=pool_statement_cache
+            )
+            break
+        except Exception as e:
+            if attempt == 9:
+                raise
+            wait = min(2 ** attempt, 5)
+            logger.warning(f"DB connect attempt {attempt + 1} failed: {e}. Retrying in {wait}s...")
+            await asyncio.sleep(wait)
     logger.info("Ariadne GraphQL server started on port 4000")
 
 

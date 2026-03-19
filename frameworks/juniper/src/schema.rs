@@ -212,22 +212,36 @@ impl QueryRoot {
             .map_err(|e| juniper::FieldError::new(e, juniper::Value::null()))
     }
 
-    async fn posts(context: &Context, limit: Option<i32>) -> FieldResult<Vec<Post>> {
+    async fn posts(context: &Context, limit: Option<i32>, published: Option<bool>) -> FieldResult<Vec<Post>> {
         let limit = limit.unwrap_or(10).min(100) as i64;
 
         let client = context.db.pool().get().await
             .map_err(|e| juniper::FieldError::new(format!("DB error: {}", e), juniper::Value::null()))?;
 
-        let rows = client
-            .query(
-                "SELECT id, pk_post, title, content, fk_author, created_at
-                 FROM benchmark.tb_post
-                 ORDER BY created_at DESC
-                 LIMIT $1",
-                &[&limit],
-            )
-            .await
-            .map_err(|e| juniper::FieldError::new(format!("Query error: {}", e), juniper::Value::null()))?;
+        let rows = if let Some(pub_filter) = published {
+            client
+                .query(
+                    "SELECT id, pk_post, title, content, fk_author, created_at
+                     FROM benchmark.tb_post
+                     WHERE published = $2
+                     ORDER BY created_at DESC
+                     LIMIT $1",
+                    &[&limit, &pub_filter],
+                )
+                .await
+                .map_err(|e| juniper::FieldError::new(format!("Query error: {}", e), juniper::Value::null()))?
+        } else {
+            client
+                .query(
+                    "SELECT id, pk_post, title, content, fk_author, created_at
+                     FROM benchmark.tb_post
+                     ORDER BY created_at DESC
+                     LIMIT $1",
+                    &[&limit],
+                )
+                .await
+                .map_err(|e| juniper::FieldError::new(format!("Query error: {}", e), juniper::Value::null()))?
+        };
 
         Ok(rows
             .iter()

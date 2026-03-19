@@ -19,6 +19,7 @@ type Post struct {
 	Title    string  `json:"title"`
 	Content  *string `json:"content"`
 	AuthorID *string `json:"authorId"`
+	Author   *User   `json:"-"` // pre-loaded from JOIN in resolvePosts
 }
 
 // Comment represents a comment on a post
@@ -181,6 +182,9 @@ func NewSchema() (graphql.Schema, error) {
 					"limit": &graphql.ArgumentConfig{
 						Type:         graphql.Int,
 						DefaultValue: 10,
+					},
+					"published": &graphql.ArgumentConfig{
+						Type: graphql.Boolean,
 					},
 				},
 				Resolve: resolvePosts,

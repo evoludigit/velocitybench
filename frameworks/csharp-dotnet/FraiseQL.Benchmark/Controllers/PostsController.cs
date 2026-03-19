@@ -34,9 +34,9 @@ public class PostsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] int page = 0, [FromQuery] int size = 10)
+    public async Task<IActionResult> GetAll([FromQuery] int page = 0, [FromQuery] int size = 10, [FromQuery] bool? published = null)
     {
-        var posts = await _postRepository.GetAllAsync(page, size);
+        var posts = await _postRepository.GetAllAsync(page, size, published);
         var result = posts.Select(post => new
         {
             id = post.Id,

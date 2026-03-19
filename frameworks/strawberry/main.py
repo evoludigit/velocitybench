@@ -73,12 +73,7 @@ async def load_posts_batch(keys: list[str], db: AsyncDatabase) -> list[dict | No
     """Batch load posts by IDs with error handling."""
     try:
         result = await db.fetch(
-            """
-            SELECT p.id, p.title, p.content, u.id as author_id
-            FROM benchmark.tb_post p
-            JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-            WHERE p.id = ANY($1)
-            """,
+            "SELECT id, fk_author, title, content FROM benchmark.tb_post WHERE id = ANY($1)",
             keys,
             timeout=5.0,
         )
@@ -92,14 +87,32 @@ async def load_posts_batch(keys: list[str], db: AsyncDatabase) -> list[dict | No
         return [None] * len(keys)
 
 
+async def load_users_by_pk_batch(keys: list[int], db: AsyncDatabase) -> list[dict | None]:
+    """Batch load users by integer pk_user."""
+    try:
+        result = await db.fetch(
+            "SELECT pk_user, id, username, full_name, bio FROM benchmark.tb_user WHERE pk_user = ANY($1)",
+            keys,
+            timeout=5.0,
+        )
+        user_map = {user["pk_user"]: user for user in result}
+        return [user_map.get(key) for key in keys]
+    except TimeoutError:
+        logger.error(f"Timeout loading users by pk: {keys}")
+        return [None] * len(keys)
+    except (asyncpg.PostgresError, KeyError, ValueError, TypeError) as e:
+        logger.exception(f"Error loading users by pk batch: {e}")
+        return [None] * len(keys)
+
+
 async def load_posts_by_author_batch(
     keys: list[str], db: AsyncDatabase
 ) -> list[list[dict]]:
-    """Batch load posts by author IDs with error handling."""
+    """Batch load posts by author UUIDs (for User.posts field)."""
     try:
         result = await db.fetch(
             """
-            SELECT p.id, p.title, p.content, u.id as author_id
+            SELECT p.id, p.fk_author, u.id as author_uuid, p.title, p.content
             FROM benchmark.tb_post p
             JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
             WHERE u.id = ANY($1)
@@ -108,10 +121,10 @@ async def load_posts_by_author_batch(
             keys,
             timeout=5.0,
         )
-        # Group by author_id
+        # Group by author UUID
         posts_by_author = {key: [] for key in keys}
         for post in result:
-            posts_by_author[str(post["author_id"])].append(post)
+            posts_by_author[str(post["author_uuid"])].append(post)
         return [posts_by_author[key] for key in keys]
     except TimeoutError:
         logger.error(f"Timeout loading posts by author: {keys}")
@@ -193,9 +206,7 @@ class Comment:
                     id=strawberry.ID(post_data["id"]),
                     title=post_data["title"],
                     content=post_data.get("content"),
-                    author_id=strawberry.ID(post_data.get("author_id"))
-                    if post_data.get("author_id")
-                    else None,
+                    fk_author=post_data.get("fk_author"),
                 )
         except (asyncpg.PostgresError, KeyError, ValueError, TypeError) as e:
             logger.exception(f"Error loading post for comment {self.id}: {e}")
@@ -211,16 +222,16 @@ class Post:
     content: str | None = strawberry.field(
         default=None, description="Post content (markdown format)"
     )
-    author_id: strawberry.ID | None = strawberry.field(
-        default=None, description="UUID of the post author"
+    fk_author: int | None = strawberry.field(
+        default=None, description="Integer FK of the post author"
     )
 
     @strawberry.field(description="Author who wrote this post")
     async def author(self, info) -> User | None:
-        if not self.author_id:
+        if not self.fk_author:
             return None
         try:
-            user_data = await info.context.user_loader.load(str(self.author_id))
+            user_data = await info.context.user_by_pk_loader.load(self.fk_author)
             if user_data:
                 return User(
                     id=strawberry.ID(user_data["id"]),
@@ -236,7 +247,7 @@ class Post:
     async def comments(
         self,
         info,
-        limit: int = strawberry.field(default=50, description="Max 50 comments"),
+        limit: int = 50,
     ) -> list[Comment]:
         limit = min(limit, 50)  # Server-side limit
         try:
@@ -281,7 +292,7 @@ class User:
     async def posts(
         self,
         info,
-        limit: int = strawberry.field(default=50, description="Max 50 posts"),
+        limit: int = 50,
     ) -> list[Post]:
         limit = min(limit, 50)  # Server-side limit
         try:
@@ -291,9 +302,7 @@ class User:
                     id=strawberry.ID(post["id"]),
                     title=post["title"],
                     content=post.get("content"),
-                    author_id=strawberry.ID(post.get("author_id"))
-                    if post.get("author_id")
-                    else None,
+                    fk_author=post.get("fk_author"),
                 )
                 for post in posts_data[:limit]
             ]
@@ -350,7 +359,7 @@ class Query:
     async def users(
         self,
         info,
-        limit: int = strawberry.field(default=10, description="Max 100 users"),
+        limit: int = 10,
     ) -> list[User]:
         """Fetch a list of users with pagination."""
         try:
@@ -391,12 +400,7 @@ class Query:
 
             db = info.context.db
             result = await db.fetchrow(
-                """
-                SELECT p.id, p.title, p.content, u.id as author_id
-                FROM benchmark.tb_post p
-                JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-                WHERE p.id = $1
-                """,
+                "SELECT id, fk_author, title, content FROM benchmark.tb_post WHERE id = $1",
                 id,
                 timeout=5.0,
             )
@@ -405,9 +409,7 @@ class Query:
                     id=strawberry.ID(result["id"]),
                     title=result["title"],
                     content=result.get("content"),
-                    author_id=strawberry.ID(result.get("author_id"))
-                    if result.get("author_id")
-                    else None,
+                    fk_author=result.get("fk_author"),
                 )
             return None
         except ValueError as e:
@@ -424,7 +426,8 @@ class Query:
     async def posts(
         self,
         info,
-        limit: int = strawberry.field(default=10, description="Max 100 posts"),
+        limit: int = 10,
+        published: bool | None = None,
     ) -> list[Post]:
         """Fetch a list of posts ordered by creation date (newest first)."""
         try:
@@ -432,25 +435,25 @@ class Query:
             limit = max(limit, 1)
 
             db = info.context.db
-            result = await db.fetch(
-                """
-                SELECT p.id, p.title, p.content, u.id as author_id
-                FROM benchmark.tb_post p
-                JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-                ORDER BY p.created_at DESC
-                LIMIT $1
-                """,
-                limit,
-                timeout=5.0,
-            )
+            if published is None:
+                result = await db.fetch(
+                    "SELECT id, fk_author, title, content FROM benchmark.tb_post ORDER BY created_at DESC LIMIT $1",
+                    limit,
+                    timeout=5.0,
+                )
+            else:
+                result = await db.fetch(
+                    "SELECT id, fk_author, title, content FROM benchmark.tb_post WHERE published = $2 ORDER BY created_at DESC LIMIT $1",
+                    limit,
+                    published,
+                    timeout=5.0,
+                )
             return [
                 Post(
                     id=strawberry.ID(row["id"]),
                     title=row["title"],
                     content=row.get("content"),
-                    author_id=strawberry.ID(row.get("author_id"))
-                    if row.get("author_id")
-                    else None,
+                    fk_author=row.get("fk_author"),
                 )
                 for row in result
             ]
@@ -516,13 +519,9 @@ class Mutation:
     async def update_user(
         self,
         info,
-        id: strawberry.ID = strawberry.field(description="User ID to update"),
-        bio: str | None = strawberry.field(
-            default=None, description="Updated biography"
-        ),
-        full_name: str | None = strawberry.field(
-            default=None, description="Updated full name"
-        ),
+        id: strawberry.ID,
+        bio: str | None = None,
+        full_name: str | None = None,
     ) -> User | None:
         """Update user profile information (bio and/or full_name)."""
         try:
@@ -608,6 +607,9 @@ class Context(BaseContext):
         # Create DataLoaders for batching (proper function references instead of lambdas)
         self.user_loader: DataLoader[str, dict | None] = DataLoader(
             load_fn=lambda keys: load_users_batch(keys, db)
+        )
+        self.user_by_pk_loader: DataLoader[int, dict | None] = DataLoader(
+            load_fn=lambda keys: load_users_by_pk_batch(keys, db)
         )
         self.post_loader: DataLoader[str, dict | None] = DataLoader(
             load_fn=lambda keys: load_posts_batch(keys, db)

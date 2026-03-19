@@ -11,8 +11,90 @@ import (
 
 	"github.com/benchmark/go-gqlgen/graph/model"
 	"github.com/benchmark/go-gqlgen/internal/db"
-	"github.com/go-playground/validator/v10"
+	validator "github.com/go-playground/validator/v10"
 )
+
+// UpdateUser is the resolver for the updateUser field.
+func (r *mutationResolver) UpdateUser(ctx context.Context, id string, fullName *string, bio *string) (*model.User, error) {
+	// Validate input
+	req := UpdateUserRequest{
+		ID:       id,
+		FullName: fullName,
+		Bio:      bio,
+	}
+
+	validate := validator.New()
+	if err := validate.Struct(req); err != nil {
+		return nil, fmt.Errorf("validation error: %w", err)
+	}
+	query := "UPDATE benchmark.tb_user SET updated_at = NOW()"
+	args := []interface{}{}
+	argIdx := 1
+
+	if fullName != nil {
+		query += fmt.Sprintf(", full_name = $%d", argIdx)
+		args = append(args, *fullName)
+		argIdx++
+	}
+	if bio != nil {
+		query += fmt.Sprintf(", bio = $%d", argIdx)
+		args = append(args, *bio)
+		argIdx++
+	}
+
+	query += fmt.Sprintf(" WHERE id = $%d", argIdx)
+	args = append(args, id)
+
+	_, err := db.Pool.Exec(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	// Return updated user via direct SELECT (DataLoader is not safe in mutations)
+	var user model.User
+	var updatedFullName, updatedBio *string
+	err = db.Pool.QueryRow(ctx,
+		"SELECT id, username, full_name, bio FROM benchmark.tb_user WHERE id = $1",
+		id,
+	).Scan(&user.ID, &user.Username, &updatedFullName, &updatedBio)
+	if err != nil {
+		return nil, err
+	}
+	user.FullName = updatedFullName
+	user.Bio = updatedBio
+	return &user, nil
+}
+
+// UpdatePost is the resolver for the updatePost field.
+func (r *mutationResolver) UpdatePost(ctx context.Context, id string, title *string, content *string) (*model.Post, error) {
+	query := "UPDATE benchmark.tb_post SET updated_at = NOW()"
+	args := []interface{}{}
+	argIdx := 1
+
+	if title != nil {
+		query += fmt.Sprintf(", title = $%d", argIdx)
+		args = append(args, *title)
+		argIdx++
+	}
+	if content != nil {
+		query += fmt.Sprintf(", content = $%d", argIdx)
+		args = append(args, *content)
+		argIdx++
+	}
+
+	query += fmt.Sprintf(" WHERE id = $%d", argIdx)
+	args = append(args, id)
+
+	_, err := db.Pool.Exec(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	// Return updated post via dataloader
+	loaders := GetLoaders(ctx)
+	loaders.PostLoader.Clear(ctx, id)
+	return loaders.PostLoader.Load(ctx, id)()
+}
 
 // Ping is the resolver for the ping field.
 func (r *queryResolver) Ping(ctx context.Context) (string, error) {
@@ -65,19 +147,33 @@ func (r *queryResolver) Post(ctx context.Context, id string) (*model.Post, error
 }
 
 // Posts is the resolver for the posts field.
-func (r *queryResolver) Posts(ctx context.Context, limit *int32) ([]*model.Post, error) {
+func (r *queryResolver) Posts(ctx context.Context, limit *int32, published *bool) ([]*model.Post, error) {
 	l := 10
 	if limit != nil {
 		l = int(*limit)
 	}
 
-	rows, err := db.Pool.Query(ctx, `
+	sqlQuery := `
 		SELECT p.id, u.id AS author_uuid, u.username, u.full_name, p.title, p.content, p.created_at::text
 		FROM benchmark.tb_post p
 		JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
 		ORDER BY p.created_at DESC
 		LIMIT $1
-	`, l)
+	`
+	args := []interface{}{l}
+	if published != nil {
+		sqlQuery = `
+			SELECT p.id, u.id AS author_uuid, u.username, u.full_name, p.title, p.content, p.created_at::text
+			FROM benchmark.tb_post p
+			JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+			WHERE p.published = $2
+			ORDER BY p.created_at DESC
+			LIMIT $1
+		`
+		args = append(args, *published)
+	}
+
+	rows, err := db.Pool.Query(ctx, sqlQuery, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -139,186 +235,25 @@ func (r *queryResolver) Comments(ctx context.Context, limit *int32) ([]*model.Co
 	return comments, nil
 }
 
-// UpdateUserRequest represents the validated input for updating a user
-type UpdateUserRequest struct {
-	ID       string  `validate:"required,uuid"`
-	FullName *string `validate:"omitempty,max=255"`
-	Bio      *string `validate:"omitempty,max=1000"`
-}
-
-// UpdateUser is the resolver for the updateUser field.
-func (r *mutationResolver) UpdateUser(ctx context.Context, id string, fullName *string, bio *string) (*model.User, error) {
-	// Validate input
-	req := UpdateUserRequest{
-		ID:       id,
-		FullName: fullName,
-		Bio:      bio,
-	}
-
-	validate := validator.New()
-	if err := validate.Struct(req); err != nil {
-		return nil, fmt.Errorf("validation error: %w", err)
-	}
-	query := "UPDATE benchmark.tb_user SET updated_at = NOW()"
-	args := []interface{}{}
-	argIdx := 1
-
-	if fullName != nil {
-		query += fmt.Sprintf(", full_name = $%d", argIdx)
-		args = append(args, *fullName)
-		argIdx++
-	}
-	if bio != nil {
-		query += fmt.Sprintf(", bio = $%d", argIdx)
-		args = append(args, *bio)
-		argIdx++
-	}
-
-	query += fmt.Sprintf(" WHERE id = $%d", argIdx)
-	args = append(args, id)
-
-	_, err := db.Pool.Exec(ctx, query, args...)
-	if err != nil {
-		return nil, err
-	}
-
-	// Return updated user via dataloader
-	loaders := GetLoaders(ctx)
-	loaders.UserLoader.Clear(ctx, id)
-	return loaders.UserLoader.Load(ctx, id)()
-}
-
-// UpdatePost is the resolver for the updatePost field.
-func (r *mutationResolver) UpdatePost(ctx context.Context, id string, title *string, content *string) (*model.Post, error) {
-	query := "UPDATE benchmark.tb_post SET updated_at = NOW()"
-	args := []interface{}{}
-	argIdx := 1
-
-	if title != nil {
-		query += fmt.Sprintf(", title = $%d", argIdx)
-		args = append(args, *title)
-		argIdx++
-	}
-	if content != nil {
-		query += fmt.Sprintf(", content = $%d", argIdx)
-		args = append(args, *content)
-		argIdx++
-	}
-
-	query += fmt.Sprintf(" WHERE id = $%d", argIdx)
-	args = append(args, id)
-
-	_, err := db.Pool.Exec(ctx, query, args...)
-	if err != nil {
-		return nil, err
-	}
-
-	// Return updated post via dataloader
-	loaders := GetLoaders(ctx)
-	loaders.PostLoader.Clear(ctx, id)
-	return loaders.PostLoader.Load(ctx, id)()
-}
-
-// Author is the resolver for the author field (Comment type).
-func (r *commentResolver) Author(ctx context.Context, obj *model.Comment) (*model.User, error) {
-	if obj.Author != nil && obj.Author.ID != "" {
-		loaders := GetLoaders(ctx)
-		return loaders.UserLoader.Load(ctx, obj.Author.ID)()
-	}
-	return nil, nil
-}
-
-// Post is the resolver for the post field (Comment type).
-func (r *commentResolver) Post(ctx context.Context, obj *model.Comment) (*model.Post, error) {
-	if obj.Post != nil && obj.Post.ID != "" {
-		loaders := GetLoaders(ctx)
-		return loaders.PostLoader.Load(ctx, obj.Post.ID)()
-	}
-	return nil, nil
-}
-
-// Author is the resolver for the author field (Post type).
-func (r *postResolver) Author(ctx context.Context, obj *model.Post) (*model.User, error) {
-	if obj.Author == nil || obj.Author.ID == "" {
-		return nil, nil
-	}
-	// If the author was eagerly loaded (username populated by Posts query), return it directly.
-	if obj.Author.Username != "" {
-		return obj.Author, nil
-	}
-	loaders := GetLoaders(ctx)
-	return loaders.UserLoader.Load(ctx, obj.Author.ID)()
-}
-
-// Comments is the resolver for the comments field (Post type).
-func (r *postResolver) Comments(ctx context.Context, obj *model.Post, limit *int32) ([]*model.Comment, error) {
-	loaders := GetLoaders(ctx)
-	comments, err := loaders.CommentsByPostLoader.Load(ctx, obj.ID)()
-	if err != nil {
-		return nil, err
-	}
-
-	l := 50
-	if limit != nil {
-		l = int(*limit)
-	}
-	if len(comments) > l {
-		comments = comments[:l]
-	}
-	return comments, nil
-}
-
-// Posts is the resolver for the posts field (User type).
-func (r *userResolver) Posts(ctx context.Context, obj *model.User, limit *int32) ([]*model.Post, error) {
-	loaders := GetLoaders(ctx)
-	posts, err := loaders.PostsByAuthorLoader.Load(ctx, obj.ID)()
-	if err != nil {
-		return nil, err
-	}
-
-	l := 50
-	if limit != nil {
-		l = int(*limit)
-	}
-	if len(posts) > l {
-		posts = posts[:l]
-	}
-	return posts, nil
-}
-
-// Followers is the resolver for the followers field (User type).
-func (r *userResolver) Followers(ctx context.Context, obj *model.User, limit *int32) ([]*model.User, error) {
-	// TODO: Implement followers relationship query
-	// For now, return empty slice as the schema allows this
-	return []*model.User{}, nil
-}
-
-// Following is the resolver for the following field (User type).
-func (r *userResolver) Following(ctx context.Context, obj *model.User, limit *int32) ([]*model.User, error) {
-	// TODO: Implement following relationship query
-	// For now, return empty slice as the schema allows this
-	return []*model.User{}, nil
-}
-
-// Comment returns CommentResolver implementation.
-func (r *Resolver) Comment() CommentResolver { return &commentResolver{r} }
-
 // Mutation returns MutationResolver implementation.
 func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
-
-// Post returns PostResolver implementation.
-func (r *Resolver) Post() PostResolver { return &postResolver{r} }
 
 // Query returns QueryResolver implementation.
 func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
-// User returns UserResolver implementation.
-func (r *Resolver) User() UserResolver { return &userResolver{r} }
-
-type Resolver struct{}
-
-type commentResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
-type postResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
-type userResolver struct{ *Resolver }
+
+// !!! WARNING !!!
+// The code below was going to be deleted when updating resolvers. It has been copied here so you have
+// one last chance to move it out of harms way if you want. There are two reasons this happens:
+//  - When renaming or deleting a resolver the old code will be put in here. You can safely delete
+//    it when you're done.
+//  - You have helper methods in this file. Move them out to keep these resolver files clean.
+/*
+	type UpdateUserRequest struct {
+	ID       string  `validate:"required,uuid"`
+	FullName *string `validate:"omitempty,max=255"`
+	Bio      *string `validate:"omitempty,max=1000"`
+}
+*/

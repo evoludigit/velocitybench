@@ -37,9 +37,9 @@ export const resolvers = {
       });
     },
 
-    posts: async (_: any, { limit }: { limit: number }) => {
+    posts: async (_: any, { limit, published }: { limit: number; published?: boolean }) => {
       return postRepository.find({
-        where: { published: true },
+        where: published !== undefined ? { published } : {},
         order: { created_at: 'DESC' },
         take: limit,
         // Remove relations - let field resolvers handle with DataLoaders

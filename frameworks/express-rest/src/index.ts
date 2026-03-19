@@ -189,28 +189,54 @@ app.put('/users/:id', async (req: Request, res: Response) => {
 app.get('/posts', async (req: Request, res: Response) => {
   const limit = parseInt(req.query.limit as string) || 10;
   const include = ((req.query.include as string) || '').split(',').filter(Boolean);
+  const publishedParam = req.query.published as string | undefined;
 
-  const posts = await query(
-    `SELECT p.id, u.id as author_id, p.title, p.content, p.published as status
-     FROM benchmark.tb_post p
-     JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-     WHERE p.published = true
-     ORDER BY p.created_at DESC
-     LIMIT $1`,
-    [limit]
-  );
-
+  let posts;
   if (include.includes('author')) {
-    const authorIds = [...new Set(posts.map((p: any) => p.author_id))];
-    const authors = await query(
-      `SELECT id, username, full_name
-       FROM benchmark.tb_user WHERE id = ANY($1::uuid[])`,
-      [authorIds]
-    );
-    const authorMap = new Map(authors.map((a: any) => [a.id, a]));
+    if (publishedParam === undefined || publishedParam === '') {
+      posts = await query(
+        `SELECT p.id, u.id as author_id, u.username, u.full_name, p.title, p.content, p.published as status
+         FROM benchmark.tb_post p
+         JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+         ORDER BY p.created_at DESC
+         LIMIT $1`,
+        [limit]
+      );
+    } else {
+      const publishedBool = publishedParam === 'true' || publishedParam === '1';
+      posts = await query(
+        `SELECT p.id, u.id as author_id, u.username, u.full_name, p.title, p.content, p.published as status
+         FROM benchmark.tb_post p
+         JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+         WHERE p.published = $2
+         ORDER BY p.created_at DESC
+         LIMIT $1`,
+        [limit, publishedBool]
+      );
+    }
     posts.forEach((p: any) => {
-      p.author = authorMap.get(p.author_id);
+      p.author = { id: p.author_id, username: p.username, full_name: p.full_name };
     });
+  } else {
+    if (publishedParam === undefined || publishedParam === '') {
+      posts = await query(
+        `SELECT id, fk_author as author_id, title, content, published as status
+         FROM benchmark.tb_post
+         ORDER BY created_at DESC
+         LIMIT $1`,
+        [limit]
+      );
+    } else {
+      const publishedBool = publishedParam === 'true' || publishedParam === '1';
+      posts = await query(
+        `SELECT id, fk_author as author_id, title, content, published as status
+         FROM benchmark.tb_post
+         WHERE published = $2
+         ORDER BY created_at DESC
+         LIMIT $1`,
+        [limit, publishedBool]
+      );
+    }
   }
 
   res.json(posts);

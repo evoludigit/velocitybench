@@ -373,24 +373,43 @@ async def update_user(
 
 
 @app.get("/posts")
-async def list_posts(limit: int = Query(10, ge=1, le=100), include: str | None = None):
-    """List posts with optional includes"""
+async def list_posts(
+    limit: int = Query(10, ge=1, le=100),
+    include: str | None = None,
+    published: bool | None = Query(None),
+):
+    """List posts with optional includes and published filter"""
     if REQUEST_COUNT:
         REQUEST_COUNT.labels(method="GET", endpoint="/posts").inc()
 
     db = get_db()
 
-    # Base query with author
-    query = """
-        SELECT p.id, p.title, p.content, p.created_at,
-               u.id as author_id, u.username as author_username
-        FROM benchmark.tb_post p
-        JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-        ORDER BY p.created_at DESC
-        LIMIT $1
-    """
-
-    posts = await db.fetch(query, limit)
+    if published is None:
+        posts = await db.fetch(
+            """
+            SELECT p.id, p.title, p.content, p.created_at,
+                   u.id as author_id, u.username as author_username
+            FROM benchmark.tb_post p
+            JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+            ORDER BY p.created_at DESC
+            LIMIT $1
+            """,
+            limit,
+        )
+    else:
+        posts = await db.fetch(
+            """
+            SELECT p.id, p.title, p.content, p.created_at,
+                   u.id as author_id, u.username as author_username
+            FROM benchmark.tb_post p
+            JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+            WHERE p.published = $2
+            ORDER BY p.created_at DESC
+            LIMIT $1
+            """,
+            limit,
+            published,
+        )
 
     # Handle includes
     if include and "author" in include:

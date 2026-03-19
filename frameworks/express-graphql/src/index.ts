@@ -8,6 +8,7 @@ import {
   GraphQLID,
   GraphQLList,
   GraphQLNonNull,
+  GraphQLBoolean,
 } from 'graphql';
 import { createDataLoaders, DataLoaders } from './dataloaders.js';
 import { pool } from './db.js';
@@ -43,7 +44,7 @@ UserType = new GraphQLObjectType({
           id: post.id,
           title: post.title,
           content: post.content,
-          authorId: post.author_id,
+          authorId: post.fk_author,
         }));
       },
     },
@@ -60,15 +61,15 @@ PostType = new GraphQLObjectType({
     content: { type: GraphQLString },
     author: {
       type: UserType,
-      resolve: async (parent: { authorId: string }, _: unknown, ctx: GraphQLContext) => {
+      resolve: async (parent: { authorId: number }, _: unknown, ctx: GraphQLContext) => {
         if (!parent.authorId) return null;
-        const user = await ctx.loaders.userLoader.load(parent.authorId);
+        const user = await ctx.loaders.userByPkLoader.load(parent.authorId);
         if (!user) return null;
         return {
-          id: user.id,
-          username: user.username,
-          fullName: user.full_name,
-          bio: user.bio,
+          id: (user as any).id,
+          username: (user as any).username,
+          fullName: (user as any).full_name,
+          bio: (user as any).bio,
         };
       },
     },
@@ -119,7 +120,7 @@ CommentType = new GraphQLObjectType({
           id: post.id,
           title: post.title,
           content: post.content,
-          authorId: post.author_id,
+          authorId: post.fk_author,
         };
       },
     },
@@ -174,10 +175,9 @@ const QueryType = new GraphQLObjectType({
       args: { id: { type: new GraphQLNonNull(GraphQLID) } },
       resolve: async (_: unknown, { id }: { id: string }) => {
         const result = await pool.query(
-          `SELECT p.id, p.title, p.content, u.id as author_id
-           FROM benchmark.tb_post p
-           JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-           WHERE p.id = $1`,
+          `SELECT id, fk_author, title, content
+           FROM benchmark.tb_post
+           WHERE id = $1`,
           [id]
         );
         if (result.rows.length === 0) return null;
@@ -186,28 +186,40 @@ const QueryType = new GraphQLObjectType({
           id: row.id,
           title: row.title,
           content: row.content,
-          authorId: row.author_id,
+          authorId: row.fk_author,
         };
       },
     },
     posts: {
       type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(PostType))),
-      args: { limit: { type: GraphQLInt, defaultValue: 10 } },
-      resolve: async (_: unknown, { limit }: { limit: number }) => {
+      args: {
+        limit: { type: GraphQLInt, defaultValue: 10 },
+        published: { type: GraphQLBoolean },
+      },
+      resolve: async (_: unknown, { limit, published }: { limit: number; published?: boolean }) => {
         const safeLimit = Math.min(Math.max(limit, 1), 100);
-        const result = await pool.query(
-          `SELECT p.id, p.title, p.content, u.id as author_id
-           FROM benchmark.tb_post p
-           JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-           ORDER BY p.created_at DESC
-           LIMIT $1`,
-          [safeLimit]
-        );
+        let sql: string;
+        let params: unknown[];
+        if (published === undefined || published === null) {
+          sql = `SELECT id, fk_author, title, content
+           FROM benchmark.tb_post
+           ORDER BY created_at DESC
+           LIMIT $1`;
+          params = [safeLimit];
+        } else {
+          sql = `SELECT id, fk_author, title, content
+           FROM benchmark.tb_post
+           WHERE published = $2
+           ORDER BY created_at DESC
+           LIMIT $1`;
+          params = [safeLimit, published];
+        }
+        const result = await pool.query(sql, params);
         return result.rows.map((row: any) => ({
           id: row.id,
           title: row.title,
           content: row.content,
-          authorId: row.author_id,
+          authorId: row.fk_author,
         }));
       },
     },

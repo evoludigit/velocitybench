@@ -21,11 +21,18 @@ public class PostRepository : IPostRepository
             .FirstOrDefaultAsync(p => p.Id == id);
     }
 
-    public async Task<IEnumerable<Post>> GetAllAsync(int page = 0, int size = 10)
+    public async Task<IEnumerable<Post>> GetAllAsync(int page = 0, int size = 10, bool? published = null)
     {
-        return await _context.Posts
+        var query = _context.Posts
             .Include(p => p.Author)
-            .AsNoTracking()
+            .AsNoTracking();
+
+        if (published.HasValue)
+        {
+            query = query.Where(p => p.Published == published.Value);
+        }
+
+        return await query
             .OrderByDescending(p => p.CreatedAt)
             .Skip(page * size)
             .Take(size)

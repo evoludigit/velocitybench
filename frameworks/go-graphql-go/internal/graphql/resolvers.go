@@ -83,21 +83,35 @@ func resolvePost(p graphql.ResolveParams) (interface{}, error) {
 	return result, nil
 }
 
-// resolvePosts resolves multiple posts with optional limit
+// resolvePosts resolves multiple posts with optional limit and published filter
 func resolvePosts(p graphql.ResolveParams) (interface{}, error) {
 	limit, ok := p.Args["limit"].(int)
 	if !ok {
 		limit = 10
 	}
 
-	query := `
-		SELECT p.id, p.title, p.content, u.id as author_id
+	sqlQuery := `
+		SELECT p.id, p.title, p.content,
+		       u.id, u.username, u.full_name, u.bio
 		FROM benchmark.tb_post p
 		JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
 		LIMIT $1
 	`
+	args := []interface{}{limit}
 
-	rows, err := db.Pool.Query(p.Context, query, limit)
+	if published, ok := p.Args["published"].(bool); ok {
+		sqlQuery = `
+			SELECT p.id, p.title, p.content,
+			       u.id, u.username, u.full_name, u.bio
+			FROM benchmark.tb_post p
+			JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+			WHERE p.published = $2
+			LIMIT $1
+		`
+		args = append(args, published)
+	}
+
+	rows, err := db.Pool.Query(p.Context, sqlQuery, args...)
 	if err != nil {
 		log.Printf("Error querying posts: %v", err)
 		return nil, err
@@ -107,11 +121,15 @@ func resolvePosts(p graphql.ResolveParams) (interface{}, error) {
 	var posts []*Post
 	for rows.Next() {
 		var post Post
-		err := rows.Scan(&post.ID, &post.Title, &post.Content, &post.AuthorID)
+		var author User
+		err := rows.Scan(&post.ID, &post.Title, &post.Content,
+			&author.ID, &author.Username, &author.FullName, &author.Bio)
 		if err != nil {
 			log.Printf("Error scanning post: %v", err)
 			continue
 		}
+		post.AuthorID = &author.ID
+		post.Author = &author
 		posts = append(posts, &post)
 	}
 
@@ -171,7 +189,16 @@ func resolveUserPosts(p graphql.ResolveParams) (interface{}, error) {
 // resolvePostAuthor resolves the author of a post
 func resolvePostAuthor(p graphql.ResolveParams) (interface{}, error) {
 	post, ok := p.Source.(*Post)
-	if !ok || post == nil || post.AuthorID == nil {
+	if !ok || post == nil {
+		return nil, nil
+	}
+
+	// Return pre-loaded author from JOIN query if available
+	if post.Author != nil {
+		return post.Author, nil
+	}
+
+	if post.AuthorID == nil {
 		return nil, nil
 	}
 

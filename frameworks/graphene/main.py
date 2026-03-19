@@ -38,6 +38,20 @@ class UserLoader(DataLoader):
         return [user_map.get(key) for key in keys]
 
 
+class UserByPkLoader(DataLoader):
+    def __init__(self, db: AsyncDatabase):
+        super().__init__()
+        self.db = db
+
+    async def batch_load_fn(self, keys: list[int]) -> list[dict | None]:
+        result = await self.db.fetch(
+            "SELECT pk_user, id, username, full_name, bio FROM benchmark.tb_user WHERE pk_user = ANY($1)",
+            keys,
+        )
+        user_map = {user["pk_user"]: user for user in result}
+        return [user_map.get(key) for key in keys]
+
+
 class PostLoader(DataLoader):
     def __init__(self, db: AsyncDatabase):
         super().__init__()
@@ -45,12 +59,7 @@ class PostLoader(DataLoader):
 
     async def batch_load_fn(self, keys: list[str]) -> list[dict | None]:
         result = await self.db.fetch(
-            """
-            SELECT p.id, p.title, p.content, u.id as author_id
-            FROM benchmark.tb_post p
-            JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-            WHERE p.id = ANY($1)
-            """,
+            "SELECT id, fk_author, title, content FROM benchmark.tb_post WHERE id = ANY($1)",
             keys,
         )
         post_map = {str(post["id"]): post for post in result}
@@ -65,7 +74,7 @@ class PostsByAuthorLoader(DataLoader):
     async def batch_load_fn(self, keys: list[str]) -> list[list[dict]]:
         result = await self.db.fetch(
             """
-            SELECT p.id, p.title, p.content, u.id as author_id
+            SELECT p.id, p.fk_author, u.id as author_uuid, p.title, p.content
             FROM benchmark.tb_post p
             JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
             WHERE u.id = ANY($1)
@@ -75,9 +84,9 @@ class PostsByAuthorLoader(DataLoader):
         )
         posts_by_author = {key: [] for key in keys}
         for post in result:
-            author_id = str(post["author_id"])
-            if author_id in posts_by_author:
-                posts_by_author[author_id].append(post)
+            author_uuid = str(post["author_uuid"])
+            if author_uuid in posts_by_author:
+                posts_by_author[author_uuid].append(post)
         return [posts_by_author[key] for key in keys]
 
 
@@ -139,7 +148,7 @@ class Comment(ObjectType):
                 id=post_data["id"],
                 title=post_data["title"],
                 content=post_data.get("content"),
-                author_id=post_data.get("author_id"),
+                fk_author=post_data.get("fk_author"),
             )
         return None
 
@@ -152,13 +161,13 @@ class Post(ObjectType):
     comments = GrapheneList(lambda: Comment, limit=Int(default_value=10))
 
     def __init__(self, *args, **kwargs):
-        self.author_id = kwargs.pop("author_id", None)
+        self.fk_author = kwargs.pop("fk_author", None)
         super().__init__(*args, **kwargs)
 
     async def resolve_author(self, info):
-        if not self.author_id:
+        if not self.fk_author:
             return None
-        user_data = await info.context["user_loader"].load(self.author_id)
+        user_data = await info.context["user_by_pk_loader"].load(self.fk_author)
         if user_data:
             return User(
                 id=user_data["id"],
@@ -200,7 +209,7 @@ class User(ObjectType):
                 id=post["id"],
                 title=post["title"],
                 content=post.get("content"),
-                author_id=post.get("author_id"),
+                fk_author=post.get("fk_author"),
             )
             for post in posts_data[:limit]
         ]
@@ -211,7 +220,7 @@ class Query(ObjectType):
     user = Field(User, id=ID(required=True))
     users = GrapheneList(User, limit=Int(default_value=10))
     post = Field(Post, id=ID(required=True))
-    posts = GrapheneList(Post, limit=Int(default_value=10))
+    posts = GrapheneList(Post, limit=Int(default_value=10), published=graphene.Boolean())
     comment = Field(Comment, id=ID(required=True))
 
     async def resolve_ping(self, info):
@@ -251,12 +260,7 @@ class Query(ObjectType):
     async def resolve_post(self, info, id):
         db = info.context["db"]
         result = await db.fetchrow(
-            """
-            SELECT p.id, p.title, p.content, u.id as author_id
-            FROM benchmark.tb_post p
-            JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-            WHERE p.id = $1
-            """,
+            "SELECT id, fk_author, title, content FROM benchmark.tb_post WHERE id = $1",
             id,
         )
         if result:
@@ -264,28 +268,29 @@ class Query(ObjectType):
                 id=result["id"],
                 title=result["title"],
                 content=result.get("content"),
-                author_id=result.get("author_id"),
+                fk_author=result.get("fk_author"),
             )
         return None
 
-    async def resolve_posts(self, info, limit):
+    async def resolve_posts(self, info, limit, published=None):
         db = info.context["db"]
-        result = await db.fetch(
-            """
-            SELECT p.id, p.title, p.content, u.id as author_id
-            FROM benchmark.tb_post p
-            JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-            ORDER BY p.created_at DESC
-            LIMIT $1
-            """,
-            limit,
-        )
+        if published is None:
+            result = await db.fetch(
+                "SELECT id, fk_author, title, content FROM benchmark.tb_post ORDER BY created_at DESC LIMIT $1",
+                limit,
+            )
+        else:
+            result = await db.fetch(
+                "SELECT id, fk_author, title, content FROM benchmark.tb_post WHERE published = $2 ORDER BY created_at DESC LIMIT $1",
+                limit,
+                published,
+            )
         return [
             Post(
                 id=row["id"],
                 title=row["title"],
                 content=row.get("content"),
-                author_id=row.get("author_id"),
+                fk_author=row.get("fk_author"),
             )
             for row in result
         ]
@@ -318,20 +323,14 @@ class UpdateUser(graphene.Mutation):
         bio = String()
         full_name = String()
 
-    user = Field(lambda: User)
+    id = ID()
+    username = String()
+    full_name = String()
+    bio = String()
 
     async def mutate(self, info, id, bio=None, full_name=None):
-        # Basic input validation
-        if bio is not None and (not isinstance(bio, str) or len(bio) > 1000):
-            raise ValueError("Bio must be a string with maximum length 1000")
-        if full_name is not None and (
-            not isinstance(full_name, str) or len(full_name) > 255
-        ):
-            raise ValueError("Full name must be a string with maximum length 255")
-
         db = info.context["db"]
 
-        # Update user
         update_fields = []
         params = [id]
         param_idx = 2
@@ -351,21 +350,18 @@ class UpdateUser(graphene.Mutation):
                 *params,
             )
 
-        # Return updated user
         result = await db.fetchrow(
             "SELECT id, username, full_name, bio FROM benchmark.tb_user WHERE id = $1",
             id,
         )
         if result:
             return UpdateUser(
-                user=User(
-                    id=result["id"],
-                    username=result["username"],
-                    full_name=result.get("full_name"),
-                    bio=result.get("bio"),
-                )
+                id=result["id"],
+                username=result["username"],
+                full_name=result.get("full_name"),
+                bio=result.get("bio"),
             )
-        return UpdateUser(user=None)
+        return UpdateUser(id=None, username=None, full_name=None, bio=None)
 
 
 class Mutation(ObjectType):
@@ -452,6 +448,7 @@ async def graphql_endpoint(request: Request):
         context = {
             "db": db,
             "user_loader": UserLoader(db),
+            "user_by_pk_loader": UserByPkLoader(db),
             "post_loader": PostLoader(db),
             "posts_by_author_loader": PostsByAuthorLoader(db),
             "comments_by_post_loader": CommentsByPostLoader(db),

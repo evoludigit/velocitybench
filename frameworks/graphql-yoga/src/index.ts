@@ -10,7 +10,7 @@ const typeDefs = /* GraphQL */ `
     user(id: ID!): User
     users(limit: Int = 10): [User!]!
     post(id: ID!): Post
-    posts(limit: Int = 10): [Post!]!
+    posts(limit: Int = 10, published: Boolean): [Post!]!
     comment(id: ID!): Comment
   }
 
@@ -84,10 +84,9 @@ const resolvers = {
 
     post: async (_: unknown, { id }: { id: string }) => {
       const result = await pool.query(
-        `SELECT p.id, p.title, p.content, u.id as author_id
-         FROM benchmark.tb_post p
-         JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-         WHERE p.id = $1`,
+        `SELECT id, fk_author, title, content
+         FROM benchmark.tb_post
+         WHERE id = $1`,
         [id]
       );
       if (result.rows.length === 0) return null;
@@ -96,25 +95,36 @@ const resolvers = {
         id: row.id,
         title: row.title,
         content: row.content,
-        authorId: row.author_id,
+        fkAuthor: row.fk_author,
       };
     },
 
-    posts: async (_: unknown, { limit }: { limit: number }) => {
+    posts: async (_: unknown, { limit, published }: { limit: number; published?: boolean }) => {
       const safeLimit = Math.min(Math.max(limit, 1), 100);
-      const result = await pool.query(
-        `SELECT p.id, p.title, p.content, u.id as author_id
-         FROM benchmark.tb_post p
-         JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-         ORDER BY p.created_at DESC
-         LIMIT $1`,
-        [safeLimit]
-      );
+      let result;
+      if (published === undefined || published === null) {
+        result = await pool.query(
+          `SELECT id, fk_author, title, content
+           FROM benchmark.tb_post
+           ORDER BY created_at DESC
+           LIMIT $1`,
+          [safeLimit]
+        );
+      } else {
+        result = await pool.query(
+          `SELECT id, fk_author, title, content
+           FROM benchmark.tb_post
+           WHERE published = $2
+           ORDER BY created_at DESC
+           LIMIT $1`,
+          [safeLimit, published]
+        );
+      }
       return result.rows.map((row) => ({
         id: row.id,
         title: row.title,
         content: row.content,
-        authorId: row.author_id,
+        fkAuthor: row.fk_author,
       }));
     },
 
@@ -196,21 +206,21 @@ const resolvers = {
         id: post.id,
         title: post.title,
         content: post.content,
-        authorId: post.author_id,
+        fkAuthor: (post as any).fk_author,
       }));
     },
   },
 
   Post: {
-    author: async (parent: { authorId: string }, _: unknown, ctx: GraphQLContext) => {
-      if (!parent.authorId) return null;
-      const user = await ctx.loaders.userLoader.load(parent.authorId);
+    author: async (parent: { fkAuthor: number }, _: unknown, ctx: GraphQLContext) => {
+      if (!parent.fkAuthor) return null;
+      const user = await ctx.loaders.userByPkLoader.load(parent.fkAuthor);
       if (!user) return null;
       return {
-        id: user.id,
-        username: user.username,
-        fullName: user.full_name,
-        bio: user.bio,
+        id: (user as any).id,
+        username: (user as any).username,
+        fullName: (user as any).full_name,
+        bio: (user as any).bio,
       };
     },
     comments: async (
@@ -248,7 +258,7 @@ const resolvers = {
         id: post.id,
         title: post.title,
         content: post.content,
-        authorId: post.author_id,
+        fkAuthor: (post as any).fk_author,
       };
     },
   },

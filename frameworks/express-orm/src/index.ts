@@ -178,6 +178,7 @@ app.put('/users/:id', async (req: Request, res: Response) => {
 app.get('/posts', async (req: Request, res: Response) => {
   const limit = parseInt(req.query.limit as string) || 10;
   const include = ((req.query.include as string) || '').split(',').filter(Boolean);
+  const publishedParam = req.query.published as string | undefined;
 
   const includeOptions: any[] = [];
 
@@ -189,8 +190,13 @@ app.get('/posts', async (req: Request, res: Response) => {
     });
   }
 
+  const whereClause: any = {};
+  if (publishedParam !== undefined) {
+    whereClause.published = publishedParam === 'true' || publishedParam === '1';
+  }
+
   const posts = await Post.findAll({
-    where: { published: true },
+    where: whereClause,
     limit,
     order: [['created_at', 'DESC']],
     include: includeOptions,

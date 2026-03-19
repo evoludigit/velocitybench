@@ -25,6 +25,9 @@ public class Post
     [Required]
     public int FkAuthor { get; set; }
 
+    [Column("published")]
+    public bool Published { get; set; }
+
     [Column("created_at")]
     public DateTime CreatedAt { get; set; }
 

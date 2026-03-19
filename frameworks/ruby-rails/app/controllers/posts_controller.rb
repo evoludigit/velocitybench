@@ -21,18 +21,36 @@ class PostsController < ApplicationController
     size = params.fetch(:size, 10).to_i
 
     posts = Post.includes(:author)
-                .order(created_at: :desc)
-                .offset(page * size)
-                .limit(size)
 
-    result = posts.map do |post|
-      {
-        id: post.id,
-        title: post.title,
-        content: post.content,
-        authorId: post.author.id,
-        createdAt: post.created_at.iso8601
-      }
+    if params.key?(:published)
+      published_val = params[:published].to_s.downcase == "true" || params[:published].to_s == "1"
+      posts = posts.where(published: published_val)
+    end
+
+    posts = posts.order(created_at: :desc)
+                 .offset(page * size)
+                 .limit(size)
+
+    if params[:with_author] == "true"
+      result = posts.map do |post|
+        {
+          id: post.id,
+          title: post.title,
+          content: post.content,
+          author: { username: post.author.username, fullName: post.author.full_name },
+          createdAt: post.created_at.iso8601
+        }
+      end
+    else
+      result = posts.map do |post|
+        {
+          id: post.id,
+          title: post.title,
+          content: post.content,
+          authorId: post.author.id,
+          createdAt: post.created_at.iso8601
+        }
+      end
     end
 
     render json: result

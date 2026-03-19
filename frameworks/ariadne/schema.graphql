@@ -17,7 +17,7 @@ type Query {
     post(id: ID!): Post
 
     """Fetch multiple posts"""
-    posts(limit: Int = 10): [Post!]!
+    posts(limit: Int = 10, published: Boolean): [Post!]!
 
     """Fetch a single comment by ID"""
     comment(id: ID!): Comment

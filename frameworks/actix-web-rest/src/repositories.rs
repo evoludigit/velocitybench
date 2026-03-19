@@ -199,20 +199,33 @@ impl PostRepository {
         Ok(Some(post))
     }
 
-    pub async fn find_all_simple(&self, limit: i64, offset: i64) -> Result<Vec<Post>, ApiError> {
+    pub async fn find_all_simple(&self, limit: i64, offset: i64, published: Option<bool>) -> Result<Vec<Post>, ApiError> {
         let client = self.get_client().await?;
 
-        let rows = client
-            .query(
-                "SELECT p.id::text, p.title, p.fk_author::text as author_id
-                 FROM benchmark.tb_post p
-                 WHERE p.published = true
-                 ORDER BY p.created_at DESC
-                 LIMIT $1 OFFSET $2",
-                &[&limit, &offset],
-            )
-            .await
-            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+        let rows = if let Some(pub_filter) = published {
+            client
+                .query(
+                    "SELECT p.id::text, p.title, p.fk_author::text as author_id
+                     FROM benchmark.tb_post p
+                     WHERE p.published = $3
+                     ORDER BY p.created_at DESC
+                     LIMIT $1 OFFSET $2",
+                    &[&limit, &offset, &pub_filter],
+                )
+                .await
+                .map_err(|e| ApiError::DatabaseError(e.to_string()))?
+        } else {
+            client
+                .query(
+                    "SELECT p.id::text, p.title, p.fk_author::text as author_id
+                     FROM benchmark.tb_post p
+                     ORDER BY p.created_at DESC
+                     LIMIT $1 OFFSET $2",
+                    &[&limit, &offset],
+                )
+                .await
+                .map_err(|e| ApiError::DatabaseError(e.to_string()))?
+        };
 
         let mut posts = Vec::new();
         for row in rows {
@@ -231,22 +244,37 @@ impl PostRepository {
         Ok(posts)
     }
 
-    pub async fn find_all_with_author(&self, limit: i64, offset: i64) -> Result<Vec<Post>, ApiError> {
+    pub async fn find_all_with_author(&self, limit: i64, offset: i64, published: Option<bool>) -> Result<Vec<Post>, ApiError> {
         let client = self.get_client().await?;
 
-        let rows = client
-            .query(
-                "SELECT p.id::text, p.title, p.content, p.fk_author, p.created_at::text,
-                        u.id::text as user_id, u.username, u.full_name, u.bio
-                 FROM benchmark.tb_post p
-                 JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-                 WHERE p.published = true
-                 ORDER BY p.created_at DESC
-                 LIMIT $1 OFFSET $2",
-                &[&limit, &offset],
-            )
-            .await
-            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+        let rows = if let Some(pub_filter) = published {
+            client
+                .query(
+                    "SELECT p.id::text, p.title, p.content, p.fk_author, p.created_at::text,
+                            u.id::text as user_id, u.username, u.full_name, u.bio
+                     FROM benchmark.tb_post p
+                     JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+                     WHERE p.published = $3
+                     ORDER BY p.created_at DESC
+                     LIMIT $1 OFFSET $2",
+                    &[&limit, &offset, &pub_filter],
+                )
+                .await
+                .map_err(|e| ApiError::DatabaseError(e.to_string()))?
+        } else {
+            client
+                .query(
+                    "SELECT p.id::text, p.title, p.content, p.fk_author, p.created_at::text,
+                            u.id::text as user_id, u.username, u.full_name, u.bio
+                     FROM benchmark.tb_post p
+                     JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+                     ORDER BY p.created_at DESC
+                     LIMIT $1 OFFSET $2",
+                    &[&limit, &offset],
+                )
+                .await
+                .map_err(|e| ApiError::DatabaseError(e.to_string()))?
+        };
 
         let mut posts = Vec::new();
         for row in rows {
@@ -279,7 +307,7 @@ impl PostRepository {
     }
 
     pub async fn find_all(&self, limit: i64, offset: i64) -> Result<Vec<Post>, ApiError> {
-        self.find_all_with_author(limit, offset).await
+        self.find_all_with_author(limit, offset, None).await
     }
 
     pub async fn find_by_author(&self, author_id: &str, limit: i64, offset: i64) -> Result<Vec<Post>, ApiError> {

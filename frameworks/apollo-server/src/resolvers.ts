@@ -26,23 +26,30 @@ export const resolvers = {
 
     post: async (_: any, { id }: { id: string }) => {
       return queryOne(
-        `SELECT p.id, u.id as author_id, p.title, p.content, p.published as status
-         FROM benchmark.tb_post p
-         JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-         WHERE p.id = $1`,
+        `SELECT id, fk_author, title, content, published as status
+         FROM benchmark.tb_post
+         WHERE id = $1`,
         [id]
       );
     },
 
-    posts: async (_: any, { limit }: { limit: number }) => {
+    posts: async (_: any, { limit, published }: { limit: number; published?: boolean }) => {
+      if (published === undefined || published === null) {
+        return query(
+          `SELECT id, fk_author, title, content, published as status
+           FROM benchmark.tb_post
+           ORDER BY created_at DESC
+           LIMIT $1`,
+          [limit]
+        );
+      }
       return query(
-        `SELECT p.id, u.id as author_id, p.title, p.content, p.published as status
-         FROM benchmark.tb_post p
-         JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-         WHERE p.published = true
-         ORDER BY p.created_at DESC
+        `SELECT id, fk_author, title, content, published as status
+         FROM benchmark.tb_post
+         WHERE published = $2
+         ORDER BY created_at DESC
          LIMIT $1`,
-        [limit]
+        [limit, published]
       );
     },
 
@@ -75,7 +82,9 @@ export const resolvers = {
 
     posts: async (user: any, { limit }: { limit: number }, { loaders }: Context) => {
       const posts = await loaders.postsByAuthorLoader.load(user.id);
-      return posts.slice(0, limit || 10);
+      return posts.slice(0, limit || 10).map((p: any) => ({
+        id: p.id, fk_author: p.fk_author, title: p.title, content: p.content, status: p.status,
+      }));
     },
 
     followerCount: async (user: any, _: any, { loaders }: Context) => {
@@ -85,7 +94,7 @@ export const resolvers = {
 
   Post: {
     author: async (post: any, _: any, { loaders }: Context) => {
-      return loaders.userLoader.load(post.author_id);
+      return loaders.userByPkLoader.load(post.fk_author);
     },
 
     comments: async (post: any, { limit }: { limit: number }, { loaders }: Context) => {

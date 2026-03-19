@@ -157,18 +157,27 @@ impl QueryRoot {
         }))
     }
 
-    async fn posts(&self, ctx: &Context<'_>, limit: Option<i32>, offset: Option<i32>) -> Result<Vec<Post>> {
+    async fn posts(&self, ctx: &Context<'_>, limit: Option<i32>, offset: Option<i32>, published: Option<bool>) -> Result<Vec<Post>> {
         let db = ctx.data::<Database>()?;
         let limit = limit.unwrap_or(10).min(100) as i64;
         let offset = offset.unwrap_or(0) as i64;
 
         let client = db.pool().get().await?;
-        let rows = client
-            .query(
-                "SELECT id, pk_post, title, content, fk_author, created_at FROM benchmark.tb_post LIMIT $1 OFFSET $2",
-                &[&limit, &offset],
-             )
-            .await?;
+        let rows = if let Some(pub_filter) = published {
+            client
+                .query(
+                    "SELECT id, pk_post, title, content, fk_author, created_at FROM benchmark.tb_post WHERE published = $3 LIMIT $1 OFFSET $2",
+                    &[&limit, &offset, &pub_filter],
+                )
+                .await?
+        } else {
+            client
+                .query(
+                    "SELECT id, pk_post, title, content, fk_author, created_at FROM benchmark.tb_post LIMIT $1 OFFSET $2",
+                    &[&limit, &offset],
+                )
+                .await?
+        };
 
         let posts = rows
             .iter()

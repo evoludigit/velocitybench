@@ -27,7 +27,7 @@ export const typeDefs = `#graphql
     user(id: ID!): User
     users(limit: Int = 10): [User!]!
     post(id: ID!): Post
-    posts(limit: Int = 10): [Post!]!
+    posts(limit: Int = 10, published: Boolean): [Post!]!
     comment(id: ID!): Comment
     comments(limit: Int = 10): [Comment!]!
   }

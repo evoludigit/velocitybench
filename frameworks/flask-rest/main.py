@@ -5,6 +5,7 @@ Traditional synchronous REST API using psycopg3 connection pool
 (demonstrates N+1 problem).
 """
 
+import atexit
 import os
 import time
 from contextlib import contextmanager
@@ -41,17 +42,6 @@ class ResourceNotFoundError(AppError):
     def __init__(self, message: str):
         super().__init__(message, 404)
         self.error_code = "NOT_FOUND"
-
-
-# Simple logging middleware for Flask-REST
-class FlaskLoggingMiddleware:
-    def __init__(self, app):
-        self.app = app
-
-    def __call__(self, environ, start_response):
-        # Simple logging - just log the request
-        print(f"Request: {environ['REQUEST_METHOD']} {environ['PATH_INFO']}")
-        return self.app(environ, start_response)
 
 
 # Simple validator class for Flask-REST
@@ -115,9 +105,6 @@ REQUEST_LATENCY = prometheus_client.Histogram(
 
 
 app = Flask(__name__)
-
-# Initialize request logging middleware
-FlaskLoggingMiddleware(app)
 
 # Health check startup time
 app.config["START_TIME"] = time.time()
@@ -187,18 +174,20 @@ def init_pool() -> ConnectionPool:
         conninfo=conninfo,
         min_size=10,
         max_size=50,
-        timeout=30.0,
+        timeout=5.0,
         max_idle=300.0,
         max_lifetime=3600.0,
     )
 
     app.config["DB_POOL"] = pool
-    return pool
+    atexit.register(pool.close)
 
 
 @contextmanager
 def get_db_connection() -> Any:
-    """Get database connection from app context."""
+    """Get database connection from pool."""
+    if "DB_POOL" not in app.config:
+        init_pool()
     pool = app.config["DB_POOL"]
     with pool.connection() as conn:
         yield conn
@@ -213,31 +202,11 @@ def execute_query(query: str, params: tuple | None = None) -> list[dict[str, Any
         return []
 
 
-# Initialize pool before first request
-_pool_initialized = False
-
-
-@app.before_request
-def setup_db() -> None:
-    """Initialize database pool on first request."""
-    global _pool_initialized
-    if not _pool_initialized:
-        init_pool()
-        _pool_initialized = True
-
-
-# Register cleanup on app teardown
-@app.teardown_appcontext
-def teardown_db(exception: BaseException | None = None) -> None:
-    """Close pool on app shutdown."""
-    pool = app.config.get("DB_POOL")
-    if pool:
-        pool.close()
-
-
 def _check_database() -> dict[str, Any]:
     """Check database health."""
     try:
+        if "DB_POOL" not in app.config:
+            init_pool()
         pool = app.config.get("DB_POOL")
         if not pool:
             return {"status": "down", "error": "Database pool not initialized"}
@@ -377,7 +346,7 @@ def list_users():
         # Use ANY array for batch fetch
         users = execute_query(
             """
-            SELECT id, username, full_name, bio, avatar_url
+            SELECT id, username, full_name, bio
             FROM benchmark.tb_user
             WHERE id = ANY(%s::uuid[])
         """,
@@ -515,7 +484,7 @@ def update_user(user_id):
 
 @app.route("/posts")
 def list_posts():
-    """List posts with optional includes"""
+    """List posts with optional includes and published filter"""
     REQUEST_COUNT.labels(method="GET", endpoint="/posts").inc()
 
     try:
@@ -524,6 +493,14 @@ def list_posts():
         )
     except InputValidationError:
         raise
+
+    published_param = request.args.get("published")
+    if published_param is None:
+        published_filter = None
+    elif published_param.lower() in ("true", "1"):
+        published_filter = True
+    else:
+        published_filter = False
 
     allowed_includes = ["author", "comments", "comments.author"]
     include = request.args.get("include", "")
@@ -537,17 +514,31 @@ def list_posts():
 
     # Query posts with author if needed
     if "author" in includes:
-        posts = execute_query(
-            """
-            SELECT p.id, p.title, p.content,
-                   u.id as author_id, u.username as author_username
-            FROM benchmark.tb_post p
-            JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-            ORDER BY p.created_at DESC
-            LIMIT %s
-        """,
-            (limit,),
-        )
+        if published_filter is None:
+            posts = execute_query(
+                """
+                SELECT p.id, p.title, p.content,
+                       u.id as author_id, u.username as author_username
+                FROM benchmark.tb_post p
+                JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+                ORDER BY p.created_at DESC
+                LIMIT %s
+            """,
+                (limit,),
+            )
+        else:
+            posts = execute_query(
+                """
+                SELECT p.id, p.title, p.content,
+                       u.id as author_id, u.username as author_username
+                FROM benchmark.tb_post p
+                JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+                WHERE p.published = %s
+                ORDER BY p.created_at DESC
+                LIMIT %s
+            """,
+                (published_filter, limit),
+            )
 
         # Add author as nested object
         for post in posts:
@@ -558,15 +549,27 @@ def list_posts():
             del post["author_id"]
             del post["author_username"]
     else:
-        posts = execute_query(
-            """
-            SELECT p.id, p.title, p.content
-            FROM benchmark.tb_post p
-            ORDER BY p.created_at DESC
-            LIMIT %s
-        """,
-            (limit,),
-        )
+        if published_filter is None:
+            posts = execute_query(
+                """
+                SELECT p.id, p.title, p.content
+                FROM benchmark.tb_post p
+                ORDER BY p.created_at DESC
+                LIMIT %s
+            """,
+                (limit,),
+            )
+        else:
+            posts = execute_query(
+                """
+                SELECT p.id, p.title, p.content
+                FROM benchmark.tb_post p
+                WHERE p.published = %s
+                ORDER BY p.created_at DESC
+                LIMIT %s
+            """,
+                (published_filter, limit),
+            )
 
     return jsonify({"posts": posts})
 
@@ -671,8 +674,7 @@ def get_post_comments(post_id):
     comments = execute_query(
         """
         SELECT c.id, c.content, c.created_at, c.is_approved,
-               u.id as author_id, u.username as author_username,
-               u.avatar_url as author_avatar
+               u.id as author_id, u.username as author_username
         FROM benchmark.tb_comment c
         JOIN benchmark.tb_post p ON c.fk_post = p.pk_post
         JOIN benchmark.tb_user u ON c.fk_author = u.pk_user

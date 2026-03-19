@@ -165,17 +165,33 @@ func UpdateUser(c *gin.Context) {
 func GetPosts(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	include := strings.Split(c.Query("include"), ",")
+	publishedParam := c.Query("published")
 
 	ctx := c.Request.Context()
 
-	rows, err := db.Pool.Query(ctx, `
+	sqlQuery := `
 		SELECT p.id, u.id as author_id, p.title, p.content
 		FROM benchmark.tb_post p
 		JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-		WHERE p.published = true
 		ORDER BY p.created_at DESC
 		LIMIT $1
-	`, limit)
+	`
+	args := []interface{}{limit}
+
+	if publishedParam != "" {
+		publishedBool := publishedParam == "true" || publishedParam == "1"
+		sqlQuery = `
+			SELECT p.id, u.id as author_id, p.title, p.content
+			FROM benchmark.tb_post p
+			JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+			WHERE p.published = $2
+			ORDER BY p.created_at DESC
+			LIMIT $1
+		`
+		args = append(args, publishedBool)
+	}
+
+	rows, err := db.Pool.Query(ctx, sqlQuery, args...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -256,15 +272,16 @@ func getPostsByUser(ctx context.Context, userID string) []models.Post {
 
 func getAuthorByID(ctx context.Context, authorID string) map[string]interface{} {
 	row := db.Pool.QueryRow(ctx, `
-		SELECT id, username FROM benchmark.tb_user WHERE id = $1
+		SELECT id, username, full_name FROM benchmark.tb_user WHERE id = $1
 	`, authorID)
 
 	var id, username string
-	if err := row.Scan(&id, &username); err != nil {
+	var fullName *string
+	if err := row.Scan(&id, &username, &fullName); err != nil {
 		return map[string]interface{}{}
 	}
 
-	return map[string]interface{}{"id": id, "username": username}
+	return map[string]interface{}{"id": id, "username": username, "fullName": fullName}
 }
 
 func GetPostComments(c *gin.Context) {

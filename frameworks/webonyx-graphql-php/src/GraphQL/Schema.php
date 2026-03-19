@@ -51,9 +51,15 @@ class Schema
                         'limit' => [
                             'type' => Type::int(),
                             'defaultValue' => 10
+                        ],
+                        'published' => [
+                            'type' => Type::boolean()
                         ]
                     ],
-                    'resolve' => fn($root, array $args) => Post::all(min($args['limit'], 100))
+                    'resolve' => fn($root, array $args) => Post::all(
+                        min($args['limit'], 100),
+                        array_key_exists('published', $args) ? $args['published'] : null
+                    )
                 ]
             ]
         ]);

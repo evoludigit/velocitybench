@@ -32,11 +32,14 @@ class PostController extends Controller
         $limit = $request->get("limit", $request->get("size", 10));
         $includeAuthor = $request->has("include") && $request->get("include") === "author";
 
-        $posts = Post::with("author")
-            ->orderBy("created_at", "desc")
-            ->offset($page * $limit)
-            ->limit($limit)
-            ->get();
+        $query = Post::with("author")->orderBy("created_at", "desc");
+
+        if ($request->has("published")) {
+            $published = filter_var($request->get("published"), FILTER_VALIDATE_BOOLEAN);
+            $query->where("published", $published);
+        }
+
+        $posts = $query->offset($page * $limit)->limit($limit)->get();
 
         $result = $posts->map(function ($post) use ($includeAuthor) {
             $item = [

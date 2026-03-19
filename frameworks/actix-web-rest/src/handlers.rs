@@ -116,10 +116,16 @@ pub async fn list_posts(
 
     let include_author = query.get("include").map(|s| s == "author").unwrap_or(false);
 
+    let published_filter: Option<bool> = query.get("published").and_then(|s| match s.as_str() {
+        "true" | "1" => Some(true),
+        "false" | "0" => Some(false),
+        _ => None,
+    });
+
     let posts = if include_author {
-        state.post_repository.find_all_with_author(limit, offset).await?
+        state.post_repository.find_all_with_author(limit, offset, published_filter).await?
     } else {
-        state.post_repository.find_all_simple(limit, offset).await?
+        state.post_repository.find_all_simple(limit, offset, published_filter).await?
     };
 
     Ok(HttpResponse::Ok().json(posts))
