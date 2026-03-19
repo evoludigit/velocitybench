@@ -14,7 +14,7 @@ dependencies = [
     "prometheus-client==0.19.0",
     "sqlalchemy[asyncio]==2.0.23",
     "psycopg[binary]==3.2.13",
-    "psutil==5.9.6",
+    "psutil==7.2.2",
 ]
 
 [build-system]
