@@ -19,10 +19,8 @@ public class TestFactory {
         User user = new User();
         user.setId(UUID.randomUUID().toString());
         user.setUsername(username);
-        user.setEmail(email);
         user.setFullName(fullName);
         user.setBio(bio == null || bio.isEmpty() ? null : bio);
-        user.setIsActive(true);
         user.setCreatedAt(LocalDateTime.now());
         user.setUpdatedAt(LocalDateTime.now());
 
