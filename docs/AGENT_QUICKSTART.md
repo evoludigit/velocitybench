@@ -270,7 +270,7 @@ pytest tests/qa/test_users.py::test_user_creation -v
 
 ### Minute 1: Clone and Setup
 ```bash
-git clone https://github.com/velocitybench/velocitybench.git
+git clone https://github.com/evoludigit/velocitybench.git
 cd velocitybench
 docker-compose up -d postgres  # Start database
 ```

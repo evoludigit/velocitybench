@@ -2,42 +2,45 @@
 
 GraphQL & REST framework performance benchmarks — 8 languages, reproducible methodology, real PostgreSQL data.
 
-> **Latest run**: February 2026 · sequential isolation · 40 workers · 20s per framework · dataset: 10 000 users / 50 000 posts / 200 000 comments
+> **Latest run**: March 2026 · sequential isolation · 40 workers · 30s per framework · dataset: 10 000 users / 50 000 posts / 200 000 comments
 
 ---
 
 ## Results
 
-Full tables: [reports/bench-sequential-2026-02-22.md](reports/bench-sequential-2026-02-22.md)
+Full tables: [reports/bench-sequential-2026-03-04.md](reports/bench-sequential-2026-03-04.md)
 
 ### Q1 — `users(limit: 20) { id username fullName }`
 
 | Framework | Language | Type | RPS | p50 | p99 | Errors |
 |-----------|----------|------|----:|----:|----:|--------|
-| gin-rest | Go | REST | 5 850 | 6.6 ms | 11.6 ms | 0% |
-| actix-web-rest | Rust | REST | 5 501 | 7.0 ms | 12.0 ms | 0% |
-| go-gqlgen | Go | GraphQL | 5 019 | 7.7 ms | 13.4 ms | 0% |
-| quarkus-graphql | Java | GraphQL | 4 913 | 7.5 ms | 20.7 ms | 0% |
-| spring-boot-orm | Java | REST | 4 693 | 7.7 ms | 20.1 ms | 0% |
-| mercurius | Node.js | GraphQL | 4 681 | 7.6 ms | 14.8 ms | 0% |
-| juniper | Rust | GraphQL | 4 658 | 8.3 ms | 15.0 ms | 0% |
-| async-graphql | Rust | GraphQL | 4 038 | 8.7 ms | 29.8 ms | 0% |
-| fastapi-rest | Python | REST | 1 707 | 12.9 ms | 21.2 ms | 47% |
-| strawberry | Python | GraphQL | 906 | 42.3 ms | 53.1 ms | 0% |
-| webonyx-graphql-php | PHP | GraphQL | 63 | 644 ms | 813 ms | 0% |
+| actix-web-rest | Rust | REST | 12 588 | 2.0 ms | 17.2 ms | 0% |
+| spring-boot | Java | REST | 9 150 | 3.3 ms | 17.4 ms | 0% |
+| mercurius | Node.js | GraphQL | 9 008 | 4.0 ms | 10.7 ms | 0% |
+| async-graphql | Rust | GraphQL | 7 905 | 4.7 ms | 12.1 ms | 0% |
+| graphql-go | Go | GraphQL | 7 576 | 4.3 ms | 19.3 ms | 0% |
+| express-rest | Node.js | REST | 7 513 | 3.8 ms | 7.7 ms | 0% |
+| fraiseql-v | Python | GraphQL | 6 513 | 5.6 ms | 13.8 ms | 0% |
+| go-gqlgen | Go | GraphQL | 6 442 | 4.3 ms | 30.1 ms | 0% |
+| play-graphql | Scala | GraphQL | 6 182 | 5.0 ms | 26.9 ms | 0% |
+| ruby-rails | Ruby | REST | 5 642 | 5.5 ms | 26.8 ms | 0% |
+| gin-rest | Go | REST | 5 586 | 4.5 ms | 37.2 ms | 0% |
 
 ### Q2b — `posts(limit: 10) { id title author { username fullName } }` (nested join)
 
 | Framework | Language | Type | RPS | p50 | p99 | Errors |
 |-----------|----------|------|----:|----:|----:|--------|
-| actix-web-rest | Rust | REST | 5 752 | 6.6 ms | 14.2 ms | 0% |
-| juniper | Rust | GraphQL | 3 417 | 11.5 ms | 16.6 ms | 0% |
-| quarkus-graphql | Java | GraphQL | 3 414 | 11.0 ms | 25.3 ms | 0% |
-| async-graphql | Rust | GraphQL | 2 992 | 11.8 ms | 34.2 ms | 0% |
-| gin-rest | Go | REST | 2 881 | 12.8 ms | 33.3 ms | 0% |
-| strawberry | Python | GraphQL | 431 | 54.5 ms | 70.1 ms | 78% |
-
-> **Not included in summary:** apollo-server, express-rest, flask-rest, ruby-rails, ariadne, graphene, and several others did not become healthy in this run. Contributions to fix them are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+| actix-web-rest | Rust | REST | 11 019 | 2.4 ms | 19.1 ms | 0% |
+| mercurius | Node.js | GraphQL | 8 252 | 4.5 ms | 11.6 ms | 0% |
+| express-rest | Node.js | REST | 7 573 | 4.3 ms | 11.5 ms | 0% |
+| play-graphql | Scala | GraphQL | 7 421 | 4.6 ms | 16.6 ms | 0% |
+| graphql-go | Go | GraphQL | 7 323 | 4.5 ms | 18.1 ms | 0% |
+| gin-rest | Go | REST | 6 818 | 4.3 ms | 23.8 ms | 0% |
+| graphql-yoga | Node.js | GraphQL | 6 437 | 5.6 ms | 10.8 ms | 0% |
+| csharp-dotnet | C# | REST | 6 386 | 5.2 ms | 15.6 ms | 0% |
+| go-gqlgen | Go | GraphQL | 6 271 | 5.0 ms | 24.6 ms | 0% |
+| spring-boot | Java | REST | 5 265 | 6.0 ms | 27.9 ms | 0% |
+| async-graphql | Rust | GraphQL | 4 229 | 8.2 ms | 25.3 ms | 0% |
 
 ---
 
@@ -53,7 +56,7 @@ Three query scenarios on a shared PostgreSQL dataset, each revealing different c
 
 **Metrics**: RPS (requests per second), p50 / p95 / p99 latency, error rate.
 
-**Method**: Sequential isolation — each framework runs alone against PostgreSQL. No resource contention between frameworks. Each scenario runs for 20 seconds after a 5-second warmup.
+**Method**: Sequential isolation — each framework runs alone against PostgreSQL. No resource contention between frameworks. Each scenario runs for 30 seconds after a 10-second warmup.
 
 ---
 
@@ -123,11 +126,11 @@ make down
 | quarkus-graphql | Java | ✅ |
 | strawberry | Python | ✅ |
 | fraiseql | Python | ✅ |
-| apollo-server | Node.js | ⚠️ needs fix |
-| graphene | Python | ⚠️ needs fix |
-| ariadne | Python | ⚠️ needs fix |
+| apollo-server | Node.js | ✅ |
+| graphene | Python | ✅ |
+| ariadne | Python | ✅ |
 | webonyx-graphql-php | PHP | ✅ |
-| ruby-rails (graphql-ruby) | Ruby | ⚠️ needs fix |
+| ruby-rails (graphql-ruby) | Ruby | ✅ |
 | hasura | — | managed |
 
 ### REST
@@ -137,10 +140,10 @@ make down
 | gin-rest | Go | ✅ |
 | actix-web-rest | Rust | ✅ |
 | spring-boot-orm | Java | ✅ |
-| fastapi-rest | Python | ⚠️ high error rate |
-| flask-rest | Python | ⚠️ needs fix |
-| express-rest | Node.js | ⚠️ needs fix |
-| csharp-dotnet | C# | ⚠️ needs fix |
+| fastapi-rest | Python | ✅ |
+| flask-rest | Python | ✅ |
+| express-rest | Node.js | ✅ |
+| csharp-dotnet | C# | ✅ |
 
 ---
 

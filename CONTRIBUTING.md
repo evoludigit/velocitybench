@@ -39,7 +39,7 @@ By participating in this project, you agree to:
 
 ```bash
 # Clone the repository
-git clone https://github.com/velocitybench/velocitybench.git
+git clone https://github.com/evoludigit/velocitybench.git
 cd velocitybench
 
 # Set up pre-commit hooks (recommended)

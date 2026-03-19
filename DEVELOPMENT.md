@@ -29,7 +29,7 @@ Welcome to VelocityBench development! This guide covers setup, development workf
 
 ```bash
 # Clone the repository
-git clone https://github.com/velocitybench/velocitybench.git
+git clone https://github.com/evoludigit/velocitybench.git
 cd velocitybench
 
 # Install pre-commit hooks (optional but recommended)
@@ -656,7 +656,7 @@ pytest --pdb tests/  # Drops to pdb on failure
 
 ## Questions?
 
-- Check [GitHub Issues](https://github.com/velocitybench/velocitybench/issues)
+- Check [GitHub Issues](https://github.com/evoludigit/velocitybench/issues)
 - Review [test examples](tests/)
 - Look at existing [framework implementations](frameworks/)
 

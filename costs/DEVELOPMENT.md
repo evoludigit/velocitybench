@@ -408,7 +408,7 @@ assert result == pytest.approx(expected, rel=1e-2)
 - Python 3.10+ Type Hints: https://docs.python.org/3.10/library/typing.html
 - Pytest Documentation: https://docs.pytest.org/
 - Google Style Guide: https://google.github.io/styleguide/pyguide.html
-- VelocityBench: https://github.com/velocitybench/velocitybench
+- VelocityBench: https://github.com/evoludigit/velocitybench
 
 ## Getting Help
 
