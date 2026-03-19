@@ -19,6 +19,10 @@ COPY common/ /app/common
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:4000/health')" || exit 1
 
+RUN useradd --system --no-create-home appuser
+
+USER appuser
+
 EXPOSE 4000
 
 CMD ["python", "app.py"]

@@ -112,7 +112,7 @@ class DatabaseSetup:
             admin_user=os.getenv("DB_ADMIN_USER", "postgres"),
             admin_password=os.getenv("DB_ADMIN_PASSWORD", "postgres"),
             test_user=os.getenv("DB_TEST_USER", "velocitybench"),
-            test_password=os.getenv("DB_TEST_PASSWORD", "password"),
+            test_password=os.getenv("DB_TEST_PASSWORD", "benchmark123"),
             seed_size=size,
         )
 

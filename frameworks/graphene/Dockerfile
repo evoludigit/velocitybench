@@ -19,6 +19,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY graphene/ .
 COPY common/ /app/common
 
+RUN useradd --system --no-create-home appuser
+
+USER appuser
+
 EXPOSE 8000
 
 CMD ["python", "main.py"]

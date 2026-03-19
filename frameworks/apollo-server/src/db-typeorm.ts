@@ -10,7 +10,7 @@ export const AppDataSource = new DataSource({
   port: parseInt(process.env.DB_PORT || '5432'),
   database: process.env.DB_NAME || 'velocitybench_benchmark',
   username: process.env.DB_USER || 'benchmark',
-  password: process.env.DB_PASSWORD || 'benchmark123',
+  password: process.env.DB_PASSWORD ?? (() => { throw new Error('DB_PASSWORD env var is required'); })(),
   schema: 'benchmark',
   entities: [User, Post, Comment],
   synchronize: false, // Never use in production

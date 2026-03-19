@@ -15,8 +15,12 @@ FROM alpine:3.19
 ENV TMPDIR=/data/tmp
 RUN mkdir -p /data/tmp && apk --no-cache add ca-certificates curl
 
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
 COPY --from=builder /server /server
 WORKDIR /
+
+USER appuser
 
 EXPOSE 4009
 

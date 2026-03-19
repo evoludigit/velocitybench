@@ -14,6 +14,10 @@ COPY src ./src
 RUN npm run build
 RUN npm prune --production
 
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+USER appuser
+
 EXPOSE 4004 4005
 
 CMD ["node", "dist/index.js"]

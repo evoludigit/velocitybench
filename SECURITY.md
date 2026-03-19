@@ -167,7 +167,7 @@ DB_SSL=require  # Enforce encrypted connections
 If you discover a security vulnerability:
 
 1. **DO NOT** open a public GitHub issue
-2. **Email** security concerns to: [security contact - add to project]
+2. **Report** via [GitHub Security Advisories](https://github.com/evoludigit/velocitybench/security/advisories)
 3. Include:
    - Description of the vulnerability
    - Steps to reproduce
@@ -375,9 +375,8 @@ For any network exposure beyond localhost - no. Add security layers first.
 ## Security Contacts
 
 For security issues:
-- 📧 Email: [Add contact]
-- 🔒 GPG Key: [Add if available]
-- 🐛 Issue Tracker: [Link to GitHub]
+- 🔒 Report via [GitHub Security Advisories](https://github.com/evoludigit/velocitybench/security/advisories)
+- 🐛 Non-security bugs: [GitHub Issues](https://github.com/evoludigit/velocitybench/issues)
 
 For general questions:
 - 📖 See [DEVELOPMENT.md](DEVELOPMENT.md)

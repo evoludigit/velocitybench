@@ -13,6 +13,10 @@ COPY src ./src
 RUN npm run build && test -f dist/index.js || (echo "TypeScript build failed: dist/index.js missing" && exit 1)
 RUN npm prune --production
 
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+USER appuser
+
 EXPOSE 4002
 
 CMD ["node", "dist/index.js"]

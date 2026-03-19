@@ -18,6 +18,10 @@ RUN npm prune --production
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
   CMD node -e "require('http').get('http://localhost:4000/health', r => { process.exit(r.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"
 
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+USER appuser
+
 EXPOSE 4000
 
 CMD ["node", "dist/src/index.js"]
