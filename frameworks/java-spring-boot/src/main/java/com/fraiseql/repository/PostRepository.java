@@ -15,7 +15,7 @@ public interface PostRepository extends JpaRepository<Post, Integer> {
 
     List<Post> findByFkAuthorAndPublishedOrderByCreatedAtDesc(Integer fkAuthor, Boolean published, Pageable pageable);
 
-    @Query("SELECT p FROM Post p WHERE p.id = :uuid")
+    @Query(value = "SELECT * FROM benchmark.tb_post WHERE id = CAST(:uuid AS uuid)", nativeQuery = true)
     Optional<Post> findByUuid(@Param("uuid") String uuid);
 
     List<Post> findByPublishedOrderByCreatedAtDesc(Boolean published, Pageable pageable);

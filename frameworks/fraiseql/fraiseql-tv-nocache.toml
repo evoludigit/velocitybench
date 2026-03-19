@@ -26,6 +26,9 @@ metrics_enabled = false
 # Cache explicitly disabled — cold reads hit PostgreSQL every time.
 cache_enabled = false
 
+# Raise complexity limit to allow Q3 (comments with author+post nesting, complexity ~161)
+max_query_complexity = 1000
+
 [jsonb_optimization]
 default_strategy = "project"
 auto_threshold_percent = 80

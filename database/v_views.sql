@@ -1,29 +1,22 @@
--- FraiseQL v2.0.0-beta.3 Database Extensions
+-- JSONB views (v_*) for fraiseql-v variant (on-the-fly JSONB computation)
+-- Apply to an existing database: psql -h localhost -U benchmark -d velocitybench_benchmark -f database/v_views.sql
 --
--- Two families of views, both built on the CQRS trinity-pattern tables:
---
---   v_*  (Variant A) — on-the-fly JSONB views (schema.py)
---       JSONB is constructed at query time via jsonb_build_object().
---       Consistent with fraiseql init canonical blog template.
---
---   tv_* (Variant B) — pre-computed JSONB tables (schema_tv.py)
---       JSONB is baked in at INSERT time; queries just SELECT the column.
---       snake_case keys align directly with database columns.
---
--- Trinity pattern fields exposed at the top level of every JSONB object:
---   pk         INT    — internal integer primary key (fast join)
---   id         UUID   — public GraphQL ID (secure, UUID v4)
---   identifier TEXT   — human-readable identifier (username / slug)
+-- Run this when the DB was initialized with the old fv_ view names
+-- (renames fv_* → v_* and recreates with FraiseQL-compatible column aliases).
 
 SET search_path TO benchmark, public;
 
--- ============================================================================
--- VARIANT A: On-the-fly JSONB Views (v_*)
--- ============================================================================
+-- Drop old fv_ views if they exist (pre-rename migration)
+DROP VIEW IF EXISTS benchmark.fv_comment CASCADE;
+DROP VIEW IF EXISTS benchmark.fv_post CASCADE;
+DROP VIEW IF EXISTS benchmark.fv_user CASCADE;
 
--- v_user: User entity as JSONB
+-- Drop current v_ views so we can recreate with correct schema
+DROP VIEW IF EXISTS v_comment CASCADE;
+DROP VIEW IF EXISTS v_post CASCADE;
 DROP VIEW IF EXISTS v_user CASCADE;
 
+-- v_user: User entity as JSONB
 CREATE VIEW v_user AS
 SELECT
     id,
@@ -41,9 +34,6 @@ SELECT
 FROM benchmark.tb_user;
 
 -- v_post: Post entity with nested author as JSONB
--- Author pre-computed to eliminate N+1 queries
-DROP VIEW IF EXISTS v_post CASCADE;
-
 CREATE VIEW v_post AS
 SELECT
     p.id,
@@ -73,9 +63,6 @@ FROM benchmark.tb_post p
 LEFT JOIN benchmark.tb_user u ON u.pk_user = p.fk_author;
 
 -- v_comment: Comment entity with nested author and post as JSONB
--- Both relationships pre-computed to eliminate N+1 queries
-DROP VIEW IF EXISTS v_comment CASCADE;
-
 CREATE VIEW v_comment AS
 SELECT
     c.id,
@@ -117,29 +104,9 @@ SELECT
     c.fk_author    AS _author_pk,
     c.fk_post      AS _post_pk
 FROM benchmark.tb_comment c
-LEFT JOIN benchmark.tb_user u  ON u.pk_user   = c.fk_author
-LEFT JOIN benchmark.tb_post p  ON p.pk_post   = c.fk_post
-LEFT JOIN benchmark.tb_user pu ON pu.pk_user  = p.fk_author;
-
--- ============================================================================
--- Indexes on underlying tables (views are not directly indexed)
--- ============================================================================
-
-CREATE INDEX IF NOT EXISTS idx_tb_user_id         ON benchmark.tb_user(id);
-CREATE INDEX IF NOT EXISTS idx_tb_user_identifier  ON benchmark.tb_user(identifier);
-
-CREATE INDEX IF NOT EXISTS idx_tb_post_id          ON benchmark.tb_post(id);
-CREATE INDEX IF NOT EXISTS idx_tb_post_identifier  ON benchmark.tb_post(identifier);
-CREATE INDEX IF NOT EXISTS idx_tb_post_published   ON benchmark.tb_post(published);
-CREATE INDEX IF NOT EXISTS idx_tb_post_fk_author   ON benchmark.tb_post(fk_author);
-
-CREATE INDEX IF NOT EXISTS idx_tb_comment_id       ON benchmark.tb_comment(id);
-CREATE INDEX IF NOT EXISTS idx_tb_comment_fk_post  ON benchmark.tb_comment(fk_post);
-CREATE INDEX IF NOT EXISTS idx_tb_comment_fk_author ON benchmark.tb_comment(fk_author);
-
--- ============================================================================
--- Permissions
--- ============================================================================
+LEFT JOIN benchmark.tb_user u  ON u.pk_user  = c.fk_author
+LEFT JOIN benchmark.tb_post p  ON p.pk_post  = c.fk_post
+LEFT JOIN benchmark.tb_user pu ON pu.pk_user = p.fk_author;
 
 GRANT SELECT ON v_user    TO PUBLIC;
 GRANT SELECT ON v_post    TO PUBLIC;

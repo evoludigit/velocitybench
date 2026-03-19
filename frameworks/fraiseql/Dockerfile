@@ -42,6 +42,7 @@ FROM rust:latest AS builder
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
+    jq \
     && rm -rf /var/lib/apt/lists/*
 
 # Install fraiseql-cli from crates.io (beta.3 published)
@@ -57,6 +58,10 @@ COPY fraiseql.toml .
 
 # Compile schema: TOML mode with Python SDK types
 RUN fraiseql-cli compile fraiseql.toml --types schema.json
+
+# Inject validation_config so the server allows complex queries (e.g. Q3 with 2-level nesting)
+RUN jq '.validation_config = {"max_query_complexity": 1000, "max_query_depth": 20, "introspection_enabled": true}' \
+    schema.compiled.json > schema.compiled.json.tmp && mv schema.compiled.json.tmp schema.compiled.json
 
 # Copy fraiseql-server binary (local beta.3 build — not yet on crates.io)
 COPY fraiseql-server /usr/local/bin/fraiseql-server

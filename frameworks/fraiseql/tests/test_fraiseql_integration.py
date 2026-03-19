@@ -134,76 +134,76 @@ class TestFraiseQLServer:
 class TestFraiseQLViews:
     """Test JSONB view structure in database."""
 
-    def test_fv_user_view_exists(self, db_connection):
-        """Verify fv_user view exists and has correct structure."""
+    def test_v_user_view_exists(self, db_connection):
+        """Verify v_user view exists and has correct structure."""
         with db_connection.cursor() as cursor:
             cursor.execute("""
                 SELECT EXISTS (
                     SELECT 1 FROM information_schema.views
                     WHERE table_schema = 'benchmark'
-                    AND table_name = 'fv_user'
+                    AND table_name = 'v_user'
                 )
             """)
             exists = cursor.fetchone()[0]
-            assert exists, "fv_user view not found"
+            assert exists, "v_user view not found"
 
             cursor.execute("""
                 SELECT column_name FROM information_schema.columns
                 WHERE table_schema = 'benchmark'
-                AND table_name = 'fv_user'
+                AND table_name = 'v_user'
                 ORDER BY column_name
             """)
             columns = {row[0] for row in cursor.fetchall()}
-            assert "id" in columns, "fv_user missing 'id' column"
-            assert "data" in columns, "fv_user missing 'data' column"
+            assert "id" in columns, "v_user missing 'id' column"
+            assert "data" in columns, "v_user missing 'data' column"
 
-    def test_fv_post_view_exists(self, db_connection):
-        """Verify fv_post view exists and has correct structure."""
+    def test_v_post_view_exists(self, db_connection):
+        """Verify v_post view exists and has correct structure."""
         with db_connection.cursor() as cursor:
             cursor.execute("""
                 SELECT EXISTS (
                     SELECT 1 FROM information_schema.views
                     WHERE table_schema = 'benchmark'
-                    AND table_name = 'fv_post'
+                    AND table_name = 'v_post'
                 )
             """)
             exists = cursor.fetchone()[0]
-            assert exists, "fv_post view not found"
+            assert exists, "v_post view not found"
 
-    def test_fv_comment_view_exists(self, db_connection):
-        """Verify fv_comment view exists."""
+    def test_v_comment_view_exists(self, db_connection):
+        """Verify v_comment view exists."""
         with db_connection.cursor() as cursor:
             cursor.execute("""
                 SELECT EXISTS (
                     SELECT 1 FROM information_schema.views
                     WHERE table_schema = 'benchmark'
-                    AND table_name = 'fv_comment'
+                    AND table_name = 'v_comment'
                 )
             """)
             exists = cursor.fetchone()[0]
-            assert exists, "fv_comment view not found"
+            assert exists, "v_comment view not found"
 
-    def test_fv_user_fields(self, db_connection):
-        """Verify fv_user JSONB exposes id, identifier, and user fields."""
+    def test_v_user_fields(self, db_connection):
+        """Verify v_user JSONB exposes id, identifier, and user fields."""
         with db_connection.cursor() as cursor:
-            cursor.execute("SELECT data FROM benchmark.fv_user LIMIT 1")
+            cursor.execute("SELECT data FROM benchmark.v_user LIMIT 1")
             result = cursor.fetchone()
             if result:
                 data = result[0]
-                assert isinstance(data, dict), "fv_user.data should be JSONB object"
+                assert isinstance(data, dict), "v_user.data should be JSONB object"
                 assert "id" in data, "JSONB data missing 'id'"
                 assert "identifier" in data, "JSONB data missing 'identifier'"
                 assert "email" in data, "JSONB data missing 'email'"
                 assert "username" in data, "JSONB data missing 'username'"
 
-    def test_fv_post_fields(self, db_connection):
-        """Verify fv_post JSONB exposes id, identifier, and nested author."""
+    def test_v_post_fields(self, db_connection):
+        """Verify v_post JSONB exposes id, identifier, and nested author."""
         with db_connection.cursor() as cursor:
-            cursor.execute("SELECT data FROM benchmark.fv_post LIMIT 1")
+            cursor.execute("SELECT data FROM benchmark.v_post LIMIT 1")
             result = cursor.fetchone()
             if result:
                 data = result[0]
-                assert isinstance(data, dict), "fv_post.data should be JSONB object"
+                assert isinstance(data, dict), "v_post.data should be JSONB object"
                 assert "id" in data, "JSONB data missing 'id'"
                 assert "identifier" in data, "JSONB data missing 'identifier'"
                 assert "title" in data, "JSONB data missing 'title'"
@@ -213,14 +213,14 @@ class TestFraiseQLViews:
                     assert "id" in author, "nested author missing 'id'"
                     assert "identifier" in author, "nested author missing 'identifier'"
 
-    def test_fv_comment_fields(self, db_connection):
-        """Verify fv_comment JSONB exposes id and nested relationships."""
+    def test_v_comment_fields(self, db_connection):
+        """Verify v_comment JSONB exposes id and nested relationships."""
         with db_connection.cursor() as cursor:
-            cursor.execute("SELECT data FROM benchmark.fv_comment LIMIT 1")
+            cursor.execute("SELECT data FROM benchmark.v_comment LIMIT 1")
             result = cursor.fetchone()
             if result:
                 data = result[0]
-                assert isinstance(data, dict), "fv_comment.data should be JSONB object"
+                assert isinstance(data, dict), "v_comment.data should be JSONB object"
                 assert "id" in data, "JSONB data missing 'id'"
                 assert "content" in data, "JSONB data missing 'content'"
                 assert "author" in data, "JSONB data missing nested 'author'"

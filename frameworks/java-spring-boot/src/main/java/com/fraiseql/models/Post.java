@@ -12,7 +12,7 @@ public class Post {
     @Column(name = "pk_post")
     private Integer pkPost;
 
-    @Column(name = "id", columnDefinition = "uuid")
+    @Column(name = "id", columnDefinition = "uuid", insertable = false, updatable = false)
     private String id;
 
     @Column(name = "identifier")

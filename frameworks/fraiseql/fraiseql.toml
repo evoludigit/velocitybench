@@ -48,6 +48,9 @@ metrics_enabled = false
 # For cold-read baseline comparison, use fraiseql-nocache.toml (cache_enabled = false).
 cache_enabled = true
 
+# Raise complexity limit to allow Q3 (comments with author+post nesting, complexity ~161)
+max_query_complexity = 1000
+
 # ============================================================================
 # JSONB Optimization Strategy
 # "project": generates SQL like data->>'field' for scalars, data->'field'
@@ -71,6 +74,10 @@ description = "VelocityBench FraiseQL GraphQL benchmark framework"
 [fraiseql]
 schema_file = "schema.json"
 output_file = "schema.compiled.json"
+
+[fraiseql.validation]
+max_query_complexity = 1000
+max_query_depth = 20
 
 [fraiseql.security.audit_logging]
 enabled = false
