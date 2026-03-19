@@ -8,7 +8,7 @@ class UsersController < ApplicationController
     end
 
     render json: {
-      id: user.id,
+      id: user[:id],
       username: user.username,
       fullName: user.full_name,
       bio: user.bio
@@ -23,7 +23,7 @@ class UsersController < ApplicationController
 
     result = users.map do |user|
       {
-        id: user.id,
+        id: user[:id],
         username: user.username,
         fullName: user.full_name,
         bio: user.bio
@@ -31,5 +31,22 @@ class UsersController < ApplicationController
     end
 
     render json: result
+  end
+
+  def update
+    user = User.find_by(id: params[:id])
+
+    if user.nil?
+      render json: { error: 'User not found' }, status: :not_found
+      return
+    end
+
+    user.update!(bio: params[:bio])
+    render json: {
+      id: user[:id],
+      username: user.username,
+      fullName: user.full_name,
+      bio: user.bio
+    }
   end
 end

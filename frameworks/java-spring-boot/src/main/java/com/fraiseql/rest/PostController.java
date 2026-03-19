@@ -1,6 +1,7 @@
 package com.fraiseql.rest;
 
 import com.fraiseql.dto.PostDTO;
+import com.fraiseql.dto.PostWithAuthorDTO;
 import com.fraiseql.service.PostService;
 import com.fraiseql.metrics.ApplicationMetrics;
 import org.springframework.http.ResponseEntity;
@@ -39,6 +40,14 @@ public class PostController {
         metrics.incrementRestRequests();
         List<PostDTO> posts = postService.getAllPosts(page, size);
         return ResponseEntity.ok(posts);
+    }
+
+    @GetMapping("/with-author")
+    public ResponseEntity<List<PostWithAuthorDTO>> listPostsWithAuthor(
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "10") int size) {
+        metrics.incrementRestRequests();
+        return ResponseEntity.ok(postService.getPostsWithAuthor(page, size));
     }
 
     @GetMapping("/by-author/{authorId}")

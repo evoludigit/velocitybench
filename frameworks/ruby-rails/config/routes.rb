@@ -2,6 +2,7 @@ Rails.application.routes.draw do
   # API Routes
   get '/api/users/:id', to: 'users#show'
   get '/api/users', to: 'users#index'
+  put '/api/users/:id', to: 'users#update'
   
   get '/api/posts/:id', to: 'posts#show'
   get '/api/posts', to: 'posts#index'

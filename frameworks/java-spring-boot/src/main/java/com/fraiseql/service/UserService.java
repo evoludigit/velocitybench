@@ -3,11 +3,12 @@ package com.fraiseql.service;
 import com.fraiseql.dto.UserDTO;
 import com.fraiseql.models.User;
 import com.fraiseql.repository.UserRepository;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 
 import java.util.List;
 import java.util.Optional;
@@ -30,10 +31,20 @@ public class UserService {
 
     public List<UserDTO> getAllUsers(int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        Page<User> userPage = userRepository.findAll(pageable);
-        return userPage.getContent().stream()
+        List<User> users = userRepository.findAllByOrderByUsername(pageable);
+        return users.stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public Optional<UserDTO> updateBio(String uuid, String bio) {
+        return userRepository.findByUuid(uuid)
+                .map(user -> {
+                    user.setBio(bio);
+                    user.setUpdatedAt(LocalDateTime.now());
+                    return toDTO(userRepository.save(user));
+                });
     }
 
     private UserDTO toDTO(User user) {

@@ -14,6 +14,8 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Integer> {
     List<User> findAllByOrderByUsername(Pageable pageable);
 
-    @Query("SELECT u FROM User u WHERE u.id = :uuid")
+    @Query(value = "SELECT * FROM benchmark.tb_user WHERE id = CAST(:uuid AS uuid)", nativeQuery = true)
     Optional<User> findByUuid(@Param("uuid") String uuid);
+
+    List<User> findAllByPkUserIn(List<Integer> pkUserIds);
 }
