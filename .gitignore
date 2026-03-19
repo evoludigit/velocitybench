@@ -41,6 +41,10 @@ package-lock.json
 .DS_Store
 dist/
 bin/
+frameworks/go-graphql-go/server
+
+# C# / .NET
+obj/
 
 # Java / Gradle
 target/

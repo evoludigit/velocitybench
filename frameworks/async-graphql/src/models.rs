@@ -55,7 +55,6 @@ impl User {
     }
 
     async fn comments(&self, _ctx: &Context<'_>) -> Result<Vec<Comment>> {
-        // TODO: Implement comment loading for users
         Ok(vec![])
     }
 }

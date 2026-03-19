@@ -36,10 +36,10 @@ func main() {
 		w.Write([]byte(`{"status": "healthy", "framework": "go-graphql-go"}`))
 	})
 
-	// Metrics handler (placeholder for now)
+	// Metrics handler (placeholder)
 	http.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("# Metrics endpoint - TODO: implement prometheus metrics"))
+		w.Write([]byte("# HELP go_graphql_go_up Framework is running\n# TYPE go_graphql_go_up gauge\ngo_graphql_go_up 1\n"))
 	})
 
 	// Ping handler
