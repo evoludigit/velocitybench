@@ -41,10 +41,12 @@ pub fn spi_run_ddl(sql: &str) -> Result<(), String> {
         // Use SPI_execute_extended with allow_nonatomic=true so PostgreSQL 18's
         // assertion (IsTransactionOrTransactionBlock assertion for DDL in atomic
         // context) is suppressed.
-        let mut opts = pg_sys::SPIExecuteOptions::default();
-        opts.read_only = false;
-        opts.allow_nonatomic = true;
-        opts.tcount = 0;
+        let opts = pg_sys::SPIExecuteOptions {
+            read_only: false,
+            allow_nonatomic: true,
+            tcount: 0,
+            ..pg_sys::SPIExecuteOptions::default()
+        };
 
         let execute_result = pg_sys::SPI_execute_extended(c_sql.as_ptr(), &opts);
 
@@ -98,23 +100,38 @@ pub fn spi_get_string(query: &str) -> spi::Result<Option<String>> {
 use pgrx::pg_sys::Oid;
 
 /// Extracts a `pk_*` integer from `NEW` or `OLD` tuple by convention.
-/// For MVP we assume the column name is literally `pk_*`.
-#[allow(dead_code)]
+///
+/// Derives the PK column name dynamically from the triggering table OID.
+/// Convention: `tb_<entity>` → `pk_<entity>` (e.g. `tb_user` → `pk_user`).
 pub fn extract_pk(trigger: &PgTrigger) -> spi::Result<i64> {
-    // For simplicity we assume there's a column named 'pk_*' and you know the entity.
-    // For real code:
-    //  - inspect relation attributes,
-    //  - find first "pk_" column,
-    //  - read value.
     let tuple = trigger
         .new()
         .or_else(|| trigger.old())
         .expect("Row must exist for AFTER trigger");
 
-    // This function is no longer used in the main code path
+    let table_oid = trigger
+        .relation()
+        .map_err(|_| crate::TViewError::SpiError {
+            query: "get trigger relation".to_string(),
+            error: "Failed to get trigger relation".to_string(),
+        })?
+        .oid();
+
+    let entity = crate::catalog::entity_for_table(table_oid)?
+        .ok_or_else(|| crate::TViewError::SpiError {
+            query: "entity_for_table".to_string(),
+            error: format!("Table OID {table_oid:?} not managed by pg_tviews"),
+        })?;
+
+    let pk_column = format!("pk_{entity}");
+
     let pk: i64 = tuple
-        .get_by_name("pk_post")? // <-- placeholder: replace per entity
-        .expect("pk_post must not be null");
+        .get_by_name(&pk_column)?
+        .ok_or_else(|| crate::TViewError::SpiError {
+            query: pk_column.clone(),
+            error: format!("{pk_column} must not be null"),
+        })?;
+
     Ok(pk)
 }
 

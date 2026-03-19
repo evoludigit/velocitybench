@@ -1,13 +1,11 @@
 use std::collections::HashSet;
 use super::key::RefreshKey;
-use super::state::{TX_REFRESH_QUEUE, TX_REFRESH_SCHEDULED};
-use crate::TViewResult;
+use super::state::TX_REFRESH_QUEUE;
 
 /// Enqueue a refresh request for the given entity and pk
 ///
 /// This is the main entry point from triggers.
 /// Deduplication is automatic (`HashSet`).
-#[allow(dead_code)]
 pub fn enqueue_refresh(entity: &str, pk: i64) {
     let key = RefreshKey {
         entity: entity.to_string(),
@@ -24,7 +22,6 @@ pub fn enqueue_refresh(entity: &str, pk: i64) {
 ///
 /// This is the statement-level trigger entry point.
 /// Deduplication is automatic (`HashSet`).
-#[allow(dead_code)]
 pub fn enqueue_refresh_bulk(entity: &str, pks: Vec<i64>) {
     TX_REFRESH_QUEUE.with(|q| {
         let mut queue = q.borrow_mut();
@@ -44,7 +41,6 @@ pub fn enqueue_refresh_bulk(entity: &str, pks: Vec<i64>) {
 ///
 /// Called by commit handler to get all pending refreshes.
 /// Thread-local state is cleared after snapshot.
-#[allow(dead_code)]
 pub fn take_queue_snapshot() -> HashSet<RefreshKey> {
     TX_REFRESH_QUEUE.with(|q| {
         let mut queue = q.borrow_mut();
@@ -53,46 +49,10 @@ pub fn take_queue_snapshot() -> HashSet<RefreshKey> {
 }
 
 /// Clear the queue (used on transaction abort)
-#[allow(dead_code)]
 pub fn clear_queue() {
     TX_REFRESH_QUEUE.with(|q| {
         q.borrow_mut().clear();
     });
-}
-
-/// Register transaction commit callback (once per transaction)
-pub fn register_commit_callback_once() -> TViewResult<()> {
-    TX_REFRESH_SCHEDULED.with(|flag| {
-        let mut scheduled = flag.borrow_mut();
-        if *scheduled {
-            // Already registered, skip
-            return Ok(());
-        }
-
-        // Register transaction and subtransaction callbacks
-        unsafe {
-            super::xact::register_xact_callback();
-            super::xact::register_subxact_callback();
-        }
-
-        *scheduled = true;
-        Ok(())
-    })
-}
-
-/// Reset the scheduled flag (called after commit/abort)
-#[allow(dead_code)]
-pub fn reset_scheduled_flag() {
-    TX_REFRESH_SCHEDULED.with(|flag| {
-        *flag.borrow_mut() = false;
-    });
-}
-
-/// Clear queue and reset scheduled flag (public API for `DISCARD ALL` handling)
-#[allow(dead_code)]
-pub fn clear_queue_and_reset() {
-    clear_queue();
-    reset_scheduled_flag();
 }
 
 #[cfg(test)]

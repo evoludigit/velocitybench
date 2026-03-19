@@ -2,8 +2,9 @@ use pgrx::prelude::*;
 use pgrx::pg_sys;
 use pgrx::datum::DatumWithOid;
 use std::os::raw::c_void;
+use std::panic::AssertUnwindSafe;
 use std::collections::HashSet;
-use super::ops::{take_queue_snapshot, clear_queue, reset_scheduled_flag};
+use super::ops::{take_queue_snapshot, clear_queue};
 use crate::TViewResult;
 
 // Thread-local storage for savepoint support
@@ -70,66 +71,75 @@ pub unsafe fn register_subxact_callback() {
 /// # Safety
 /// This is an extern "C-unwind" callback invoked by `PostgreSQL` internals.
 /// Must not panic or unwind.
+///
+/// # Error handling
+/// `error!()` (which calls `panic_any`) must NEVER be called inside
+/// `catch_unwind`.  If it were, `catch_unwind` would intercept the panic and
+/// then the fallback `error!()` outside would fire in a raw `extern "C-unwind"`
+/// context without `#[pg_guard]`, causing SIGABRT.  Instead the closure
+/// returns `Result<(), String>` and `error!()` is called *after*
+/// `catch_unwind` returns.
 #[no_mangle]
 unsafe extern "C-unwind" fn tview_xact_callback(event: u32, _arg: *mut c_void) {
-    // Wrap FFI callback in catch_unwind to prevent panics crossing FFI boundary
-    let result = std::panic::catch_unwind(|| {
+    // The closure returns Ok(()) on success, Err(message) when the transaction
+    // must be aborted.  `error!()` is called OUTSIDE catch_unwind only.
+    let result = std::panic::catch_unwind(AssertUnwindSafe(|| -> Result<(), String> {
         // Determine event type (using PostgreSQL C API constants)
         let xact_event = match event {
             0 => XactEvent::Commit,      // XACT_EVENT_COMMIT
             1 => XactEvent::PreCommit,   // XACT_EVENT_PRE_COMMIT
             2 => XactEvent::Abort,       // XACT_EVENT_ABORT
             4 => XactEvent::Prepare,     // XACT_EVENT_PREPARE
-            _ => return, // Ignore other events
+            _ => return Ok(()), // Ignore other events
         };
 
         // Handle event
         match xact_event {
             XactEvent::PreCommit => {
                 // PRE_COMMIT: Flush queue before transaction commits
-                // This is the main refresh point
                 //
                 // CRITICAL: We must propagate errors to abort the transaction.
                 // Per PRD R2: "If refresh fails: the entire transaction fails and rolls back."
-                //
-                // PostgreSQL behavior:
-                // - If this callback returns normally → transaction commits
-                // - If this callback returns error!() or panics → transaction aborts
-                //
-                // We MUST NOT catch errors here - let them propagate to PostgreSQL
                 if let Err(e) = handle_pre_commit() {
-                    // Use pgrx error!() macro to abort transaction
-                    error!("TVIEW refresh failed during PRE_COMMIT, aborting transaction: {:?}", e);
-                    // This will never return - PostgreSQL longjmps to abort handler
+                    return Err(format!(
+                        "TVIEW refresh failed during PRE_COMMIT, aborting transaction: {e:?}"
+                    ));
                 }
             }
             XactEvent::Prepare => {
                 // PREPARE: Serialize queue to persistent storage
-                // This ensures 2PC transactions don't lose pending refreshes
                 if let Err(e) = handle_prepare() {
-                    error!("TVIEW failed to persist queue during PREPARE: {:?}", e);
-                    // For PREPARE, we should abort the prepare operation
-                    // PostgreSQL will handle this by failing the PREPARE TRANSACTION
+                    return Err(format!(
+                        "TVIEW failed to persist queue during PREPARE: {e:?}"
+                    ));
                 }
             }
             XactEvent::Abort => {
                 // ABORT: Clear queue without refreshing
                 clear_queue();
-                reset_scheduled_flag();
-                // Reset metrics for aborted transaction
                 crate::metrics::metrics_api::reset_metrics();
             }
             XactEvent::Commit => {
                 // COMMIT: Cleanup (queue already flushed in PRE_COMMIT)
-                reset_scheduled_flag();
-                // Reset metrics for completed transaction
                 crate::metrics::metrics_api::reset_metrics();
             }
         }
-    });
 
-    if result.is_err() {
-        error!("PANIC in transaction callback - this is a bug!");
+        Ok(())
+    }));
+
+    // Now outside catch_unwind — safe to call error!() which triggers panic_any
+    // under #[pg_guard]-like semantics in extern "C-unwind" context.
+    match result {
+        Ok(Ok(())) => {} // Success
+        Ok(Err(msg)) => {
+            // Application-level error (e.g. refresh failure, prepare failure)
+            error!("{}", msg);
+        }
+        Err(_) => {
+            // Panic inside catch_unwind — should not happen in normal operation
+            error!("PANIC in transaction callback - this is a bug!");
+        }
     }
 }
 
@@ -143,18 +153,18 @@ unsafe extern "C-unwind" fn tview_xact_callback(event: u32, _arg: *mut c_void) {
 /// Must not panic or unwind.
 #[no_mangle]
 unsafe extern "C-unwind" fn tview_xact_start_callback(event: u32, _arg: *mut c_void) {
-    // Wrap FFI callback in catch_unwind to prevent panics crossing FFI boundary
-    let result = std::panic::catch_unwind(|| {
+    let result = std::panic::catch_unwind(AssertUnwindSafe(|| {
         if event == 3 { // XACT_EVENT_START
             // Defensive: Clear any leftover state from previous transaction
             // This prevents queue leakage in connection poolers (PgBouncer, etc.)
             clear_queue();
-            reset_scheduled_flag();
         }
-    });
+    }));
 
     if result.is_err() {
-        error!("PANIC in transaction start callback - this is a bug!");
+        // Non-fatal: defensive cleanup only. Use warning instead of error
+        // to avoid SIGABRT from panic_any in raw extern "C-unwind" context.
+        warning!("PANIC in transaction start callback - this is a bug!");
     }
 }
 
@@ -173,8 +183,7 @@ unsafe extern "C-unwind" fn tview_subxact_callback(
     _parent_subid: pg_sys::SubTransactionId,
     _arg: *mut c_void,
 ) {
-    // Wrap FFI callback in catch_unwind to prevent panics crossing FFI boundary
-    let result = std::panic::catch_unwind(|| {
+    let result = std::panic::catch_unwind(AssertUnwindSafe(|| {
         match event {
             pg_sys::SubXactEvent::SUBXACT_EVENT_START_SUB => {
                 // SAVEPOINT created: increment depth and snapshot current queue
@@ -220,10 +229,12 @@ unsafe extern "C-unwind" fn tview_subxact_callback(
                 // Ignore other subtransaction events
             }
         }
-    });
+    }));
 
     if result.is_err() {
-        error!("PANIC in subtransaction callback - this is a bug!");
+        // Non-fatal: savepoint tracking is defensive. Use warning instead of error
+        // to avoid SIGABRT from panic_any in raw extern "C-unwind" context.
+        warning!("PANIC in subtransaction callback - this is a bug!");
     }
 }
 

@@ -191,6 +191,14 @@ extern "C-unwind" fn _PG_init() {
         hooks::ensure_hook_installed();
     }
 
+    // Register transaction callbacks once at startup.
+    // PostgreSQL's RegisterXactCallback appends to a persistent linked list,
+    // so registering per-transaction would accumulate N copies after N transactions.
+    unsafe {
+        queue::xact::register_xact_callback();
+        queue::xact::register_subxact_callback();
+    }
+
     // Note: We cannot call functions that require SPI/database connection here
     // (like `check_jsonb_delta_available` or `register_cache_invalidation_callbacks`)
     // because no database connection exists during shared library preloading.
@@ -624,13 +632,12 @@ fn pg_tviews_cascade(
         }
 
 
-        // Refresh each affected row (this will cascade via propagate_from_row)
+        // Enqueue affected rows for refresh at PRE_COMMIT
         for affected_pk in affected_rows {
-            if let Err(e) = refresh::refresh_pk(tview_meta.view_oid, affected_pk) {
-                warning!("Failed to refresh {}[{}]: {:?}", tview_meta.entity_name, affected_pk, e);
-            }
+            queue::enqueue_refresh(&tview_meta.entity_name, affected_pk);
         }
     }
+
 }
 
 /// Handle INSERT operations on base tables
@@ -816,13 +823,13 @@ pub mod pg_test {
 #[pg_schema]
 mod tests {
     use pgrx::prelude::*;
-    #[cfg(feature = "pg_test")]
     use crate::error::TViewError;
 
 
     #[pg_test]
     fn sanity_check() {
-        assert_eq!(2, 1 + 1);
+        let two: i32 = 2;
+        assert_eq!(two, 1 + 1);
     }
 
     #[pg_test]
@@ -846,9 +853,9 @@ mod tests {
     #[should_panic(expected = "TVIEW metadata not found")]
     fn test_error_propagates_to_postgres() {
         // This should raise a PostgreSQL error
-        Err::<(), _>(TViewError::MetadataNotFound {
+        panic!("{:?}", TViewError::MetadataNotFound {
             entity: "test".to_string(),
-        }).unwrap();
+        });
     }
 
     // Tests for jsonb_delta detection
@@ -935,6 +942,20 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(restored.0["name"], "rust", "refresh should restore data from the backing view");
+    }
+}
+
+/// Migrate all existing TVIEW triggers from the old PL/pgSQL handler to the
+/// Rust `pg_tview_trigger_handler()`.
+///
+/// Call this once after upgrading `pg_tviews` to convert triggers installed by
+/// prior versions. The operation is idempotent and safe to re-run.
+///
+/// Raises a `PostgreSQL` ERROR if any trigger cannot be migrated.
+#[pg_extern]
+fn pg_tviews_migrate_triggers() {
+    if let Err(e) = crate::dependency::triggers::migrate_all_triggers_to_rust_handler() {
+        error!("Failed to migrate triggers: {:?}", e);
     }
 }
 

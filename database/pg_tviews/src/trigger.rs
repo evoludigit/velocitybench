@@ -22,7 +22,7 @@ use pgrx::prelude::*;
 /// - Minimal database queries during trigger execution
 /// - Queue processing deferred to commit time
 use pgrx::spi;
-use crate::queue::{enqueue_refresh, enqueue_refresh_bulk, register_commit_callback_once};
+use crate::queue::{enqueue_refresh, enqueue_refresh_bulk};
 use crate::catalog::entity_for_table;
 use crate::refresh::bulk::quote_identifier;
 
@@ -64,12 +64,6 @@ fn pg_tview_trigger_handler<'a>(
 
     // Enqueue refresh request (deferred to commit)
     enqueue_refresh(&entity, pk_value);
-
-    // Register commit callback (once per transaction)
-    if let Err(e) = register_commit_callback_once() {
-        warning!("Failed to register commit callback: {:?}", e);
-        return Ok(None);
-    }
 
     Ok(None)
 }
@@ -119,12 +113,6 @@ fn pg_tview_stmt_trigger_handler<'a>(
 
     // Bulk enqueue all changed PKs
     enqueue_refresh_bulk(&entity, changed_pks);
-
-    // Register commit callback (once per transaction)
-    if let Err(e) = register_commit_callback_once() {
-        warning!("Failed to register commit callback: {:?}", e);
-        return Ok(None);
-    }
 
     Ok(None)
 }
