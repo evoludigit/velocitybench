@@ -112,6 +112,7 @@ frameworks/*/venv
 database/.venv
 tests/qa/.venv
 .plan/
+.phases*/
 
 # Development artifacts
 setup-log.json
