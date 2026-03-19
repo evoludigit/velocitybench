@@ -12,7 +12,9 @@ RUN apk add --no-cache \
     git \
     unzip \
     libxml2-dev \
-    curl
+    curl \
+    nginx \
+    && mkdir -p /run/nginx /var/log/nginx
 
 # Install PHP extensions
 RUN docker-php-ext-install pdo pdo_pgsql session fileinfo dom
@@ -45,13 +47,12 @@ RUN php artisan config:cache --no-interaction || true
 # Build stage complete
 FROM base AS production
 
-# Create non-root user
-RUN addgroup -g 1001 -S appuser && \
-    adduser -u 1001 -S appuser -G appuser
+# Copy nginx config
+COPY nginx.conf /etc/nginx/http.d/default.conf
 
-# Change ownership
-RUN chown -R appuser:appuser /app
-USER appuser
+# Copy entrypoint
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
 # Expose port
 EXPOSE 8009
@@ -60,5 +61,4 @@ EXPOSE 8009
 HEALTHCHECK --interval=30s --timeout=15s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8009/api/health || exit 1
 
-# Start Laravel with built-in server
-CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8009"]
+CMD ["/docker-entrypoint.sh"]

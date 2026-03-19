@@ -8,6 +8,7 @@ use GraphQL\Type\Definition\Type;
 use GraphQL\Type\Definition\InputObjectType;
 use VelocityBench\Model\User;
 use VelocityBench\Model\Post;
+use VelocityBench\Model\Comment;
 
 class Types
 {
@@ -53,7 +54,8 @@ class Types
                         ],
                         'resolve' => function (User $user, array $args, $context) {
                             $limit = min($args['limit'], 50);
-                            return $context['loaders']->getPostsByAuthorLoader($limit)->load($user->pk_user);
+                            $byAuthor = Post::findByAuthorPks([$user->pk_user], $limit);
+                            return $byAuthor[$user->pk_user] ?? [];
                         }
                     ],
                     'followers' => [
@@ -107,7 +109,7 @@ class Types
                     'author' => [
                         'type' => Type::nonNull(self::user()),
                         'resolve' => function (Post $post, array $args, $context) {
-                            return $context['loaders']->getUserLoader()->load($post->fk_author);
+                            return User::findByPk($post->fk_author);
                         }
                     ],
                     'comments' => [
@@ -120,7 +122,8 @@ class Types
                         ],
                         'resolve' => function (Post $post, array $args, $context) {
                             $limit = min($args['limit'], 50);
-                            return $context['loaders']->getCommentsByPostLoader($limit)->load($post->pk_post);
+                            $byPost = Comment::findByPostPks([$post->pk_post], $limit);
+                            return $byPost[$post->pk_post] ?? [];
                         }
                     ]
                 ]
@@ -149,15 +152,11 @@ class Types
                     ],
                     'author' => [
                         'type' => self::user(),
-                        'resolve' => function ($comment, array $args, $context) {
-                            return $context['loaders']->getUserLoader()->load($comment->fk_author);
-                        }
+                        'resolve' => fn($comment) => User::findByPk($comment->fk_author)
                     ],
                     'post' => [
                         'type' => self::post(),
-                        'resolve' => function ($comment, array $args, $context) {
-                            return $context['loaders']->getPostLoader()->load($comment->fk_post);
-                        }
+                        'resolve' => fn($comment) => Post::findByPk($comment->fk_post)
                     ]
                 ]
             ]);

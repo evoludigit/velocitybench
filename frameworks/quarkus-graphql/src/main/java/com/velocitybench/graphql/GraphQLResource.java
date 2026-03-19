@@ -53,6 +53,11 @@ public class GraphQLResource {
         return postRepository.findAll(Math.min(limit, 100));
     }
 
+    @Query
+    public List<Comment> comments(@DefaultValue("20") @Name("limit") int limit) {
+        return commentRepository.findAll(Math.min(limit, 100));
+    }
+
     // Mutations
     @Mutation
     public User updateUser(@Name("id") String id, @Name("input") UpdateUserInput input) {

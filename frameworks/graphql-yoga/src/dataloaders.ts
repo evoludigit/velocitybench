@@ -10,7 +10,7 @@ interface User {
 
 interface Post {
   id: string;
-  author_id: string;
+  fk_author: number;
   title: string;
   content: string | null;
 }
@@ -24,7 +24,7 @@ interface Comment {
 
 export function createDataLoaders() {
   return {
-    // Batch load users by ID
+    // Batch load users by UUID
     userLoader: new DataLoader<string, User | null>(async (ids) => {
       const result = await pool.query(
         `SELECT id, username, full_name, bio
@@ -36,23 +36,34 @@ export function createDataLoaders() {
       return ids.map((id) => userMap.get(id) || null);
     }),
 
+    // Batch load users by integer pk_user (for Post.author)
+    userByPkLoader: new DataLoader<number, User | null>(async (pks) => {
+      const result = await pool.query(
+        `SELECT pk_user, id, username, full_name, bio
+         FROM benchmark.tb_user
+         WHERE pk_user = ANY($1::int[])`,
+        [pks as number[]]
+      );
+      const userMap = new Map(result.rows.map((u: any) => [u.pk_user, u]));
+      return pks.map((pk) => userMap.get(pk) || null);
+    }),
+
     // Batch load posts by ID
     postLoader: new DataLoader<string, Post | null>(async (ids) => {
       const result = await pool.query(
-        `SELECT p.id, u.id as author_id, p.title, p.content
-         FROM benchmark.tb_post p
-         JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-         WHERE p.id = ANY($1)`,
+        `SELECT id, fk_author, title, content
+         FROM benchmark.tb_post
+         WHERE id = ANY($1)`,
         [ids as string[]]
       );
       const postMap = new Map(result.rows.map((p: Post) => [p.id, p]));
       return ids.map((id) => postMap.get(id) || null);
     }),
 
-    // Batch load posts by author ID
+    // Batch load posts by author UUID (for User.posts field)
     postsByAuthorLoader: new DataLoader<string, Post[]>(async (authorIds) => {
       const result = await pool.query(
-        `SELECT p.id, u.id as author_id, p.title, p.content
+        `SELECT p.id, p.fk_author, u.id as author_uuid, p.title, p.content
          FROM benchmark.tb_post p
          JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
          WHERE u.id = ANY($1)
@@ -60,11 +71,11 @@ export function createDataLoaders() {
         [authorIds as string[]]
       );
       const postMap = new Map<string, Post[]>();
-      for (const post of result.rows as Post[]) {
-        if (!postMap.has(post.author_id)) {
-          postMap.set(post.author_id, []);
+      for (const post of result.rows as any[]) {
+        if (!postMap.has(post.author_uuid)) {
+          postMap.set(post.author_uuid, []);
         }
-        postMap.get(post.author_id)!.push(post);
+        postMap.get(post.author_uuid)!.push({ id: post.id, fk_author: post.fk_author, title: post.title, content: post.content });
       }
       return authorIds.map((id) => postMap.get(id) || []);
     }),

@@ -10,7 +10,7 @@ interface User {
 
 interface Post {
   id: string;
-  author_id: string;
+  fk_author: number;
   title: string;
   content: string | null;
   status: string;
@@ -25,7 +25,7 @@ interface Comment {
 
 export function createDataLoaders() {
   return {
-    // Batch load users by ID
+    // Batch load users by UUID
     userLoader: new DataLoader<string, User | null>(async (ids) => {
       const users = await query<User>(
         `SELECT id, username, full_name, bio
@@ -37,10 +37,22 @@ export function createDataLoaders() {
       return ids.map((id) => userMap.get(id) || null);
     }),
 
-    // Batch load posts by author ID
+    // Batch load users by integer pk_user (for Post.author)
+    userByPkLoader: new DataLoader<number, User | null>(async (pks) => {
+      const users = await query<any>(
+        `SELECT pk_user, id, username, full_name, bio
+         FROM benchmark.tb_user
+         WHERE pk_user = ANY($1::int[])`,
+        [pks]
+      );
+      const userMap = new Map(users.map((u: any) => [u.pk_user, u]));
+      return pks.map((pk) => userMap.get(pk) || null);
+    }),
+
+    // Batch load posts by author UUID (for User.posts field)
     postsByAuthorLoader: new DataLoader<string, Post[]>(async (authorIds) => {
-      const posts = await query<Post>(
-        `SELECT p.id, u.id as author_id, p.title, p.content, p.published as status
+      const posts = await query<any>(
+        `SELECT p.id, p.fk_author, u.id as author_uuid, p.title, p.content, p.published as status
          FROM benchmark.tb_post p
          JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
          WHERE u.id = ANY($1)
@@ -50,10 +62,10 @@ export function createDataLoaders() {
       );
       const postMap = new Map<string, Post[]>();
       for (const post of posts) {
-        if (!postMap.has(post.author_id)) {
-          postMap.set(post.author_id, []);
+        if (!postMap.has(post.author_uuid)) {
+          postMap.set(post.author_uuid, []);
         }
-        postMap.get(post.author_id)!.push(post);
+        postMap.get(post.author_uuid)!.push({ id: post.id, fk_author: post.fk_author, title: post.title, content: post.content, status: post.status });
       }
       return authorIds.map((id) => postMap.get(id) || []);
     }),

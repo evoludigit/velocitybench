@@ -14,6 +14,24 @@ public class CommentRepository {
     @Inject
     AgroalDataSource dataSource;
 
+    public List<Comment> findAll(int limit) {
+        String sql = "SELECT pk_comment, id, fk_post, fk_author, content, created_at, updated_at " +
+                     "FROM benchmark.tb_comment ORDER BY pk_comment LIMIT ?";
+        List<Comment> result = new ArrayList<>();
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, limit);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    result.add(mapRow(rs));
+                }
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+        return result;
+    }
+
     public Map<Integer, List<Comment>> findByPostPks(Set<Integer> postPks, int limit) {
         if (postPks.isEmpty()) return Collections.emptyMap();
 

@@ -12,6 +12,9 @@ environment ENV.fetch("RACK_ENV", "production")
 preload_app!
 
 on_worker_boot do
-  # Reconnect to database in forked workers
-  VelocityBench::DB.disconnect if defined?(VelocityBench::DB)
+  # Disconnect inherited parent connection and force-reconnect in this worker
+  if defined?(VelocityBench::DB)
+    VelocityBench::DB.disconnect
+    VelocityBench::DB.connection  # eagerly reconnect
+  end
 end
