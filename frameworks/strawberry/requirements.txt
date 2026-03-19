@@ -2,7 +2,7 @@
 # Updated for latest stable versions with pytest-asyncio 1.0+
 
 # Web Framework
-fastapi==0.115.0
+fastapi==0.135.1
 uvicorn[standard]==0.32.0
 
 # GraphQL Framework (with Pydantic v2 support)
