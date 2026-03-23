@@ -313,7 +313,7 @@ jobs:
           echo '{"bomVersion": "1", "components": []}' > sbom/sbom-${{ matrix.component.name }}.json
 
       - name: Upload SBOM artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: sbom-${{ matrix.component.name }}
@@ -466,7 +466,7 @@ jobs:
           cat sbom-output/SBOM_INDEX.md
 
       - name: Upload aggregated SBOMs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: sbom-aggregated
           path: sbom-output/
