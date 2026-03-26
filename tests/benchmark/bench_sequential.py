@@ -747,7 +747,6 @@ FRAMEWORKS: dict[str, dict] = {
         "t1_template": "fraiseql",
         "health_url": "http://localhost:8815/health",
         "warmup_secs": 30,
-        "m1_template": "fraiseql",
     },
     # Phase 5: Observer overhead — fraiseql-tv with audit logging enabled
     "fraiseql-tv-audit": {
