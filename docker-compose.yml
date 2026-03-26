@@ -56,7 +56,7 @@ services:
   # ============================================================================
 
   fraiseql:
-    # FraiseQL v2.0.0-beta.3 — Variant A: v_* on-the-fly JSONB views
+    # FraiseQL v2.1.0 — Variant A: v_* on-the-fly JSONB views
     build:
       context: ./frameworks/fraiseql
       args:
@@ -70,6 +70,7 @@ services:
       - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
       - RUST_LOG=info
       - FRAISEQL_CONFIG=fraiseql.toml
+      - FRAISEQL_ENV=development
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8815/health"]
       interval: 30s
@@ -88,11 +89,12 @@ services:
       - velocitybench-benchmark
 
   fraiseql-tv:
-    # FraiseQL v2.0.0-beta.3 — Variant B: tv_* pre-computed JSONB tables
+    # FraiseQL v2.1.0 — Variant B: tv_* pre-computed JSONB tables
     build:
       context: ./frameworks/fraiseql
       args:
         SCHEMA_FILE: schema_tv.py
+        BUILD_TOML: fraiseql-build-tv.toml
     ports:
       - "8816:8815"
     depends_on:
@@ -104,6 +106,7 @@ services:
       - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
       - RUST_LOG=info
       - FRAISEQL_CONFIG=fraiseql-tv.toml
+      - FRAISEQL_ENV=development
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8815/health"]
       interval: 30s
@@ -122,11 +125,12 @@ services:
       - velocitybench-benchmark
 
   fraiseql-tv-nocache:
-    # FraiseQL v2 — Variant B (tv_*), cache disabled — Phase 1 cold-read baseline
+    # FraiseQL v2.1.0 — Variant B (tv_*), cache disabled — cold-read baseline
     build:
       context: ./frameworks/fraiseql
       args:
         SCHEMA_FILE: schema_tv.py
+        BUILD_TOML: fraiseql-build-tv.toml
     ports:
       - "8817:8815"
     depends_on:
@@ -138,6 +142,7 @@ services:
       - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
       - RUST_LOG=info
       - FRAISEQL_CONFIG=fraiseql-tv-nocache.toml
+      - FRAISEQL_ENV=development
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8815/health"]
       interval: 30s
@@ -156,11 +161,12 @@ services:
       - velocitybench-benchmark
 
   fraiseql-tv-audit:
-    # FraiseQL v2 — Variant B (tv_*), audit logging ENABLED — Phase 5 observer overhead
+    # FraiseQL v2.1.0 — Variant B (tv_*), audit logging ENABLED — observer overhead
     build:
       context: ./frameworks/fraiseql
       args:
         SCHEMA_FILE: schema_tv.py
+        BUILD_TOML: fraiseql-build-tv-audit.toml
     ports:
       - "8818:8815"
     depends_on:
@@ -172,6 +178,7 @@ services:
       - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
       - RUST_LOG=info
       - FRAISEQL_CONFIG=fraiseql-tv-audit.toml
+      - FRAISEQL_ENV=development
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8815/health"]
       interval: 30s

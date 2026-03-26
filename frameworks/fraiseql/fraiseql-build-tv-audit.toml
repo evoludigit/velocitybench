@@ -1,0 +1,27 @@
+# FraiseQL v2.1.0 — Compiler Configuration (TV Tables + Audit Logging)
+# Used by fraiseql-cli to compile schema_tv.json -> schema.compiled.json with audit enabled
+
+[project]
+name = "velocitybench-tv-audit"
+version = "1.0.0"
+description = "VelocityBench FraiseQL TV-tables variant with audit logging"
+
+[fraiseql]
+schema_file = "schema.json"
+output_file = "schema.compiled.json"
+
+[fraiseql.security.audit_logging]
+enabled = true
+log_level = "info"
+include_sensitive_data = false
+async_logging = true
+
+[fraiseql.security.error_sanitization]
+enabled = true
+generic_messages = true
+
+[fraiseql.security.rate_limiting]
+enabled = false
+
+[fraiseql.security.state_encryption]
+enabled = false

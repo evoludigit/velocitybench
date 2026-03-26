@@ -79,7 +79,7 @@ class Comment:
 
 
 @fraiseql.query(
-    sql_source="benchmark.v_user",
+    sql_source="v_user",
     auto_params={"limit": True, "offset": True, "where": True, "order_by": True},
 )
 def users(
@@ -90,14 +90,14 @@ def users(
     pass
 
 
-@fraiseql.query(sql_source="benchmark.v_user")
+@fraiseql.query(sql_source="v_user")
 def user(id: ID) -> User | None:
     """Get a single user by UUID."""
     pass
 
 
 @fraiseql.query(
-    sql_source="benchmark.v_post",
+    sql_source="v_post",
     auto_params={"limit": True, "offset": True, "where": True, "order_by": True},
 )
 def posts(
@@ -110,14 +110,14 @@ def posts(
     pass
 
 
-@fraiseql.query(sql_source="benchmark.v_post")
+@fraiseql.query(sql_source="v_post")
 def post(id: ID) -> Post | None:
     """Get a single post by UUID."""
     pass
 
 
 @fraiseql.query(
-    sql_source="benchmark.v_comment",
+    sql_source="v_comment",
     auto_params={"limit": True, "offset": True, "where": True, "order_by": True},
 )
 def comments(
@@ -130,7 +130,7 @@ def comments(
     pass
 
 
-@fraiseql.query(sql_source="benchmark.v_comment")
+@fraiseql.query(sql_source="v_comment")
 def comment(id: ID) -> Comment | None:
     """Get a single comment by UUID."""
     pass
@@ -142,13 +142,13 @@ def comment(id: ID) -> Comment | None:
 # ============================================================================
 
 
-@fraiseql.mutation(sql_source="benchmark.fn_update_user", operation="UPDATE")
+@fraiseql.mutation(sql_source="fn_update_user", operation="UPDATE")
 def updateUser(id: ID, bio: str | None = None) -> User | None:
     """Update a user's bio. Returns the updated user."""
     pass
 
 
-@fraiseql.mutation(sql_source="benchmark.fn_create_post", operation="CREATE")
+@fraiseql.mutation(sql_source="fn_create_post", operation="CREATE")
 def createPost(
     title: str,
     content: str,

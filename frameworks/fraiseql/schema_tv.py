@@ -74,7 +74,7 @@ class Comment:
 
 
 @fraiseql.query(
-    sql_source="benchmark.tv_user",
+    sql_source="tv_user",
     jsonb_column="data",
     auto_params={"limit": True, "offset": True, "where": True, "order_by": True},
 )
@@ -86,14 +86,14 @@ def users(
     pass
 
 
-@fraiseql.query(sql_source="benchmark.tv_user", jsonb_column="data")
+@fraiseql.query(sql_source="tv_user", jsonb_column="data")
 def user(id: ID) -> User | None:
     """Get a single user by UUID."""
     pass
 
 
 @fraiseql.query(
-    sql_source="benchmark.tv_post",
+    sql_source="tv_post",
     jsonb_column="data",
     auto_params={"limit": True, "offset": True, "where": True, "order_by": True},
 )
@@ -107,14 +107,14 @@ def posts(
     pass
 
 
-@fraiseql.query(sql_source="benchmark.tv_post", jsonb_column="data")
+@fraiseql.query(sql_source="tv_post", jsonb_column="data")
 def post(id: ID) -> Post | None:
     """Get a single post by UUID."""
     pass
 
 
 @fraiseql.query(
-    sql_source="benchmark.tv_comment",
+    sql_source="tv_comment",
     jsonb_column="data",
     auto_params={"limit": True, "offset": True, "where": True, "order_by": True},
 )
@@ -128,7 +128,7 @@ def comments(
     pass
 
 
-@fraiseql.query(sql_source="benchmark.tv_comment", jsonb_column="data")
+@fraiseql.query(sql_source="tv_comment", jsonb_column="data")
 def comment(id: ID) -> Comment | None:
     """Get a single comment by UUID."""
     pass
@@ -140,13 +140,13 @@ def comment(id: ID) -> Comment | None:
 # ============================================================================
 
 
-@fraiseql.mutation(sql_source="benchmark.fn_update_user", operation="UPDATE")
+@fraiseql.mutation(sql_source="fn_update_user", operation="UPDATE")
 def updateUser(id: ID, bio: str | None = None) -> User | None:
     """Update a user's bio. Returns the updated user."""
     pass
 
 
-@fraiseql.mutation(sql_source="benchmark.fn_create_post", operation="CREATE")
+@fraiseql.mutation(sql_source="fn_create_post", operation="CREATE")
 def createPost(
     title: str,
     content: str,

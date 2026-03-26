@@ -1,0 +1,27 @@
+# FraiseQL v2.1.0 — Compiler Configuration (TV Tables Variant)
+# Used by fraiseql-cli to compile schema_tv.json -> schema.compiled.json
+
+[project]
+name = "velocitybench-tv"
+version = "1.0.0"
+description = "VelocityBench FraiseQL TV-tables variant (pre-computed JSONB)"
+
+[fraiseql]
+schema_file = "schema.json"
+output_file = "schema.compiled.json"
+
+[fraiseql.security.audit_logging]
+enabled = false
+log_level = "info"
+include_sensitive_data = false
+async_logging = true
+
+[fraiseql.security.error_sanitization]
+enabled = true
+generic_messages = true
+
+[fraiseql.security.rate_limiting]
+enabled = false
+
+[fraiseql.security.state_encryption]
+enabled = false

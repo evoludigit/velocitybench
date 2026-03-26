@@ -1,0 +1,28 @@
+# FraiseQL v2.1.0 — Compiler Configuration
+# Used by fraiseql-cli to compile schema.json -> schema.compiled.json
+# Server runtime configuration is in fraiseql.toml (read by fraiseql-server)
+
+[project]
+name = "velocitybench"
+version = "1.0.0"
+description = "VelocityBench FraiseQL GraphQL benchmark framework"
+
+[fraiseql]
+schema_file = "schema.json"
+output_file = "schema.compiled.json"
+
+[fraiseql.security.audit_logging]
+enabled = false
+log_level = "info"
+include_sensitive_data = false
+async_logging = true
+
+[fraiseql.security.error_sanitization]
+enabled = true
+generic_messages = true
+
+[fraiseql.security.rate_limiting]
+enabled = false
+
+[fraiseql.security.state_encryption]
+enabled = false

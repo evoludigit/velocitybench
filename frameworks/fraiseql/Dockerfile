@@ -1,21 +1,22 @@
-# FraiseQL v2.0.0-rc.11 Dockerfile for VelocityBench
-# Multi-stage build: Rust builder -> Python schema gen -> Debian runtime
-#
-# NOTE: fraiseql-server v2.0.0-beta.4 is not yet published to crates.io.
-# The server binary is copied from the local build at ~/code/fraiseql/target/release/.
-# When the server is published, replace the COPY with:
-#   RUN cargo install fraiseql-server --version 2.0.0-beta.4 --locked
-#
-# beta.4 includes fix for issue #27 (nested Object projection using -> instead
-# of ->>) — the "stream" strategy workaround in fraiseql.toml is no longer needed.
+# FraiseQL v2.1.0 Dockerfile for VelocityBench
+# Multi-stage build: Python schema gen -> CLI compile -> Debian runtime
 
 # Build argument: which schema variant to compile.
-#   schema.py    → Variant A (v_* on-the-fly JSONB views) — default
-#   schema_tv.py → Variant B (tv_* pre-computed JSONB tables)
+#   schema.py    -> Variant A (v_* on-the-fly JSONB views) -- default
+#   schema_tv.py -> Variant B (tv_* pre-computed JSONB tables)
 ARG SCHEMA_FILE=schema.py
 
+# Build argument: which compiler config to use.
+#   fraiseql-build.toml          -> default (audit disabled)
+#   fraiseql-build-tv.toml       -> TV variant (audit disabled)
+#   fraiseql-build-tv-audit.toml -> TV variant (audit enabled)
+ARG BUILD_TOML=fraiseql-build.toml
+
+# Build argument: server runtime config (copied into final image).
+ARG SERVER_TOML=fraiseql.toml
+
 # ============================================================================
-# Stage 1: Python — generate schema.json from the selected schema variant
+# Stage 1: Python -- generate schema.json from the selected schema variant
 # ============================================================================
 FROM python:3.13-slim-bookworm AS schema-builder
 
@@ -27,49 +28,39 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy selected schema file; always produce schema.json for Stage 2.
-# schema.py    → outputs schema.json    (no rename needed)
-# schema_tv.py → outputs schema_tv.json (rename to schema.json)
+# schema.py    -> outputs schema.json    (no rename needed)
+# schema_tv.py -> outputs schema_tv.json (rename to schema.json)
 COPY ${SCHEMA_FILE} ./schema_source.py
 RUN python schema_source.py && \
     mv schema_tv.json schema.json 2>/dev/null || true
 
 # ============================================================================
-# Stage 2: Rust — install fraiseql-cli and compile schema
-# (runs on same OS as the cli so glibc versions match)
+# Stage 2: Compile schema with fraiseql-cli v2.1.0
+# The build directory intentionally has NO fraiseql.toml (server config)
+# to avoid auto-discovery conflicts with the CLI's TOML parser.
 # ============================================================================
-FROM rust:latest AS builder
+FROM debian:trixie-slim AS builder
 
-RUN apt-get update && apt-get install -y \
-    pkg-config \
-    libssl-dev \
-    jq \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install fraiseql-cli from crates.io (beta.3 published)
-# fraiseql-cli beta.4 not yet on crates.io — use local build copied alongside fraiseql-server
+# Install fraiseql-cli (v2.1.0 release binary)
 COPY fraiseql-cli /usr/local/bin/fraiseql-cli
 RUN chmod +x /usr/local/bin/fraiseql-cli
 
-WORKDIR /app
+WORKDIR /build
 
-# Copy schema artifacts and config for compilation
+# Copy only schema.json and compile config — no server config here
+ARG BUILD_TOML
 COPY --from=schema-builder /app/schema.json .
-COPY fraiseql.toml .
+COPY ${BUILD_TOML} ./fraiseql.toml
 
-# Compile schema: TOML mode with Python SDK types
-RUN fraiseql-cli compile fraiseql.toml --types schema.json
+# Compile schema: TOML-only workflow (types, queries, mutations defined in build TOML + schema.json)
+RUN fraiseql-cli compile schema.json -o schema.compiled.json
 
-# Inject validation_config so the server allows complex queries (e.g. Q3 with 2-level nesting)
-RUN jq '.validation_config = {"max_query_complexity": 1000, "max_query_depth": 20, "introspection_enabled": true}' \
-    schema.compiled.json > schema.compiled.json.tmp && mv schema.compiled.json.tmp schema.compiled.json
-
-# Copy fraiseql-server binary (local beta.3 build — not yet on crates.io)
+# Copy fraiseql-server binary (v2.1.0 release)
 COPY fraiseql-server /usr/local/bin/fraiseql-server
 RUN chmod +x /usr/local/bin/fraiseql-server
 
 # ============================================================================
-# Stage 3: Runtime image (bookworm-slim)
-# NOTE: fraiseql-server is a local build linked against bookworm glibc
+# Stage 3: Runtime image
 # ============================================================================
 FROM debian:trixie-slim
 
@@ -82,8 +73,10 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 COPY --from=builder /usr/local/bin/fraiseql-server /usr/local/bin/
-COPY --from=builder /app/schema.compiled.json .
-COPY fraiseql.toml .
+COPY --from=builder /build/schema.compiled.json .
+
+ARG SERVER_TOML
+COPY ${SERVER_TOML} ./fraiseql.toml
 
 RUN useradd -r -s /bin/false fraiseql
 USER fraiseql

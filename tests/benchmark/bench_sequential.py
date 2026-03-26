@@ -758,11 +758,7 @@ DEFAULT_FRAMEWORK_ORDER = [
 REPORTS_DIR = Path(__file__).parent.parent.parent / "reports"
 
 # Frameworks with known failures — targeted by --broken-only for fast iteration.
-BROKEN_FRAMEWORKS = [
-    "fraiseql-v",
-    "fraiseql-tv-nocache",
-    "fraiseql-tv",
-]
+BROKEN_FRAMEWORKS = []
 
 # ---------------------------------------------------------------------------
 # Data structures
