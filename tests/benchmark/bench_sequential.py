@@ -88,6 +88,29 @@ _FRAISEQL_F3 = "{ users(limit: 20) { id username fullName } }"  # baseline; exte
 _GQL_F1 = _FRAISEQL_F1  # same query works for all standard GraphQL frameworks
 _GQL_F2 = _FRAISEQL_F2  # same query works for all standard GraphQL frameworks
 
+# T1 "Total Scenario" — full blog page load (post + author + 10 comments with authors)
+# GraphQL: single nested query.  REST: 3 sequential HTTP calls.
+_GQL_T1_TMPL = (
+    '{{ post(id: "{post_id}") {{ id title content '
+    "author {{ username fullName bio }} "
+    "comments(limit: 10) {{ id content author {{ username }} }} "
+    "}} }}"
+)
+# PostGraphile Relay-style T1
+_PG_T1_TMPL = (
+    '{{ tbPostById(id: "{post_id}") {{ id title content '
+    "tbUserByFkAuthor {{ username fullName }} "
+    "tbCommentsByFkPost(first: 10) {{ nodes {{ id content tbUserByFkAuthor {{ username }} }} }} "
+    "}} }}"
+)
+# FraiseQL T1: 2 sequential GraphQL calls (post doesn't nest comments in tview)
+_FRAISEQL_T1_POST_TMPL = (
+    '{{ post(id: "{post_id}") {{ id title content author {{ username fullName bio }} }} }}'
+)
+_FRAISEQL_T1_COMMENTS = (
+    "{ comments(limit: 10) { id content author { username } post { title } } }"
+)
+
 FRAMEWORKS: dict[str, dict] = {
     # ------------------------------------------------------------------
     # Rust frameworks
@@ -104,6 +127,7 @@ FRAMEWORKS: dict[str, dict] = {
             "M1": "M1",
             "F1": "http://localhost:8015/posts?published=true&limit=10",
             "F2": "http://localhost:8015/posts?published=true&limit=10&include=author",
+            "T1": "T1",  # no /posts/{id}/comments endpoint — skipped at runtime if missing
         },
         "health_url": "http://localhost:8015/health",
     },
@@ -120,6 +144,7 @@ FRAMEWORKS: dict[str, dict] = {
             "M1": "M1",
             "F1": ("http://localhost:8016/graphql", _GQL_F1),
             "F2": ("http://localhost:8016/graphql", _GQL_F2),
+            "T1": "T1",
         },
         "health_url": "http://localhost:8016/health",
     },
@@ -137,6 +162,7 @@ FRAMEWORKS: dict[str, dict] = {
             "M1": "M1",
             "F1": ("http://localhost:4000/graphql", _GQL_F1),
             "F2": ("http://localhost:4000/graphql", _GQL_F2),
+            "T1": "T1",
         },
         # Juniper wraps mutation args in input object: updateUser(id, input: {bio})
         "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "bench" }}) {{ id bio }} }}',
@@ -158,6 +184,7 @@ FRAMEWORKS: dict[str, dict] = {
             "M1": "M1",
             "F1": ("http://localhost:4010/query", _GQL_F1),
             "F2": ("http://localhost:4010/query", _GQL_F2),
+            "T1": "T1",
         },
         "health_url": "http://localhost:4010/health",
         "m1_template": _GQL_M1_FLAT_TMPL,
@@ -174,6 +201,7 @@ FRAMEWORKS: dict[str, dict] = {
             "M1": "M1",
             "F1": "http://localhost:8006/posts?published=true&limit=10",
             "F2": "http://localhost:8006/posts?published=true&limit=10&include=author",
+            "T1": "T1",
         },
         "health_url": "http://localhost:8006/health",
     },
@@ -189,6 +217,7 @@ FRAMEWORKS: dict[str, dict] = {
             "M1": "M1",
             "F1": ("http://localhost:8008/graphql", _GQL_F1),
             "F2": ("http://localhost:8008/graphql", _GQL_F2),
+            "T1": "T1",
         },
         "health_url": "http://localhost:8008/health",
         "m1_template": _GQL_M1_FLAT_TMPL,
@@ -205,6 +234,7 @@ FRAMEWORKS: dict[str, dict] = {
             "M1": "M1",
             "F1": ("http://localhost:4011/graphql", _GQL_F1),
             "F2": ("http://localhost:4011/graphql", _GQL_F2),
+            "T1": "T1",
         },
         "health_url": "http://localhost:4011/health",
         "m1_template": _GQL_M1_FLAT_TMPL,
@@ -224,6 +254,7 @@ FRAMEWORKS: dict[str, dict] = {
             "M1": "M1",
             "F1": ("http://localhost:4002/graphql", _GQL_F1),
             "F2": ("http://localhost:4002/graphql", _GQL_F2),
+            "T1": "T1",
         },
         "health_url": "http://localhost:4002/health",
         "m1_template": _GQL_M1_FLAT_TMPL,
@@ -239,6 +270,7 @@ FRAMEWORKS: dict[str, dict] = {
             "Q2b": ("http://localhost:4004/graphql", _GQL_Q2b),
             "F1": ("http://localhost:4004/graphql", _GQL_F1),
             "F2": ("http://localhost:4004/graphql", _GQL_F2),
+            "T1": "T1",
         },
         "health_url": "http://localhost:4004/health",
     },
@@ -253,6 +285,7 @@ FRAMEWORKS: dict[str, dict] = {
             "Q2b": "http://localhost:8005/posts?limit=10&include=author",
             "F1": "http://localhost:8005/posts?published=true&limit=10",
             "F2": "http://localhost:8005/posts?published=true&limit=10&include=author",
+            "T1": "T1",
         },
         "health_url": "http://localhost:8005/health",
     },
@@ -267,6 +300,7 @@ FRAMEWORKS: dict[str, dict] = {
             "Q2b": "http://localhost:8007/posts?limit=10&include=author",
             "F1": "http://localhost:8007/posts?published=true&limit=10",
             "F2": "http://localhost:8007/posts?published=true&limit=10&include=author",
+            "T1": "T1",
         },
         "health_url": "http://localhost:8007/health",
     },
@@ -282,6 +316,7 @@ FRAMEWORKS: dict[str, dict] = {
             "M1": "M1",
             "F1": ("http://localhost:4011/graphql", _GQL_F1),
             "F2": ("http://localhost:4011/graphql", _GQL_F2),
+            "T1": "T1",
         },
         "health_url": "http://localhost:4011/health",
         "m1_template": _GQL_M1_FLAT_TMPL,
@@ -298,6 +333,7 @@ FRAMEWORKS: dict[str, dict] = {
             "M1": "M1",
             "F1": ("http://localhost:4012/graphql", _GQL_F1),
             "F2": ("http://localhost:4012/graphql", _GQL_F2),
+            "T1": "T1",
         },
         "health_url": "http://localhost:4012/health",
         "m1_template": _GQL_M1_FLAT_TMPL,
@@ -314,6 +350,7 @@ FRAMEWORKS: dict[str, dict] = {
             "M1": "M1",
             "F1": ("http://localhost:4008/graphql", _GQL_F1),
             "F2": ("http://localhost:4008/graphql", _GQL_F2),
+            "T1": "T1",
         },
         "health_url": "http://localhost:4008/health",
         "m1_template": _GQL_M1_FLAT_TMPL,
@@ -333,6 +370,7 @@ FRAMEWORKS: dict[str, dict] = {
             "M1": "M1",
             "F1": ("http://localhost:8011/graphql", _GQL_F1),
             "F2": ("http://localhost:8011/graphql", _GQL_F2),
+            "T1": "T1",
         },
         "health_url": "http://localhost:8011/health",
         "m1_template": _GQL_M1_FLAT_TMPL,
@@ -349,6 +387,7 @@ FRAMEWORKS: dict[str, dict] = {
             "M1": "M1",
             "F1": ("http://localhost:8002/graphql", _GQL_F1),
             "F2": ("http://localhost:8002/graphql", _GQL_F2),
+            "T1": "T1",
         },
         "health_url": "http://localhost:8002/health",
         "m1_template": _GQL_M1_FLAT_TMPL,
@@ -365,6 +404,7 @@ FRAMEWORKS: dict[str, dict] = {
             "M1": "M1",
             "F1": "http://localhost:8003/posts?published=true&limit=10",
             "F2": "http://localhost:8003/posts?published=true&limit=10&include=author",
+            "T1": "T1",
         },
         "health_url": "http://localhost:8003/health",
     },
@@ -379,6 +419,7 @@ FRAMEWORKS: dict[str, dict] = {
             "Q2b": "http://localhost:8004/posts?limit=10&include=author",
             "F1": "http://localhost:8004/posts?limit=10&published=true",
             "F2": "http://localhost:8004/posts?limit=10&published=true&include=author",
+            "T1": "T1",
         },
         "health_url": "http://localhost:8004/health",
     },
@@ -393,6 +434,7 @@ FRAMEWORKS: dict[str, dict] = {
             "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
             "F1": ("http://localhost:4000/graphql", _GQL_F1),
             "F2": ("http://localhost:4000/graphql", _GQL_F2),
+            "T1": "T1",
         },
         "health_url": "http://localhost:4000/health",
     },
@@ -407,6 +449,7 @@ FRAMEWORKS: dict[str, dict] = {
             "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
             "F1": ("http://localhost:4000/graphql", _GQL_F1),
             "F2": ("http://localhost:4000/graphql", _GQL_F2),
+            "T1": "T1",
         },
         "health_url": "http://localhost:4000/health",
     },
@@ -428,6 +471,7 @@ FRAMEWORKS: dict[str, dict] = {
             "F1": "http://localhost:8010/api/posts?page=0&size=10",
             "F2": "http://localhost:8010/api/posts/with-author?page=0&size=10",
             "M1": "M1",
+            "T1": "T1",  # no /posts/{id}/comments — multi-call will skip if endpoint missing
         },
         "health_url": "http://localhost:8010/actuator/health",
     },
@@ -445,6 +489,7 @@ FRAMEWORKS: dict[str, dict] = {
             # Q2 already hardcodes published=true (JPQL WHERE p.published = true), so F1 == Q2
             "F1": "http://localhost:8013/api/posts?size=10",
             "F2": None,
+            "T1": "T1",
         },
         "health_url": "http://localhost:8013/actuator/health",
     },
@@ -457,6 +502,7 @@ FRAMEWORKS: dict[str, dict] = {
         "queries": {
             "Q1": "http://localhost:8014/api/users?page=0&size=20",
             "Q2": "http://localhost:8014/api/posts?size=10",
+            "T1": "T1",
         },
         "health_url": "http://localhost:8014/health",
     },
@@ -471,6 +517,7 @@ FRAMEWORKS: dict[str, dict] = {
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
             "M1": "M1",
+            "T1": "T1",
         },
         "health_url": "http://localhost:4000/health",
         # Micronaut wraps mutation args in input object: updateUser(id, input: {bio})
@@ -488,6 +535,7 @@ FRAMEWORKS: dict[str, dict] = {
             "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
             "Q3": ("http://localhost:4000/graphql", _GQL_Q3),
             "M1": "M1",
+            "T1": "T1",
         },
         "health_url": "http://localhost:4000/health",
         # Quarkus wraps mutation args in input object: updateUser(id, input: {bio})
@@ -507,6 +555,7 @@ FRAMEWORKS: dict[str, dict] = {
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
             "M1": "M1",
+            "T1": "T1",
         },
         "health_url": "http://localhost:4000/health",
         "m1_template": _GQL_M1_FLAT_TMPL,
@@ -526,6 +575,7 @@ FRAMEWORKS: dict[str, dict] = {
             "F1": "http://localhost:8012/api/posts?published=true&limit=10",
             "F2": "http://localhost:8012/api/posts?published=true&with_author=true",
             "M1": "M1",
+            "T1": "T1",
         },
         "health_url": "http://localhost:8012/api/health",
     },
@@ -538,6 +588,7 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:4000/graphql", _GQL_Q2b),
+            "T1": "T1",
         },
         "health_url": "http://localhost:4000/health",
     },
@@ -555,6 +606,7 @@ FRAMEWORKS: dict[str, dict] = {
             "Q2b": "http://localhost:8009/api/posts?limit=10&include=author",
             "F1": "http://localhost:8009/api/posts?published=true&limit=10",
             "F2": "http://localhost:8009/api/posts?published=true&limit=10&include=author",
+            "T1": "T1",
         },
         "health_url": "http://localhost:8009/api/health",
     },
@@ -570,6 +622,7 @@ FRAMEWORKS: dict[str, dict] = {
             "F1": ("http://localhost:4000/graphql", _GQL_F1),
             "F2": ("http://localhost:4000/graphql", _GQL_F2),
             "M1": "M1",
+            "T1": "T1",
         },
         # webonyx uses input object wrapper: updateUser(id, input: {bio})
         "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "bench" }}) {{ id bio }} }}',
@@ -587,8 +640,10 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": ("http://localhost:4014/graphql", _PG_Q1),
             "Q2": ("http://localhost:4014/graphql", _PG_Q2),
             "Q2b": ("http://localhost:4014/graphql", _PG_Q2b),
+            "T1": "T1",
         },
         "health_url": "http://localhost:4014/health",
+        "t1_template": "postgraphile",
     },
     # ------------------------------------------------------------------
     # C# / .NET frameworks
@@ -605,6 +660,7 @@ FRAMEWORKS: dict[str, dict] = {
             "M1": "M1",
             "F1": ("http://localhost:8025/graphql", _GQL_F1),
             "F2": ("http://localhost:8025/graphql", _GQL_F2),
+            "T1": "T1",
         },
         "health_url": "http://localhost:8025/health",
         "m1_template": _GQL_M1_FLAT_TMPL,
@@ -632,11 +688,13 @@ FRAMEWORKS: dict[str, dict] = {
             "F1": ("http://localhost:8816/graphql", _FRAISEQL_F1),
             "F2": ("http://localhost:8816/graphql", _FRAISEQL_F2),
             "F3": ("http://localhost:8816/graphql", _FRAISEQL_F3),
+            "T1": "T1",  # FraiseQL T1: 2 sequential GraphQL calls (post+author, then comments)
         },
         "health_url": "http://localhost:8816/health",
         # Phase 1: LRU cache needs 30s warmup to fill before measuring cache-hit throughput.
         "warmup_secs": 30,
         "m1_template": "fraiseql",
+        "t1_template": "fraiseql",
         "c3_template": _FRAISEQL_C3_TMPL,
     },
     "fraiseql-tv-nocache": {
@@ -659,9 +717,11 @@ FRAMEWORKS: dict[str, dict] = {
             "F1": ("http://localhost:8817/graphql", _FRAISEQL_F1),
             "F2": ("http://localhost:8817/graphql", _FRAISEQL_F2),
             "F3": ("http://localhost:8817/graphql", _FRAISEQL_F3),
+            "T1": "T1",  # FraiseQL T1: 2 sequential GraphQL calls
         },
         "health_url": "http://localhost:8817/health",
         "m1_template": "fraiseql",
+        "t1_template": "fraiseql",
         "c3_template": _FRAISEQL_C3_TMPL,
     },
     "fraiseql-v": {
@@ -681,7 +741,10 @@ FRAMEWORKS: dict[str, dict] = {
             # Phase 3: Filtered query benchmarks
             "F1": ("http://localhost:8815/graphql", _FRAISEQL_F1),
             "F2": ("http://localhost:8815/graphql", _FRAISEQL_F2),
+            "T1": "T1",  # FraiseQL T1: 2 sequential GraphQL calls
         },
+        "m1_template": "fraiseql",
+        "t1_template": "fraiseql",
         "health_url": "http://localhost:8815/health",
         "warmup_secs": 30,
         "m1_template": "fraiseql",
@@ -1116,6 +1179,164 @@ def _discover_user_uuid(fw_config: dict) -> str | None:
     return None
 
 
+def _discover_post_uuid(fw_config: dict) -> tuple[str, str] | None:
+    """Discover a published post UUID and its author UUID for T1 scenario.
+
+    Returns (post_id, author_id) or None if discovery fails.
+    """
+    fw_type = fw_config["type"]
+    try:
+        if fw_type == "graphql":
+            # Use Q2b entry or Q1 entry to find the GraphQL URL
+            for key in ("Q2b", "Q2", "Q1"):
+                entry = fw_config["queries"].get(key)
+                if entry is not None and isinstance(entry, tuple):
+                    gql_url = entry[0]
+                    break
+            else:
+                gql_url = fw_config.get("graphql_url")
+            if not gql_url:
+                return None
+            # Query a single post with author to get both IDs
+            query = '{ posts(limit: 1) { id author { id } } }'
+            payload = json.dumps({"query": query}).encode()
+            req = urllib.request.Request(
+                gql_url,
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                body = json.loads(resp.read())
+                posts = body.get("data", {}).get("posts", [])
+                if posts and posts[0].get("author"):
+                    return str(posts[0]["id"]), str(posts[0]["author"]["id"])
+                # Fallback: post exists but author wasn't nested — get author separately
+                if posts:
+                    return str(posts[0]["id"]), ""
+        else:
+            # REST: use Q2b URL pattern (posts with author included)
+            q2b_url = fw_config["queries"].get("Q2b")
+            if q2b_url and isinstance(q2b_url, str):
+                # Replace limit to just get 1 post
+                url = q2b_url.replace("limit=10", "limit=1").replace("size=10", "size=1")
+                req = urllib.request.Request(url, method="GET")
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    body = json.loads(resp.read())
+                    # Unwrap: raw list, or {"posts": [...]}, {"content": [...]}, {"data": [...]}
+                    if isinstance(body, list):
+                        posts = body
+                    elif isinstance(body, dict):
+                        posts = (
+                            body.get("posts")
+                            or body.get("content")
+                            or body.get("data")
+                            or []
+                        )
+                    else:
+                        posts = []
+                    if posts and isinstance(posts, list) and posts[0]:
+                        post = posts[0]
+                        post_id = str(post.get("id", ""))
+                        # Author ID can be nested or flat
+                        author = post.get("author", {})
+                        author_id = str(author.get("id", "")) if isinstance(author, dict) else ""
+                        if not author_id:
+                            author_id = str(post.get("author_id", ""))
+                        if post_id:
+                            return post_id, author_id
+    except (urllib.error.URLError, OSError, json.JSONDecodeError, KeyError, IndexError):
+        pass
+    return None
+
+
+def _build_rest_t1_urls(fw_name: str, base: str, post_id: str, author_id: str) -> list[str] | None:
+    """Build the REST URL chain for T1 total scenario.
+
+    Returns a list of URLs to call sequentially, or None if the framework
+    doesn't have the required endpoints.
+    """
+    # Framework-specific URL patterns for individual resource endpoints
+    _REST_T1_PATTERNS: dict[str, dict] = {
+        # Python
+        "fastapi-rest": {
+            "post": "/posts/{post_id}",
+            "author": "/users/{author_id}",
+            "comments": "/posts/{post_id}/comments?limit=10",
+        },
+        "flask-rest": {
+            "post": "/posts/{post_id}",
+            "author": "/users/{author_id}",
+            "comments": "/posts/{post_id}/comments?limit=10",
+        },
+        # Go
+        "gin-rest": {
+            "post": "/posts/{post_id}",
+            "author": "/users/{author_id}",
+            "comments": "/posts/{post_id}/comments?limit=10",
+        },
+        # Node.js
+        "express-rest": {
+            "post": "/posts/{post_id}",
+            "author": "/users/{author_id}",
+            "comments": "/posts/{post_id}/comments?limit=10",
+        },
+        "express-orm": {
+            "post": "/posts/{post_id}",
+            "author": "/users/{author_id}",
+            "comments": None,  # no comments endpoint
+        },
+        # Rust
+        "actix-web-rest": {
+            "post": "/posts/{post_id}",
+            "author": "/users/{author_id}",
+            "comments": None,  # no comments endpoint
+        },
+        # Java / Spring Boot
+        "spring-boot": {
+            "post": "/api/posts/{post_id}",
+            "author": "/api/users/{author_id}",
+            "comments": None,  # no comments endpoint
+        },
+        "spring-boot-orm": {
+            "post": "/api/posts/{post_id}",
+            "author": "/api/users/{author_id}",
+            "comments": None,
+        },
+        "spring-boot-orm-naive": {
+            "post": "/api/posts/{post_id}",
+            "author": "/api/users/{author_id}",
+            "comments": None,
+        },
+        # Ruby
+        "ruby-rails": {
+            "post": "/api/posts/{post_id}",
+            "author": "/api/users/{author_id}",
+            "comments": None,  # no comments endpoint
+        },
+        # PHP
+        "php-laravel": {
+            "post": "/api/posts/{post_id}",
+            "author": "/api/users/{author_id}",
+            "comments": None,  # no comments endpoint
+        },
+    }
+
+    patterns = _REST_T1_PATTERNS.get(fw_name)
+    if not patterns:
+        return None
+
+    urls = []
+    for key in ("post", "author", "comments"):
+        pattern = patterns.get(key)
+        if pattern is None:
+            continue  # skip missing endpoints (still run post + author as 2-call chain)
+        url = base + pattern.format(post_id=post_id, author_id=author_id)
+        urls.append(url)
+
+    return urls if urls else None
+
+
 def _worker_graphql_with_vars(
     url: str, query: str, variables: dict, end_time: float
 ) -> _WorkerResult:
@@ -1162,6 +1383,64 @@ def _worker_mutation_rest(url: str, payload: bytes, end_time: float) -> _WorkerR
     return latencies, errors, breakdown, samples
 
 
+def _worker_graphql_composite(url: str, payloads: list[bytes], end_time: float) -> _WorkerResult:
+    """Worker for T1 total scenario with multiple sequential GraphQL POSTs.
+
+    Used by FraiseQL where comments can't be nested on post — fires
+    post(id) then comments(limit:10) sequentially. Latency = total wall-clock.
+    """
+    latencies: list[float] = []
+    errors = 0
+    breakdown: dict[str, int] = {}
+    samples: list[tuple[str, str]] = []
+    conn = _PersistentConn(url)
+    while time.monotonic() < end_time:
+        t0 = time.monotonic()
+        failed = False
+        for payload in payloads:
+            ok, _lat, cat, detail = conn.post_graphql(payload)
+            if not ok:
+                failed = True
+                errors += 1
+                breakdown[cat] = breakdown.get(cat, 0) + 1
+                if len(samples) < _MAX_ERROR_SAMPLES:
+                    samples.append((cat, detail))
+                break
+        if not failed:
+            elapsed = (time.monotonic() - t0) * 1000
+            latencies.append(elapsed)
+    return latencies, errors, breakdown, samples
+
+
+def _worker_rest_composite(urls: list[str], end_time: float) -> _WorkerResult:
+    """Worker for T1 total scenario: chains multiple sequential REST GETs per iteration.
+
+    Each iteration fires all URLs in order (simulating a client that must fetch
+    post → author → comments). Latency = total wall-clock for the full sequence.
+    """
+    latencies: list[float] = []
+    errors = 0
+    breakdown: dict[str, int] = {}
+    samples: list[tuple[str, str]] = []
+    conns = [_PersistentConn(url) for url in urls]
+    while time.monotonic() < end_time:
+        t0 = time.monotonic()
+        failed = False
+        for conn in conns:
+            ok, _lat, cat, detail = conn.get()
+            if not ok:
+                failed = True
+                errors += 1
+                breakdown[cat] = breakdown.get(cat, 0) + 1
+                if len(samples) < _MAX_ERROR_SAMPLES:
+                    samples.append((cat, detail))
+                break
+        if not failed:
+            elapsed = (time.monotonic() - t0) * 1000
+            latencies.append(elapsed)
+    return latencies, errors, breakdown, samples
+
+
 # ---------------------------------------------------------------------------
 # Diagnostic mode
 # ---------------------------------------------------------------------------
@@ -1173,6 +1452,13 @@ def run_diagnose(fw_name: str, fw_config: dict) -> None:
     for query_name, entry in fw_config["queries"].items():
         if entry is None:
             print(f"    {query_name}: skipped (None)", flush=True)
+            continue
+        # Skip unresolved sentinels and composite entries in diagnose mode
+        if isinstance(entry, str) and entry in ("M1", "C3", "T1"):
+            print(f"    {query_name}: skipped (unresolved sentinel)", flush=True)
+            continue
+        if isinstance(entry, dict):
+            print(f"    {query_name}: skipped (composite — {len(entry.get('urls', []))} URLs)", flush=True)
             continue
         fw_type = fw_config["type"]
         print(f"    {query_name}:", flush=True)
@@ -1244,7 +1530,22 @@ def run_scenario(
         all_breakdown: dict[str, int] = {}
         all_samples: list[tuple[str, str]] = []
         with ThreadPoolExecutor(max_workers=concurrency) as pool:
-            if fw_type == "graphql":
+            if isinstance(entry, dict) and entry.get("mode") == "graphql_composite":
+                # FraiseQL T1: chain multiple GraphQL POSTs per iteration
+                url = entry["url"]
+                payloads = entry["payloads"]
+                futures = [
+                    pool.submit(_worker_graphql_composite, url, payloads, end_time)
+                    for _ in range(concurrency)
+                ]
+            elif isinstance(entry, dict) and entry.get("mode") == "composite":
+                # T1 total scenario: chain multiple REST calls per iteration
+                urls = entry["urls"]
+                futures = [
+                    pool.submit(_worker_rest_composite, urls, end_time)
+                    for _ in range(concurrency)
+                ]
+            elif fw_type == "graphql":
                 if len(entry) == 3:
                     url, query, variables = entry
                     futures = [
@@ -1416,6 +1717,7 @@ _QUERY_LABELS = {
     "F1": "`posts(published: true, limit: 10) { id title }` — published filter, no nesting",
     "F2": "`posts(published: true, limit: 10) { id title author { ... } }` — published filter + nesting",
     "F3": "`users(limit: 20) { id username fullName }` — baseline for ORDER BY comparison",
+    "T1": "Full blog page load — `post(id) { title content author { ... } comments(limit:10) { content author { ... } } }`",
 }
 
 
@@ -1711,6 +2013,70 @@ def main() -> None:
                 else:
                     fw_config["queries"]["C3"] = None
                     print("  C3: could not discover user UUID — skipping", flush=True)
+
+        # Resolve T1 "total scenario" sentinel — needs a real post UUID + author UUID
+        if fw_config["queries"].get("T1") == "T1":
+            post_info = _discover_post_uuid(fw_config)
+            if post_info:
+                post_id, author_id = post_info
+                fw_type = fw_config["type"]
+                if fw_type == "graphql":
+                    # Find the GraphQL URL from any existing query entry
+                    gql_url = None
+                    for key in ("Q1", "Q2", "Q2b"):
+                        entry = fw_config["queries"].get(key)
+                        if entry is not None and isinstance(entry, tuple):
+                            gql_url = entry[0]
+                            break
+                    if not gql_url:
+                        gql_url = fw_config.get("graphql_url", "")
+                    if gql_url:
+                        t1_tmpl_key = fw_config.get("t1_template")
+                        if t1_tmpl_key == "fraiseql":
+                            # FraiseQL: 2 sequential GraphQL calls (post+author, then comments)
+                            post_query = _FRAISEQL_T1_POST_TMPL.format(post_id=post_id)
+                            payloads = [
+                                json.dumps({"query": post_query}).encode(),
+                                json.dumps({"query": _FRAISEQL_T1_COMMENTS}).encode(),
+                            ]
+                            fw_config["queries"]["T1"] = {
+                                "mode": "graphql_composite",
+                                "url": gql_url,
+                                "payloads": payloads,
+                            }
+                            print(f"  T1: resolved post UUID {post_id[:8]}... (FraiseQL 2-query composite)", flush=True)
+                        elif t1_tmpl_key == "postgraphile":
+                            t1_query = _PG_T1_TMPL.format(post_id=post_id)
+                            fw_config["queries"]["T1"] = (gql_url, t1_query)
+                            print(f"  T1: resolved post UUID {post_id[:8]}... (GraphQL single query)", flush=True)
+                        else:
+                            t1_query = _GQL_T1_TMPL.format(post_id=post_id)
+                            fw_config["queries"]["T1"] = (gql_url, t1_query)
+                            print(f"  T1: resolved post UUID {post_id[:8]}... (GraphQL single query)", flush=True)
+                    else:
+                        fw_config["queries"]["T1"] = None
+                        print("  T1: no GraphQL URL found — skipping", flush=True)
+                else:
+                    # REST: build multi-URL composite call chain
+                    # Derive base URL (scheme + host + port) from Q1 endpoint
+                    q1_url = fw_config["queries"].get("Q1", "")
+                    if isinstance(q1_url, str) and q1_url:
+                        parsed = urlparse(q1_url)
+                        base = f"{parsed.scheme}://{parsed.netloc}"
+                        # Build the sequential REST URLs
+                        t1_urls = _build_rest_t1_urls(fw_name, base, post_id, author_id)
+                        if t1_urls:
+                            fw_config["queries"]["T1"] = {"mode": "composite", "urls": t1_urls}
+                            print(f"  T1: resolved post UUID {post_id[:8]}... ({len(t1_urls)} REST calls)", flush=True)
+                        else:
+                            fw_config["queries"]["T1"] = None
+                            print("  T1: could not build REST URL chain — skipping", flush=True)
+                    else:
+                        fw_config["queries"]["T1"] = None
+                        print("  T1: no REST base URL found — skipping", flush=True)
+            else:
+                fw_config["queries"]["T1"] = None
+                print("  T1: could not discover post UUID — skipping", flush=True)
 
         for query_name in query_names:
             print(f"  {query_name}:")

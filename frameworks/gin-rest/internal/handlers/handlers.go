@@ -289,8 +289,8 @@ func GetPostComments(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
 	rows, err := db.Pool.Query(c.Request.Context(), `
-		SELECT c.id, c.content, c.created_at, c.is_approved,
-		       u.id as author_id, u.username as author_username, u.avatar_url as author_avatar
+		SELECT c.id, c.content, c.created_at,
+		       u.id as author_id, u.username as author_username
 		FROM benchmark.tb_comment c
 		JOIN benchmark.tb_post p ON c.fk_post = p.pk_post
 		JOIN benchmark.tb_user u ON c.fk_author = u.pk_user
@@ -307,11 +307,9 @@ func GetPostComments(c *gin.Context) {
 	var comments []map[string]interface{}
 	for rows.Next() {
 		var id, content, authorID, authorUsername string
-		var createdAt string
-		var isApproved bool
-		var authorAvatar *string
+		var createdAt time.Time
 
-		err := rows.Scan(&id, &content, &createdAt, &isApproved, &authorID, &authorUsername, &authorAvatar)
+		err := rows.Scan(&id, &content, &createdAt, &authorID, &authorUsername)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -321,12 +319,8 @@ func GetPostComments(c *gin.Context) {
 			"id":              id,
 			"content":         content,
 			"created_at":      createdAt,
-			"is_approved":     isApproved,
 			"author_id":       authorID,
 			"author_username": authorUsername,
-		}
-		if authorAvatar != nil {
-			comment["author_avatar"] = *authorAvatar
 		}
 		comments = append(comments, comment)
 	}

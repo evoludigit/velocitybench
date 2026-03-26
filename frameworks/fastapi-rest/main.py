@@ -532,9 +532,8 @@ async def get_post_comments(
 
     comments = await db.fetch(
         """
-        SELECT c.id, c.content, c.created_at, c.is_approved,
-               u.id as author_id, u.username as author_username,
-               u.avatar_url as author_avatar
+        SELECT c.id, c.content, c.created_at,
+               u.id as author_id, u.username as author_username
         FROM benchmark.tb_comment c
         JOIN benchmark.tb_post p ON c.fk_post = p.pk_post
         JOIN benchmark.tb_user u ON c.fk_author = u.pk_user

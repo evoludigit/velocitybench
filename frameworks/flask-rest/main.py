@@ -673,7 +673,7 @@ def get_post_comments(post_id):
 
     comments = execute_query(
         """
-        SELECT c.id, c.content, c.created_at, c.is_approved,
+        SELECT c.id, c.content, c.created_at,
                u.id as author_id, u.username as author_username
         FROM benchmark.tb_comment c
         JOIN benchmark.tb_post p ON c.fk_post = p.pk_post
