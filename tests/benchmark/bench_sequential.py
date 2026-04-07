@@ -1769,13 +1769,35 @@ def _reset_postgres_state() -> None:
     Best-effort: failures are printed but do not abort the benchmark.
     """
     print("  resetting PostgreSQL state (CHECKPOINT + VACUUM + pg_prewarm)...", end=" ", flush=True)
+    # UPDATE tb_user triggers a 3-table pg_tviews cascade: tv_user, tv_post, tv_comment.
+    # All five tables must be pre-warmed to avoid cold-page I/O at the start of M1.
     result = _compose(
         "exec", "-T", "postgres",
         "psql", "-U", "benchmark", "-d", "velocitybench_benchmark",
         "-c", "CHECKPOINT",
-        "-c", "VACUUM ANALYZE benchmark.tb_user, benchmark.tv_user",
-        "-c", "SELECT pg_prewarm('benchmark.tb_user')",
-        "-c", "SELECT pg_prewarm('benchmark.tv_user')",
+        "-c", "VACUUM ANALYZE benchmark.tb_user, benchmark.tv_user, benchmark.tv_post, benchmark.tv_comment",
+        check=False,
+    )
+    # Prewarm: prefer pg_prewarm (reads all blocks into shared_buffers via OS read-ahead).
+    # If the extension is absent, fall back to a full column read — reading the JSONB 'data'
+    # column forces a heap scan that loads all pages, unlike COUNT(*) which may use the
+    # visibility map.  Added to 01-extensions.sql; takes effect after image rebuild.
+    _compose(
+        "exec", "-T", "postgres",
+        "psql", "-U", "benchmark", "-d", "velocitybench_benchmark",
+        "-c", "SELECT pg_prewarm('benchmark.tb_user'), pg_prewarm('benchmark.tv_user'), "
+              "pg_prewarm('benchmark.tv_post'), pg_prewarm('benchmark.tv_comment')",
+        check=False,
+    )
+    # Unconditional fallback: if pg_prewarm is absent the above call returns non-zero and
+    # is silently skipped (check=False), but we still want warm buffers.  Reading octet_length
+    # of every data column value is guaranteed to load all heap pages into shared_buffers.
+    _compose(
+        "exec", "-T", "postgres",
+        "psql", "-U", "benchmark", "-d", "velocitybench_benchmark",
+        "-c", "SELECT sum(octet_length(data::text)) FROM benchmark.tv_user",
+        "-c", "SELECT sum(octet_length(data::text)) FROM benchmark.tv_post",
+        "-c", "SELECT sum(octet_length(data::text)) FROM benchmark.tv_comment",
         check=False,
     )
     if result.returncode == 0:

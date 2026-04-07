@@ -8,6 +8,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pg_stat_statements";
 CREATE EXTENSION IF NOT EXISTS "pg_buffercache";
+CREATE EXTENSION IF NOT EXISTS "pg_prewarm";
 
 -- pg_tviews: automatic JSONB TVIEW materialization with trigger-based cascade sync
 -- Provides pg_tviews_create(), pg_tviews_refresh(), and DDL event triggers for tv_* tables
