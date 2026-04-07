@@ -31,30 +31,44 @@ CREATE OR REPLACE FUNCTION benchmark.fn_update_user(
     entity      JSONB,
     entity_type TEXT,
     cascade     JSONB,
-    metadata    JSONB
+    metadata    JSONB,
+    entity_id   TEXT
 ) AS $$
+DECLARE
+    v_pk   INT;
+    v_data JSONB;
+BEGIN
     UPDATE benchmark.tb_user
     SET
         bio        = COALESCE(p_bio #>> '{}', bio),
         updated_at = NOW()
-    WHERE benchmark.tb_user.id = (p_id #>> '{}')::UUID
-    RETURNING
+    WHERE id = (p_id #>> '{}')::UUID
+    RETURNING pk_user INTO v_pk;
+
+    IF v_pk IS NULL THEN
+        RETURN QUERY SELECT
+            'failed:not_found'::TEXT,
+            'User not found'::TEXT,
+            NULL::JSONB,
+            'User'::TEXT,
+            NULL::JSONB,
+            NULL::JSONB,
+            NULL::TEXT;
+        RETURN;
+    END IF;
+
+    SELECT vu.data INTO v_data FROM benchmark.v_user vu WHERE vu._pk = v_pk;
+
+    RETURN QUERY SELECT
         'updated'::TEXT,
         NULL::TEXT,
-        jsonb_build_object(
-            'id',         benchmark.tb_user.id::text,
-            'identifier', identifier,
-            'email',      email,
-            'username',   username,
-            'fullName',   full_name,
-            'bio',        bio,
-            'createdAt',  to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
-            'updatedAt',  to_char(updated_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
-        ),
+        v_data,
         'User'::TEXT,
         NULL::JSONB,
-        NULL::JSONB;
-$$ LANGUAGE sql;
+        NULL::JSONB,
+        (p_id #>> '{}')::TEXT;  -- entity_id: enables precise entity-eviction path
+END;
+$$ LANGUAGE plpgsql;
 
 GRANT EXECUTE ON FUNCTION benchmark.fn_update_user(JSONB, JSONB) TO PUBLIC;
 
@@ -76,13 +90,15 @@ CREATE OR REPLACE FUNCTION benchmark.fn_create_post(
     metadata    JSONB
 ) AS $$
 DECLARE
-    v_title       TEXT;
-    v_content     TEXT;
+    v_title      TEXT;
+    v_content    TEXT;
     v_author_uuid UUID;
-    v_published   BOOLEAN;
-    v_author_pk   INT;
-    v_post_id     UUID;
-    v_slug        TEXT;
+    v_published  BOOLEAN;
+    v_author_pk  INT;
+    v_post_pk    INT;
+    v_post_id    UUID;
+    v_slug       TEXT;
+    v_data       JSONB;
 BEGIN
     v_title       := p_title #>> '{}';
     v_content     := p_content #>> '{}';
@@ -92,7 +108,7 @@ BEGIN
     -- Resolve author UUID → internal pk (fast INT join)
     SELECT pk_user INTO v_author_pk
     FROM benchmark.tb_user
-    WHERE benchmark.tb_user.id = v_author_uuid;
+    WHERE id = v_author_uuid;
 
     IF v_author_pk IS NULL THEN
         RETURN QUERY SELECT
@@ -110,26 +126,16 @@ BEGIN
     v_slug := lower(regexp_replace(v_title, '[^a-zA-Z0-9]+', '-', 'g'))
               || '-' || substring(v_post_id::text, 1, 8);
 
-    RETURN QUERY
     INSERT INTO benchmark.tb_post (id, identifier, title, content, fk_author, published)
     VALUES (v_post_id, v_slug, v_title, v_content, v_author_pk, v_published)
-    RETURNING
+    RETURNING pk_post INTO v_post_pk;
+
+    SELECT vp.data INTO v_data FROM benchmark.v_post vp WHERE vp._pk = v_post_pk;
+
+    RETURN QUERY SELECT
         'new'::TEXT,
         NULL::TEXT,
-        jsonb_build_object(
-            'id',         benchmark.tb_post.id::text,
-            'identifier', identifier,
-            'title',      title,
-            'content',    content,
-            'published',  published,
-            'createdAt',  to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
-            'updatedAt',  to_char(updated_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
-            'author',     jsonb_build_object(
-                'id',       v_author_uuid::text,
-                'username', (SELECT username FROM benchmark.tb_user WHERE benchmark.tb_user.id = v_author_uuid),
-                'fullName', (SELECT full_name FROM benchmark.tb_user WHERE benchmark.tb_user.id = v_author_uuid)
-            )
-        ),
+        v_data,
         'Post'::TEXT,
         NULL::JSONB,
         NULL::JSONB;

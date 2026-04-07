@@ -31,9 +31,12 @@ Query suite:
 import argparse
 import http.client
 import json
+import re
+import shutil
 import statistics
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -75,9 +78,11 @@ _GQL_M1_FLAT_TMPL = (
 # inline literals. M1 is therefore stored as a 3-tuple (url, query, variables) and sent
 # as {"query": ..., "variables": {...}} — see _worker_graphql_with_vars below.
 _FRAISEQL_M1_QUERY = (
-    "mutation UpdateUser($id: ID!, $bio: String) { updateUser(id: $id, bio: $bio) { id bio } }"
+    "mutation UpdateUser($id: ID!, $bio: String) { updateUser(id: $id, bio: $bio)"
+    " { id identifier email username fullName bio createdAt updatedAt } }"
 )
 _FRAISEQL_C3_TMPL = '{{ user(id: "{user_id}") {{ id username fullName }} }}'
+_FRAISEQL_C3_QUERY = "query GetUser($id: ID!) { user(id: $id) { id username fullName } }"
 
 # Phase 3: Filtered query constants (FraiseQL WHERE / ORDER BY pushdown)
 _FRAISEQL_F1 = "{ posts(published: true, limit: 10) { id title } }"
@@ -165,7 +170,7 @@ FRAMEWORKS: dict[str, dict] = {
             "T1": "T1",
         },
         # Juniper wraps mutation args in input object: updateUser(id, input: {bio})
-        "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "bench" }}) {{ id bio }} }}',
+        "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "bench" }}) {{ id username fullName bio }} }}',
         "health_url": "http://localhost:4000/health",
     },
     # ------------------------------------------------------------------
@@ -521,7 +526,7 @@ FRAMEWORKS: dict[str, dict] = {
         },
         "health_url": "http://localhost:4000/health",
         # Micronaut wraps mutation args in input object: updateUser(id, input: {bio})
-        "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "bench" }}) {{ id bio }} }}',
+        "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "bench" }}) {{ id username fullName bio createdAt }} }}',
     },
     "quarkus-graphql": {
         "compose_service": "quarkus-graphql",
@@ -539,7 +544,7 @@ FRAMEWORKS: dict[str, dict] = {
         },
         "health_url": "http://localhost:4000/health",
         # Quarkus wraps mutation args in input object: updateUser(id, input: {bio})
-        "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "bench" }}) {{ id bio }} }}',
+        "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "bench" }}) {{ id username fullName bio createdAt updatedAt }} }}',
     },
     # ------------------------------------------------------------------
     # Scala frameworks
@@ -625,7 +630,7 @@ FRAMEWORKS: dict[str, dict] = {
             "T1": "T1",
         },
         # webonyx uses input object wrapper: updateUser(id, input: {bio})
-        "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "bench" }}) {{ id bio }} }}',
+        "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "bench" }}) {{ id username fullName bio createdAt }} }}',
         "health_url": "http://localhost:4000/health",
     },
     # ------------------------------------------------------------------
@@ -679,8 +684,8 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": ("http://localhost:8816/graphql", _GQL_Q1),
             "Q2": ("http://localhost:8816/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:8816/graphql", _GQL_Q2b),
-            "Q3": None,  # Q3: works for direct queries but fails under benchmark concurrent load
-            # Phase 1: Cache benchmarks — sentinel resolved to single-entity UUID at runtime
+            "Q3": ("http://localhost:8816/graphql", _GQL_Q3),
+            # C3: single-entity lookup — rotating UUIDs resolved at runtime
             "C3": "C3",
             # Phase 2: Mutation benchmark
             "M1": "M1",
@@ -709,7 +714,7 @@ FRAMEWORKS: dict[str, dict] = {
             "Q2": ("http://localhost:8817/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:8817/graphql", _GQL_Q2b),
             "Q3": ("http://localhost:8817/graphql", _GQL_Q3),
-            # Phase 1: Cold-read baseline for C3 (no cache — every request hits DB)
+            # C3: single-entity lookup — rotating UUIDs resolved at runtime
             "C3": "C3",
             # Phase 2: Mutation benchmark
             "M1": "M1",
@@ -720,6 +725,9 @@ FRAMEWORKS: dict[str, dict] = {
             "T1": "T1",  # FraiseQL T1: 2 sequential GraphQL calls
         },
         "health_url": "http://localhost:8817/health",
+        # Fair comparison with fraiseql-tv: same warmup so connection pool and pg plan cache
+        # are both fully warm before the measurement window.
+        "warmup_secs": 30,
         "m1_template": "fraiseql",
         "t1_template": "fraiseql",
         "c3_template": _FRAISEQL_C3_TMPL,
@@ -810,9 +818,9 @@ DEFAULT_FRAMEWORK_ORDER = [
     "webonyx-graphql-php",
     # C# / .NET
     "csharp-dotnet",
-    # FraiseQL variants
-    "fraiseql-tv",           # TV tables, cache enabled  (Phase 1 warm, Phase 2 M1, Phase 3 F1-F3)
-    "fraiseql-tv-nocache",   # TV tables, cache disabled (Phase 1 cold baseline)
+    # FraiseQL variants — nocache runs first to confirm M1 ordering hypothesis (Cause 3)
+    "fraiseql-tv-nocache",   # TV tables, cache disabled — runs first (ordering hypothesis test)
+    "fraiseql-tv",           # TV tables, cache enabled  — runs second (should degrade if ordering matters)
     "fraiseql-v",            # On-the-fly JSONB views    (Phase 2 M1 comparison)
     "fraiseql-tv-audit",     # TV tables, audit logging  (Phase 5 observer overhead)
 ]
@@ -1178,6 +1186,39 @@ def _discover_user_uuid(fw_config: dict) -> str | None:
     return None
 
 
+def _discover_user_uuids(fw_config: dict) -> list[str]:
+    """Fetch Q1 and return all user ids found (up to the Q1 limit).
+
+    Used by mutation workers to rotate across multiple rows and avoid 40 workers
+    hammering the same row, which causes artificial row-lock contention in PostgreSQL.
+    """
+    q1_entry = fw_config["queries"].get("Q1")
+    fw_type = fw_config["type"]
+    try:
+        if fw_type == "graphql":
+            if q1_entry is None:
+                gql_url = fw_config.get("graphql_url")
+                if not gql_url:
+                    return []
+                url, query = gql_url, _GQL_Q1
+            else:
+                url, query = q1_entry
+            payload = json.dumps({"query": query}).encode()
+            req = urllib.request.Request(
+                url,
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                body = json.loads(resp.read())
+                users = body.get("data", {}).get("users", [])
+                return [str(u["id"]) for u in users if u.get("id")]
+    except (urllib.error.URLError, OSError, json.JSONDecodeError, KeyError, IndexError):
+        pass
+    return []
+
+
 def _discover_post_uuid(fw_config: dict) -> tuple[str, str] | None:
     """Discover a published post UUID and its author UUID for T1 scenario.
 
@@ -1337,16 +1378,25 @@ def _build_rest_t1_urls(fw_name: str, base: str, post_id: str, author_id: str) -
 
 
 def _worker_graphql_with_vars(
-    url: str, query: str, variables: dict, end_time: float
+    url: str, query: str, variables: dict | list[dict], end_time: float
 ) -> _WorkerResult:
-    """Worker for GraphQL requests that require a variables map (e.g. FraiseQL mutations)."""
-    payload = json.dumps({"query": query, "variables": variables}).encode()
+    """Worker for GraphQL requests that require a variables map (e.g. FraiseQL mutations).
+
+    When `variables` is a list, a random entry is chosen per request to distribute
+    mutations across multiple rows and avoid row-lock contention under high concurrency.
+    """
+    import random
+
+    rotating = isinstance(variables, list)
+    payload = None if rotating else json.dumps({"query": query, "variables": variables}).encode()
     latencies: list[float] = []
     errors = 0
     breakdown: dict[str, int] = {}
     samples: list[tuple[str, str]] = []
     conn = _PersistentConn(url)
     while time.monotonic() < end_time:
+        if rotating:
+            payload = json.dumps({"query": query, "variables": random.choice(variables)}).encode()  # noqa: S311
         ok, lat, cat, detail = conn.post_graphql(payload)
         if ok:
             latencies.append(lat)
@@ -1674,6 +1724,248 @@ def stop_service(service: str) -> None:
     print("stopped", flush=True)
 
 
+def prune_service_image(service: str) -> None:
+    """Remove the locally-built docker image for a compose service.
+
+    Docker Compose names images as <project>-<service>:latest where the project
+    name is derived from the working directory (velocitybench). Pre-pulled images
+    (postgres, etc.) don't follow this convention and are left untouched.
+    """
+    image_name = f"velocitybench-{service}:latest"
+    result = subprocess.run(
+        ["docker", "rmi", image_name],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode == 0:
+        print(f"  image {image_name} pruned", flush=True)
+
+
+def _check_disk_space(min_gb: float = 5.0) -> None:
+    """Abort early if there is insufficient free disk space.
+
+    TV M1 generates ~255 000 mutations × ~2 KB WAL per row × 2 tables ≈ 1 GB WAL,
+    plus dead-tuple bloat and Docker overlay writes.  5 GB headroom is the minimum
+    safe threshold for a full medium-dataset sequential run.
+    """
+    free_gb = shutil.disk_usage("/").free / (1024**3)
+    if free_gb < min_gb:
+        raise RuntimeError(
+            f"Insufficient disk space: {free_gb:.1f} GB free, {min_gb:.0f} GB required. "
+            "Free space before benchmarking (try: docker system prune -f)."
+        )
+    print(f"  disk space OK: {free_gb:.1f} GB free (≥{min_gb:.0f} GB required)", flush=True)
+
+
+def _reset_postgres_state() -> None:
+    """CHECKPOINT + VACUUM + pg_prewarm between framework runs.
+
+    Reclaims dead-tuple bloat from mutation workloads, flushes WAL so the next
+    framework starts with a clean write path, and pre-warms the shared-buffer
+    pool for the benchmark tables.  Prevents PostgreSQL state contamination from
+    one framework's M1 run from degrading the next framework's measurements.
+
+    Best-effort: failures are printed but do not abort the benchmark.
+    """
+    print("  resetting PostgreSQL state (CHECKPOINT + VACUUM + pg_prewarm)...", end=" ", flush=True)
+    result = _compose(
+        "exec", "-T", "postgres",
+        "psql", "-U", "benchmark", "-d", "velocitybench_benchmark",
+        "-c", "CHECKPOINT",
+        "-c", "VACUUM ANALYZE benchmark.tb_user, benchmark.tv_user",
+        "-c", "SELECT pg_prewarm('benchmark.tb_user')",
+        "-c", "SELECT pg_prewarm('benchmark.tv_user')",
+        check=False,
+    )
+    if result.returncode == 0:
+        print("done ✓", flush=True)
+    else:
+        stderr = result.stderr.strip() if result.stderr else "(no stderr)"
+        print(f"warn (exit {result.returncode}): {stderr[:200]}", flush=True)
+
+
+# ---------------------------------------------------------------------------
+# Resource metrics (opt-in via --resource-metrics)
+# ---------------------------------------------------------------------------
+
+# Map framework name → frameworks/ subdirectory name when they differ.
+_FW_DIR_OVERRIDE: dict[str, str] = {
+    "spring-boot": "java-spring-boot",
+    "fraiseql-tv": "fraiseql",
+    "fraiseql-tv-nocache": "fraiseql",
+    "fraiseql-v": "fraiseql",
+    "fraiseql-tv-audit": "fraiseql",
+}
+
+_LANG_EXTENSIONS: dict[str, list[str]] = {
+    "Rust": [".rs"],
+    "Go": [".go"],
+    "Node.js": [".js", ".ts"],
+    "Python": [".py"],
+    "Java": [".java"],
+    "Scala": [".scala"],
+    "Ruby": [".rb"],
+    "PHP": [".php"],
+    "C#": [".cs"],
+}
+
+# Directories to exclude from LOC/complexity counting.
+_SKIP_DIRS = {
+    "test", "tests", "spec", "__tests__", "__pycache__",
+    "vendor", "node_modules", ".venv", "venv", "env",
+    "target", "build", "dist", ".gradle", "generated",
+    "migrations", "fixtures",
+}
+
+# Language-agnostic decision-point keywords for complexity proxy.
+_DECISION_RE = re.compile(
+    r"\b(if|else|elif|for|while|switch|case|match|catch|except|rescue|unless|loop)\b"
+    r"|&&|\|\|"
+)
+
+
+def compute_loc_complexity(fw_name: str) -> tuple[int, float]:
+    """Return (loc, complexity_per_100_loc) for the framework's source code.
+
+    LOC = non-blank, non-pure-comment lines in primary source files.
+    Complexity proxy = decision-keyword occurrences per 100 LOC (McCabe proxy).
+    Excludes test directories, vendor/generated code.
+    """
+    lang = FRAMEWORKS.get(fw_name, {}).get("language", "")
+    extensions = _LANG_EXTENSIONS.get(lang, [])
+    if not extensions:
+        return 0, 0.0
+
+    dir_name = _FW_DIR_OVERRIDE.get(fw_name, fw_name)
+    fw_dir = Path(__file__).parent.parent.parent / "frameworks" / dir_name
+    if not fw_dir.is_dir():
+        return 0, 0.0
+
+    total_loc = 0
+    total_decisions = 0
+
+    for ext in extensions:
+        for path in fw_dir.rglob(f"*{ext}"):
+            if any(skip in path.parts for skip in _SKIP_DIRS):
+                continue
+            try:
+                text = path.read_text(errors="replace")
+            except OSError:
+                continue
+            for line in text.splitlines():
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                # Skip pure comment lines (covers //, #, --, /*, *)
+                if stripped.startswith(("//", "#", "--", "*", "/*")):
+                    continue
+                total_loc += 1
+                total_decisions += len(_DECISION_RE.findall(stripped))
+
+    complexity = (total_decisions / total_loc * 100) if total_loc > 0 else 0.0
+    return total_loc, round(complexity, 1)
+
+
+def get_image_size_mb(service: str) -> float:
+    """Return the docker image size in MB, or 0.0 if unavailable."""
+    image_name = f"velocitybench-{service}:latest"
+    result = subprocess.run(
+        ["docker", "image", "inspect", image_name, "--format", "{{.Size}}"],
+        capture_output=True, text=True, check=False,
+    )
+    if result.returncode != 0 or not result.stdout.strip():
+        return 0.0
+    try:
+        return int(result.stdout.strip()) / (1024 * 1024)
+    except ValueError:
+        return 0.0
+
+
+def _parse_mem_mb(mem_str: str) -> float:
+    """Parse docker stats memory like '256MiB / 16GiB' → float MB (current usage)."""
+    used = mem_str.split("/")[0].strip()
+    m = re.match(r"([\d.]+)\s*([A-Za-z]+)", used)
+    if not m:
+        return 0.0
+    value, unit = float(m.group(1)), m.group(2).lower()
+    multipliers = {"b": 1 / (1024 * 1024), "kib": 1 / 1024, "kb": 1 / 1024,
+                   "mib": 1.0, "mb": 1.0, "gib": 1024.0, "gb": 1024.0}
+    return value * multipliers.get(unit, 0.0)
+
+
+def _parse_cpu_pct(cpu_str: str) -> float:
+    """Parse docker stats CPU like '12.50%' → 12.5, or -1 on failure."""
+    m = re.match(r"([\d.]+)%", cpu_str.strip())
+    return float(m.group(1)) if m else -1.0
+
+
+@dataclass
+class FrameworkResourceMetrics:
+    fw_name: str
+    loc: int = 0
+    complexity_per_100_loc: float = 0.0
+    image_mb: float = 0.0
+    peak_ram_mb: float = 0.0
+    avg_cpu_pct: float = 0.0
+
+
+class ResourceMonitor:
+    """Background thread that polls `docker stats` while a framework is benchmarked.
+
+    Collects peak RAM (MiB) and average CPU% for the container.
+    Container name follows Compose convention: velocitybench-<service>-1.
+    """
+
+    def __init__(self, service: str, interval_secs: float = 2.0) -> None:
+        self._container = f"velocitybench-{service}-1"
+        self._interval = interval_secs
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._peak_ram_mb: float = 0.0
+        self._cpu_samples: list[float] = []
+
+    def start(self) -> None:
+        self._stop.clear()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> tuple[float, float]:
+        """Stop monitoring and return (peak_ram_mb, avg_cpu_pct)."""
+        self._stop.set()
+        if self._thread:
+            self._thread.join(timeout=5)
+        avg_cpu = statistics.mean(self._cpu_samples) if self._cpu_samples else 0.0
+        return self._peak_ram_mb, round(avg_cpu, 1)
+
+    def _run(self) -> None:
+        while not self._stop.is_set():
+            self._poll()
+            self._stop.wait(self._interval)
+
+    def _poll(self) -> None:
+        result = subprocess.run(
+            [
+                "docker", "stats", "--no-stream",
+                "--format", "{{.MemUsage}}\t{{.CPUPerc}}",
+                self._container,
+            ],
+            capture_output=True, text=True, check=False,
+        )
+        if result.returncode != 0 or not result.stdout.strip():
+            return
+        line = result.stdout.strip().split("\n")[0]
+        parts = line.split("\t")
+        if len(parts) < 2:
+            return
+        ram_mb = _parse_mem_mb(parts[0])
+        cpu_pct = _parse_cpu_pct(parts[1])
+        if ram_mb > self._peak_ram_mb:
+            self._peak_ram_mb = ram_mb
+        if cpu_pct >= 0:
+            self._cpu_samples.append(cpu_pct)
+
+
 # ---------------------------------------------------------------------------
 # Report formatting
 # ---------------------------------------------------------------------------
@@ -1712,7 +2004,7 @@ _QUERY_LABELS = {
     "Q3": "`comments(limit: 20) { id content author { username } post { title } }`",
     "M1": "`mutation { updateUser(...) { id bio } }`",
     # Feature benchmark labels (published filter cross-framework, FraiseQL-specific extras)
-    "C3": "`user(id: UUID) { id username fullName }` — single entity by UUID (cache warm)",
+    "C3": "`user(id: UUID) { id username fullName }` — single entity, rotating UUIDs",
     "F1": "`posts(published: true, limit: 10) { id title }` — published filter, no nesting",
     "F2": "`posts(published: true, limit: 10) { id title author { ... } }` — published filter + nesting",
     "F3": "`users(limit: 20) { id username fullName }` — baseline for ORDER BY comparison",
@@ -1724,6 +2016,7 @@ def format_report(
     results: list[BenchResult],
     args: argparse.Namespace,
     date_str: str,
+    resource_metrics: dict[str, FrameworkResourceMetrics] | None = None,
 ) -> str:
     detailed = getattr(args, "detailed_errors", False)
 
@@ -1818,6 +2111,43 @@ def format_report(
             f"| {r.rps:.0f} | {r.p50_ms:.1f} | {r.p99_ms:.1f} |"
         )
 
+    # Resource metrics section (only if collected via --resource-metrics)
+    if resource_metrics:
+        lines += [
+            "",
+            "---",
+            "",
+            "## Resource Metrics",
+            "",
+            "> **LOC**: non-blank, non-comment lines in primary source files (excl. tests/vendor).  ",
+            "> **Complexity**: decision-keyword occurrences per 100 LOC (if/for/while/catch/&&/|| etc.) — McCabe proxy.  ",
+            "> **Image**: compressed docker image size.  ",
+            "> **Peak RAM**: maximum RSS observed during the full benchmark run.  ",
+            "> **Avg CPU**: mean CPU% sampled every 2 s during the benchmark run.",
+            "",
+            "| Framework | Language | LOC | Complexity | Image (MB) | Peak RAM (MB) | Avg CPU (%) |",
+            "|-----------|----------|----:|-----------:|-----------:|--------------:|------------:|",
+        ]
+        # Sort by Q1 RPS descending (same order as summary table) for easy cross-reference.
+        q1_rps: dict[str, float] = {r.framework: r.rps for r in all_q1_sorted}
+        sorted_fws = sorted(
+            resource_metrics.values(),
+            key=lambda m: q1_rps.get(m.fw_name, 0),
+            reverse=True,
+        )
+        for m in sorted_fws:
+            lang = FRAMEWORKS.get(m.fw_name, {}).get("language", "")
+            image_str = f"{m.image_mb:.0f}" if m.image_mb else "—"
+            ram_str = f"{m.peak_ram_mb:.0f}" if m.peak_ram_mb else "—"
+            cpu_str = f"{m.avg_cpu_pct:.1f}" if m.avg_cpu_pct else "—"
+            complexity_str = f"{m.complexity_per_100_loc:.1f}" if m.loc else "—"
+            loc_str = f"{m.loc:,}" if m.loc else "—"
+            lines.append(
+                f"| {m.fw_name} | {lang} "
+                f"| {loc_str} | {complexity_str} "
+                f"| {image_str} | {ram_str} | {cpu_str} |"
+            )
+
     return "\n".join(lines)
 
 
@@ -1898,6 +2228,18 @@ def main() -> None:
         action="store_true",
         help=f"Run only frameworks with known failures: {', '.join(BROKEN_FRAMEWORKS)}",
     )
+    parser.add_argument(
+        "--prune-images",
+        action="store_true",
+        help="Remove each framework's docker image after its benchmark run to reclaim disk space. "
+             "postgres and other pre-pulled images are never touched.",
+    )
+    parser.add_argument(
+        "--resource-metrics",
+        action="store_true",
+        help="Collect LOC, complexity, image size, RAM, and CPU metrics per framework "
+             "(adds docker stats polling overhead; use for analysis runs, not timing runs).",
+    )
     args = parser.parse_args()
 
     if args.broken_only:
@@ -1913,6 +2255,8 @@ def main() -> None:
     date_str = datetime.now().strftime("%Y-%m-%d")
 
     print("VelocityBench — Sequential Isolation Benchmark")
+    print("Pre-flight checks")
+    _check_disk_space()
     print("=" * 55)
     print(f"Frameworks  : {', '.join(args.frameworks)}")
     print(f"Concurrency : {args.concurrency} workers")
@@ -1925,6 +2269,7 @@ def main() -> None:
     print()
 
     all_results: list[BenchResult] = []
+    all_resource_metrics: dict[str, FrameworkResourceMetrics] = {}
 
     for i, fw_name in enumerate(args.frameworks):
         fw_config = FRAMEWORKS[fw_name]
@@ -1949,12 +2294,29 @@ def main() -> None:
                         skip_reason="service did not become healthy",
                     )
                     all_results.append(r)
+                if args.prune_images:
+                    prune_service_image(fw_config["compose_service"])
                 continue
         else:
             healthy = True
 
         if args.diagnose:
             run_diagnose(fw_name, fw_config)
+
+        # Resource metrics: collect static metrics and start runtime monitor
+        _monitor: ResourceMonitor | None = None
+        if args.resource_metrics:
+            loc, complexity = compute_loc_complexity(fw_name)
+            image_mb = get_image_size_mb(fw_config["compose_service"])
+            all_resource_metrics[fw_name] = FrameworkResourceMetrics(
+                fw_name=fw_name,
+                loc=loc,
+                complexity_per_100_loc=complexity,
+                image_mb=image_mb,
+            )
+            if not args.no_isolation:
+                _monitor = ResourceMonitor(fw_config["compose_service"])
+                _monitor.start()
 
         # Resolve M1 and C3 sentinel queries at runtime (need a real user UUID)
         needs_user_id = (
@@ -1979,11 +2341,17 @@ def main() -> None:
                             mutation = _GQL_M1_TMPL.format(user_id=user_id)
                             fw_config["queries"]["M1"] = (gql_url, mutation)
                         elif m1_tmpl == "fraiseql":
-                            # FraiseQL: must use variables (executor ignores inline args)
+                            # FraiseQL: must use variables (executor ignores inline args).
+                            # Use all discovered UUIDs as a rotating list so 40 workers
+                            # don't all hammer the same row (row-lock contention).
+                            user_ids = _discover_user_uuids(fw_config)
+                            if not user_ids:
+                                user_ids = [user_id]
+                            variables_list = [{"id": uid, "bio": "bench"} for uid in user_ids]
                             fw_config["queries"]["M1"] = (
                                 gql_url,
                                 _FRAISEQL_M1_QUERY,
-                                {"id": user_id, "bio": "bench"},
+                                variables_list,
                             )
                         else:
                             mutation = m1_tmpl.format(user_id=user_id)
@@ -2005,10 +2373,28 @@ def main() -> None:
                         if q1_entry is not None
                         else fw_config.get("graphql_url", "")
                     )
-                    c3_tmpl = fw_config.get("c3_template", _FRAISEQL_C3_TMPL)
-                    c3_query = c3_tmpl.format(user_id=user_id)
-                    fw_config["queries"]["C3"] = (gql_url, c3_query)
-                    print(f"  C3: resolved user UUID {user_id[:8]}...", flush=True)
+                    if fw_config.get("m1_template") == "fraiseql":
+                        # FraiseQL: use variables with rotating UUIDs so workers spread
+                        # across all discovered users — realistic single-entity lookup traffic.
+                        user_ids = _discover_user_uuids(fw_config)
+                        if not user_ids:
+                            user_ids = [user_id]
+                        variables_list = [{"id": uid} for uid in user_ids]
+                        fw_config["queries"]["C3"] = (
+                            gql_url,
+                            _FRAISEQL_C3_QUERY,
+                            variables_list,
+                        )
+                        print(
+                            f"  C3: resolved {len(user_ids)} user UUIDs "
+                            f"(rotating, fraiseql variables)",
+                            flush=True,
+                        )
+                    else:
+                        c3_tmpl = fw_config.get("c3_template", _FRAISEQL_C3_TMPL)
+                        c3_query = c3_tmpl.format(user_id=user_id)
+                        fw_config["queries"]["C3"] = (gql_url, c3_query)
+                        print(f"  C3: resolved user UUID {user_id[:8]}...", flush=True)
                 else:
                     fw_config["queries"]["C3"] = None
                     print("  C3: could not discover user UUID — skipping", flush=True)
@@ -2032,7 +2418,7 @@ def main() -> None:
                     if gql_url:
                         t1_tmpl_key = fw_config.get("t1_template")
                         if t1_tmpl_key == "fraiseql":
-                            # FraiseQL: 2 sequential GraphQL calls (post+author, then comments)
+                            # FraiseQL: 2 sequential GraphQL calls (post doesn't nest comments in tview)
                             post_query = _FRAISEQL_T1_POST_TMPL.format(post_id=post_id)
                             payloads = [
                                 json.dumps({"query": post_query}).encode(),
@@ -2043,7 +2429,7 @@ def main() -> None:
                                 "url": gql_url,
                                 "payloads": payloads,
                             }
-                            print(f"  T1: resolved post UUID {post_id[:8]}... (FraiseQL 2-query composite)", flush=True)
+                            print(f"  T1: resolved post UUID {post_id[:8]}... (fraiseql composite)", flush=True)
                         elif t1_tmpl_key == "postgraphile":
                             t1_query = _PG_T1_TMPL.format(post_id=post_id)
                             fw_config["queries"]["T1"] = (gql_url, t1_query)
@@ -2093,15 +2479,26 @@ def main() -> None:
                 for cat, detail in r.error_samples:
                     print(f"      [{cat}] {detail}", file=sys.stderr, flush=True)
 
+        if _monitor is not None and fw_name in all_resource_metrics:
+            peak_ram, avg_cpu = _monitor.stop()
+            all_resource_metrics[fw_name].peak_ram_mb = peak_ram
+            all_resource_metrics[fw_name].avg_cpu_pct = avg_cpu
+
         if not args.no_isolation:
             stop_service(fw_config["compose_service"])
+            if args.prune_images:
+                prune_service_image(fw_config["compose_service"])
 
         if i < len(args.frameworks) - 1:
+            _reset_postgres_state()
             print(f"  cooldown {args.cooldown}s...", flush=True)
             time.sleep(args.cooldown)
         print()
 
-    report = format_report(all_results, args, date_str)
+    report = format_report(
+        all_results, args, date_str,
+        resource_metrics=all_resource_metrics if all_resource_metrics else None,
+    )
 
     output_path = (
         Path(args.output)
@@ -2131,7 +2528,24 @@ def main() -> None:
         }
         for r in all_results
     ]
-    json_path.write_text(json.dumps(json_data, indent=2))
+    if all_resource_metrics:
+        json_data_out: dict = {
+            "results": json_data,
+            "resource_metrics": [
+                {
+                    "framework": m.fw_name,
+                    "loc": m.loc,
+                    "complexity_per_100_loc": m.complexity_per_100_loc,
+                    "image_mb": round(m.image_mb, 1),
+                    "peak_ram_mb": round(m.peak_ram_mb, 1),
+                    "avg_cpu_pct": m.avg_cpu_pct,
+                }
+                for m in all_resource_metrics.values()
+            ],
+        }
+        json_path.write_text(json.dumps(json_data_out, indent=2))
+    else:
+        json_path.write_text(json.dumps(json_data, indent=2))
     print(f"JSON data written to: {json_path}")
 
 
