@@ -73,7 +73,7 @@ def users(
     pass
 
 
-@fraiseql.query(sql_source="tv_user")
+@fraiseql.query(sql_source="tv_user", cache_ttl_seconds=0)
 def user(id: ID) -> User | None:
     """Get a single user by UUID."""
     pass
@@ -93,7 +93,7 @@ def posts(
     pass
 
 
-@fraiseql.query(sql_source="tv_post")
+@fraiseql.query(sql_source="tv_post", cache_ttl_seconds=0)
 def post(id: ID) -> Post | None:
     """Get a single post by UUID."""
     pass
@@ -113,7 +113,7 @@ def comments(
     pass
 
 
-@fraiseql.query(sql_source="tv_comment")
+@fraiseql.query(sql_source="tv_comment", cache_ttl_seconds=0)
 def comment(id: ID) -> Comment | None:
     """Get a single comment by UUID."""
     pass
