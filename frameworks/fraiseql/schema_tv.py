@@ -33,10 +33,10 @@ class User:
 
     email: str
     username: str
-    fullName: str
+    full_name: str
     bio: str | None
-    createdAt: DateTime
-    updatedAt: DateTime
+    created_at: DateTime
+    updated_at: DateTime
 
 
 @fraiseql.type
@@ -50,8 +50,8 @@ class Post:
     content: str
     published: bool
     author: User  # Nested relationship pre-computed in JSONB
-    createdAt: DateTime
-    updatedAt: DateTime
+    created_at: DateTime
+    updated_at: DateTime
 
 
 @fraiseql.type
@@ -64,8 +64,8 @@ class Comment:
     content: str
     author: User  # Nested relationship pre-computed in JSONB
     post: Post  # Nested relationship pre-computed in JSONB
-    createdAt: DateTime
-    updatedAt: DateTime
+    created_at: DateTime
+    updated_at: DateTime
 
 
 # ============================================================================
@@ -75,7 +75,6 @@ class Comment:
 
 @fraiseql.query(
     sql_source="tv_user",
-    jsonb_column="data",
     auto_params={"limit": True, "offset": True, "where": True, "order_by": True},
 )
 def users(
@@ -86,7 +85,7 @@ def users(
     pass
 
 
-@fraiseql.query(sql_source="tv_user", jsonb_column="data")
+@fraiseql.query(sql_source="tv_user")
 def user(id: ID) -> User | None:
     """Get a single user by UUID."""
     pass
@@ -94,7 +93,6 @@ def user(id: ID) -> User | None:
 
 @fraiseql.query(
     sql_source="tv_post",
-    jsonb_column="data",
     auto_params={"limit": True, "offset": True, "where": True, "order_by": True},
 )
 def posts(
@@ -107,7 +105,7 @@ def posts(
     pass
 
 
-@fraiseql.query(sql_source="tv_post", jsonb_column="data")
+@fraiseql.query(sql_source="tv_post")
 def post(id: ID) -> Post | None:
     """Get a single post by UUID."""
     pass
@@ -115,7 +113,6 @@ def post(id: ID) -> Post | None:
 
 @fraiseql.query(
     sql_source="tv_comment",
-    jsonb_column="data",
     auto_params={"limit": True, "offset": True, "where": True, "order_by": True},
 )
 def comments(
@@ -128,7 +125,7 @@ def comments(
     pass
 
 
-@fraiseql.query(sql_source="tv_comment", jsonb_column="data")
+@fraiseql.query(sql_source="tv_comment")
 def comment(id: ID) -> Comment | None:
     """Get a single comment by UUID."""
     pass
@@ -140,17 +137,17 @@ def comment(id: ID) -> Comment | None:
 # ============================================================================
 
 
-@fraiseql.mutation(sql_source="fn_update_user", operation="UPDATE")
+@fraiseql.mutation(sql_source="benchmark.fn_update_user", operation="UPDATE")
 def updateUser(id: ID, bio: str | None = None) -> User | None:
     """Update a user's bio. Returns the updated user."""
     pass
 
 
-@fraiseql.mutation(sql_source="fn_create_post", operation="CREATE")
+@fraiseql.mutation(sql_source="benchmark.fn_create_post", operation="CREATE")
 def createPost(
     title: str,
     content: str,
-    authorId: ID,
+    author_id: ID,
     published: bool = False,
 ) -> Post | None:
     """Create a new post. Returns the created post."""
