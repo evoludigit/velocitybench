@@ -29,6 +29,7 @@ Query suite:
 """
 
 import argparse
+import hashlib
 import http.client
 import json
 import re
@@ -85,6 +86,50 @@ _FRAISEQL_M1D_QUERY = (
     "mutation UpdateUserDelta($id: ID!, $bio: String) { updateUserDelta(id: $id, bio: $bio)"
     " { id identifier email username fullName bio createdAt updatedAt } }"
 )
+
+# ---------------------------------------------------------------------------
+# APQ (Automatic Persisted Queries) — pre-computed SHA-256 hashes.
+# Registered with the server once during sentinel resolution; measurement
+# phase sends hash-only payloads (no query string), eliminating parse overhead.
+# ---------------------------------------------------------------------------
+
+def _apq_hash(query: str) -> str:
+    return hashlib.sha256(query.encode()).hexdigest()
+
+
+def _apq_payload_static(sha256: str) -> bytes:
+    """Hash-only APQ payload for queries without variables."""
+    return json.dumps(
+        {"extensions": {"persistedQuery": {"version": 1, "sha256Hash": sha256}}}
+    ).encode()
+
+
+def _apq_payload_with_vars(sha256: str, variables: dict) -> bytes:
+    """Hash + variables APQ payload (no query string)."""
+    return json.dumps(
+        {"variables": variables, "extensions": {"persistedQuery": {"version": 1, "sha256Hash": sha256}}}
+    ).encode()
+
+
+def _apq_register(url: str, query: str, sha256: str) -> bool:
+    """Register a query with the server via APQ protocol.
+
+    Sends query + hash once. Returns True if the server accepted it
+    (HTTP 200 with data, no PersistedQueryNotFound error). Returns False
+    if the server doesn't support APQ or the registration failed.
+    """
+    payload = json.dumps(
+        {"query": query, "extensions": {"persistedQuery": {"version": 1, "sha256Hash": sha256}}}
+    ).encode()
+    try:
+        conn = _PersistentConn(url)
+        ok, _, cat, detail = conn.post_graphql(payload)
+        if not ok and "PersistedQueryNotFound" in detail:
+            # Server requires re-send with query (shouldn't happen on first registration)
+            ok, _, _, _ = conn.post_graphql(payload)
+        return ok
+    except Exception:
+        return False
 _FRAISEQL_C3_TMPL = '{{ user(id: "{user_id}") {{ id username fullName }} }}'
 _FRAISEQL_C3_QUERY = "query GetUser($id: ID!) { user(id: $id) { id username fullName } }"
 
@@ -172,6 +217,8 @@ FRAMEWORKS: dict[str, dict] = {
             "F2": ("http://localhost:8016/graphql", _GQL_F2),
             "T1": "T1",
             "MC1": "MC1",
+            "Q1_APQ": "Q1_APQ",
+            "Q2b_APQ": "Q2b_APQ",
         },
         "health_url": "http://localhost:8016/health",
         "m1_template": _GQL_M1_FLAT_TMPL,
@@ -363,6 +410,8 @@ FRAMEWORKS: dict[str, dict] = {
             "F2": ("http://localhost:4012/graphql", _GQL_F2),
             "T1": "T1",
             "MC1": "MC1",
+            "Q1_APQ": "Q1_APQ",
+            "Q2b_APQ": "Q2b_APQ",
         },
         "health_url": "http://localhost:4012/health",
         "m1_template": _GQL_M1_FLAT_TMPL,
@@ -381,6 +430,8 @@ FRAMEWORKS: dict[str, dict] = {
             "F2": ("http://localhost:4008/graphql", _GQL_F2),
             "T1": "T1",
             "MC1": "MC1",
+            "Q1_APQ": "Q1_APQ",
+            "Q2b_APQ": "Q2b_APQ",
         },
         "health_url": "http://localhost:4008/health",
         "m1_template": _GQL_M1_FLAT_TMPL,
@@ -732,6 +783,9 @@ FRAMEWORKS: dict[str, dict] = {
             "T1": "T1",
             # MC1: mutation-to-consistent-state cycle (cascade: 1 request replaces M1+Q1+C3)
             "MC1": "MC1",
+            "Q1_APQ": "Q1_APQ",
+            "Q2b_APQ": "Q2b_APQ",
+            "M1_APQ": "M1_APQ",
         },
         "health_url": "http://localhost:8817/health",
         "warmup_secs": 30,
@@ -763,6 +817,9 @@ FRAMEWORKS: dict[str, dict] = {
             "F3": ("http://localhost:8816/graphql", _FRAISEQL_F3),
             "T1": "T1",
             "MC1": "MC1",
+            "Q1_APQ": "Q1_APQ",
+            "Q2b_APQ": "Q2b_APQ",
+            "M1_APQ": "M1_APQ",
         },
         "health_url": "http://localhost:8816/health",
         "warmup_secs": 30,
@@ -796,6 +853,9 @@ FRAMEWORKS: dict[str, dict] = {
             "F3": ("http://localhost:8819/graphql", _FRAISEQL_F3),
             "T1": "T1",
             "MC1": "MC1",
+            "Q1_APQ": "Q1_APQ",
+            "Q2b_APQ": "Q2b_APQ",
+            "M1_APQ": "M1_APQ",
         },
         "health_url": "http://localhost:8819/health",
         "warmup_secs": 5,
@@ -828,6 +888,9 @@ FRAMEWORKS: dict[str, dict] = {
             "F3": ("http://localhost:8815/graphql", _FRAISEQL_F3),
             "T1": "T1",
             "MC1": "MC1",
+            "Q1_APQ": "Q1_APQ",
+            "Q2b_APQ": "Q2b_APQ",
+            "M1_APQ": "M1_APQ",
         },
         "health_url": "http://localhost:8815/health",
         # Cache needs 30s warmup to fill before measuring sustained cache-hit throughput.
@@ -1491,6 +1554,57 @@ def _worker_graphql_with_vars(
     return latencies, errors, breakdown, samples
 
 
+def _worker_graphql_apq(url: str, payload: bytes, end_time: float) -> _WorkerResult:
+    """Worker for APQ hash-only requests (query pre-registered during setup).
+
+    Sends a static pre-computed payload on every request — no query string,
+    no per-request JSON encoding. Pure hash-lookup path on the server.
+    """
+    latencies: list[float] = []
+    errors = 0
+    breakdown: dict[str, int] = {}
+    samples: list[tuple[str, str]] = []
+    conn = _PersistentConn(url)
+    while time.monotonic() < end_time:
+        ok, lat, cat, detail = conn.post_graphql(payload)
+        if ok:
+            latencies.append(lat)
+        else:
+            errors += 1
+            breakdown[cat] = breakdown.get(cat, 0) + 1
+            if len(samples) < _MAX_ERROR_SAMPLES:
+                samples.append((cat, detail))
+    return latencies, errors, breakdown, samples
+
+
+def _worker_graphql_apq_vars(
+    url: str, payloads: list[bytes], end_time: float
+) -> _WorkerResult:
+    """Worker for APQ requests that carry variables (e.g. mutations).
+
+    `payloads` is a pre-computed list of hash+variables JSON blobs (no query
+    string). A random entry is chosen per request to distribute writes across
+    multiple rows without per-request JSON encoding overhead.
+    """
+    import random
+
+    latencies: list[float] = []
+    errors = 0
+    breakdown: dict[str, int] = {}
+    samples: list[tuple[str, str]] = []
+    conn = _PersistentConn(url)
+    while time.monotonic() < end_time:
+        ok, lat, cat, detail = conn.post_graphql(random.choice(payloads))  # noqa: S311
+        if ok:
+            latencies.append(lat)
+        else:
+            errors += 1
+            breakdown[cat] = breakdown.get(cat, 0) + 1
+            if len(samples) < _MAX_ERROR_SAMPLES:
+                samples.append((cat, detail))
+    return latencies, errors, breakdown, samples
+
+
 def _worker_mutation_graphql(url: str, query: str, end_time: float) -> _WorkerResult:
     """Worker for GraphQL mutations — identical to _worker_graphql."""
     return _worker_graphql(url, query, end_time)
@@ -1617,7 +1731,7 @@ def run_diagnose(fw_name: str, fw_config: dict) -> None:
             print(f"    {query_name}: skipped (None)", flush=True)
             continue
         # Skip unresolved sentinels and composite entries in diagnose mode
-        if isinstance(entry, str) and entry in ("M1", "MC1", "C3", "HC3", "T1"):
+        if isinstance(entry, str) and entry in ("M1", "MC1", "C3", "HC3", "T1", "M1d", "Q1_APQ", "Q2b_APQ", "M1_APQ"):
             print(f"    {query_name}: skipped (unresolved sentinel)", flush=True)
             continue
         if isinstance(entry, dict):
@@ -1694,7 +1808,23 @@ def run_scenario(
         all_breakdown: dict[str, int] = {}
         all_samples: list[tuple[str, str]] = []
         with ThreadPoolExecutor(max_workers=concurrency) as pool:
-            if isinstance(entry, dict) and entry.get("mode") == "graphql_composite":
+            if isinstance(entry, dict) and entry.get("mode") == "apq":
+                # APQ hash-only: no query string, pure hash lookup on the server
+                url = entry["url"]
+                payload = entry["payload"]
+                futures = [
+                    pool.submit(_worker_graphql_apq, url, payload, end_time)
+                    for _ in range(concurrency)
+                ]
+            elif isinstance(entry, dict) and entry.get("mode") == "apq_vars":
+                # APQ with variables: hash + rotating variables payloads (no query string)
+                url = entry["url"]
+                payloads = entry["payloads"]
+                futures = [
+                    pool.submit(_worker_graphql_apq_vars, url, payloads, end_time)
+                    for _ in range(concurrency)
+                ]
+            elif isinstance(entry, dict) and entry.get("mode") == "graphql_composite":
                 # FraiseQL T1: chain multiple GraphQL POSTs per iteration
                 url = entry["url"]
                 payloads = entry["payloads"]
@@ -2260,6 +2390,9 @@ _QUERY_LABELS = {
     "F3": "`users(limit: 20) { id username fullName }` — baseline for ORDER BY comparison",
     "T1": "Full blog page load — `post(id) { title content author { ... } comments(limit:10) { content author { ... } } }`",
     "MC1": "Mutation-to-consistent-state cycle — FraiseQL: 1 request (M1 + cascade data). Classical: 2 serial requests (M1 + Q1 re-fetch). RPS = cycles/second.",
+    "Q1_APQ": "APQ hash-only Q1 — no query string sent, server resolves by SHA-256 hash. Compare to Q1.",
+    "Q2b_APQ": "APQ hash-only Q2b — nested posts+author query via hash lookup. Compare to Q2b.",
+    "M1_APQ": "APQ mutation — hash + variables only (FraiseQL) or hash-only (classical). Compare to M1.",
 }
 
 
@@ -3020,14 +3153,105 @@ def main() -> None:
                 fw_config["queries"]["T1"] = None
                 print("  T1: could not discover post UUID — skipping", flush=True)
 
+        # Resolve APQ sentinels — register each query with the server once, then
+        # store hash-only payloads for the measurement phase.
+        _APQ_BASE_QUERIES: dict[str, str] = {
+            "Q1_APQ": _GQL_Q1,
+            "Q2b_APQ": _GQL_Q2b,
+        }
+        q1_entry = fw_config["queries"].get("Q1")
+        apq_url = (
+            q1_entry[0]
+            if q1_entry is not None and isinstance(q1_entry, tuple)
+            else fw_config.get("graphql_url", "")
+        )
+        for apq_key, base_query in _APQ_BASE_QUERIES.items():
+            if fw_config["queries"].get(apq_key) == apq_key:
+                if apq_url:
+                    sha256 = _apq_hash(base_query)
+                    ok = _apq_register(apq_url, base_query, sha256)
+                    if ok:
+                        fw_config["queries"][apq_key] = {
+                            "mode": "apq",
+                            "url": apq_url,
+                            "payload": _apq_payload_static(sha256),
+                        }
+                        print(f"  {apq_key}: registered hash {sha256[:12]}...", flush=True)
+                    else:
+                        fw_config["queries"][apq_key] = None
+                        print(f"  {apq_key}: server does not support APQ — skipping", flush=True)
+                else:
+                    fw_config["queries"][apq_key] = None
+                    print(f"  {apq_key}: no GraphQL URL — skipping", flush=True)
+
+        # M1_APQ: hash + rotating variables (fraiseql) or hash-only (classical inline mutation)
+        if fw_config["queries"].get("M1_APQ") == "M1_APQ":
+            if apq_url:
+                m1_tmpl = fw_config.get("m1_template")
+                if m1_tmpl == "fraiseql":
+                    # FraiseQL mutation uses variables — pre-compute payloads for each UUID
+                    user_ids_apq = _discover_user_uuids(fw_config)
+                    if not user_ids_apq:
+                        # Fall back to the single UUID discovered for M1
+                        single = fw_config["queries"].get("M1")
+                        if isinstance(single, tuple) and len(single) == 3:
+                            user_ids_apq = [v["id"] for v in single[2]] if single[2] else []
+                    if user_ids_apq:
+                        sha256 = _apq_hash(_FRAISEQL_M1_QUERY)
+                        ok = _apq_register(apq_url, _FRAISEQL_M1_QUERY, sha256)
+                        if ok:
+                            apq_payloads = [
+                                _apq_payload_with_vars(sha256, {"id": uid, "bio": "bench"})
+                                for uid in user_ids_apq
+                            ]
+                            fw_config["queries"]["M1_APQ"] = {
+                                "mode": "apq_vars",
+                                "url": apq_url,
+                                "payloads": apq_payloads,
+                            }
+                            print(
+                                f"  M1_APQ: registered hash {sha256[:12]}... "
+                                f"({len(user_ids_apq)} UUID payloads)",
+                                flush=True,
+                            )
+                        else:
+                            fw_config["queries"]["M1_APQ"] = None
+                            print("  M1_APQ: server does not support APQ — skipping", flush=True)
+                    else:
+                        fw_config["queries"]["M1_APQ"] = None
+                        print("  M1_APQ: could not discover user UUIDs — skipping", flush=True)
+                else:
+                    # Classical inline mutation: bake UUID into query string, register once
+                    m1_entry = fw_config["queries"].get("M1")
+                    inline_query = m1_entry[1] if isinstance(m1_entry, tuple) else None
+                    if inline_query:
+                        sha256 = _apq_hash(inline_query)
+                        ok = _apq_register(apq_url, inline_query, sha256)
+                        if ok:
+                            fw_config["queries"]["M1_APQ"] = {
+                                "mode": "apq",
+                                "url": apq_url,
+                                "payload": _apq_payload_static(sha256),
+                            }
+                            print(f"  M1_APQ: registered hash {sha256[:12]}...", flush=True)
+                        else:
+                            fw_config["queries"]["M1_APQ"] = None
+                            print("  M1_APQ: server does not support APQ — skipping", flush=True)
+                    else:
+                        fw_config["queries"]["M1_APQ"] = None
+                        print("  M1_APQ: M1 not resolved yet — skipping", flush=True)
+            else:
+                fw_config["queries"]["M1_APQ"] = None
+                print("  M1_APQ: no GraphQL URL — skipping", flush=True)
+
         for query_name in query_names:
-            # VACUUM immediately before M1/MC1 so mutation scenarios start from a
+            # VACUUM immediately before M1/MC1/M1_APQ so mutation scenarios start from a
             # defined page state: dead tuples reclaimed, fillfactor reserve restored.
             # Read scenarios ran earlier; their I/O activity is harmless (reads don't
             # create dead tuples). This decouples M1's starting condition from the
             # prior framework's write burst without hiding M1's run-order dependency
             # (the second framework's M1 still runs on pages fragmented by the first).
-            if query_name in ("M1", "MC1"):
+            if query_name in ("M1", "MC1", "M1_APQ"):
                 _reset_postgres_state()
             print(f"  {query_name}:")
             r = run_scenario(
