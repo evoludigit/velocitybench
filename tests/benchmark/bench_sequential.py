@@ -123,10 +123,29 @@ def _apq_register(url: str, query: str, sha256: str) -> bool:
     ).encode()
     try:
         conn = _PersistentConn(url)
-        ok, _, cat, detail = conn.post_graphql(payload)
-        if not ok and "PersistedQueryNotFound" in detail:
-            # Server requires re-send with query (shouldn't happen on first registration)
-            ok, _, _, _ = conn.post_graphql(payload)
+        ok, _, _, _ = conn.post_graphql(payload)
+        return ok
+    except Exception:
+        return False
+
+
+def _apq_register_with_vars(url: str, query: str, sha256: str, variables: dict) -> bool:
+    """Register a query+variables with the server via APQ protocol.
+
+    Used for mutations that require variables to pass server-side validation
+    during the registration call. The server caches the query by hash;
+    subsequent requests send hash+variables only.
+    """
+    payload = json.dumps(
+        {
+            "query": query,
+            "variables": variables,
+            "extensions": {"persistedQuery": {"version": 1, "sha256Hash": sha256}},
+        }
+    ).encode()
+    try:
+        conn = _PersistentConn(url)
+        ok, _, _, _ = conn.post_graphql(payload)
         return ok
     except Exception:
         return False
@@ -3198,7 +3217,10 @@ def main() -> None:
                             user_ids_apq = [v["id"] for v in single[2]] if single[2] else []
                     if user_ids_apq:
                         sha256 = _apq_hash(_FRAISEQL_M1_QUERY)
-                        ok = _apq_register(apq_url, _FRAISEQL_M1_QUERY, sha256)
+                        # Register with a sample variable set — mutations require variables
+                        # to pass server-side validation during the registration call.
+                        reg_vars = {"id": user_ids_apq[0], "bio": "bench"}
+                        ok = _apq_register_with_vars(apq_url, _FRAISEQL_M1_QUERY, sha256, reg_vars)
                         if ok:
                             apq_payloads = [
                                 _apq_payload_with_vars(sha256, {"id": uid, "bio": "bench"})
