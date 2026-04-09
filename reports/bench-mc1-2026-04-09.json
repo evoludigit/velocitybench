@@ -1,0 +1,1168 @@
+{
+  "results": [
+    {
+      "framework": "fraiseql-tv",
+      "query": "Q1",
+      "rps": 10961.5,
+      "p50_ms": 3.25,
+      "p95_ms": 7.31,
+      "p99_ms": 9.84,
+      "requests": 219230,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "Q2",
+      "rps": 11206.2,
+      "p50_ms": 3.12,
+      "p95_ms": 7.5,
+      "p99_ms": 10.22,
+      "requests": 224124,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "Q2b",
+      "rps": 9643.9,
+      "p50_ms": 3.83,
+      "p95_ms": 7.65,
+      "p99_ms": 10.06,
+      "requests": 192878,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "Q3",
+      "rps": 5050.2,
+      "p50_ms": 7.7,
+      "p95_ms": 10.9,
+      "p99_ms": 12.96,
+      "requests": 101004,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "C3",
+      "rps": 8697.8,
+      "p50_ms": 3.63,
+      "p95_ms": 11.02,
+      "p99_ms": 19.3,
+      "requests": 173956,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "HC3",
+      "rps": 8231.0,
+      "p50_ms": 3.81,
+      "p95_ms": 11.8,
+      "p99_ms": 20.51,
+      "requests": 164620,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "M1",
+      "rps": 6935.1,
+      "p50_ms": 4.61,
+      "p95_ms": 12.65,
+      "p99_ms": 20.3,
+      "requests": 138703,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "M1d",
+      "rps": 1282.4,
+      "p50_ms": 24.4,
+      "p95_ms": 74.05,
+      "p99_ms": 105.25,
+      "requests": 25648,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "F1",
+      "rps": 10757.2,
+      "p50_ms": 3.28,
+      "p95_ms": 7.7,
+      "p99_ms": 10.38,
+      "requests": 215145,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "F2",
+      "rps": 9314.4,
+      "p50_ms": 3.96,
+      "p95_ms": 7.92,
+      "p99_ms": 10.42,
+      "requests": 186288,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "F3",
+      "rps": 10952.3,
+      "p50_ms": 3.28,
+      "p95_ms": 7.23,
+      "p99_ms": 9.75,
+      "requests": 219046,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "T1",
+      "rps": 7660.3,
+      "p50_ms": 5.07,
+      "p95_ms": 7.78,
+      "p99_ms": 9.76,
+      "requests": 153206,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "MC1",
+      "rps": 9372.0,
+      "p50_ms": 3.95,
+      "p95_ms": 7.37,
+      "p99_ms": 9.54,
+      "requests": 187441,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "Q1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 56228,
+      "error_breakdown": {
+        "connection_error": 56228
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "Q2",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 152341,
+      "error_breakdown": {
+        "connection_error": 152341
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "Q2b",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 153802,
+      "error_breakdown": {
+        "connection_error": 153802
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "Q3",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 66073,
+      "error_breakdown": {
+        "connection_error": 66073
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "C3",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": true,
+      "skip_reason": "known bug \u2014 skipped"
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "HC3",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": true,
+      "skip_reason": "known bug \u2014 skipped"
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "M1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": true,
+      "skip_reason": "known bug \u2014 skipped"
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "F1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 148987,
+      "error_breakdown": {
+        "connection_error": 148987
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "F2",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 49815,
+      "error_breakdown": {
+        "connection_error": 49815
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "F3",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 141482,
+      "error_breakdown": {
+        "connection_error": 141482
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "T1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": true,
+      "skip_reason": "known bug \u2014 skipped"
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "MC1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": true,
+      "skip_reason": "known bug \u2014 skipped"
+    },
+    {
+      "framework": "fraiseql-v-nocache",
+      "query": "Q1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 54992,
+      "error_breakdown": {
+        "connection_error": 54992
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-v-nocache",
+      "query": "Q2",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 74020,
+      "error_breakdown": {
+        "connection_error": 74020
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-v-nocache",
+      "query": "Q2b",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 156484,
+      "error_breakdown": {
+        "connection_error": 156484
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-v-nocache",
+      "query": "Q3",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 165159,
+      "error_breakdown": {
+        "connection_error": 165159
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-v-nocache",
+      "query": "C3",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": true,
+      "skip_reason": "known bug \u2014 skipped"
+    },
+    {
+      "framework": "fraiseql-v-nocache",
+      "query": "HC3",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": true,
+      "skip_reason": "known bug \u2014 skipped"
+    },
+    {
+      "framework": "fraiseql-v-nocache",
+      "query": "M1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": true,
+      "skip_reason": "known bug \u2014 skipped"
+    },
+    {
+      "framework": "fraiseql-v-nocache",
+      "query": "F1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 160818,
+      "error_breakdown": {
+        "connection_error": 160818
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-v-nocache",
+      "query": "F2",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 163178,
+      "error_breakdown": {
+        "connection_error": 163178
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-v-nocache",
+      "query": "F3",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 161692,
+      "error_breakdown": {
+        "connection_error": 161692
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-v-nocache",
+      "query": "T1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": true,
+      "skip_reason": "known bug \u2014 skipped"
+    },
+    {
+      "framework": "fraiseql-v-nocache",
+      "query": "MC1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": true,
+      "skip_reason": "known bug \u2014 skipped"
+    },
+    {
+      "framework": "fraiseql-v-cache",
+      "query": "Q1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 164380,
+      "error_breakdown": {
+        "connection_error": 164380
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-v-cache",
+      "query": "Q2",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 158935,
+      "error_breakdown": {
+        "connection_error": 158935
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-v-cache",
+      "query": "Q2b",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 164458,
+      "error_breakdown": {
+        "connection_error": 164458
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-v-cache",
+      "query": "Q3",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 161875,
+      "error_breakdown": {
+        "connection_error": 161875
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-v-cache",
+      "query": "C3",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": true,
+      "skip_reason": "known bug \u2014 skipped"
+    },
+    {
+      "framework": "fraiseql-v-cache",
+      "query": "HC3",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": true,
+      "skip_reason": "known bug \u2014 skipped"
+    },
+    {
+      "framework": "fraiseql-v-cache",
+      "query": "M1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": true,
+      "skip_reason": "known bug \u2014 skipped"
+    },
+    {
+      "framework": "fraiseql-v-cache",
+      "query": "F1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 158843,
+      "error_breakdown": {
+        "connection_error": 158843
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-v-cache",
+      "query": "F2",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 163318,
+      "error_breakdown": {
+        "connection_error": 163318
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-v-cache",
+      "query": "F3",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 159495,
+      "error_breakdown": {
+        "connection_error": 159495
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-v-cache",
+      "query": "T1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": true,
+      "skip_reason": "known bug \u2014 skipped"
+    },
+    {
+      "framework": "fraiseql-v-cache",
+      "query": "MC1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": true,
+      "skip_reason": "known bug \u2014 skipped"
+    },
+    {
+      "framework": "async-graphql",
+      "query": "Q1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 158048,
+      "error_breakdown": {
+        "connection_error": 158048
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "async-graphql",
+      "query": "Q2",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 159299,
+      "error_breakdown": {
+        "connection_error": 159299
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "async-graphql",
+      "query": "Q2b",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 160384,
+      "error_breakdown": {
+        "connection_error": 160384
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "async-graphql",
+      "query": "Q3",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 163265,
+      "error_breakdown": {
+        "connection_error": 163265
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "async-graphql",
+      "query": "M1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": true,
+      "skip_reason": "known bug \u2014 skipped"
+    },
+    {
+      "framework": "async-graphql",
+      "query": "F1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 156002,
+      "error_breakdown": {
+        "connection_error": 156002
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "async-graphql",
+      "query": "F2",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 162124,
+      "error_breakdown": {
+        "connection_error": 162124
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "async-graphql",
+      "query": "T1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": true,
+      "skip_reason": "known bug \u2014 skipped"
+    },
+    {
+      "framework": "async-graphql",
+      "query": "MC1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": true,
+      "skip_reason": "known bug \u2014 skipped"
+    },
+    {
+      "framework": "graphql-yoga",
+      "query": "Q1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 156343,
+      "error_breakdown": {
+        "connection_error": 156343
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "graphql-yoga",
+      "query": "Q2",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 161632,
+      "error_breakdown": {
+        "connection_error": 161632
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "graphql-yoga",
+      "query": "Q2b",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 164580,
+      "error_breakdown": {
+        "connection_error": 164580
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "graphql-yoga",
+      "query": "M1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": true,
+      "skip_reason": "known bug \u2014 skipped"
+    },
+    {
+      "framework": "graphql-yoga",
+      "query": "F1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 156413,
+      "error_breakdown": {
+        "connection_error": 156413
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "graphql-yoga",
+      "query": "F2",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 161460,
+      "error_breakdown": {
+        "connection_error": 161460
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "graphql-yoga",
+      "query": "T1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": true,
+      "skip_reason": "known bug \u2014 skipped"
+    },
+    {
+      "framework": "graphql-yoga",
+      "query": "MC1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": true,
+      "skip_reason": "known bug \u2014 skipped"
+    },
+    {
+      "framework": "mercurius",
+      "query": "Q1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 156778,
+      "error_breakdown": {
+        "connection_error": 156778
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "mercurius",
+      "query": "Q2",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 163662,
+      "error_breakdown": {
+        "connection_error": 163662
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "mercurius",
+      "query": "Q2b",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 160921,
+      "error_breakdown": {
+        "connection_error": 160921
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "mercurius",
+      "query": "M1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": true,
+      "skip_reason": "known bug \u2014 skipped"
+    },
+    {
+      "framework": "mercurius",
+      "query": "F1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 160117,
+      "error_breakdown": {
+        "connection_error": 160117
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "mercurius",
+      "query": "F2",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 163588,
+      "error_breakdown": {
+        "connection_error": 163588
+      },
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "mercurius",
+      "query": "T1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": true,
+      "skip_reason": "known bug \u2014 skipped"
+    },
+    {
+      "framework": "mercurius",
+      "query": "MC1",
+      "rps": 0.0,
+      "p50_ms": 0.0,
+      "p95_ms": 0.0,
+      "p99_ms": 0.0,
+      "requests": 0,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": true,
+      "skip_reason": "known bug \u2014 skipped"
+    }
+  ],
+  "db_footprint": [
+    {
+      "table": "tb_mutation_log",
+      "total_bytes": 4186169344,
+      "heap_bytes": 3862560768,
+      "indexes_bytes": 322535424
+    },
+    {
+      "table": "tv_comment",
+      "total_bytes": 2048180224,
+      "heap_bytes": 859283456,
+      "indexes_bytes": 371892224
+    },
+    {
+      "table": "tvd_comment",
+      "total_bytes": 1215455232,
+      "heap_bytes": 500776960,
+      "indexes_bytes": 53862400
+    },
+    {
+      "table": "tb_comment",
+      "total_bytes": 395190272,
+      "heap_bytes": 308862976,
+      "indexes_bytes": 86204416
+    },
+    {
+      "table": "tv_post",
+      "total_bytes": 368828416,
+      "heap_bytes": 229990400,
+      "indexes_bytes": 82378752
+    },
+    {
+      "table": "tvd_post",
+      "total_bytes": 200663040,
+      "heap_bytes": 140541952,
+      "indexes_bytes": 8962048
+    },
+    {
+      "table": "tb_post",
+      "total_bytes": 161103872,
+      "heap_bytes": 140099584,
+      "indexes_bytes": 20930560
+    },
+    {
+      "table": "tb_post_like",
+      "total_bytes": 15015936,
+      "heap_bytes": 5218304,
+      "indexes_bytes": 9764864
+    },
+    {
+      "table": "tv_user",
+      "total_bytes": 14901248,
+      "heap_bytes": 8593408,
+      "indexes_bytes": 6266880
+    },
+    {
+      "table": "tb_user",
+      "total_bytes": 10444800,
+      "heap_bytes": 6512640,
+      "indexes_bytes": 3891200
+    },
+    {
+      "table": "tb_user_follows",
+      "total_bytes": 6938624,
+      "heap_bytes": 2220032,
+      "indexes_bytes": 4685824
+    },
+    {
+      "table": "tvd_user",
+      "total_bytes": 6520832,
+      "heap_bytes": 5791744,
+      "indexes_bytes": 688128
+    },
+    {
+      "table": "sessions",
+      "total_bytes": 32768,
+      "heap_bytes": 0,
+      "indexes_bytes": 24576
+    },
+    {
+      "table": "failed_jobs",
+      "total_bytes": 24576,
+      "heap_bytes": 0,
+      "indexes_bytes": 16384
+    },
+    {
+      "table": "migrations",
+      "total_bytes": 24576,
+      "heap_bytes": 8192,
+      "indexes_bytes": 16384
+    },
+    {
+      "table": "users",
+      "total_bytes": 24576,
+      "heap_bytes": 0,
+      "indexes_bytes": 16384
+    },
+    {
+      "table": "jobs",
+      "total_bytes": 24576,
+      "heap_bytes": 0,
+      "indexes_bytes": 16384
+    },
+    {
+      "table": "cache_locks",
+      "total_bytes": 16384,
+      "heap_bytes": 0,
+      "indexes_bytes": 8192
+    },
+    {
+      "table": "password_reset_tokens",
+      "total_bytes": 16384,
+      "heap_bytes": 0,
+      "indexes_bytes": 8192
+    },
+    {
+      "table": "job_batches",
+      "total_bytes": 16384,
+      "heap_bytes": 0,
+      "indexes_bytes": 8192
+    },
+    {
+      "table": "cache",
+      "total_bytes": 16384,
+      "heap_bytes": 0,
+      "indexes_bytes": 8192
+    }
+  ]
+}
