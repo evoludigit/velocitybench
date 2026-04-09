@@ -1,4 +1,4 @@
-# FraiseQL v2.1.0 — Server Runtime Configuration
+# FraiseQL v2.1.2 — Server Runtime Configuration
 # VelocityBench Benchmark Environment
 #
 # Read by fraiseql-server via FRAISEQL_CONFIG env var.
@@ -25,3 +25,6 @@ playground_enabled = false
 metrics_enabled = false
 
 cache_enabled = true
+
+[validation]
+max_query_complexity = 1000

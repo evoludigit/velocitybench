@@ -38,10 +38,10 @@ class User:
 
     email: str
     username: str
-    fullName: str
+    full_name: str
     bio: str | None
-    createdAt: DateTime
-    updatedAt: DateTime
+    created_at: DateTime
+    updated_at: DateTime
 
 
 @fraiseql.type
@@ -55,8 +55,8 @@ class Post:
     content: str
     published: bool
     author: User  # Nested relationship pre-computed in JSONB
-    createdAt: DateTime
-    updatedAt: DateTime
+    created_at: DateTime
+    updated_at: DateTime
 
 
 @fraiseql.type
@@ -69,8 +69,8 @@ class Comment:
     content: str
     author: User  # Nested relationship pre-computed in JSONB
     post: Post  # Nested relationship pre-computed in JSONB
-    createdAt: DateTime
-    updatedAt: DateTime
+    created_at: DateTime
+    updated_at: DateTime
 
 
 # ============================================================================
@@ -104,7 +104,7 @@ def posts(
     limit: int = 10,
     offset: int = 0,
     published: bool | None = None,
-    authorId: ID | None = None,
+    author_id: ID | None = None,
 ) -> list[Post]:
     """Get list of posts with filtering and pagination."""
     pass
@@ -123,8 +123,8 @@ def post(id: ID) -> Post | None:
 def comments(
     limit: int = 10,
     offset: int = 0,
-    postId: ID | None = None,
-    authorId: ID | None = None,
+    post_id: ID | None = None,
+    author_id: ID | None = None,
 ) -> list[Comment]:
     """Get list of comments with filtering and pagination."""
     pass
@@ -133,6 +133,33 @@ def comments(
 @fraiseql.query(sql_source="v_comment")
 def comment(id: ID) -> Comment | None:
     """Get a single comment by UUID."""
+    pass
+
+
+@fraiseql.type
+class PostFull:
+    """Post with pre-aggregated comments — single-query full blog page load.
+
+    Backed by v_post_full: composed view of tv_post (pre-computed post+author JSONB)
+    and tv_comment (pre-computed comment+author JSONB). Zero extra disk cost vs TV tables.
+    PostgreSQL pushes WHERE id = $1 through both TV tables; jsonb_agg runs only on
+    the matched post's comments.
+    """
+
+    id: ID
+    identifier: str
+    title: str
+    content: str
+    published: bool
+    author: User
+    comments: list[Comment]
+    created_at: DateTime
+    updated_at: DateTime
+
+
+@fraiseql.query(sql_source="v_post_full")
+def postFull(id: ID) -> PostFull | None:
+    """Get a post with its 10 most recent comments. Single SQL query via composed view."""
     pass
 
 
@@ -152,7 +179,7 @@ def updateUser(id: ID, bio: str | None = None) -> User | None:
 def createPost(
     title: str,
     content: str,
-    authorId: ID,
+    author_id: ID,
     published: bool = False,
 ) -> Post | None:
     """Create a new post. Returns the created post."""

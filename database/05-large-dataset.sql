@@ -119,74 +119,9 @@ ON CONFLICT DO NOTHING;
 
 ANALYZE benchmark.tb_post_like;
 
--- ============================================================================
--- SYNC TO QUERY SIDE (tv_* TABLES)
--- ============================================================================
+-- tv_* tables are kept current by pg_tviews triggers installed in fraiseql_cqrs_schema.sql.
+-- Every INSERT above has already cascaded into tv_user / tv_post / tv_comment automatically.
 
--- Sync all users to tv_user
-DO $$
-DECLARE
-    batch_size INT := 1000;
-    total_count INT;
-    processed INT := 0;
-BEGIN
-    SELECT COUNT(*) INTO total_count FROM benchmark.tb_user;
-    RAISE NOTICE 'Syncing % users to tv_user...', total_count;
-
-    FOR user_rec IN SELECT id FROM benchmark.tb_user LOOP
-        PERFORM benchmark.fn_sync_tv_user(user_rec.id);
-        processed := processed + 1;
-        IF processed % batch_size = 0 THEN
-            RAISE NOTICE '  Synced %/%', processed, total_count;
-            COMMIT;
-        END IF;
-    END LOOP;
-    RAISE NOTICE '  All % users synced', total_count;
-END $$;
-
--- Sync all posts to tv_post
-DO $$
-DECLARE
-    batch_size INT := 1000;
-    total_count INT;
-    processed INT := 0;
-BEGIN
-    SELECT COUNT(*) INTO total_count FROM benchmark.tb_post;
-    RAISE NOTICE 'Syncing % posts to tv_post...', total_count;
-
-    FOR post_rec IN SELECT id FROM benchmark.tb_post LOOP
-        PERFORM benchmark.fn_sync_tv_post(post_rec.id);
-        processed := processed + 1;
-        IF processed % batch_size = 0 THEN
-            RAISE NOTICE '  Synced %/%', processed, total_count;
-            COMMIT;
-        END IF;
-    END LOOP;
-    RAISE NOTICE '  All % posts synced', total_count;
-END $$;
-
--- Sync all comments to tv_comment
-DO $$
-DECLARE
-    batch_size INT := 1000;
-    total_count INT;
-    processed INT := 0;
-BEGIN
-    SELECT COUNT(*) INTO total_count FROM benchmark.tb_comment;
-    RAISE NOTICE 'Syncing % comments to tv_comment...', total_count;
-
-    FOR comment_rec IN SELECT id FROM benchmark.tb_comment LOOP
-        PERFORM benchmark.fn_sync_tv_comment(comment_rec.id);
-        processed := processed + 1;
-        IF processed % batch_size = 0 THEN
-            RAISE NOTICE '  Synced %/%', processed, total_count;
-            COMMIT;
-        END IF;
-    END LOOP;
-    RAISE NOTICE '  All % comments synced', total_count;
-END $$;
-
--- Final analysis for query planner
 ANALYZE;
 
-RAISE NOTICE 'Large dataset generation complete!';
+DO $$ BEGIN RAISE NOTICE 'Large dataset generation complete!'; END $$;

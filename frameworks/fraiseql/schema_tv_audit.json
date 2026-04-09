@@ -1,0 +1,362 @@
+{
+  "types": [
+    {
+      "name": "User",
+      "sql_source": "v_user",
+      "fields": [
+        {
+          "name": "id",
+          "type": "ID",
+          "nullable": false
+        },
+        {
+          "name": "identifier",
+          "type": "String",
+          "nullable": false
+        },
+        {
+          "name": "email",
+          "type": "String",
+          "nullable": false
+        },
+        {
+          "name": "username",
+          "type": "String",
+          "nullable": false
+        },
+        {
+          "name": "full_name",
+          "type": "String",
+          "nullable": false
+        },
+        {
+          "name": "bio",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "created_at",
+          "type": "DateTime",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "DateTime",
+          "nullable": false
+        }
+      ],
+      "description": "User type representing a platform user."
+    },
+    {
+      "name": "Post",
+      "sql_source": "v_post",
+      "fields": [
+        {
+          "name": "id",
+          "type": "ID",
+          "nullable": false
+        },
+        {
+          "name": "identifier",
+          "type": "String",
+          "nullable": false
+        },
+        {
+          "name": "title",
+          "type": "String",
+          "nullable": false
+        },
+        {
+          "name": "content",
+          "type": "String",
+          "nullable": false
+        },
+        {
+          "name": "published",
+          "type": "Boolean",
+          "nullable": false
+        },
+        {
+          "name": "author",
+          "type": "User",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "DateTime",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "DateTime",
+          "nullable": false
+        }
+      ],
+      "description": "Post type representing a blog post."
+    },
+    {
+      "name": "Comment",
+      "sql_source": "v_comment",
+      "fields": [
+        {
+          "name": "id",
+          "type": "ID",
+          "nullable": false
+        },
+        {
+          "name": "identifier",
+          "type": "String",
+          "nullable": true
+        },
+        {
+          "name": "content",
+          "type": "String",
+          "nullable": false
+        },
+        {
+          "name": "author",
+          "type": "User",
+          "nullable": false
+        },
+        {
+          "name": "post",
+          "type": "Post",
+          "nullable": false
+        },
+        {
+          "name": "created_at",
+          "type": "DateTime",
+          "nullable": false
+        },
+        {
+          "name": "updated_at",
+          "type": "DateTime",
+          "nullable": false
+        }
+      ],
+      "description": "Comment type representing a comment on a post."
+    }
+  ],
+  "enums": [],
+  "input_types": [],
+  "interfaces": [],
+  "unions": [],
+  "queries": [
+    {
+      "name": "users",
+      "return_type": "User",
+      "returns_list": true,
+      "nullable": false,
+      "arguments": [
+        {
+          "name": "limit",
+          "type": "Int",
+          "nullable": false,
+          "default": 10
+        },
+        {
+          "name": "offset",
+          "type": "Int",
+          "nullable": false,
+          "default": 0
+        }
+      ],
+      "description": "Get list of users with pagination.",
+      "sql_source": "tv_user",
+      "jsonb_column": "data",
+      "auto_params": {
+        "limit": true,
+        "offset": true,
+        "where": true,
+        "order_by": true
+      }
+    },
+    {
+      "name": "user",
+      "return_type": "User",
+      "returns_list": false,
+      "nullable": true,
+      "arguments": [
+        {
+          "name": "id",
+          "type": "ID",
+          "nullable": false
+        }
+      ],
+      "description": "Get a single user by UUID.",
+      "sql_source": "tv_user",
+      "jsonb_column": "data"
+    },
+    {
+      "name": "posts",
+      "return_type": "Post",
+      "returns_list": true,
+      "nullable": false,
+      "arguments": [
+        {
+          "name": "limit",
+          "type": "Int",
+          "nullable": false,
+          "default": 10
+        },
+        {
+          "name": "offset",
+          "type": "Int",
+          "nullable": false,
+          "default": 0
+        },
+        {
+          "name": "published",
+          "type": "Boolean",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "author_id",
+          "type": "ID",
+          "nullable": true,
+          "default": null
+        }
+      ],
+      "description": "Get list of posts with filtering and pagination.",
+      "sql_source": "tv_post",
+      "jsonb_column": "data",
+      "auto_params": {
+        "limit": true,
+        "offset": true,
+        "where": true,
+        "order_by": true
+      }
+    },
+    {
+      "name": "post",
+      "return_type": "Post",
+      "returns_list": false,
+      "nullable": true,
+      "arguments": [
+        {
+          "name": "id",
+          "type": "ID",
+          "nullable": false
+        }
+      ],
+      "description": "Get a single post by UUID.",
+      "sql_source": "tv_post",
+      "jsonb_column": "data"
+    },
+    {
+      "name": "comments",
+      "return_type": "Comment",
+      "returns_list": true,
+      "nullable": false,
+      "arguments": [
+        {
+          "name": "limit",
+          "type": "Int",
+          "nullable": false,
+          "default": 10
+        },
+        {
+          "name": "offset",
+          "type": "Int",
+          "nullable": false,
+          "default": 0
+        },
+        {
+          "name": "post_id",
+          "type": "ID",
+          "nullable": true,
+          "default": null
+        },
+        {
+          "name": "author_id",
+          "type": "ID",
+          "nullable": true,
+          "default": null
+        }
+      ],
+      "description": "Get list of comments with filtering and pagination.",
+      "sql_source": "tv_comment",
+      "jsonb_column": "data",
+      "auto_params": {
+        "limit": true,
+        "offset": true,
+        "where": true,
+        "order_by": true
+      }
+    },
+    {
+      "name": "comment",
+      "return_type": "Comment",
+      "returns_list": false,
+      "nullable": true,
+      "arguments": [
+        {
+          "name": "id",
+          "type": "ID",
+          "nullable": false
+        }
+      ],
+      "description": "Get a single comment by UUID.",
+      "sql_source": "tv_comment",
+      "jsonb_column": "data"
+    }
+  ],
+  "mutations": [
+    {
+      "name": "updateUser",
+      "return_type": "User",
+      "returns_list": false,
+      "nullable": true,
+      "arguments": [
+        {
+          "name": "id",
+          "type": "ID",
+          "nullable": false
+        },
+        {
+          "name": "bio",
+          "type": "String",
+          "nullable": true,
+          "default": null
+        }
+      ],
+      "description": "Update a user's bio. Logs before/after snapshot to tb_mutation_log.",
+      "sql_source": "fn_update_user_full",
+      "operation": "UPDATE"
+    },
+    {
+      "name": "createPost",
+      "return_type": "Post",
+      "returns_list": false,
+      "nullable": true,
+      "arguments": [
+        {
+          "name": "title",
+          "type": "String",
+          "nullable": false
+        },
+        {
+          "name": "content",
+          "type": "String",
+          "nullable": false
+        },
+        {
+          "name": "author_id",
+          "type": "ID",
+          "nullable": false
+        },
+        {
+          "name": "published",
+          "type": "Boolean",
+          "nullable": false,
+          "default": false
+        }
+      ],
+      "description": "Create a new post. Logs snapshot to tb_mutation_log and returns cascade data.",
+      "sql_source": "fn_create_post_full",
+      "operation": "CREATE"
+    }
+  ],
+  "subscriptions": []
+}

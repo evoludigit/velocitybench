@@ -1,4 +1,4 @@
-# FraiseQL v2.1.0 — Compiler Configuration
+# FraiseQL v2.1.2 — Compiler Configuration
 # Used by fraiseql-cli to compile schema.json -> schema.compiled.json
 # Server runtime configuration is in fraiseql.toml (read by fraiseql-server)
 

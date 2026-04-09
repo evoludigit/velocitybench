@@ -1,7 +1,7 @@
-# FraiseQL v2.1.2 — Server Runtime Configuration (TV Tables + Audit Logging)
-# Audit logging enabled in compiled schema; compare M1 latency vs fraiseql-tv.
+# FraiseQL v2.1.2 — Server Runtime Configuration (v_* Views, Cache DISABLED)
+# Raw JOIN baseline — measures on-the-fly JSONB view cost without in-process cache.
 
-schema_path = "schema_tv_audit.compiled.json"
+schema_path = "schema.compiled.json"
 database_url = "postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark"
 bind_addr = "0.0.0.0:8815"
 
@@ -17,7 +17,7 @@ introspection_require_auth = false
 playground_enabled = false
 metrics_enabled = false
 
-cache_enabled = true
+cache_enabled = false
 
 [validation]
-max_query_complexity = 200
+max_query_complexity = 1000

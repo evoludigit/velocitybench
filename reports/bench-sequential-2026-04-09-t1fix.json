@@ -1,0 +1,203 @@
+{
+  "results": [
+    {
+      "framework": "fraiseql-tv",
+      "query": "Q1",
+      "rps": 10976.6,
+      "p50_ms": 3.26,
+      "p95_ms": 7.24,
+      "p99_ms": 9.78,
+      "requests": 219532,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "Q2",
+      "rps": 11376.4,
+      "p50_ms": 3.08,
+      "p95_ms": 7.34,
+      "p99_ms": 9.97,
+      "requests": 227527,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "Q2b",
+      "rps": 9640.0,
+      "p50_ms": 3.82,
+      "p95_ms": 7.68,
+      "p99_ms": 10.23,
+      "requests": 192801,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "Q3",
+      "rps": 4823.0,
+      "p50_ms": 8.06,
+      "p95_ms": 11.44,
+      "p99_ms": 13.41,
+      "requests": 96460,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "C3",
+      "rps": 10413.2,
+      "p50_ms": 3.28,
+      "p95_ms": 8.38,
+      "p99_ms": 11.94,
+      "requests": 208264,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "HC3",
+      "rps": 9857.9,
+      "p50_ms": 3.36,
+      "p95_ms": 9.04,
+      "p99_ms": 14.43,
+      "requests": 197158,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "M1",
+      "rps": 3370.2,
+      "p50_ms": 9.31,
+      "p95_ms": 26.05,
+      "p99_ms": 43.65,
+      "requests": 67405,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "F1",
+      "rps": 10738.4,
+      "p50_ms": 3.28,
+      "p95_ms": 7.72,
+      "p99_ms": 10.5,
+      "requests": 214768,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "F2",
+      "rps": 9387.8,
+      "p50_ms": 3.99,
+      "p95_ms": 7.54,
+      "p99_ms": 9.91,
+      "requests": 187755,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "F3",
+      "rps": 10972.8,
+      "p50_ms": 3.28,
+      "p95_ms": 7.17,
+      "p99_ms": 9.65,
+      "requests": 219456,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "T1",
+      "rps": 1211.2,
+      "p50_ms": 23.99,
+      "p95_ms": 72.4,
+      "p99_ms": 82.43,
+      "requests": 24225,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    }
+  ],
+  "db_footprint": [
+    {
+      "table": "tb_mutation_log",
+      "total_bytes": 3936256000,
+      "heap_bytes": 3631849472,
+      "indexes_bytes": 303390720
+    },
+    {
+      "table": "tv_comment",
+      "total_bytes": 1800413184,
+      "heap_bytes": 792674304,
+      "indexes_bytes": 334315520
+    },
+    {
+      "table": "tb_comment",
+      "total_bytes": 395190272,
+      "heap_bytes": 308862976,
+      "indexes_bytes": 86204416
+    },
+    {
+      "table": "tv_post",
+      "total_bytes": 346996736,
+      "heap_bytes": 220504064,
+      "indexes_bytes": 74727424
+    },
+    {
+      "table": "tb_post",
+      "total_bytes": 161103872,
+      "heap_bytes": 140099584,
+      "indexes_bytes": 20930560
+    },
+    {
+      "table": "tb_post_like",
+      "total_bytes": 15015936,
+      "heap_bytes": 5218304,
+      "indexes_bytes": 9764864
+    },
+    {
+      "table": "tv_user",
+      "total_bytes": 14712832,
+      "heap_bytes": 8593408,
+      "indexes_bytes": 6078464
+    },
+    {
+      "table": "tb_user",
+      "total_bytes": 10190848,
+      "heap_bytes": 6512640,
+      "indexes_bytes": 3637248
+    },
+    {
+      "table": "tb_user_follows",
+      "total_bytes": 6938624,
+      "heap_bytes": 2220032,
+      "indexes_bytes": 4685824
+    }
+  ]
+}

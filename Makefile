@@ -32,6 +32,8 @@ help:
 	@echo "  make bench-sequential DURATION=30          -   with custom duration (seconds)"
 	@echo "  make bench-sequential CONCURRENCY=40       -   with custom concurrency"
 	@echo "  make bench-sequential FRAMEWORKS='a b'     -   subset of frameworks only"
+	@echo "  make bench-sequential PRUNE_IMAGES=1       -   remove each image after run (saves ~10-16 GB)"
+	@echo "  make bench-sequential RESOURCE_METRICS=1  -   add LOC/complexity/RAM/CPU/disk to report"
 	@echo "  make bench-one FRAMEWORK=<name>            - k6 benchmark a single framework"
 	@echo "  make bench-all                             - Full k6 suite (all frameworks, ~90 min)"
 	@echo "  make bench                                 - FraiseQL v_* vs tv_* comparison"

@@ -17,9 +17,12 @@ services:
       - ./database/01-extensions.sql:/docker-entrypoint-initdb.d/01-extensions.sql
       - ./database/fraiseql_cqrs_schema.sql:/docker-entrypoint-initdb.d/02-fraiseql-cqrs.sql
       - ./database/04-cqrs-extensions.sql:/docker-entrypoint-initdb.d/03-cqrs-extensions.sql
-      - ./database/05-medium-seed.sql:/docker-entrypoint-initdb.d/04-medium-seed.sql
+      - ./database/05-large-dataset.sql:/docker-entrypoint-initdb.d/04-seed.sql
       - ./frameworks/fraiseql/database/extensions.sql:/docker-entrypoint-initdb.d/05-fraiseql-views.sql
-      - ./database/fraiseql_mutations.sql:/docker-entrypoint-initdb.d/06-fraiseql-mutations.sql
+      - ./database/fraiseql_tv_bulk_sync.sql:/docker-entrypoint-initdb.d/06-fraiseql-tv-sync.sql
+      - ./database/fraiseql_mutations.sql:/docker-entrypoint-initdb.d/07-fraiseql-mutations.sql
+      - ./database/fraiseql_audit_helpers.sql:/docker-entrypoint-initdb.d/08-fraiseql-audit-helpers.sql
+      - ./database/fraiseql_mutations_full.sql:/docker-entrypoint-initdb.d/09-fraiseql-mutations-full.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U benchmark -d velocitybench_benchmark"]
       interval: 10s
@@ -56,7 +59,7 @@ services:
   # ============================================================================
 
   fraiseql:
-    # FraiseQL v2.1.0 — Variant A: v_* on-the-fly JSONB views
+    # FraiseQL v2.1.2 — Variant A: v_* on-the-fly JSONB views
     build:
       context: ./frameworks/fraiseql
       args:
@@ -66,6 +69,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - ./frameworks/fraiseql/fraiseql.toml:/app/fraiseql.toml
+      - ./frameworks/fraiseql/schema_v.compiled.json:/app/schema.compiled.json
     environment:
       - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
       - RUST_LOG=info
@@ -88,8 +94,44 @@ services:
     networks:
       - velocitybench-benchmark
 
+  fraiseql-v-nocache:
+    # FraiseQL v2.1.2 — Variant A (v_* views), cache disabled — raw JOIN baseline
+    build:
+      context: ./frameworks/fraiseql
+      args:
+        SCHEMA_FILE: schema.py
+    ports:
+      - "8819:8815"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./frameworks/fraiseql/fraiseql-nocache.toml:/app/fraiseql-nocache.toml
+      - ./frameworks/fraiseql/schema_v.compiled.json:/app/schema.compiled.json
+    environment:
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
+      - RUST_LOG=info
+      - FRAISEQL_CONFIG=fraiseql-nocache.toml
+      - FRAISEQL_ENV=development
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8815/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '2.0'
+    profiles:
+      - benchmark
+      - fraiseql
+    networks:
+      - velocitybench-benchmark
+
   fraiseql-tv:
-    # FraiseQL v2.1.0 — Variant B: tv_* pre-computed JSONB tables
+    # FraiseQL v2.1.2 — Variant B: tv_* pre-computed JSONB tables
     build:
       context: ./frameworks/fraiseql
       args:
@@ -102,6 +144,7 @@ services:
         condition: service_healthy
     volumes:
       - ./frameworks/fraiseql/fraiseql-tv.toml:/app/fraiseql-tv.toml
+      - ./frameworks/fraiseql/schema.compiled.json:/app/schema.compiled.json
     environment:
       - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
       - RUST_LOG=info
@@ -116,7 +159,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1G
           cpus: '2.0'
     profiles:
       - benchmark
@@ -125,7 +168,7 @@ services:
       - velocitybench-benchmark
 
   fraiseql-tv-nocache:
-    # FraiseQL v2.1.0 — Variant B (tv_*), cache disabled — cold-read baseline
+    # FraiseQL v2.1.2 — Variant B (tv_*), cache disabled — cold-read baseline
     build:
       context: ./frameworks/fraiseql
       args:
@@ -138,6 +181,7 @@ services:
         condition: service_healthy
     volumes:
       - ./frameworks/fraiseql/fraiseql-tv-nocache.toml:/app/fraiseql-tv-nocache.toml
+      - ./frameworks/fraiseql/schema.compiled.json:/app/schema.compiled.json
     environment:
       - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
       - RUST_LOG=info
@@ -152,7 +196,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1G
           cpus: '2.0'
     profiles:
       - benchmark
@@ -161,11 +205,11 @@ services:
       - velocitybench-benchmark
 
   fraiseql-tv-audit:
-    # FraiseQL v2.1.0 — Variant B (tv_*), audit logging ENABLED — observer overhead
+    # FraiseQL v2.1.2 — Variant C (tv_*), full audit mutations — measures production overhead
     build:
       context: ./frameworks/fraiseql
       args:
-        SCHEMA_FILE: schema_tv.py
+        SCHEMA_FILE: schema_tv_audit.py
         BUILD_TOML: fraiseql-build-tv-audit.toml
     ports:
       - "8818:8815"
@@ -174,6 +218,7 @@ services:
         condition: service_healthy
     volumes:
       - ./frameworks/fraiseql/fraiseql-tv-audit.toml:/app/fraiseql-tv-audit.toml
+      - ./frameworks/fraiseql/schema_tv_audit.compiled.json:/app/schema_tv_audit.compiled.json
     environment:
       - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
       - RUST_LOG=info

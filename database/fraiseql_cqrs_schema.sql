@@ -23,7 +23,7 @@ CREATE TABLE benchmark.tb_user (
     -- Metadata
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+) WITH (fillfactor=70);
 
 CREATE INDEX idx_tb_user_id ON benchmark.tb_user(id);
 CREATE INDEX idx_tb_user_email ON benchmark.tb_user(email);
@@ -115,114 +115,132 @@ INSERT INTO benchmark.tb_comment (id, content, fk_post, fk_author) VALUES
 
 -- ============================================================================
 -- QUERY SIDE SETUP: Create TVIEWs via pg_tviews_create()
--- pg_tviews creates backing views (benchmark.v_*) and materialized tables
--- (benchmark.tv_*), populates them from current data, and installs triggers
--- on tb_* tables so future writes auto-cascade.
+-- Must run BEFORE extensions.sql — pg_tviews creates its own backing v_* views
+-- which extensions.sql then replaces with our custom JSONB shape.
 -- ============================================================================
 
--- Set search_path so pg_tviews resolves current_schema() = benchmark (beta.3+).
--- Both backing views and materialized tables land in the benchmark schema.
 SET search_path TO benchmark, public;
 
--- tv_user: backed by benchmark.v_user, materialized in benchmark.tv_user
--- Triggers installed on tb_user. CASCADE: user update → tv_user + tv_post + tv_comment
+-- tv_user
 SELECT pg_tviews_create('tv_user', $TVIEW_SQL$
     SELECT
-        u.pk_user                              AS pk_user,
-        u.id                                   AS id,
-        u.identifier                           AS identifier,
+        u.pk_user     AS pk_user,
+        u.id          AS id,
+        u.identifier  AS identifier,
         jsonb_build_object(
             'id',         u.id::text,
             'identifier', u.identifier,
             'email',      u.email,
             'username',   u.username,
-            'fullName',   u.full_name,
+            'full_name',  u.full_name,
             'bio',        u.bio,
-            'createdAt',  to_char(u.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
-            'updatedAt',  to_char(u.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
-            'postCount',  COALESCE(pc.cnt, 0)
-        )                                      AS data
+            'created_at', u.created_at,
+            'updated_at', u.updated_at
+        )             AS data
     FROM benchmark.tb_user u
-    LEFT JOIN (
-        SELECT fk_author, COUNT(*) AS cnt
-        FROM benchmark.tb_post
-        GROUP BY fk_author
-    ) pc ON pc.fk_author = u.pk_user
 $TVIEW_SQL$);
+ALTER TABLE benchmark.tv_user SET (fillfactor=70);
 
--- tv_post: backed by benchmark.v_post, materialized in benchmark.tv_post
--- Triggers on tb_post AND tb_user (cascade: author change → tv_post update)
+-- tv_post — author embedded via JOIN
 SELECT pg_tviews_create('tv_post', $TVIEW_SQL$
     SELECT
-        p.pk_post                              AS pk_post,
-        p.id                                   AS id,
-        p.identifier                           AS identifier,
-        p.fk_author                            AS fk_author,
+        p.pk_post     AS pk_post,
+        p.id          AS id,
+        p.identifier  AS identifier,
+        p.fk_author   AS fk_author,
+        p.published   AS _published,
+        u.id          AS author_id,
         jsonb_build_object(
-            'id',           p.id::text,
-            'identifier',   p.identifier,
-            'title',        p.title,
-            'content',      p.content,
-            'published',    p.published,
-            'createdAt',    to_char(p.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
-            'updatedAt',    to_char(p.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
-            'author',       jsonb_build_object(
+            'id',         p.id::text,
+            'identifier', p.identifier,
+            'title',      p.title,
+            'content',    p.content,
+            'published',  p.published,
+            'created_at', p.created_at,
+            'updated_at', p.updated_at,
+            'author',     jsonb_build_object(
                 'id',         u.id::text,
+                'identifier', u.identifier,
+                'email',      u.email,
                 'username',   u.username,
-                'fullName',   u.full_name
-            ),
-            'commentCount', COALESCE(cc.cnt, 0)
-        )                                      AS data
+                'full_name',  u.full_name,
+                'bio',        u.bio,
+                'created_at', u.created_at,
+                'updated_at', u.updated_at
+            )
+        )             AS data
     FROM benchmark.tb_post p
     JOIN benchmark.tb_user u ON u.pk_user = p.fk_author
-    LEFT JOIN (
-        SELECT fk_post, COUNT(*) AS cnt
-        FROM benchmark.tb_comment
-        GROUP BY fk_post
-    ) cc ON cc.fk_post = p.pk_post
 $TVIEW_SQL$);
 
--- tv_comment: backed by benchmark.v_comment, materialized in benchmark.tv_comment
--- Triggers on tb_comment, tb_post, tb_user
+-- pg_tviews infers TEXT for generic expressions; cast _published to BOOLEAN so
+-- FraiseQL can filter directly with boolean params instead of JSONB extraction.
+ALTER TABLE benchmark.tv_post ALTER COLUMN _published TYPE boolean USING _published::boolean;
+ALTER TABLE benchmark.tv_post SET (fillfactor=70);
+
+-- tv_comment — author + post (with its author) embedded via JOINs
 SELECT pg_tviews_create('tv_comment', $TVIEW_SQL$
     SELECT
-        c.pk_comment                           AS pk_comment,
-        c.id                                   AS id,
-        c.identifier                           AS identifier,
-        c.fk_author                            AS fk_author,
-        c.fk_post                              AS fk_post,
+        c.pk_comment  AS pk_comment,
+        c.id          AS id,
+        c.identifier  AS identifier,
+        c.fk_author   AS fk_author,
+        c.fk_post     AS fk_post,
+        u.id          AS author_id,
+        p.id          AS post_id,
         jsonb_build_object(
             'id',         c.id::text,
             'identifier', c.identifier,
             'content',    c.content,
-            'createdAt',  to_char(c.created_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
-            'updatedAt',  to_char(c.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+            'created_at', c.created_at,
+            'updated_at', c.updated_at,
             'author',     jsonb_build_object(
                 'id',         u.id::text,
+                'identifier', u.identifier,
+                'email',      u.email,
                 'username',   u.username,
-                'fullName',   u.full_name
+                'full_name',  u.full_name,
+                'bio',        u.bio,
+                'created_at', u.created_at,
+                'updated_at', u.updated_at
             ),
             'post',       jsonb_build_object(
-                'id',    p.id::text,
-                'title', p.title
+                'id',         p.id::text,
+                'identifier', p.identifier,
+                'title',      p.title,
+                'content',    p.content,
+                'published',  p.published,
+                'created_at', p.created_at,
+                'updated_at', p.updated_at,
+                'author',     jsonb_build_object(
+                    'id',         pu.id::text,
+                    'identifier', pu.identifier,
+                    'email',      pu.email,
+                    'username',   pu.username,
+                    'full_name',  pu.full_name,
+                    'bio',        pu.bio,
+                    'created_at', pu.created_at,
+                    'updated_at', pu.updated_at
+                )
             )
-        )                                      AS data
+        )             AS data
     FROM benchmark.tb_comment c
-    JOIN benchmark.tb_user u ON u.pk_user = c.fk_author
+    JOIN benchmark.tb_user u  ON u.pk_user  = c.fk_author
     JOIN benchmark.tb_post  p ON p.pk_post  = c.fk_post
+    JOIN benchmark.tb_user pu ON pu.pk_user = p.fk_author
 $TVIEW_SQL$);
+ALTER TABLE benchmark.tv_comment SET (fillfactor=70);
 
 -- ============================================================================
 -- COMMENTS AND DOCUMENTATION
 -- ============================================================================
 
-COMMENT ON TABLE benchmark.tb_user IS 'Command side: Normalized users with Trinity identifiers (pk_user, id, identifier)';
-COMMENT ON TABLE benchmark.tb_post IS 'Command side: Normalized posts with INT foreign keys for fast joins';
+COMMENT ON TABLE benchmark.tb_user    IS 'Command side: Normalized users with Trinity identifiers (pk_user, id, identifier)';
+COMMENT ON TABLE benchmark.tb_post    IS 'Command side: Normalized posts with INT foreign keys for fast joins';
 COMMENT ON TABLE benchmark.tb_comment IS 'Command side: Normalized comments with INT foreign keys for fast joins';
-
-COMMENT ON TABLE benchmark.tv_user IS 'Query side: TVIEW managed by pg_tviews — denormalized users with JSONB and pre-computed post count';
-COMMENT ON TABLE benchmark.tv_post IS 'Query side: TVIEW managed by pg_tviews — denormalized posts with embedded author and comment count';
-COMMENT ON TABLE benchmark.tv_comment IS 'Query side: TVIEW managed by pg_tviews — denormalized comments with embedded author and post info';
+COMMENT ON TABLE benchmark.tv_user    IS 'Query side: TVIEW managed by pg_tviews — pre-computed user JSONB';
+COMMENT ON TABLE benchmark.tv_post    IS 'Query side: TVIEW managed by pg_tviews — pre-computed post JSONB with embedded author';
+COMMENT ON TABLE benchmark.tv_comment IS 'Query side: TVIEW managed by pg_tviews — pre-computed comment JSONB with embedded author and post';
 
 -- ============================================================================
 -- PERFORMANCE ANALYSIS QUERIES

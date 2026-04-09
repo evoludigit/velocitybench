@@ -85,7 +85,7 @@ def users(
     pass
 
 
-@fraiseql.query(sql_source="tv_user", cache_ttl_seconds=0)
+@fraiseql.query(sql_source="tv_user")
 def user(id: ID) -> User | None:
     """Get a single user by UUID."""
     pass
@@ -105,7 +105,7 @@ def posts(
     pass
 
 
-@fraiseql.query(sql_source="tv_post", cache_ttl_seconds=0)
+@fraiseql.query(sql_source="tv_post")
 def post(id: ID) -> Post | None:
     """Get a single post by UUID."""
     pass
@@ -125,9 +125,42 @@ def comments(
     pass
 
 
-@fraiseql.query(sql_source="tv_comment", cache_ttl_seconds=0)
+@fraiseql.query(sql_source="tv_comment")
 def comment(id: ID) -> Comment | None:
     """Get a single comment by UUID."""
+    pass
+
+
+@fraiseql.type
+class PostFull:
+    """Post with pre-aggregated comments — single-query full blog page load.
+
+    Backed by v_post_full: composed view of tv_post (pre-computed post+author JSONB)
+    and tv_comment (pre-computed comment+author JSONB). Zero extra disk cost vs TV tables.
+    PostgreSQL pushes WHERE id = $1 through both TV tables; jsonb_agg runs only on
+    the matched post's comments.
+    """
+
+    id: ID
+    identifier: str
+    title: str
+    content: str
+    published: bool
+    author: User
+    comments: list[Comment]
+    created_at: DateTime
+    updated_at: DateTime
+
+
+@fraiseql.query(sql_source="v_post_full")
+def postFull(id: ID) -> PostFull | None:
+    """Get a post with its 10 most recent comments. Single SQL query via composed view."""
+    pass
+
+
+@fraiseql.query(sql_source="v_post_full_delta")
+def postFullDelta(id: ID) -> PostFull | None:
+    """Get a post with comments from tvd_* (delta-managed tables). T1d benchmark variant."""
     pass
 
 
@@ -140,6 +173,16 @@ def comment(id: ID) -> Comment | None:
 @fraiseql.mutation(sql_source="benchmark.fn_update_user", operation="UPDATE")
 def updateUser(id: ID, bio: str | None = None) -> User | None:
     """Update a user's bio. Returns the updated user."""
+    pass
+
+
+@fraiseql.mutation(sql_source="benchmark.fn_update_user_delta", operation="UPDATE")
+def updateUserDelta(id: ID, bio: str | None = None) -> User | None:
+    """Update a user's bio via surgical jsonb_delta patch on tvd_* tables.
+
+    Bypasses pg_tviews cascade — patches tvd_user / tvd_post / tvd_comment
+    in-place using jsonb_smart_patch_nested. M1d benchmark variant.
+    """
     pass
 
 

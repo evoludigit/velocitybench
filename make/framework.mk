@@ -152,12 +152,15 @@ bench-all: parity-test
 
 # Sequential isolation benchmark (canonical, no k6 required).
 # Usage: make bench-sequential [DURATION=20] [CONCURRENCY=40] [FRAMEWORKS="fraiseql-tv gin-rest"]
+#        make bench-sequential PRUNE_IMAGES=1   # reclaim disk after each framework (~10-16 GB total)
 bench-sequential:
 	@echo "Running sequential isolation benchmark..."
 	$(PROJECT_ROOT)venv/bin/python $(PROJECT_ROOT)tests/benchmark/bench_sequential.py \
 	  $(if $(DURATION),--duration $(DURATION),) \
 	  $(if $(CONCURRENCY),--concurrency $(CONCURRENCY),) \
-	  $(if $(FRAMEWORKS),--frameworks $(FRAMEWORKS),)
+	  $(if $(FRAMEWORKS),--frameworks $(FRAMEWORKS),) \
+	  $(if $(PRUNE_IMAGES),--prune-images,) \
+	  $(if $(RESOURCE_METRICS),--resource-metrics,)
 
 # N+1 query guard: detect DataLoader regressions using pg_stat_statements.
 # Run serially against the benchmark stack (no concurrent traffic).

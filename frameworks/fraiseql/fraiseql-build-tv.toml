@@ -1,4 +1,4 @@
-# FraiseQL v2.1.0 — Compiler Configuration (TV Tables Variant)
+# FraiseQL v2.1.2 — Compiler Configuration (TV Tables Variant)
 # Used by fraiseql-cli to compile schema_tv.json -> schema.compiled.json
 
 [project]
