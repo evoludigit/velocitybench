@@ -4,6 +4,7 @@ import com.fraiseql.entities.Post;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -13,8 +14,8 @@ public interface PostRepository extends JpaRepository<Post, Integer> {
 
     Post findById(String uuid);
 
-    @Query("SELECT p FROM Post p WHERE p.published = true ORDER BY p.createdAt DESC")
-    List<Post> findPublishedPostsWithLimit(int limit);
+    @Query(value = "SELECT * FROM benchmark.tb_post WHERE published = true ORDER BY created_at DESC LIMIT :limit", nativeQuery = true)
+    List<Post> findPublishedPostsWithLimit(@Param("limit") int limit);
 
     @Query(value = "SELECT p.id, p.title, p.content, p.created_at, u.username, u.full_name " +
                    "FROM posts p " +

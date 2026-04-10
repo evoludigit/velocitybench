@@ -27,6 +27,7 @@ import strawberry
 from fastapi import FastAPI, Request
 from strawberry.dataloader import DataLoader
 from strawberry.fastapi import BaseContext, GraphQLRouter
+from strawberry.types import Info
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from common.async_db import AsyncDatabase
@@ -179,7 +180,7 @@ class Comment:
     )
 
     @strawberry.field(description="Author who wrote this comment")
-    async def author(self, info) -> User | None:
+    async def author(self, info: Info) -> User | None:
         if not self.author_id:
             return None
         try:
@@ -196,7 +197,7 @@ class Comment:
         return None
 
     @strawberry.field(description="Post this comment belongs to")
-    async def post(self, info) -> Post | None:
+    async def post(self, info: Info) -> Post | None:
         if not self.post_id:
             return None
         try:
@@ -227,7 +228,7 @@ class Post:
     )
 
     @strawberry.field(description="Author who wrote this post")
-    async def author(self, info) -> User | None:
+    async def author(self, info: Info) -> User | None:
         if not self.fk_author:
             return None
         try:
@@ -246,7 +247,7 @@ class Post:
     @strawberry.field(description="Comments on this post (limited to 50)")
     async def comments(
         self,
-        info,
+        info: Info,
         limit: int = 50,
     ) -> list[Comment]:
         limit = min(limit, 50)  # Server-side limit
@@ -291,7 +292,7 @@ class User:
     @strawberry.field(description="Posts authored by this user")
     async def posts(
         self,
-        info,
+        info: Info,
         limit: int = 50,
     ) -> list[Post]:
         limit = min(limit, 50)  # Server-side limit
@@ -322,7 +323,7 @@ class Query:
 
     @strawberry.field(description="Fetch a single user by ID")
     async def user(
-        self, info, id: strawberry.ID = strawberry.field(description="User ID (UUID)")
+        self, info: Info, id: strawberry.ID = strawberry.field(description="User ID (UUID)")
     ) -> User | None:
         """Fetch a user by their UUID."""
         try:
@@ -358,7 +359,7 @@ class Query:
     @strawberry.field(description="Fetch multiple users")
     async def users(
         self,
-        info,
+        info: Info,
         limit: int = 10,
     ) -> list[User]:
         """Fetch a list of users with pagination."""
@@ -390,7 +391,7 @@ class Query:
 
     @strawberry.field(description="Fetch a single post by ID")
     async def post(
-        self, info, id: strawberry.ID = strawberry.field(description="Post ID (UUID)")
+        self, info: Info, id: strawberry.ID = strawberry.field(description="Post ID (UUID)")
     ) -> Post | None:
         """Fetch a post by its UUID."""
         try:
@@ -425,7 +426,7 @@ class Query:
     @strawberry.field(description="Fetch multiple posts")
     async def posts(
         self,
-        info,
+        info: Info,
         limit: int = 10,
         published: bool | None = None,
     ) -> list[Post]:
@@ -467,7 +468,7 @@ class Query:
     @strawberry.field(description="Fetch a single comment by ID")
     async def comment(
         self,
-        info,
+        info: Info,
         id: strawberry.ID = strawberry.field(description="Comment ID (UUID)"),
     ) -> Comment | None:
         """Fetch a comment by its UUID."""
@@ -518,7 +519,7 @@ class Mutation:
     @strawberry.mutation(description="Update a user's profile")
     async def update_user(
         self,
-        info,
+        info: Info,
         id: strawberry.ID,
         bio: str | None = None,
         full_name: str | None = None,
