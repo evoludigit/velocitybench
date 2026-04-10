@@ -596,6 +596,10 @@ FRAMEWORKS: dict[str, dict] = {
         "queries": {
             "Q1": "http://localhost:8014/api/users?page=0&size=20",
             "Q2": "http://localhost:8014/api/posts?size=10",
+            "Q2b": "http://localhost:8014/api/posts?include=author&size=10",
+            # Q2/Q2b always filter published=true, so F1==Q2, F2==Q2b
+            "F1": "http://localhost:8014/api/posts?size=10",
+            "F2": "http://localhost:8014/api/posts?include=author&size=10",
             "T1": "T1",
         },
         "health_url": "http://localhost:8014/health",

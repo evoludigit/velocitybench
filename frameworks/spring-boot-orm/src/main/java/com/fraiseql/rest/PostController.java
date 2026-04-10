@@ -37,7 +37,7 @@ public class PostController {
 
     @GetMapping("/{id}")
     public ResponseEntity<PostDTO> getPost(@PathVariable String id) {
-        Post post = postRepository.findById(id);
+        Post post = postRepository.findByUuid(id);
         if (post != null) {
             PostDTO postDTO = new PostDTO(
                 post.getId(),

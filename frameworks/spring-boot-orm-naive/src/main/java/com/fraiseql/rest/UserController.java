@@ -29,7 +29,7 @@ public class UserController {
     @GetMapping("/{id}")
     public ResponseEntity<UserDTO> getUser(@PathVariable String id) {
         String sql = "SELECT u.id, u.username, u.full_name, u.bio " +
-                    "FROM benchmark.tb_user u WHERE u.id = ?";
+                    "FROM benchmark.tb_user u WHERE u.id = CAST(? AS uuid)";
 
         List<UserDTO> users = jdbcTemplate.query(sql, new Object[]{id}, new UserRowMapper());
 

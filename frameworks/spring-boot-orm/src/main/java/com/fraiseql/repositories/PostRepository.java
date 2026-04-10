@@ -12,7 +12,8 @@ import java.util.List;
 @Repository
 public interface PostRepository extends JpaRepository<Post, Integer> {
 
-    Post findById(String uuid);
+    @Query(value = "SELECT * FROM benchmark.tb_post WHERE id = CAST(:id AS uuid)", nativeQuery = true)
+    Post findByUuid(@Param("id") String id);
 
     @Query(value = "SELECT * FROM benchmark.tb_post WHERE published = true ORDER BY created_at DESC LIMIT :limit", nativeQuery = true)
     List<Post> findPublishedPostsWithLimit(@Param("limit") int limit);
@@ -27,7 +28,7 @@ public interface PostRepository extends JpaRepository<Post, Integer> {
 
     List<Post> findByFkAuthor(Integer fkAuthor);
 
-    @Query(value = "SELECT p.id, p.title, p.content, p.created_at, u.id AS author_id, u.username, u.full_name " +
+    @Query(value = "SELECT CAST(p.id AS text), p.title, p.content, p.created_at, CAST(u.id AS text) AS author_id, u.username, u.full_name " +
                    "FROM benchmark.tb_post p " +
                    "JOIN benchmark.tb_user u ON u.pk_user = p.fk_author " +
                    "WHERE p.published = true " +

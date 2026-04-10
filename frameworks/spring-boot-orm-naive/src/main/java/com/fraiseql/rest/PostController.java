@@ -1,7 +1,9 @@
 package com.fraiseql.rest;
 
 import com.fraiseql.dto.CommentDTO;
+import com.fraiseql.dto.PostAuthorDTO;
 import com.fraiseql.dto.PostDTO;
+import com.fraiseql.dto.PostWithAuthorDTO;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -15,6 +17,7 @@ import javax.sql.DataSource;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @RestController
@@ -30,7 +33,7 @@ public class PostController {
     @GetMapping("/{id}")
     public ResponseEntity<PostDTO> getPost(@PathVariable String id) {
         String sql = "SELECT p.id, p.title, p.content, p.fk_author, p.created_at " +
-                    "FROM benchmark.tb_post p WHERE p.id = ? AND p.published = true";
+                    "FROM benchmark.tb_post p WHERE p.id = CAST(? AS uuid) AND p.published = true";
 
         List<PostDTO> posts = jdbcTemplate.query(sql, new Object[]{id}, new PostRowMapper());
 
@@ -41,9 +44,35 @@ public class PostController {
     }
 
     @GetMapping
-    public ResponseEntity<List<PostDTO>> listPosts(
+    public ResponseEntity<?> listPosts(
         @RequestParam(defaultValue = "0") int page,
-        @RequestParam(defaultValue = "10") int size) {
+        @RequestParam(defaultValue = "10") int size,
+        @RequestParam(required = false) String include) {
+
+        if ("author".equals(include)) {
+            // Q2b: naive N+1 — one query per post to fetch its author (intentional for comparison)
+            String postSql = "SELECT p.id, p.title, p.content, p.fk_author, p.created_at " +
+                        "FROM benchmark.tb_post p " +
+                        "WHERE p.published = true " +
+                        "ORDER BY p.created_at DESC LIMIT ?";
+            List<PostDTO> posts = jdbcTemplate.query(postSql, new Object[]{size}, new PostRowMapper());
+
+            String authorSql = "SELECT CAST(u.id AS text), u.username, u.full_name " +
+                        "FROM benchmark.tb_user u WHERE u.pk_user = ?";
+            List<PostWithAuthorDTO> result = new ArrayList<>(posts.size());
+            for (PostDTO post : posts) {
+                int fkAuthor = post.getAuthorId() != null ? Integer.parseInt(post.getAuthorId()) : 0;
+                List<PostAuthorDTO> authors = jdbcTemplate.query(authorSql, new Object[]{fkAuthor},
+                    (rs, rowNum) -> new PostAuthorDTO(
+                        rs.getString(1),
+                        rs.getString("username"),
+                        rs.getString("full_name")
+                    ));
+                PostAuthorDTO author = authors.isEmpty() ? new PostAuthorDTO("", "", "") : authors.get(0);
+                result.add(new PostWithAuthorDTO(post.getId(), post.getTitle(), post.getContent(), post.getCreatedAt(), author));
+            }
+            return ResponseEntity.ok(result);
+        }
 
         String sql = "SELECT p.id, p.title, p.content, p.fk_author, p.created_at " +
                     "FROM benchmark.tb_post p " +
@@ -63,7 +92,7 @@ public class PostController {
         String sql = "SELECT p.id, p.title, p.content, p.fk_author, p.created_at " +
                     "FROM benchmark.tb_post p " +
                     "JOIN benchmark.tb_user u ON p.fk_author = u.pk_user " +
-                    "WHERE u.id = ? AND p.published = true " +
+                    "WHERE u.id = CAST(? AS uuid) AND p.published = true " +
                     "ORDER BY p.created_at DESC LIMIT ?";
 
         List<PostDTO> posts = jdbcTemplate.query(sql, new Object[]{authorId, size}, new PostRowMapper());
@@ -79,7 +108,7 @@ public class PostController {
         String sql = "SELECT c.id, c.content, c.fk_author, c.created_at " +
                     "FROM benchmark.tb_comment c " +
                     "JOIN benchmark.tb_post p ON p.pk_post = c.fk_post " +
-                    "WHERE p.id = ? " +
+                    "WHERE p.id = CAST(? AS uuid) " +
                     "ORDER BY c.created_at DESC LIMIT ?";
 
         List<CommentDTO> comments = jdbcTemplate.query(sql, new Object[]{postId, limit}, (rs, rowNum) ->
