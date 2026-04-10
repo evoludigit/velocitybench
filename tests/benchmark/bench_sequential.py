@@ -236,11 +236,9 @@ FRAMEWORKS: dict[str, dict] = {
             "F2": ("http://localhost:8016/graphql", _GQL_F2),
             "T1": "T1",
             "MC1": "MC1",
-            "Q1_APQ": "Q1_APQ",
-            "Q2b_APQ": "Q2b_APQ",
         },
         "health_url": "http://localhost:8016/health",
-        "m1_template": _GQL_M1_FLAT_TMPL,
+        "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "bench" }}) {{ id bio }} }}',
     },
     "juniper": {
         "compose_service": "juniper",
@@ -429,8 +427,6 @@ FRAMEWORKS: dict[str, dict] = {
             "F2": ("http://localhost:4012/graphql", _GQL_F2),
             "T1": "T1",
             "MC1": "MC1",
-            "Q1_APQ": "Q1_APQ",
-            "Q2b_APQ": "Q2b_APQ",
         },
         "health_url": "http://localhost:4012/health",
         "m1_template": _GQL_M1_FLAT_TMPL,
@@ -449,8 +445,6 @@ FRAMEWORKS: dict[str, dict] = {
             "F2": ("http://localhost:4008/graphql", _GQL_F2),
             "T1": "T1",
             "MC1": "MC1",
-            "Q1_APQ": "Q1_APQ",
-            "Q2b_APQ": "Q2b_APQ",
         },
         "health_url": "http://localhost:4008/health",
         "m1_template": _GQL_M1_FLAT_TMPL,
@@ -2611,7 +2605,11 @@ def format_report(
             "Classical frameworks must fire follow-up queries to invalidate stale cache entries.",
         ]
         if fraiseql_mc1 and classical_mc1:
-            best_fraiseql = max(fraiseql_mc1, key=lambda r: r.rps)
+            # fraiseql-v MC1 is under investigation (p50 matches Q1 read speed, not mutation speed).
+            # Restrict FraiseQL champion to fraiseql-tv variants whose MC1 is confirmed correct.
+            fraiseql_tv_mc1 = [r for r in fraiseql_mc1 if "fraiseql-v" not in r.framework]
+            mc1_champion_pool = fraiseql_tv_mc1 if fraiseql_tv_mc1 else fraiseql_mc1
+            best_fraiseql = max(mc1_champion_pool, key=lambda r: r.rps)
             best_classical = max(classical_mc1, key=lambda r: r.rps)
             ratio = best_fraiseql.rps / best_classical.rps if best_classical.rps > 0 else 0
             lines += [
