@@ -1,14 +1,15 @@
 package com.fraiseql.rest;
 
+import com.fraiseql.dto.CommentDTO;
 import com.fraiseql.dto.PostAuthorDTO;
 import com.fraiseql.dto.PostDTO;
 import com.fraiseql.dto.PostWithAuthorDTO;
+import com.fraiseql.entities.Comment;
 import com.fraiseql.entities.Post;
 import com.fraiseql.entities.User;
+import com.fraiseql.repositories.CommentRepository;
 import com.fraiseql.repositories.PostRepository;
 import com.fraiseql.repositories.UserRepository;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -16,8 +17,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -28,10 +27,12 @@ public class PostController {
 
     private final PostRepository postRepository;
     private final UserRepository userRepository;
+    private final CommentRepository commentRepository;
 
-    public PostController(PostRepository postRepository, UserRepository userRepository) {
+    public PostController(PostRepository postRepository, UserRepository userRepository, CommentRepository commentRepository) {
         this.postRepository = postRepository;
         this.userRepository = userRepository;
+        this.commentRepository = commentRepository;
     }
 
     @GetMapping("/{id}")
@@ -57,20 +58,16 @@ public class PostController {
         @RequestParam(required = false) String include) {
 
         if ("author".equals(include)) {
-            // For Q2b: simulate nested query by making multiple calls
-            List<Post> posts = postRepository.findPublishedPostsWithLimit(size);
-            List<PostWithAuthorDTO> result = posts.stream()
-                .map(post -> {
-                    // Simulate nested call by fetching author separately
-                    User author = userRepository.findByUuid(post.getFkAuthor().toString());
-                    return new PostWithAuthorDTO(
-                        post.getId(),
-                        post.getTitle(),
-                        post.getContent(),
-                        post.getCreatedAt(),
-                        author != null ? new PostAuthorDTO(author.getUsername(), author.getFullName()) : null
-                    );
-                })
+            // Q2b: single JOIN query — no N+1
+            List<Object[]> rows = postRepository.findPublishedPostsWithAuthorJoin(size);
+            List<PostWithAuthorDTO> result = rows.stream()
+                .map(row -> new PostWithAuthorDTO(
+                    (String) row[0],
+                    (String) row[1],
+                    (String) row[2],
+                    row[3] != null ? ((java.sql.Timestamp) row[3]).toLocalDateTime() : null,
+                    new PostAuthorDTO((String) row[4], (String) row[5], (String) row[6])
+                ))
                 .collect(Collectors.toList());
             return ResponseEntity.ok(result);
         }
@@ -110,5 +107,23 @@ public class PostController {
             ))
             .collect(Collectors.toList());
         return ResponseEntity.ok(postDTOs);
+    }
+
+    @GetMapping("/{postId}/comments")
+    public ResponseEntity<List<CommentDTO>> getCommentsByPost(
+        @PathVariable String postId,
+        @RequestParam(defaultValue = "10") int limit) {
+
+        List<Comment> comments = commentRepository.findByPostUuid(postId, limit);
+        List<CommentDTO> result = comments.stream()
+            .map(c -> new CommentDTO(
+                c.getId(),
+                c.getContent(),
+                postId,
+                c.getFkAuthor() != null ? String.valueOf(c.getFkAuthor()) : null,
+                c.getCreatedAt()
+            ))
+            .collect(Collectors.toList());
+        return ResponseEntity.ok(result);
     }
 }

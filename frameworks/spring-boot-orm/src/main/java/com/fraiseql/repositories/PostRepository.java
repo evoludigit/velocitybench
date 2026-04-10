@@ -27,5 +27,10 @@ public interface PostRepository extends JpaRepository<Post, Integer> {
 
     List<Post> findByFkAuthor(Integer fkAuthor);
 
-
+    @Query(value = "SELECT p.id, p.title, p.content, p.created_at, u.id AS author_id, u.username, u.full_name " +
+                   "FROM benchmark.tb_post p " +
+                   "JOIN benchmark.tb_user u ON u.pk_user = p.fk_author " +
+                   "WHERE p.published = true " +
+                   "ORDER BY p.created_at DESC LIMIT :limit", nativeQuery = true)
+    List<Object[]> findPublishedPostsWithAuthorJoin(@Param("limit") int limit);
 }

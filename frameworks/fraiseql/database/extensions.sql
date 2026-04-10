@@ -115,7 +115,8 @@ SELECT
     ) AS data,
     c.pk_comment   AS _pk,
     c.fk_author    AS _author_pk,
-    c.fk_post      AS _post_pk
+    c.fk_post      AS _post_pk,
+    p.id           AS post_id
 FROM benchmark.tb_comment c
 LEFT JOIN benchmark.tb_user u  ON u.pk_user   = c.fk_author
 LEFT JOIN benchmark.tb_post p  ON p.pk_post   = c.fk_post

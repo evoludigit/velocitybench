@@ -1,5 +1,6 @@
 package com.fraiseql.rest;
 
+import com.fraiseql.dto.CommentDTO;
 import com.fraiseql.dto.PostDTO;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -67,6 +68,30 @@ public class PostController {
 
         List<PostDTO> posts = jdbcTemplate.query(sql, new Object[]{authorId, size}, new PostRowMapper());
         return ResponseEntity.ok(posts);
+    }
+
+    @GetMapping("/{postId}/comments")
+    public ResponseEntity<List<CommentDTO>> getCommentsByPost(
+        @PathVariable String postId,
+        @RequestParam(defaultValue = "10") int limit) {
+
+        // Naive: individual lookups per comment (intentional N+1 for benchmark comparison)
+        String sql = "SELECT c.id, c.content, c.fk_author, c.created_at " +
+                    "FROM benchmark.tb_comment c " +
+                    "JOIN benchmark.tb_post p ON p.pk_post = c.fk_post " +
+                    "WHERE p.id = ? " +
+                    "ORDER BY c.created_at DESC LIMIT ?";
+
+        List<CommentDTO> comments = jdbcTemplate.query(sql, new Object[]{postId, limit}, (rs, rowNum) ->
+            new CommentDTO(
+                rs.getString("id"),
+                rs.getString("content"),
+                postId,
+                String.valueOf(rs.getInt("fk_author")),
+                rs.getTimestamp("created_at").toLocalDateTime()
+            )
+        );
+        return ResponseEntity.ok(comments);
     }
 
     private static class PostRowMapper implements RowMapper<PostDTO> {

@@ -272,7 +272,7 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": ("http://localhost:4010/query", _GQL_Q1),
             "Q2": ("http://localhost:4010/query", _GQL_Q2),
             "Q2b": ("http://localhost:4010/query", _GQL_Q2b),
-            "Q3": None,  # Q3: comments query not implemented
+            "Q3": ("http://localhost:4010/query", _GQL_Q3),
             "M1": "M1",
             "F1": ("http://localhost:4010/query", _GQL_F1),
             "F2": ("http://localhost:4010/query", _GQL_F2),
@@ -578,12 +578,12 @@ FRAMEWORKS: dict[str, dict] = {
         "queries": {
             "Q1": "http://localhost:8013/api/users?page=0&size=20",
             "Q2": "http://localhost:8013/api/posts?size=10",
-            "Q2b": None,  # Q2b: nested author queries - multiple calls approach causes connection issues
+            "Q2b": "http://localhost:8013/api/posts?include=author&size=10",
             "M1": "M1",
-            # Q2 already hardcodes published=true (JPQL WHERE p.published = true), so F1 == Q2
+            # Q2/Q2b always return published=true (JPQL WHERE p.published = true), so F1==Q2, F2==Q2b
             "F1": "http://localhost:8013/api/posts?size=10",
-            "F2": None,
-            "T1": "T1",
+            "F2": "http://localhost:8013/api/posts?include=author&size=10",
+            "T1": "T1",  # GET /api/posts/{uuid} + /api/users/{uuid} + /api/posts/{uuid}/comments
         },
         "health_url": "http://localhost:8013/actuator/health",
     },
@@ -1396,6 +1396,26 @@ def _discover_post_uuid(fw_config: dict) -> tuple[str, str] | None:
                 gql_url = fw_config.get("graphql_url")
             if not gql_url:
                 return None
+            # PostGraphile uses auto-generated names (allTbPosts, tbUserByFkAuthor)
+            if fw_config.get("t1_template") == "postgraphile":
+                pg_query = '{ allTbPosts(first: 1) { nodes { id tbUserByFkAuthor { id } } } }'
+                pg_payload = json.dumps({"query": pg_query}).encode()
+                pg_req = urllib.request.Request(
+                    gql_url,
+                    data=pg_payload,
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(pg_req, timeout=10) as pg_resp:
+                    pg_body = json.loads(pg_resp.read())
+                    nodes = pg_body.get("data", {}).get("allTbPosts", {}).get("nodes", [])
+                    if nodes:
+                        post_id = str(nodes[0].get("id", ""))
+                        author = nodes[0].get("tbUserByFkAuthor") or {}
+                        author_id = str(author.get("id", ""))
+                        if post_id:
+                            return post_id, author_id
+                return None
             # Query a single post with author to get both IDs
             query = '{ posts(limit: 1) { id author { id } } }'
             payload = json.dumps({"query": query}).encode()
@@ -1500,12 +1520,12 @@ def _build_rest_t1_urls(fw_name: str, base: str, post_id: str, author_id: str) -
         "spring-boot-orm": {
             "post": "/api/posts/{post_id}",
             "author": "/api/users/{author_id}",
-            "comments": None,
+            "comments": "/api/posts/{post_id}/comments?limit=10",
         },
         "spring-boot-orm-naive": {
             "post": "/api/posts/{post_id}",
             "author": "/api/users/{author_id}",
-            "comments": None,
+            "comments": "/api/posts/{post_id}/comments?limit=10",
         },
         # Ruby
         "ruby-rails": {
