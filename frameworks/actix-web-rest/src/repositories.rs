@@ -168,7 +168,7 @@ impl PostRepository {
                         u.id::text as user_id, u.username, u.full_name, u.bio
                  FROM benchmark.tb_post p
                  JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-                 WHERE p.id = $1",
+                 WHERE p.id::text = $1",
                 &[&id],
             )
             .await
@@ -385,7 +385,6 @@ impl CommentRepository {
                  FROM benchmark.tb_comment c
                  JOIN benchmark.tb_user u ON c.fk_author = u.pk_user
                  WHERE c.fk_post = (SELECT pk_post FROM benchmark.tb_post WHERE id::text = $1)
-                 AND c.is_approved = true
                  ORDER BY c.created_at DESC
                  LIMIT $2 OFFSET $3",
                 &[&post_id, &limit, &offset],

@@ -97,6 +97,23 @@ pub async fn update_user(
     Ok(HttpResponse::Ok().json(user))
 }
 
+// Get comments for a post
+#[get("/posts/{post_id}/comments")]
+pub async fn get_post_comments(
+    post_id: web::Path<String>,
+    query: web::Query<std::collections::HashMap<String, String>>,
+    state: web::Data<AppState>,
+) -> Result<HttpResponse, ApiError> {
+    let post_id = post_id.into_inner();
+    let limit: i64 = query
+        .get("limit")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(10)
+        .min(100);
+    let comments = state.comment_repository.find_by_post(&post_id, limit, 0).await?;
+    Ok(HttpResponse::Ok().json(comments))
+}
+
 // List posts with pagination, eager-loaded authors, and optional comments
 #[get("/posts")]
 pub async fn list_posts(

@@ -70,6 +70,7 @@ async fn main() -> std::io::Result<()> {
             .service(handlers::update_user)
             .service(handlers::list_users)
             .service(handlers::get_post)
+            .service(handlers::get_post_comments)
             .service(handlers::list_posts)
             .service(handlers::metrics_handler)
     })

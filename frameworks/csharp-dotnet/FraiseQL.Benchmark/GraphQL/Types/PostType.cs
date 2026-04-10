@@ -12,5 +12,8 @@ public class PostType : ObjectType<Post>
         descriptor.Field(p => p.Content);
         descriptor.Field(p => p.FkAuthor).Name("authorId");
         descriptor.Field(p => p.CreatedAt);
+        descriptor.Field("comments")
+            .Argument("limit", a => a.Type<IntType>().DefaultValue(10))
+            .ResolveWith<PostResolvers>(r => r.GetComments(default!, default!, default));
     }
 }

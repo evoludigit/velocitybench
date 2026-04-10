@@ -14,8 +14,8 @@ public class PostResolvers
     public async Task<IEnumerable<Comment>> GetComments(
         [Parent] Post post,
         [Service] ICommentRepository commentRepository,
-        int first = 10)
+        int limit = 10)
     {
-        return await commentRepository.GetByPostIdAsync(post.Id, 0, first);
+        return await commentRepository.GetByPostIdAsync(post.Id, 0, limit);
     }
 }

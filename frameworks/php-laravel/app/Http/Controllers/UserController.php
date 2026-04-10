@@ -10,7 +10,7 @@ class UserController extends Controller
 {
     public function show(string $id): JsonResponse
     {
-        $user = User::find($id);
+        $user = User::where('id', $id)->first();
         
         if (!$user) {
             return response()->json(["error" => "User not found"], 404);

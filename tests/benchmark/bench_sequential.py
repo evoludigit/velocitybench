@@ -1441,7 +1441,7 @@ def _discover_post_uuid(fw_config: dict) -> tuple[str, str] | None:
                         author = post.get("author", {})
                         author_id = str(author.get("id", "")) if isinstance(author, dict) else ""
                         if not author_id:
-                            author_id = str(post.get("author_id", ""))
+                            author_id = str(post.get("author_id", "") or post.get("authorId", ""))
                         if post_id:
                             return post_id, author_id
     except (urllib.error.URLError, OSError, json.JSONDecodeError, KeyError, IndexError):
@@ -1489,7 +1489,7 @@ def _build_rest_t1_urls(fw_name: str, base: str, post_id: str, author_id: str) -
         "actix-web-rest": {
             "post": "/posts/{post_id}",
             "author": "/users/{author_id}",
-            "comments": None,  # no comments endpoint
+            "comments": "/posts/{post_id}/comments?limit=10",
         },
         # Java / Spring Boot
         "spring-boot": {
@@ -1511,13 +1511,13 @@ def _build_rest_t1_urls(fw_name: str, base: str, post_id: str, author_id: str) -
         "ruby-rails": {
             "post": "/api/posts/{post_id}",
             "author": "/api/users/{author_id}",
-            "comments": None,  # no comments endpoint
+            "comments": "/api/posts/{post_id}/comments?limit=10",
         },
         # PHP
         "php-laravel": {
             "post": "/api/posts/{post_id}",
             "author": "/api/users/{author_id}",
-            "comments": None,  # no comments endpoint
+            "comments": "/api/posts/{post_id}/comments?limit=10",
         },
     }
 

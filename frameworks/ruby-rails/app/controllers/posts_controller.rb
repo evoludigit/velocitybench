@@ -1,6 +1,6 @@
 class PostsController < ApplicationController
   def show
-    post = Post.includes(:author).find_by(id: params[:id])
+    post = Post.includes(:author).where("benchmark.tb_post.id = ?", params[:id]).first
 
     if post.nil?
       render json: { error: 'Post not found' }, status: :not_found
@@ -8,10 +8,10 @@ class PostsController < ApplicationController
     end
 
     render json: {
-      id: post.id,
+      id: post[:id],
       title: post.title,
       content: post.content,
-      authorId: post.author.id,
+      authorId: post.author[:id],
       createdAt: post.created_at.iso8601
     }
   end
@@ -34,20 +34,20 @@ class PostsController < ApplicationController
     if params[:with_author] == "true"
       result = posts.map do |post|
         {
-          id: post.id,
+          id: post[:id],
           title: post.title,
           content: post.content,
-          author: { username: post.author.username, fullName: post.author.full_name },
+          author: { id: post.author[:id], username: post.author.username, fullName: post.author.full_name },
           createdAt: post.created_at.iso8601
         }
       end
     else
       result = posts.map do |post|
         {
-          id: post.id,
+          id: post[:id],
           title: post.title,
           content: post.content,
-          authorId: post.author.id,
+          authorId: post.author[:id],
           createdAt: post.created_at.iso8601
         }
       end
@@ -61,8 +61,7 @@ class PostsController < ApplicationController
     page = params.fetch(:page, 0).to_i
     size = params.fetch(:size, 10).to_i
 
-    # Find author by UUID id, get pk_user for query
-    author = User.find_by(id: author_id)
+    author = User.find_by("id = ?", author_id)
     return render json: [], status: :ok if author.nil?
 
     posts = Post.where(fk_author: author.pk_user)
@@ -73,10 +72,10 @@ class PostsController < ApplicationController
 
     result = posts.map do |post|
       {
-        id: post.id,
+        id: post[:id],
         title: post.title,
         content: post.content,
-        authorId: post.author.id,
+        authorId: post.author[:id],
         createdAt: post.created_at.iso8601
       }
     end

@@ -44,6 +44,9 @@ RUN php artisan key:generate --no-interaction || true
 # Cache configuration for faster startup
 RUN php artisan config:cache --no-interaction || true
 
+# Fix storage permissions
+RUN chmod -R 777 /app/storage /app/bootstrap/cache
+
 # Build stage complete
 FROM base AS production
 

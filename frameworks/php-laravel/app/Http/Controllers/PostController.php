@@ -11,7 +11,7 @@ class PostController extends Controller
 {
     public function show(string $id): JsonResponse
     {
-        $post = Post::with("author")->find($id);
+        $post = Post::with("author")->where('id', $id)->first();
 
         if (!$post) {
             return response()->json(["error" => "Post not found"], 404);

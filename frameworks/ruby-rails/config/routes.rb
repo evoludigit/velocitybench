@@ -7,6 +7,7 @@ Rails.application.routes.draw do
   get '/api/posts/:id', to: 'posts#show'
   get '/api/posts', to: 'posts#index'
   get '/api/posts/by-author/:authorId', to: 'posts#by_author'
+  get '/api/posts/:post_id/comments', to: 'comments#by_post'
   
   get '/api/health', to: 'health#index'
 
