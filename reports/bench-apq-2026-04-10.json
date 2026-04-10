@@ -198,15 +198,15 @@
     {
       "framework": "fraiseql-tv",
       "query": "M1_APQ",
-      "rps": 0.0,
-      "p50_ms": 0.0,
-      "p95_ms": 0.0,
-      "p99_ms": 0.0,
-      "requests": 0,
+      "rps": 1239.0,
+      "p50_ms": 25.28,
+      "p95_ms": 79.24,
+      "p99_ms": 145.41,
+      "requests": 24779,
       "errors": 0,
       "error_breakdown": {},
-      "skipped": true,
-      "skip_reason": "known bug \u2014 skipped"
+      "skipped": false,
+      "skip_reason": ""
     },
     {
       "framework": "fraiseql-tv-cache",
@@ -393,15 +393,15 @@
     {
       "framework": "fraiseql-tv-cache",
       "query": "M1_APQ",
-      "rps": 0.0,
-      "p50_ms": 0.0,
-      "p95_ms": 0.0,
-      "p99_ms": 0.0,
-      "requests": 0,
+      "rps": 8428.6,
+      "p50_ms": 4.34,
+      "p95_ms": 8.45,
+      "p99_ms": 11.5,
+      "requests": 168573,
       "errors": 0,
       "error_breakdown": {},
-      "skipped": true,
-      "skip_reason": "known bug \u2014 skipped"
+      "skipped": false,
+      "skip_reason": ""
     },
     {
       "framework": "fraiseql-v-nocache",
@@ -590,15 +590,15 @@
     {
       "framework": "fraiseql-v-nocache",
       "query": "M1_APQ",
-      "rps": 0.0,
-      "p50_ms": 0.0,
-      "p95_ms": 0.0,
-      "p99_ms": 0.0,
-      "requests": 0,
+      "rps": 8409.5,
+      "p50_ms": 4.37,
+      "p95_ms": 8.56,
+      "p99_ms": 11.15,
+      "requests": 168190,
       "errors": 0,
       "error_breakdown": {},
-      "skipped": true,
-      "skip_reason": "known bug \u2014 skipped"
+      "skipped": false,
+      "skip_reason": ""
     },
     {
       "framework": "fraiseql-v-cache",
@@ -787,15 +787,15 @@
     {
       "framework": "fraiseql-v-cache",
       "query": "M1_APQ",
-      "rps": 0.0,
-      "p50_ms": 0.0,
-      "p95_ms": 0.0,
-      "p99_ms": 0.0,
-      "requests": 0,
+      "rps": 7637.1,
+      "p50_ms": 4.5,
+      "p95_ms": 9.7,
+      "p99_ms": 15.14,
+      "requests": 152743,
       "errors": 0,
       "error_breakdown": {},
-      "skipped": true,
-      "skip_reason": "known bug \u2014 skipped"
+      "skipped": false,
+      "skip_reason": ""
     },
     {
       "framework": "async-graphql",
