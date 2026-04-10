@@ -53,7 +53,7 @@ from urllib.parse import urlparse
 
 # Each entry: compose_service (docker-compose service name), type (graphql|rest),
 # and per-query (url, payload) pairs. None means the query is skipped for this
-# framework (known bug or N/A).
+# framework (N/A, or set to None at runtime when setup fails).
 
 _GQL_Q1 = "{ users(limit: 20) { id username fullName } }"
 _GQL_Q2 = "{ posts(limit: 10) { id title } }"
@@ -1807,7 +1807,7 @@ def run_scenario(
 
     if entry is None:
         result.skipped = True
-        result.skip_reason = "known bug — skipped"
+        result.skip_reason = "skipped"
         return result
 
     fw_type = fw_config["type"]
@@ -1909,6 +1909,17 @@ def run_scenario(
     print(f"    warmup {warmup_secs}s...", end=" ", flush=True)
     _run_workers(warmup_secs)
     print("done", flush=True)
+
+    # For mutation scenarios: VACUUM between warmup and measurement.
+    #
+    # Warmup mutations write dead tuples to tb_user and cascade-update the TV tables
+    # (tv_user → tv_post → tv_comment).  Without a reset, the 5-second measurement
+    # window starts on a heap that is already fragmented by 30 × concurrency × RPS
+    # warmup writes — the same contamination we prevent between framework runs.
+    # Applying _reset_postgres_state() here gives every mutation scenario a clean,
+    # pre-warmed starting state regardless of warmup intensity.
+    if query_name in ("M1", "M1d", "MC1", "M1_APQ"):
+        _reset_postgres_state()
 
     # Measurement
     print(f"    measuring {duration_secs}s...", end=" ", flush=True)
@@ -3271,7 +3282,7 @@ def main() -> None:
             # create dead tuples). This decouples M1's starting condition from the
             # prior framework's write burst without hiding M1's run-order dependency
             # (the second framework's M1 still runs on pages fragmented by the first).
-            if query_name in ("M1", "MC1", "M1_APQ"):
+            if query_name in ("M1", "M1d", "MC1", "M1_APQ"):
                 _reset_postgres_state()
             print(f"  {query_name}:")
             r = run_scenario(
