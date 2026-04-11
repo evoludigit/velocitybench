@@ -128,3 +128,9 @@ COMMENT ON COLUMN tb_post.search_vector IS 'Full-text search vector for posts (w
 COMMENT ON COLUMN tb_user.search_vector IS 'Full-text search vector for users (weighted A=username, B=name, C=bio)';
 COMMENT ON FUNCTION benchmark.search_posts(text, integer) IS 'Search posts with full-text search and ranking';
 COMMENT ON FUNCTION benchmark.search_users(text, integer) IS 'Search users with full-text search and ranking';
+
+-- Functional indexes on (id::text) for REST frameworks that compare UUID columns as text strings.
+-- Without these, queries using WHERE id::text = $1 perform a sequential scan because the plain
+-- UUID btree index cannot be used when the column is cast.
+CREATE INDEX IF NOT EXISTS idx_tb_post_id_text ON tb_post ((id::text));
+CREATE INDEX IF NOT EXISTS idx_tb_user_id_text ON tb_user ((id::text));
