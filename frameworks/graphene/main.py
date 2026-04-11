@@ -162,9 +162,17 @@ class Post(ObjectType):
 
     def __init__(self, *args, **kwargs):
         self.fk_author = kwargs.pop("fk_author", None)
+        self._preloaded_author = kwargs.pop("_preloaded_author", None)
         super().__init__(*args, **kwargs)
 
     async def resolve_author(self, info):
+        if self._preloaded_author:
+            return User(
+                id=self._preloaded_author["id"],
+                username=self._preloaded_author["username"],
+                full_name=self._preloaded_author.get("full_name"),
+                bio=self._preloaded_author.get("bio"),
+            )
         if not self.fk_author:
             return None
         user_data = await info.context["user_by_pk_loader"].load(self.fk_author)
@@ -274,6 +282,44 @@ class Query(ObjectType):
 
     async def resolve_posts(self, info, limit, published=None):
         db = info.context["db"]
+        selections = info.field_nodes[0].selection_set.selections if info.field_nodes[0].selection_set else []
+        want_author = any(getattr(s, "name", None) and s.name.value == "author" for s in selections)
+        if want_author:
+            if published is None:
+                result = await db.fetch(
+                    """SELECT p.id, p.fk_author, p.title, p.content,
+                              u.id AS author_id, u.username, u.full_name, u.bio
+                       FROM benchmark.tb_post p
+                       JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+                       ORDER BY p.created_at DESC LIMIT $1""",
+                    limit,
+                )
+            else:
+                result = await db.fetch(
+                    """SELECT p.id, p.fk_author, p.title, p.content,
+                              u.id AS author_id, u.username, u.full_name, u.bio
+                       FROM benchmark.tb_post p
+                       JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+                       WHERE p.published = $2
+                       ORDER BY p.created_at DESC LIMIT $1""",
+                    limit,
+                    published,
+                )
+            return [
+                Post(
+                    id=row["id"],
+                    title=row["title"],
+                    content=row.get("content"),
+                    fk_author=row.get("fk_author"),
+                    _preloaded_author={
+                        "id": str(row["author_id"]),
+                        "username": row["username"],
+                        "full_name": row.get("full_name"),
+                        "bio": row.get("bio"),
+                    },
+                )
+                for row in result
+            ]
         if published is None:
             result = await db.fetch(
                 "SELECT id, fk_author, title, content FROM benchmark.tb_post ORDER BY created_at DESC LIMIT $1",

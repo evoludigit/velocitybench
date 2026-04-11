@@ -226,9 +226,18 @@ class Post:
     fk_author: int | None = strawberry.field(
         default=None, description="Integer FK of the post author"
     )
+    preloaded_author_data: strawberry.Private[dict | None] = None
 
     @strawberry.field(description="Author who wrote this post")
     async def author(self, info: Info) -> User | None:
+        if self.preloaded_author_data:
+            d = self.preloaded_author_data
+            return User(
+                id=strawberry.ID(d["id"]),
+                username=d["username"],
+                full_name=d.get("full_name"),
+                bio=d.get("bio"),
+            )
         if not self.fk_author:
             return None
         try:
@@ -436,6 +445,46 @@ class Query:
             limit = max(limit, 1)
 
             db = info.context.db
+            selections = info.field_nodes[0].selection_set.selections if info.field_nodes[0].selection_set else []
+            want_author = any(getattr(s, "name", None) and s.name.value == "author" for s in selections)
+            if want_author:
+                if published is None:
+                    result = await db.fetch(
+                        """SELECT p.id, p.fk_author, p.title, p.content,
+                                  u.id AS author_id, u.username, u.full_name, u.bio
+                           FROM benchmark.tb_post p
+                           JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+                           ORDER BY p.created_at DESC LIMIT $1""",
+                        limit,
+                        timeout=5.0,
+                    )
+                else:
+                    result = await db.fetch(
+                        """SELECT p.id, p.fk_author, p.title, p.content,
+                                  u.id AS author_id, u.username, u.full_name, u.bio
+                           FROM benchmark.tb_post p
+                           JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+                           WHERE p.published = $2
+                           ORDER BY p.created_at DESC LIMIT $1""",
+                        limit,
+                        published,
+                        timeout=5.0,
+                    )
+                return [
+                    Post(
+                        id=strawberry.ID(row["id"]),
+                        title=row["title"],
+                        content=row.get("content"),
+                        fk_author=row.get("fk_author"),
+                        preloaded_author_data={
+                            "id": str(row["author_id"]),
+                            "username": row["username"],
+                            "full_name": row.get("full_name"),
+                            "bio": row.get("bio"),
+                        },
+                    )
+                    for row in result
+                ]
             if published is None:
                 result = await db.fetch(
                     "SELECT id, fk_author, title, content FROM benchmark.tb_post ORDER BY created_at DESC LIMIT $1",
