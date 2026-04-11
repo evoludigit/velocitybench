@@ -96,6 +96,7 @@ func resolvePosts(p graphql.ResolveParams) (interface{}, error) {
 		       u.id, u.username, u.full_name, u.bio
 		FROM benchmark.tb_post p
 		JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+		ORDER BY p.created_at DESC
 		LIMIT $1
 	`
 	args := []interface{}{limit}
@@ -107,6 +108,7 @@ func resolvePosts(p graphql.ResolveParams) (interface{}, error) {
 			FROM benchmark.tb_post p
 			JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
 			WHERE p.published = $2
+			ORDER BY p.created_at DESC
 			LIMIT $1
 		`
 		args = append(args, published)
