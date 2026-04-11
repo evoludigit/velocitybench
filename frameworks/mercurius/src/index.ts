@@ -71,7 +71,7 @@ const resolvers = {
     users: async (_: unknown, { limit }: { limit: number }) => {
       const safeLimit = Math.min(Math.max(limit, 1), 100);
       const result = await pool.query(
-        'SELECT id, username, full_name, bio FROM benchmark.tb_user LIMIT $1',
+        'SELECT id, username, full_name, bio FROM benchmark.tb_user ORDER BY created_at DESC LIMIT $1',
         [safeLimit]
       );
       return result.rows.map((row: any) => ({

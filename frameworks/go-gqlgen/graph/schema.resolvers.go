@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/99designs/gqlgen/graphql"
 	"github.com/benchmark/go-gqlgen/graph/model"
 	"github.com/benchmark/go-gqlgen/internal/db"
 	validator "github.com/go-playground/validator/v10"
@@ -153,19 +154,75 @@ func (r *queryResolver) Posts(ctx context.Context, limit *int32, published *bool
 		l = int(*limit)
 	}
 
+	// Check if the author field is requested
+	wantAuthor := false
+	if fieldCtx := graphql.GetFieldContext(ctx); fieldCtx != nil {
+		opCtx := graphql.GetOperationContext(ctx)
+		for _, f := range graphql.CollectFields(opCtx, fieldCtx.Field.Selections, []string{"Post"}) {
+			if f.Name == "author" {
+				wantAuthor = true
+				break
+			}
+		}
+	}
+
+	if wantAuthor {
+		sqlQuery := `
+			SELECT p.id, u.id AS author_uuid, u.username, u.full_name, p.title, p.content, p.created_at::text
+			FROM benchmark.tb_post p
+			JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+			ORDER BY p.created_at DESC
+			LIMIT $1
+		`
+		args := []interface{}{l}
+		if published != nil {
+			sqlQuery = `
+				SELECT p.id, u.id AS author_uuid, u.username, u.full_name, p.title, p.content, p.created_at::text
+				FROM benchmark.tb_post p
+				JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+				WHERE p.published = $2
+				ORDER BY p.created_at DESC
+				LIMIT $1
+			`
+			args = append(args, *published)
+		}
+
+		rows, err := db.Pool.Query(ctx, sqlQuery, args...)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+
+		var posts []*model.Post
+		for rows.Next() {
+			var p model.Post
+			var authorUUID, authorUsername string
+			var authorFullName *string
+			var content *string
+			var createdAt string
+			if err := rows.Scan(&p.ID, &authorUUID, &authorUsername, &authorFullName, &p.Title, &content, &createdAt); err != nil {
+				continue
+			}
+			p.Content = content
+			p.CreatedAt = createdAt
+			p.Author = &model.User{ID: authorUUID, Username: authorUsername, FullName: authorFullName}
+			posts = append(posts, &p)
+		}
+		return posts, nil
+	}
+
+	// Flat query without author JOIN
 	sqlQuery := `
-		SELECT p.id, u.id AS author_uuid, u.username, u.full_name, p.title, p.content, p.created_at::text
+		SELECT p.id, p.title, p.content, p.created_at::text
 		FROM benchmark.tb_post p
-		JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
 		ORDER BY p.created_at DESC
 		LIMIT $1
 	`
 	args := []interface{}{l}
 	if published != nil {
 		sqlQuery = `
-			SELECT p.id, u.id AS author_uuid, u.username, u.full_name, p.title, p.content, p.created_at::text
+			SELECT p.id, p.title, p.content, p.created_at::text
 			FROM benchmark.tb_post p
-			JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
 			WHERE p.published = $2
 			ORDER BY p.created_at DESC
 			LIMIT $1
@@ -182,16 +239,13 @@ func (r *queryResolver) Posts(ctx context.Context, limit *int32, published *bool
 	var posts []*model.Post
 	for rows.Next() {
 		var p model.Post
-		var authorUUID, authorUsername string
-		var authorFullName *string
 		var content *string
 		var createdAt string
-		if err := rows.Scan(&p.ID, &authorUUID, &authorUsername, &authorFullName, &p.Title, &content, &createdAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Title, &content, &createdAt); err != nil {
 			continue
 		}
 		p.Content = content
 		p.CreatedAt = createdAt
-		p.Author = &model.User{ID: authorUUID, Username: authorUsername, FullName: authorFullName}
 		posts = append(posts, &p)
 	}
 

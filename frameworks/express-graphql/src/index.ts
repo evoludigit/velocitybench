@@ -61,7 +61,8 @@ PostType = new GraphQLObjectType({
     content: { type: GraphQLString },
     author: {
       type: UserType,
-      resolve: async (parent: { authorId: number }, _: unknown, ctx: GraphQLContext) => {
+      resolve: async (parent: { authorId: number; _preloadedAuthor?: any }, _: unknown, ctx: GraphQLContext) => {
+        if (parent._preloadedAuthor) return parent._preloadedAuthor;
         if (!parent.authorId) return null;
         const user = await ctx.loaders.userByPkLoader.load(parent.authorId);
         if (!user) return null;
@@ -159,7 +160,7 @@ const QueryType = new GraphQLObjectType({
       resolve: async (_: unknown, { limit }: { limit: number }) => {
         const safeLimit = Math.min(Math.max(limit, 1), 100);
         const result = await pool.query(
-          'SELECT id, username, full_name, bio FROM benchmark.tb_user LIMIT $1',
+          'SELECT id, username, full_name, bio FROM benchmark.tb_user ORDER BY created_at DESC LIMIT $1',
           [safeLimit]
         );
         return result.rows.map((row: any) => ({
@@ -196,10 +197,45 @@ const QueryType = new GraphQLObjectType({
         limit: { type: GraphQLInt, defaultValue: 10 },
         published: { type: GraphQLBoolean },
       },
-      resolve: async (_: unknown, { limit, published }: { limit: number; published?: boolean }) => {
+      resolve: async (_: unknown, { limit, published }: { limit: number; published?: boolean }, _ctx: GraphQLContext, info: any) => {
         const safeLimit = Math.min(Math.max(limit, 1), 100);
+        const selections: any[] = info?.fieldNodes?.[0]?.selectionSet?.selections ?? [];
+        const wantAuthor = selections.some((s: any) => s.name?.value === 'author');
         let sql: string;
         let params: unknown[];
+        if (wantAuthor) {
+          if (published === undefined || published === null) {
+            sql = `SELECT p.id, p.fk_author, p.title, p.content,
+                          u.id AS author_id, u.username, u.full_name, u.bio
+                   FROM benchmark.tb_post p
+                   JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+                   ORDER BY p.created_at DESC
+                   LIMIT $1`;
+            params = [safeLimit];
+          } else {
+            sql = `SELECT p.id, p.fk_author, p.title, p.content,
+                          u.id AS author_id, u.username, u.full_name, u.bio
+                   FROM benchmark.tb_post p
+                   JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+                   WHERE p.published = $2
+                   ORDER BY p.created_at DESC
+                   LIMIT $1`;
+            params = [safeLimit, published];
+          }
+          const result = await pool.query(sql, params);
+          return result.rows.map((row: any) => ({
+            id: row.id,
+            title: row.title,
+            content: row.content,
+            authorId: row.fk_author,
+            _preloadedAuthor: {
+              id: row.author_id,
+              username: row.username,
+              fullName: row.full_name,
+              bio: row.bio,
+            },
+          }));
+        }
         if (published === undefined || published === null) {
           sql = `SELECT id, fk_author, title, content
            FROM benchmark.tb_post
