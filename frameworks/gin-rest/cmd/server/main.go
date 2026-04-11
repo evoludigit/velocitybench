@@ -17,7 +17,9 @@ func main() {
 	}
 	defer db.Close()
 
-	r := gin.Default()
+	gin.SetMode(gin.ReleaseMode)
+	r := gin.New()
+	r.Use(gin.Recovery())
 
 	// Health check
 	r.GET("/health", func(c *gin.Context) {
