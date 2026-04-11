@@ -3,7 +3,7 @@ mod loaders;
 mod models;
 mod schema;
 
-use actix_web::{guard, middleware, web, App, HttpResponse, HttpServer};
+use actix_web::{guard, web, App, HttpResponse, HttpServer};
 use juniper_actix::{graphql_handler, playground_handler};
 use std::sync::Arc;
 
@@ -72,7 +72,6 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(web::Data::from(schema.clone()))
             .app_data(web::Data::new(db.clone()))
-            .wrap(middleware::Logger::default())
             .service(
                 web::resource("/graphql")
                     .guard(guard::Post())
