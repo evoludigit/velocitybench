@@ -14,8 +14,8 @@ plugin :tmp_restart
 # Specify the PID file
 # pidfile ENV['PIDFILE'] if ENV['PIDFILE']
 
-# Configure worker processes (set to 1 for benchmarking to avoid complexity)
-workers ENV.fetch('WEB_CONCURRENCY', 1)
+# Configure worker processes
+workers ENV.fetch('WEB_CONCURRENCY', 2)
 
 # Preload the application for better performance
 preload_app!
