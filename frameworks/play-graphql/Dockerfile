@@ -40,6 +40,8 @@ USER appuser
 
 ENV PORT=4000
 ENV APPLICATION_SECRET=velocitybench-benchmark-secret-key-256bit
+# Cap JVM heap — without this, sbt-staged binary uses JVM default (~25% of host RAM)
+ENV JAVA_OPTS="-Xms256m -Xmx512m -XX:MaxMetaspaceSize=256m -XX:+UseG1GC"
 
 EXPOSE 4000
 
