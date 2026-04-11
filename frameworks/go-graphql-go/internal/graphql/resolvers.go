@@ -39,6 +39,7 @@ func resolveUsers(p graphql.ResolveParams) (interface{}, error) {
 	query := `
 		SELECT id, username, full_name, bio
 		FROM benchmark.tb_user
+		ORDER BY created_at DESC
 		LIMIT $1
 	`
 

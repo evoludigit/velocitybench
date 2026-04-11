@@ -76,7 +76,7 @@ class User
     public static function all(int $limit = 10): array
     {
         $pdo = Connection::get();
-        $stmt = $pdo->prepare('SELECT * FROM tb_user ORDER BY pk_user LIMIT :limit');
+        $stmt = $pdo->prepare('SELECT * FROM tb_user ORDER BY created_at DESC LIMIT :limit');
         $stmt->bindValue('limit', min($limit, 100), PDO::PARAM_INT);
         $stmt->execute();
 

@@ -13,7 +13,7 @@ module Types
     end
 
     def users(first:)
-      User.order(:username).limit(first)
+      User.order(created_at: :desc).limit(first)
     end
 
     field :post, Types::PostType, null: true do

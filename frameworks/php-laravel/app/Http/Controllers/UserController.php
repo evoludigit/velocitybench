@@ -29,7 +29,7 @@ class UserController extends Controller
         $limit = $request->get("limit", $request->get("size", 10));
         $offset = $request->get("offset", $request->get("page", 0) * $limit);
 
-        $users = User::orderBy("username")
+        $users = User::orderBy("created_at", "desc")
             ->offset($offset)
             ->limit($limit)
             ->get();

@@ -24,7 +24,7 @@ public class UserRepository : IUserRepository
     {
         return await _context.Users
             .AsNoTracking()
-            .OrderBy(u => u.Username)
+            .OrderByDescending(u => u.CreatedAt)
             .Skip(page * size)
             .Take(size)
             .ToListAsync();

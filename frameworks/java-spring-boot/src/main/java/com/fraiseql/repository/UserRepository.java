@@ -12,7 +12,7 @@ import java.util.Optional;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Integer> {
-    List<User> findAllByOrderByUsername(Pageable pageable);
+    List<User> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
     @Query(value = "SELECT * FROM benchmark.tb_user WHERE id = CAST(:uuid AS uuid)", nativeQuery = true)
     Optional<User> findByUuid(@Param("uuid") String uuid);

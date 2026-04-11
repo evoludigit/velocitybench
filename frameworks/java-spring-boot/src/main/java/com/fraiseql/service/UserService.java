@@ -31,7 +31,7 @@ public class UserService {
 
     public List<UserDTO> getAllUsers(int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
-        List<User> users = userRepository.findAllByOrderByUsername(pageable);
+        List<User> users = userRepository.findAllByOrderByCreatedAtDesc(pageable);
         return users.stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());

@@ -109,11 +109,11 @@ class Post
     {
         $pdo = Connection::get();
         if ($published === null) {
-            $stmt = $pdo->prepare('SELECT * FROM tb_post ORDER BY pk_post LIMIT :limit');
+            $stmt = $pdo->prepare('SELECT * FROM tb_post ORDER BY created_at DESC LIMIT :limit');
             $stmt->bindValue('limit', min($limit, 100), PDO::PARAM_INT);
             $stmt->execute();
         } else {
-            $stmt = $pdo->prepare('SELECT * FROM tb_post WHERE published = :published ORDER BY pk_post LIMIT :limit');
+            $stmt = $pdo->prepare('SELECT * FROM tb_post WHERE published = :published ORDER BY created_at DESC LIMIT :limit');
             $stmt->bindValue('limit', min($limit, 100), PDO::PARAM_INT);
             $stmt->bindValue('published', $published, PDO::PARAM_BOOL);
             $stmt->execute();

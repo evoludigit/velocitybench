@@ -19,7 +19,7 @@ class UsersController < ApplicationController
     page = params.fetch(:page, 0).to_i
     size = params.fetch(:size, 10).to_i
 
-    users = User.order(:username).offset(page * size).limit(size)
+    users = User.order(created_at: :desc).offset(page * size).limit(size)
 
     result = users.map do |user|
       {

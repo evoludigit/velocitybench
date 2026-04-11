@@ -56,7 +56,7 @@ public class UserRepository {
     }
 
     public List<User> findAll(int limit) {
-        String sql = "SELECT pk_user, id, username, full_name, bio, created_at, updated_at FROM tb_user ORDER BY pk_user LIMIT ?";
+        String sql = "SELECT pk_user, id, username, full_name, bio, created_at, updated_at FROM tb_user ORDER BY created_at DESC LIMIT ?";
         List<User> users = new ArrayList<>();
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
