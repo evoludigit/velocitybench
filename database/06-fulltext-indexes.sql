@@ -119,6 +119,11 @@ CREATE INDEX IF NOT EXISTS idx_tb_comment_post_author ON tb_comment(fk_post, fk_
 -- Index for user stats queries
 CREATE INDEX IF NOT EXISTS idx_tb_post_author_published ON tb_post(fk_author, published);
 
+-- Composite index for published posts ordered by created_at DESC NULLS LAST
+-- Hibernate 6 generates ORDER BY created_at DESC NULLS LAST for nullable timestamp columns;
+-- this index makes that query fast (otherwise PostgreSQL falls back to parallel seq scan).
+CREATE INDEX IF NOT EXISTS idx_tb_post_published_created ON tb_post(published, created_at DESC NULLS LAST);
+
 COMMENT ON COLUMN tb_post.search_vector IS 'Full-text search vector for posts (weighted A=title, B=content)';
 COMMENT ON COLUMN tb_user.search_vector IS 'Full-text search vector for users (weighted A=username, B=name, C=bio)';
 COMMENT ON FUNCTION benchmark.search_posts(text, integer) IS 'Search posts with full-text search and ranking';

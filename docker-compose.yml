@@ -316,9 +316,16 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=prod
       - SERVER_PORT=8010
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/velocitybench_benchmark
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/velocitybench_benchmark?currentSchema=benchmark
       - SPRING_DATASOURCE_USERNAME=benchmark
       - SPRING_DATASOURCE_PASSWORD=benchmark123
+      - HIBERNATE_SQL_LEVEL=WARN
+      - HIBERNATE_PARAM_LEVEL=WARN
+      - LOGGING_LEVEL_COM_FRAISEQL=WARN
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_GRAPHQL=WARN
+      - LOGGING_LEVEL_IO_MICROMETER=WARN
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY=WARN
+      - LOGGING_LEVEL_COM_ZAXXER_HIKARI=WARN
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8010/actuator/health"]
       interval: 30s
