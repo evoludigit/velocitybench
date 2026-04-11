@@ -1,0 +1,17 @@
+<configuration>
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%date{ISO8601} %-5level %logger{36} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <!-- Suppress access log and verbose Play/Akka output -->
+  <logger name="play" level="WARN"/>
+  <logger name="application" level="WARN"/>
+  <logger name="akka" level="WARN"/>
+  <logger name="com.zaxxer.hikari" level="WARN"/>
+
+  <root level="WARN">
+    <appender-ref ref="STDOUT"/>
+  </root>
+</configuration>
