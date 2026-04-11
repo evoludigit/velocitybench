@@ -555,7 +555,8 @@ FRAMEWORKS: dict[str, dict] = {
         "type": "rest",
         "language": "Java",
         "category": "rest",
-        "start_timeout": 120,
+        "start_timeout": 180,
+        "no_build": True,  # Maven build is slow; use pre-built image
         "queries": {
             # Spring Boot uses page/size pagination, not limit
             "Q1": "http://localhost:8010/api/users?page=0&size=20",
@@ -574,7 +575,7 @@ FRAMEWORKS: dict[str, dict] = {
         "type": "rest",
         "language": "Java",
         "category": "rest",
-        "start_timeout": 120,
+        "start_timeout": 180,
         "queries": {
             "Q1": "http://localhost:8013/api/users?page=0&size=20",
             "Q2": "http://localhost:8013/api/posts?size=10",
@@ -592,7 +593,7 @@ FRAMEWORKS: dict[str, dict] = {
         "type": "rest",
         "language": "Java",
         "category": "rest",
-        "start_timeout": 120,
+        "start_timeout": 180,
         "queries": {
             "Q1": "http://localhost:8014/api/users?page=0&size=20",
             "Q2": "http://localhost:8014/api/posts?size=10",
@@ -609,7 +610,8 @@ FRAMEWORKS: dict[str, dict] = {
         "type": "graphql",
         "language": "Java",
         "category": "graphql",
-        "start_timeout": 120,
+        "start_timeout": 300,
+        "no_build": True,  # Maven build is slow; use pre-built image
         "queries": {
             "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
@@ -626,7 +628,8 @@ FRAMEWORKS: dict[str, dict] = {
         "type": "graphql",
         "language": "Java",
         "category": "graphql",
-        "start_timeout": 120,
+        "start_timeout": 300,
+        "no_build": True,  # Maven build is slow; use pre-built image
         "queries": {
             "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
@@ -647,7 +650,8 @@ FRAMEWORKS: dict[str, dict] = {
         "type": "graphql",
         "language": "Scala",
         "category": "graphql",
-        "start_timeout": 120,
+        "start_timeout": 180,
+        "no_build": True,  # sbt build is slow; use pre-built image
         "queries": {
             "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
