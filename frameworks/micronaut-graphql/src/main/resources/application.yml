@@ -3,6 +3,9 @@ micronaut:
     name: micronaut-graphql
   server:
     port: 4000
+  server.netty:
+    access-logger:
+      enabled: false
 
 datasources:
   default:
