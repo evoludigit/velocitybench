@@ -253,7 +253,7 @@ class Query(ObjectType):
     async def resolve_users(self, info, limit):
         db = info.context["db"]
         result = await db.fetch(
-            "SELECT id, username, full_name, bio FROM benchmark.tb_user LIMIT $1", limit
+            "SELECT id, username, full_name, bio FROM benchmark.tb_user ORDER BY created_at DESC LIMIT $1", limit
         )
         return [
             User(

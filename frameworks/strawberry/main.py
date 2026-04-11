@@ -378,7 +378,7 @@ class Query:
 
             db = info.context.db
             result = await db.fetch(
-                "SELECT id, username, full_name, bio FROM benchmark.tb_user LIMIT $1",
+                "SELECT id, username, full_name, bio FROM benchmark.tb_user ORDER BY created_at DESC LIMIT $1",
                 limit,
                 timeout=5.0,
             )
