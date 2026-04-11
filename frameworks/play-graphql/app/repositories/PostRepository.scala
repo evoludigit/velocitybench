@@ -83,7 +83,7 @@ class PostRepository @Inject()(database: Database) {
     val conn = database.getConnection
     try {
       val stmt = conn.prepareStatement(
-        "SELECT pk_post, id, fk_author, title, content, created_at, updated_at FROM tb_post ORDER BY pk_post LIMIT ?"
+        "SELECT pk_post, id, fk_author, title, content, created_at, updated_at FROM tb_post ORDER BY created_at DESC LIMIT ?"
       )
       stmt.setInt(1, Math.min(limit, 100))
       val rs = stmt.executeQuery()

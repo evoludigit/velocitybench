@@ -166,14 +166,14 @@ impl QueryRoot {
         let rows = if let Some(pub_filter) = published {
             client
                 .query(
-                    "SELECT id, pk_post, title, content, fk_author, created_at FROM benchmark.tb_post WHERE published = $3 LIMIT $1 OFFSET $2",
+                    "SELECT id, pk_post, title, content, fk_author, created_at FROM benchmark.tb_post WHERE published = $3 ORDER BY created_at DESC LIMIT $1 OFFSET $2",
                     &[&limit, &offset, &pub_filter],
                 )
                 .await?
         } else {
             client
                 .query(
-                    "SELECT id, pk_post, title, content, fk_author, created_at FROM benchmark.tb_post LIMIT $1 OFFSET $2",
+                    "SELECT id, pk_post, title, content, fk_author, created_at FROM benchmark.tb_post ORDER BY created_at DESC LIMIT $1 OFFSET $2",
                     &[&limit, &offset],
                 )
                 .await?
@@ -202,7 +202,7 @@ impl QueryRoot {
         let client = db.pool().get().await?;
         let rows = client
             .query(
-                "SELECT p.id, p.pk_post, p.title, p.content, p.fk_author, p.created_at FROM benchmark.tb_post p JOIN benchmark.tb_user u ON p.fk_author = u.pk_user WHERE u.id = $1 LIMIT $2",
+                "SELECT p.id, p.pk_post, p.title, p.content, p.fk_author, p.created_at FROM benchmark.tb_post p JOIN benchmark.tb_user u ON p.fk_author = u.pk_user WHERE u.id = $1 ORDER BY p.created_at DESC LIMIT $2",
                 &[&user_uuid, &limit],
             )
             .await?;
@@ -230,7 +230,7 @@ impl QueryRoot {
         let client = db.pool().get().await?;
         let rows = client
             .query(
-                "SELECT c.id, c.pk_comment, c.content, c.fk_post, c.fk_author, c.created_at FROM benchmark.tb_comment c JOIN benchmark.tb_post p ON c.fk_post = p.pk_post WHERE p.id = $1 LIMIT $2",
+                "SELECT c.id, c.pk_comment, c.content, c.fk_post, c.fk_author, c.created_at FROM benchmark.tb_comment c JOIN benchmark.tb_post p ON c.fk_post = p.pk_post WHERE p.id = $1 ORDER BY c.created_at DESC LIMIT $2",
                 &[&post_uuid, &limit],
             )
             .await?;
@@ -258,7 +258,7 @@ impl QueryRoot {
         let client = db.pool().get().await?;
         let rows = client
             .query(
-                "SELECT id, title, content, fk_author, created_at, pk_post FROM benchmark.tb_post LIMIT $1 OFFSET $2",
+                "SELECT id, title, content, fk_author, created_at, pk_post FROM benchmark.tb_post ORDER BY created_at DESC LIMIT $1 OFFSET $2",
                 &[&limit, &offset],
             )
             .await?;

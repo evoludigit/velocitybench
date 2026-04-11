@@ -94,7 +94,7 @@ public class PostRepository {
     }
 
     public List<Post> findAll(int limit) {
-        String sql = "SELECT pk_post, id, fk_author, title, content, created_at, updated_at FROM tb_post ORDER BY pk_post LIMIT ?";
+        String sql = "SELECT pk_post, id, fk_author, title, content, created_at, updated_at FROM tb_post ORDER BY created_at DESC LIMIT ?";
         List<Post> posts = new ArrayList<>();
         try (Connection conn = dataSource.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
