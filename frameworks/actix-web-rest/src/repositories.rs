@@ -50,7 +50,7 @@ impl UserRepository {
             .query(
                 "SELECT id::text, username, full_name, bio
                  FROM benchmark.tb_user
-                 ORDER BY id
+                 ORDER BY created_at DESC
                  LIMIT $1 OFFSET $2",
                 &[&limit, &offset],
             )
