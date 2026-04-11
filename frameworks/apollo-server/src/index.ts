@@ -41,25 +41,13 @@ app.get('/metrics', async (req, res) => {
   res.send(await register.metrics());
 });
 
-// Create Apollo Server
+// Create Apollo Server (no per-request plugins for benchmark — metrics via /metrics endpoint)
 const server = new ApolloServer({
   typeDefs,
   resolvers,
-  plugins: [
-    {
-      async requestDidStart() {
-        const start = Date.now();
-        return {
-          async willSendResponse(requestContext) {
-            const duration = (Date.now() - start) / 1000;
-            const operation = requestContext.operationName || 'unknown';
-            requestCounter.inc({ operation });
-            requestDuration.observe({ operation }, duration);
-          },
-        };
-      },
-    },
-  ],
+  introspection: false,
+  includeStacktraceInErrorResponses: false,
+  plugins: [],
 });
 
 // Start server and apply GraphQL endpoint

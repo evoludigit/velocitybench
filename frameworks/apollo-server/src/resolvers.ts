@@ -33,7 +33,34 @@ export const resolvers = {
       );
     },
 
-    posts: async (_: any, { limit, published }: { limit: number; published?: boolean }) => {
+    posts: async (_: any, { limit, published }: { limit: number; published?: boolean }, _ctx: Context, info: any) => {
+      const selections: any[] = info?.fieldNodes?.[0]?.selectionSet?.selections ?? [];
+      const wantAuthor = selections.some((s: any) => s.name?.value === 'author');
+      if (wantAuthor) {
+        if (published === undefined || published === null) {
+          const rows = await query(
+            `SELECT p.id, p.fk_author, p.title, p.content, p.published AS status,
+                    u.id AS author_id, u.username, u.full_name, u.bio
+             FROM benchmark.tb_post p
+             JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+             ORDER BY p.created_at DESC
+             LIMIT $1`,
+            [limit]
+          );
+          return rows.map((r: any) => ({ ...r, _preloadedAuthor: { id: r.author_id, username: r.username, fullName: r.full_name, bio: r.bio } }));
+        }
+        const rows = await query(
+          `SELECT p.id, p.fk_author, p.title, p.content, p.published AS status,
+                  u.id AS author_id, u.username, u.full_name, u.bio
+           FROM benchmark.tb_post p
+           JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
+           WHERE p.published = $2
+           ORDER BY p.created_at DESC
+           LIMIT $1`,
+          [limit, published]
+        );
+        return rows.map((r: any) => ({ ...r, _preloadedAuthor: { id: r.author_id, username: r.username, fullName: r.full_name, bio: r.bio } }));
+      }
       if (published === undefined || published === null) {
         return query(
           `SELECT id, fk_author, title, content, published as status
@@ -94,6 +121,7 @@ export const resolvers = {
 
   Post: {
     author: async (post: any, _: any, { loaders }: Context) => {
+      if (post._preloadedAuthor) return post._preloadedAuthor;
       return loaders.userByPkLoader.load(post.fk_author);
     },
 
