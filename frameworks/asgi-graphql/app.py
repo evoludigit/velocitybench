@@ -715,4 +715,4 @@ app = Starlette(
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", "4000"))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run("app:app", host="0.0.0.0", port=port, workers=2, access_log=False, log_level="warning")
