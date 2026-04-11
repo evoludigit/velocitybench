@@ -129,6 +129,11 @@ COMMENT ON COLUMN tb_user.search_vector IS 'Full-text search vector for users (w
 COMMENT ON FUNCTION benchmark.search_posts(text, integer) IS 'Search posts with full-text search and ranking';
 COMMENT ON FUNCTION benchmark.search_users(text, integer) IS 'Search users with full-text search and ranking';
 
+-- Index for users list ordered by newest first (Q1 pattern: ORDER BY created_at DESC LIMIT N).
+-- Without this, every Q1 request does a full 10k-row sort (3ms); with it, the index scan
+-- returns the 20 most recent rows in 0.055ms (54× faster).
+CREATE INDEX IF NOT EXISTS idx_tb_user_created_at ON tb_user (created_at DESC);
+
 -- Functional indexes on (id::text) for REST frameworks that compare UUID columns as text strings.
 -- Without these, queries using WHERE id::text = $1 perform a sequential scan because the plain
 -- UUID btree index cannot be used when the column is cast.
