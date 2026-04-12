@@ -245,7 +245,8 @@ FRAMEWORKS: dict[str, dict] = {
         "type": "graphql",
         "language": "Rust",
         "category": "graphql",
-        "start_timeout": 600,
+        "start_timeout": 120,
+        "no_build": True,  # Rust build is slow; use pre-built image
         "queries": {
             "Q1": ("http://localhost:4000/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4000/graphql", _GQL_Q2),
@@ -319,6 +320,7 @@ FRAMEWORKS: dict[str, dict] = {
         "type": "graphql",
         "language": "Go",
         "category": "graphql",
+        "no_build": True,  # Go build is slow; use pre-built image
         "queries": {
             "Q1": ("http://localhost:4011/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4011/graphql", _GQL_Q2),
