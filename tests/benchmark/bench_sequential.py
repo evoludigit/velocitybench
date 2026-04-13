@@ -32,6 +32,7 @@ import argparse
 import hashlib
 import http.client
 import json
+import random
 import re
 import shutil
 import statistics
@@ -1013,6 +1014,7 @@ class BenchResult:
     query_name: str
     duration_secs: int
     concurrency: int
+    pass_num: int = 1
     latencies_ms: list[float] = field(default_factory=list)
     errors: int = 0
     error_breakdown: dict[str, int] = field(default_factory=dict)
@@ -2022,7 +2024,7 @@ def start_service_or_skip(
     except RuntimeError as exc:
         print(f"  WARN: {exc} — skipping", flush=True)
         _compose("stop", service, check=False)
-        _compose("rm", "-f", service, check=False)
+        _compose("rm", "-f", "-v", service, check=False)
         return False
     except subprocess.CalledProcessError as exc:
         stderr = exc.stderr.strip() if exc.stderr else ""
@@ -2030,19 +2032,20 @@ def start_service_or_skip(
         if stderr:
             print(f"  stderr: {stderr[:300]}", flush=True)
         _compose("stop", service, check=False)
-        _compose("rm", "-f", service, check=False)
+        _compose("rm", "-f", "-v", service, check=False)
         return False
 
 
 def stop_service(service: str) -> None:
     print(f"  stopping {service}...", end=" ", flush=True)
     _compose("stop", service)
-    _compose("rm", "-f", service, check=False)
+    _compose("rm", "-f", "-v", service, check=False)
     print("stopped", flush=True)
 
 
 def prune_service_image(service: str) -> None:
-    """Remove the locally-built docker image for a compose service.
+    """Remove the locally-built docker image for a compose service and any
+    dangling volumes left behind.
 
     Docker Compose names images as <project>-<service>:latest where the project
     name is derived from the working directory (velocitybench). Pre-pulled images
@@ -2057,6 +2060,13 @@ def prune_service_image(service: str) -> None:
     )
     if result.returncode == 0:
         print(f"  image {image_name} pruned", flush=True)
+    # Remove any anonymous volumes that weren't caught by `rm -v` (e.g. named
+    # volumes defined in the compose file that are now unreferenced).
+    subprocess.run(
+        ["docker", "volume", "prune", "-f"],
+        capture_output=True,
+        check=False,
+    )
 
 
 def _check_disk_space(min_gb: float = 5.0) -> None:
@@ -2075,24 +2085,48 @@ def _check_disk_space(min_gb: float = 5.0) -> None:
     print(f"  disk space OK: {free_gb:.1f} GB free (≥{min_gb:.0f} GB required)", flush=True)
 
 
-def _reset_postgres_state() -> None:
-    """CHECKPOINT + VACUUM + pg_prewarm between framework runs.
+def _query_dead_tuples() -> int:
+    """Return n_dead_tup for benchmark.tb_user, or -1 on failure."""
+    result = _compose(
+        "exec", "-T", "postgres",
+        "psql", "-U", "benchmark", "-d", "velocitybench_benchmark",
+        "--csv", "--tuples-only",
+        "-c", (
+            "SELECT n_dead_tup FROM pg_stat_user_tables "
+            "WHERE schemaname = 'benchmark' AND relname = 'tb_user'"
+        ),
+        check=False,
+    )
+    if result.returncode != 0:
+        return -1
+    try:
+        return int(result.stdout.strip())
+    except ValueError:
+        return -1
 
-    Reclaims dead-tuple bloat from mutation workloads, flushes WAL so the next
-    framework starts with a clean write path, and pre-warms the shared-buffer
-    pool for the benchmark tables.  Prevents PostgreSQL state contamination from
-    one framework's M1 run from degrading the next framework's measurements.
+
+def _reset_postgres_state() -> None:
+    """CHECKPOINT + VACUUM FULL ANALYZE + pg_prewarm between framework runs.
+
+    VACUUM FULL (not plain VACUUM) is used so that page-level fragmentation left
+    by prior mutation bursts is compacted, not merely marked reusable.  Plain VACUUM
+    reclaims dead tuples but leaves sparse pages that degrade write amplification on
+    the next mutation run.  VACUUM FULL rewrites the heap to a contiguous layout,
+    giving every framework an equal physical starting state.
+
+    After compaction, pg_prewarm loads all benchmark tables into shared_buffers so
+    the first M1 request hits warm pages.
 
     Best-effort: failures are printed but do not abort the benchmark.
     """
-    print("  resetting PostgreSQL state (CHECKPOINT + VACUUM + pg_prewarm)...", end=" ", flush=True)
+    print("  resetting PostgreSQL state (CHECKPOINT + VACUUM FULL + pg_prewarm)...", end=" ", flush=True)
     # UPDATE tb_user triggers a 3-table pg_tviews cascade: tv_user, tv_post, tv_comment.
-    # All five tables must be pre-warmed to avoid cold-page I/O at the start of M1.
+    # All four tables are compacted so cascade write paths start from equal page density.
     result = _compose(
         "exec", "-T", "postgres",
         "psql", "-U", "benchmark", "-d", "velocitybench_benchmark",
         "-c", "CHECKPOINT",
-        "-c", "VACUUM ANALYZE benchmark.tb_user, benchmark.tv_user, benchmark.tv_post, benchmark.tv_comment",
+        "-c", "VACUUM FULL ANALYZE benchmark.tb_user, benchmark.tv_user, benchmark.tv_post, benchmark.tv_comment",
         check=False,
     )
     # Prewarm: prefer pg_prewarm (reads all blocks into shared_buffers via OS read-ahead).
@@ -2117,11 +2151,15 @@ def _reset_postgres_state() -> None:
         "-c", "SELECT sum(octet_length(data::text)) FROM benchmark.tv_comment",
         check=False,
     )
+    # Verify dead tuples were fully reclaimed — non-zero after VACUUM FULL indicates
+    # concurrent writes during the vacuum window (possible under --no-isolation).
+    n_dead = _query_dead_tuples()
+    dead_note = "" if n_dead <= 0 else f"  ⚠ n_dead_tup={n_dead:,} (concurrent writes during vacuum)"
     if result.returncode == 0:
-        print("done ✓", flush=True)
+        print(f"done ✓{dead_note}", flush=True)
     else:
         stderr = result.stderr.strip() if result.stderr else "(no stderr)"
-        print(f"warn (exit {result.returncode}): {stderr[:200]}", flush=True)
+        print(f"warn (exit {result.returncode}): {stderr[:200]}{dead_note}", flush=True)
 
 
 # ---------------------------------------------------------------------------
@@ -2450,6 +2488,102 @@ _QUERY_LABELS = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Multi-pass aggregation
+# ---------------------------------------------------------------------------
+
+@dataclass
+class AggResult:
+    """Per-(framework, query) aggregate across N passes."""
+    framework: str
+    query_name: str
+    passes: int
+    median_rps: float
+    std_rps: float
+    representative: BenchResult   # pass whose RPS is closest to the median
+    all_skipped: bool = False
+
+
+def _aggregate_results(results: list[BenchResult]) -> dict[tuple[str, str], AggResult]:
+    """Group results by (framework, query) and compute median ± σ across passes.
+
+    Returns a mapping from (framework, query_name) → AggResult.  When only one
+    pass exists the aggregate degenerates to that single result with std_rps=0.
+    """
+    groups: dict[tuple[str, str], list[BenchResult]] = {}
+    for r in results:
+        key = (r.framework, r.query_name)
+        groups.setdefault(key, []).append(r)
+
+    aggregates: dict[tuple[str, str], AggResult] = {}
+    for key, group in groups.items():
+        non_skipped = [r for r in group if not r.skipped]
+        if not non_skipped:
+            aggregates[key] = AggResult(
+                framework=key[0],
+                query_name=key[1],
+                passes=len(group),
+                median_rps=0.0,
+                std_rps=0.0,
+                representative=group[0],
+                all_skipped=True,
+            )
+            continue
+        rpss = [r.rps for r in non_skipped]
+        med = statistics.median(rpss)
+        std = statistics.stdev(rpss) if len(rpss) > 1 else 0.0
+        rep = min(non_skipped, key=lambda r: abs(r.rps - med))
+        aggregates[key] = AggResult(
+            framework=key[0],
+            query_name=key[1],
+            passes=len(non_skipped),
+            median_rps=med,
+            std_rps=std,
+            representative=rep,
+        )
+    return aggregates
+
+
+def _agg_row(agg: AggResult, multi_pass: bool, detailed_errors: bool = False) -> str:
+    """Format one Markdown table row from an AggResult."""
+    lang = FRAMEWORKS.get(agg.framework, {}).get("language", "")
+    r = agg.representative
+    if agg.all_skipped:
+        return (
+            f"| {agg.framework} | {lang} | {agg.query_name} "
+            f"| — | — | — | — | — | _{r.skip_reason}_ |"
+        )
+    err_col = f"{r.error_rate_pct:.1f}%"
+    if detailed_errors and r.error_breakdown:
+        parts = []
+        total_errs = sum(r.error_breakdown.values()) or 1
+        for cat, cnt in sorted(r.error_breakdown.items(), key=lambda x: -x[1]):
+            pct = cnt / total_errs * 100
+            parts.append(f"{cat}: {pct:.0f}%")
+        err_col += f" ({', '.join(parts)})"
+    if multi_pass:
+        # Columns: Framework | Language | Query | Median RPS (±σ) | p50 | p95 | p99 | Passes | Errors
+        return (
+            f"| {agg.framework} | {lang} | {agg.query_name} "
+            f"| {agg.median_rps:.0f} ±{agg.std_rps:.0f} "
+            f"| {r.p50_ms:.1f} "
+            f"| {r.p95_ms:.1f} "
+            f"| {r.p99_ms:.1f} "
+            f"| {agg.passes} "
+            f"| {err_col} |"
+        )
+    # Single-pass: Columns: Framework | Language | Query | RPS | p50 | p95 | p99 | Requests | Errors
+    return (
+        f"| {agg.framework} | {lang} | {agg.query_name} "
+        f"| {agg.median_rps:.0f} "
+        f"| {r.p50_ms:.1f} "
+        f"| {r.p95_ms:.1f} "
+        f"| {r.p99_ms:.1f} "
+        f"| {r.requests_sent:,} "
+        f"| {err_col} |"
+    )
+
+
 def format_report(
     results: list[BenchResult],
     args: argparse.Namespace,
@@ -2458,13 +2592,24 @@ def format_report(
     db_footprint: list[DbTableSize] | None = None,
 ) -> str:
     detailed = getattr(args, "detailed_errors", False)
+    passes = getattr(args, "passes", 1)
+    multi_pass = passes > 1
+
+    aggregates = _aggregate_results(results)
+
+    method_note = (
+        "Sequential isolation — each framework runs alone, PostgreSQL stays up  "
+        if not multi_pass else
+        f"Sequential isolation × {passes} passes — pass 1 canonical order, "
+        f"passes 2–{passes} randomised; RPS = median ± σ across passes  "
+    )
 
     lines: list[str] = [
         "# VelocityBench — Sequential Isolation Benchmark Results",
         "",
         f"**Date**: {date_str}  ",
         "**Dataset**: MEDIUM — 10 000 users · 50 000 posts · 200 000 comments  ",
-        "**Method**: Sequential isolation — each framework runs alone, PostgreSQL stays up  ",
+        f"**Method**: {method_note}",
         f"**Concurrency**: {args.concurrency} workers  ",
         f"**Measurement**: {args.duration}s per scenario  ",
         f"**Warmup**: {args.warmup}s per scenario  ",
@@ -2507,22 +2652,37 @@ def format_report(
         ]
 
     # Emit a section for each query type that has results
-    seen_queries = []
+    seen_queries: list[str] = []
     for r in results:
         if r.query_name not in seen_queries:
             seen_queries.append(r.query_name)
 
+    # Deduplicate aggregates so each (framework, query) appears once per section.
+    seen_fw_query: set[tuple[str, str]] = set()
+
+    if multi_pass:
+        # Drop Requests (per-pass, misleading); combine RPS+σ into one cell; add Passes count.
+        table_header = "| Framework | Language | Query | Median RPS (±σ) | p50 ms | p95 ms | p99 ms | Passes | Errors |"
+        table_sep    = "|-----------|----------|-------|----------------:|-------:|-------:|-------:|-------:|--------|"
+    else:
+        table_header = "| Framework | Language | Query | RPS | p50 ms | p95 ms | p99 ms | Requests | Errors |"
+        table_sep    = "|-----------|----------|-------|----:|-------:|-------:|-------:|---------:|--------|"
+
     for qname in seen_queries:
         label = _QUERY_LABELS.get(qname, qname)
-        lines += [
-            "",
-            f"## {qname} — {label}",
-            "",
-            "| Framework | Language | Query | RPS | p50 ms | p95 ms | p99 ms | Requests | Errors |",
-            "|-----------|----------|-------|----:|-------:|-------:|-------:|---------:|--------|",
-        ]
+        lines += ["", f"## {qname} — {label}", "", table_header, table_sep]
+        seen_fw_query.clear()
         for r in results:
-            if r.query_name == qname:
+            if r.query_name != qname:
+                continue
+            key = (r.framework, r.query_name)
+            if key in seen_fw_query:
+                continue
+            seen_fw_query.add(key)
+            agg = aggregates.get(key)
+            if agg is not None:
+                lines.append(_agg_row(agg, multi_pass=multi_pass, detailed_errors=detailed))
+            else:
                 lines.append(_row(r, detailed_errors=detailed, show_language=True))
 
     # Category leaderboards for Q1
@@ -2532,19 +2692,19 @@ def format_report(
         "graphql-precomputed": "Pre-computed GraphQL (FraiseQL)",
         "graphql-schema-first": "Schema-first GraphQL",
     }
-    q1_results = [r for r in results if r.query_name == "Q1" and not r.skipped]
+    # Build deduplicated Q1 aggregate list (one entry per framework).
+    q1_aggs = [
+        agg for (fw, qn), agg in aggregates.items()
+        if qn == "Q1" and not agg.all_skipped
+    ]
 
     for cat, cat_label in _CATEGORY_LABELS.items():
-        cat_results = sorted(
-            [
-                r
-                for r in q1_results
-                if FRAMEWORKS.get(r.framework, {}).get("category") == cat
-            ],
-            key=lambda r: r.rps,
+        cat_aggs = sorted(
+            [a for a in q1_aggs if FRAMEWORKS.get(a.framework, {}).get("category") == cat],
+            key=lambda a: a.median_rps,
             reverse=True,
         )
-        if not cat_results:
+        if not cat_aggs:
             continue
         lines += [
             "",
@@ -2555,12 +2715,13 @@ def format_report(
             "| Framework | Language | RPS | p50 ms | p99 ms | Errors |",
             "|-----------|----------|----:|-------:|-------:|--------|",
         ]
-        for r in cat_results:
-            lang = FRAMEWORKS.get(r.framework, {}).get("language", "")
+        for a in cat_aggs:
+            lang = FRAMEWORKS.get(a.framework, {}).get("language", "")
+            rps_col = f"{a.median_rps:.0f} ±{a.std_rps:.0f}" if multi_pass else f"{a.median_rps:.0f}"
             lines.append(
-                f"| {r.framework} | {lang} "
-                f"| {r.rps:.0f} | {r.p50_ms:.1f} | {r.p99_ms:.1f} "
-                f"| {r.error_rate_pct:.1f}% |"
+                f"| {a.framework} | {lang} "
+                f"| {rps_col} | {a.representative.p50_ms:.1f} | {a.representative.p99_ms:.1f} "
+                f"| {a.representative.error_rate_pct:.1f}% |"
             )
 
     # Summary: Q1 cross-framework comparison (all categories)
@@ -2573,14 +2734,15 @@ def format_report(
         "| Framework | Language | Category | RPS | p50 ms | p99 ms |",
         "|-----------|----------|----------|----:|-------:|-------:|",
     ]
-    all_q1_sorted = sorted(q1_results, key=lambda r: r.rps, reverse=True)
-    for r in all_q1_sorted:
-        fw_cfg = FRAMEWORKS.get(r.framework, {})
+    all_q1_sorted = sorted(q1_aggs, key=lambda a: a.median_rps, reverse=True)
+    for a in all_q1_sorted:
+        fw_cfg = FRAMEWORKS.get(a.framework, {})
         lang = fw_cfg.get("language", "")
         cat = fw_cfg.get("category", "")
+        rps_col = f"{a.median_rps:.0f} ±{a.std_rps:.0f}" if multi_pass else f"{a.median_rps:.0f}"
         lines.append(
-            f"| {r.framework} | {lang} | {cat} "
-            f"| {r.rps:.0f} | {r.p50_ms:.1f} | {r.p99_ms:.1f} |"
+            f"| {a.framework} | {lang} | {cat} "
+            f"| {rps_col} | {a.representative.p50_ms:.1f} | {a.representative.p99_ms:.1f} |"
         )
 
     # Resource metrics section (only if collected via --resource-metrics)
@@ -2688,9 +2850,9 @@ def format_report(
             "table state.",
             "> - **Post-cascade fragmentation** (subsequent runners): prior mutation burst "
             f"(~{peak_m1_rps * cascade_fan_out / 1_000_000:.1f}M cascade writes) scattered row "
-            "versions across pages. VACUUM reclaims dead tuples between runs but cannot repack "
-            "pages without VACUUM FULL. Equivalent to sustained production load where autovacuum "
-            "lags behind write throughput.",
+            "versions across pages. VACUUM FULL compacts pages between framework runs; within a "
+            "single M1 measurement window the heap accumulates fresh dead tuples as the run "
+            "progresses. Equivalent to sustained production load.",
             "> ",
             f"> The cascade multiplier ({cascade_fan_out}×) is the operative variable: "
             "fan-out × throughput = HOT collapse threshold. At this fan-out ratio, the fresh-table "
@@ -2778,16 +2940,26 @@ def main() -> None:
         help=f"Run only frameworks with known failures: {', '.join(BROKEN_FRAMEWORKS)}",
     )
     parser.add_argument(
-        "--prune-images",
-        action="store_true",
-        help="Remove each framework's docker image after its benchmark run to reclaim disk space. "
-             "postgres and other pre-pulled images are never touched.",
+        "--no-prune-images",
+        dest="prune_images",
+        action="store_false",
+        help="Keep each framework's docker image after its benchmark run instead of removing it.",
     )
+    parser.set_defaults(prune_images=True)
     parser.add_argument(
-        "--resource-metrics",
-        action="store_true",
-        help="Collect LOC, complexity, image size, RAM, and CPU metrics per framework "
-             "(adds docker stats polling overhead; use for analysis runs, not timing runs).",
+        "--no-resource-metrics",
+        dest="resource_metrics",
+        action="store_false",
+        help="Disable per-framework resource collection: LOC, image size, peak RAM, avg CPU.",
+    )
+    parser.set_defaults(resource_metrics=True)
+    parser.add_argument(
+        "--passes",
+        type=int,
+        default=1,
+        metavar="N",
+        help="Run the framework list N times with randomised order on passes 2+ and report "
+             "median ± σ across passes (default: 1 — single canonical run).",
     )
     args = parser.parse_args()
 
@@ -2815,6 +2987,8 @@ def main() -> None:
     print(
         f"Isolation   : {'disabled (--no-isolation)' if args.no_isolation else 'enabled'}"
     )
+    if args.passes > 1:
+        print(f"Passes      : {args.passes} (pass 1 = canonical order; passes 2+ randomised)")
     print()
 
     all_results: list[BenchResult] = []
@@ -2837,16 +3011,35 @@ def main() -> None:
         print("skipped (postgres not available)", flush=True)
     print()
 
-    for i, fw_name in enumerate(args.frameworks):
+    # Build flat run schedule: pass 1 preserves canonical order; subsequent passes are
+    # randomly shuffled so run-order bias averages out across the reported median ± σ.
+    _pass_orders: list[list[str]] = [list(args.frameworks)]
+    for _ in range(1, args.passes):
+        _shuffled = list(args.frameworks)
+        random.shuffle(_shuffled)
+        _pass_orders.append(_shuffled)
+
+    # Flatten into (pass_num, idx_in_pass, pass_size, fw_name) tuples so the inner loop
+    # body needs no extra indentation level compared to a single-pass run.
+    _flat_items: list[tuple[int, int, int, str]] = []
+    for _p_idx, _p_fws in enumerate(_pass_orders):
+        for _i, _fw in enumerate(_p_fws):
+            _flat_items.append((_p_idx + 1, _i, len(_p_fws), _fw))
+
+    _prev_pass_num = 0
+    for pass_num, i, pass_size, fw_name in _flat_items:
+        if pass_num != _prev_pass_num:
+            _prev_pass_num = pass_num
+            if args.passes > 1:
+                print(f"{'=' * 55}")
+                print(f"Pass {pass_num}/{args.passes}  order: {', '.join(_pass_orders[pass_num - 1])}")
+                print(f"{'=' * 55}")
+                print()
+
         fw_config = FRAMEWORKS[fw_name]
-        print(f"[{i + 1}/{len(args.frameworks)}] {fw_name}")
+        print(f"[{i + 1}/{pass_size}] {fw_name}")
 
         query_names = list(fw_config["queries"])
-
-        # Reset PostgreSQL state before every framework run — including the first —
-        # so each variant starts from a consistent baseline (no dead tuples from
-        # prior M1 runs, WAL flushed, buffer cache warmed).
-        _reset_postgres_state()
 
         if not args.no_isolation:
             timeout = fw_config.get("start_timeout", 60)
@@ -2861,6 +3054,7 @@ def main() -> None:
                         query_name=query_name,
                         duration_secs=args.duration,
                         concurrency=args.concurrency,
+                        pass_num=pass_num,
                         skipped=True,
                         skip_reason="service did not become healthy",
                     )
@@ -3306,14 +3500,6 @@ def main() -> None:
                 print("  M1_APQ: no GraphQL URL — skipping", flush=True)
 
         for query_name in query_names:
-            # VACUUM immediately before M1/MC1/M1_APQ so mutation scenarios start from a
-            # defined page state: dead tuples reclaimed, fillfactor reserve restored.
-            # Read scenarios ran earlier; their I/O activity is harmless (reads don't
-            # create dead tuples). This decouples M1's starting condition from the
-            # prior framework's write burst without hiding M1's run-order dependency
-            # (the second framework's M1 still runs on pages fragmented by the first).
-            if query_name in ("M1", "M1d", "MC1", "M1_APQ"):
-                _reset_postgres_state()
             print(f"  {query_name}:")
             r = run_scenario(
                 fw_name,
@@ -3323,6 +3509,7 @@ def main() -> None:
                 args.duration,
                 args.warmup,
             )
+            r.pass_num = pass_num
             all_results.append(r)
             if args.verbose and r.error_samples:
                 print("    error samples:", file=sys.stderr, flush=True)
@@ -3339,7 +3526,7 @@ def main() -> None:
             if args.prune_images:
                 prune_service_image(fw_config["compose_service"])
 
-        if i < len(args.frameworks) - 1:
+        if i < pass_size - 1:
             print(f"  cooldown {args.cooldown}s...", flush=True)
             time.sleep(args.cooldown)
         print()
@@ -3366,6 +3553,7 @@ def main() -> None:
         {
             "framework": r.framework,
             "query": r.query_name,
+            "pass": r.pass_num,
             "rps": round(r.rps, 1),
             "p50_ms": round(r.p50_ms, 2),
             "p95_ms": round(r.p95_ms, 2),
@@ -3379,6 +3567,23 @@ def main() -> None:
         for r in all_results
     ]
     json_data_out: dict = {"results": json_data}
+    # For multi-pass runs, also emit per-(framework, query) aggregates
+    if args.passes > 1:
+        all_aggs = _aggregate_results(all_results)
+        json_data_out["aggregates"] = [
+            {
+                "framework": agg.framework,
+                "query": agg.query_name,
+                "passes": agg.passes,
+                "median_rps": round(agg.median_rps, 1),
+                "std_rps": round(agg.std_rps, 1),
+                "p50_ms": round(agg.representative.p50_ms, 2),
+                "p95_ms": round(agg.representative.p95_ms, 2),
+                "p99_ms": round(agg.representative.p99_ms, 2),
+            }
+            for agg in all_aggs.values()
+            if not agg.all_skipped
+        ]
     if all_resource_metrics:
         json_data_out["resource_metrics"] = [
             {
