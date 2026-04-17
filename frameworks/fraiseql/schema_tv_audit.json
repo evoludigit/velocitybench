@@ -25,7 +25,7 @@
           "nullable": false
         },
         {
-          "name": "full_name",
+          "name": "fullName",
           "type": "String",
           "nullable": false
         },
@@ -35,12 +35,12 @@
           "nullable": true
         },
         {
-          "name": "created_at",
+          "name": "createdAt",
           "type": "DateTime",
           "nullable": false
         },
         {
-          "name": "updated_at",
+          "name": "updatedAt",
           "type": "DateTime",
           "nullable": false
         }
@@ -82,12 +82,12 @@
           "nullable": false
         },
         {
-          "name": "created_at",
+          "name": "createdAt",
           "type": "DateTime",
           "nullable": false
         },
         {
-          "name": "updated_at",
+          "name": "updatedAt",
           "type": "DateTime",
           "nullable": false
         }
@@ -124,12 +124,12 @@
           "nullable": false
         },
         {
-          "name": "created_at",
+          "name": "createdAt",
           "type": "DateTime",
           "nullable": false
         },
         {
-          "name": "updated_at",
+          "name": "updatedAt",
           "type": "DateTime",
           "nullable": false
         }
@@ -163,7 +163,6 @@
       ],
       "description": "Get list of users with pagination.",
       "sql_source": "tv_user",
-      "jsonb_column": "data",
       "auto_params": {
         "limit": true,
         "offset": true,
@@ -185,7 +184,7 @@
       ],
       "description": "Get a single user by UUID.",
       "sql_source": "tv_user",
-      "jsonb_column": "data"
+      "cache_ttl_seconds": 0
     },
     {
       "name": "posts",
@@ -212,7 +211,7 @@
           "default": null
         },
         {
-          "name": "author_id",
+          "name": "authorId",
           "type": "ID",
           "nullable": true,
           "default": null
@@ -220,7 +219,6 @@
       ],
       "description": "Get list of posts with filtering and pagination.",
       "sql_source": "tv_post",
-      "jsonb_column": "data",
       "auto_params": {
         "limit": true,
         "offset": true,
@@ -242,7 +240,7 @@
       ],
       "description": "Get a single post by UUID.",
       "sql_source": "tv_post",
-      "jsonb_column": "data"
+      "cache_ttl_seconds": 0
     },
     {
       "name": "comments",
@@ -263,13 +261,13 @@
           "default": 0
         },
         {
-          "name": "post_id",
+          "name": "postId",
           "type": "ID",
           "nullable": true,
           "default": null
         },
         {
-          "name": "author_id",
+          "name": "authorId",
           "type": "ID",
           "nullable": true,
           "default": null
@@ -277,7 +275,6 @@
       ],
       "description": "Get list of comments with filtering and pagination.",
       "sql_source": "tv_comment",
-      "jsonb_column": "data",
       "auto_params": {
         "limit": true,
         "offset": true,
@@ -299,7 +296,7 @@
       ],
       "description": "Get a single comment by UUID.",
       "sql_source": "tv_comment",
-      "jsonb_column": "data"
+      "cache_ttl_seconds": 0
     }
   ],
   "mutations": [
@@ -342,7 +339,7 @@
           "nullable": false
         },
         {
-          "name": "author_id",
+          "name": "authorId",
           "type": "ID",
           "nullable": false
         },

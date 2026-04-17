@@ -1,11 +1,10 @@
-use pgrx::prelude::*;
+use super::ops::{clear_queue, take_queue_snapshot};
+use crate::TViewResult;
 use pgrx::pg_sys;
-use pgrx::datum::DatumWithOid;
+use pgrx::prelude::*;
+use std::collections::HashSet;
 use std::os::raw::c_void;
 use std::panic::AssertUnwindSafe;
-use std::collections::HashSet;
-use super::ops::{take_queue_snapshot, clear_queue};
-use crate::TViewResult;
 
 // Thread-local storage for savepoint support
 thread_local! {
@@ -23,7 +22,7 @@ enum XactEvent {
     Commit,
     Abort,
     PreCommit,
-    Prepare,  // XACT_EVENT_PREPARE
+    Prepare, // XACT_EVENT_PREPARE
 }
 
 /// Register the transaction callback (called from enqueue logic)
@@ -35,16 +34,7 @@ pub unsafe fn register_xact_callback() {
     // The callback function must be extern "C" and #[no_mangle]
 
     unsafe {
-        pg_sys::RegisterXactCallback(
-            Some(tview_xact_callback),
-            std::ptr::null_mut(),
-        );
-
-        // Register start-of-transaction callback for connection pooling safety
-        pg_sys::RegisterXactCallback(
-            Some(tview_xact_start_callback),
-            std::ptr::null_mut(),
-        );
+        pg_sys::RegisterXactCallback(Some(tview_xact_callback), std::ptr::null_mut());
     }
 }
 
@@ -57,10 +47,7 @@ pub unsafe fn register_subxact_callback() {
     // The callback function must be extern "C" and #[no_mangle]
 
     unsafe {
-        pg_sys::RegisterSubXactCallback(
-            Some(tview_subxact_callback),
-            std::ptr::null_mut(),
-        );
+        pg_sys::RegisterSubXactCallback(Some(tview_subxact_callback), std::ptr::null_mut());
     }
 }
 
@@ -70,101 +57,50 @@ pub unsafe fn register_subxact_callback() {
 ///
 /// # Safety
 /// This is an extern "C-unwind" callback invoked by `PostgreSQL` internals.
-/// Must not panic or unwind.
 ///
 /// # Error handling
-/// `error!()` (which calls `panic_any`) must NEVER be called inside
-/// `catch_unwind`.  If it were, `catch_unwind` would intercept the panic and
-/// then the fallback `error!()` outside would fire in a raw `extern "C-unwind"`
-/// context without `#[pg_guard]`, causing SIGABRT.  Instead the closure
-/// returns `Result<(), String>` and `error!()` is called *after*
-/// `catch_unwind` returns.
-#[no_mangle]
+/// Errors from `handle_pre_commit`/`handle_prepare` are reported via pgrx's
+/// `error!()` macro, which triggers `ereport(ERROR)` and longjmps out of
+/// the callback.  `PostgreSQL` will then abort the transaction.
+///
+/// We intentionally avoid `catch_unwind` here: SPI operations in the
+/// pre-commit handler may trigger `PostgreSQL` longjmps, and intercepting
+/// those via `catch_unwind` corrupts `PG_exception_stack`, causing SIGABRT.
+#[unsafe(no_mangle)]
 unsafe extern "C-unwind" fn tview_xact_callback(event: u32, _arg: *mut c_void) {
-    // The closure returns Ok(()) on success, Err(message) when the transaction
-    // must be aborted.  `error!()` is called OUTSIDE catch_unwind only.
-    let result = std::panic::catch_unwind(AssertUnwindSafe(|| -> Result<(), String> {
-        // Determine event type (using PostgreSQL C API constants)
-        let xact_event = match event {
-            0 => XactEvent::Commit,      // XACT_EVENT_COMMIT
-            1 => XactEvent::PreCommit,   // XACT_EVENT_PRE_COMMIT
-            2 => XactEvent::Abort,       // XACT_EVENT_ABORT
-            4 => XactEvent::Prepare,     // XACT_EVENT_PREPARE
-            _ => return Ok(()), // Ignore other events
-        };
+    // Map PostgreSQL XactEvent C enum to our Rust enum.
+    // Use pg_sys constants to be version-safe.
+    #[allow(non_upper_case_globals)] // Reason: pg_sys XactEvent constants use UPPER_CASE naming
+    let xact_event = match event {
+        pg_sys::XactEvent::XACT_EVENT_COMMIT => XactEvent::Commit,
+        pg_sys::XactEvent::XACT_EVENT_PRE_COMMIT => XactEvent::PreCommit,
+        pg_sys::XactEvent::XACT_EVENT_ABORT => XactEvent::Abort,
+        pg_sys::XactEvent::XACT_EVENT_PREPARE => XactEvent::Prepare,
+        _ => return, // Ignore PARALLEL_*, PRE_PREPARE, etc.
+    };
 
-        // Handle event
-        match xact_event {
-            XactEvent::PreCommit => {
-                // PRE_COMMIT: Flush queue before transaction commits
-                //
-                // CRITICAL: We must propagate errors to abort the transaction.
-                // Per PRD R2: "If refresh fails: the entire transaction fails and rolls back."
-                if let Err(e) = handle_pre_commit() {
-                    return Err(format!(
-                        "TVIEW refresh failed during PRE_COMMIT, aborting transaction: {e:?}"
-                    ));
-                }
-            }
-            XactEvent::Prepare => {
-                // PREPARE: Serialize queue to persistent storage
-                if let Err(e) = handle_prepare() {
-                    return Err(format!(
-                        "TVIEW failed to persist queue during PREPARE: {e:?}"
-                    ));
-                }
-            }
-            XactEvent::Abort => {
-                // ABORT: Clear queue without refreshing
-                clear_queue();
-                crate::metrics::metrics_api::reset_metrics();
-            }
-            XactEvent::Commit => {
-                // COMMIT: Cleanup (queue already flushed in PRE_COMMIT)
-                crate::metrics::metrics_api::reset_metrics();
-            }
+    // Handle event.
+    //
+    // NOTE: SPI is NOT available during transaction callbacks (PRE_COMMIT, COMMIT, ABORT).
+    // Executing SPI queries here crashes the server. Queue flush (which uses SPI) is
+    // handled by the ProcessUtility hook intercepting COMMIT instead.
+    match xact_event {
+        XactEvent::PreCommit | XactEvent::Commit => {
+            // Queue flush + audit flush happen in ProcessUtility hook before COMMIT.
+            // Clear audit buffer as safety net (should already be empty after flush).
+            crate::audit::clear_audit_buffer();
+            crate::metrics::metrics_api::reset_metrics();
         }
-
-        Ok(())
-    }));
-
-    // Now outside catch_unwind — safe to call error!() which triggers panic_any
-    // under #[pg_guard]-like semantics in extern "C-unwind" context.
-    match result {
-        Ok(Ok(())) => {} // Success
-        Ok(Err(msg)) => {
-            // Application-level error (e.g. refresh failure, prepare failure)
-            error!("{}", msg);
+        XactEvent::Prepare => {
+            // PREPARE TRANSACTION also goes through ProcessUtility hook.
+            crate::audit::clear_audit_buffer();
+            crate::metrics::metrics_api::reset_metrics();
         }
-        Err(_) => {
-            // Panic inside catch_unwind — should not happen in normal operation
-            error!("PANIC in transaction callback - this is a bug!");
-        }
-    }
-}
-
-/// Start-of-transaction callback for connection pooling safety
-///
-/// This ensures thread-local state is cleared at the start of each transaction,
-/// preventing queue leakage between transactions in connection poolers like `PgBouncer`.
-///
-/// # Safety
-/// This is an extern "C-unwind" callback invoked by `PostgreSQL` internals.
-/// Must not panic or unwind.
-#[no_mangle]
-unsafe extern "C-unwind" fn tview_xact_start_callback(event: u32, _arg: *mut c_void) {
-    let result = std::panic::catch_unwind(AssertUnwindSafe(|| {
-        if event == 3 { // XACT_EVENT_START
-            // Defensive: Clear any leftover state from previous transaction
-            // This prevents queue leakage in connection poolers (PgBouncer, etc.)
+        XactEvent::Abort => {
             clear_queue();
+            crate::audit::clear_audit_buffer();
+            crate::metrics::metrics_api::reset_metrics();
         }
-    }));
-
-    if result.is_err() {
-        // Non-fatal: defensive cleanup only. Use warning instead of error
-        // to avoid SIGABRT from panic_any in raw extern "C-unwind" context.
-        warning!("PANIC in transaction start callback - this is a bug!");
     }
 }
 
@@ -176,7 +112,7 @@ unsafe extern "C-unwind" fn tview_xact_start_callback(event: u32, _arg: *mut c_v
 /// # Safety
 /// This is an extern "C-unwind" callback invoked by `PostgreSQL` internals.
 /// Must not panic or unwind.
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C-unwind" fn tview_subxact_callback(
     event: u32,
     _subxid: pg_sys::SubTransactionId,
@@ -197,14 +133,10 @@ unsafe extern "C-unwind" fn tview_subxact_callback(
                 QUEUE_SNAPSHOTS.with(|s| {
                     s.borrow_mut().push(snapshot);
                 });
-
             }
             pg_sys::SubXactEvent::SUBXACT_EVENT_ABORT_SUB => {
                 // ROLLBACK TO SAVEPOINT: restore queue to snapshot
-                SAVEPOINT_DEPTH.with(|d| {
-                    let mut depth = d.borrow_mut();
-                    *depth -= 1;
-                });
+                decrement_savepoint_depth();
 
                 // Restore queue from snapshot
                 if let Some(snapshot) = QUEUE_SNAPSHOTS.with(|s| s.borrow_mut().pop()) {
@@ -214,16 +146,12 @@ unsafe extern "C-unwind" fn tview_subxact_callback(
             }
             pg_sys::SubXactEvent::SUBXACT_EVENT_COMMIT_SUB => {
                 // RELEASE SAVEPOINT: just decrement depth and discard snapshot
-                SAVEPOINT_DEPTH.with(|d| {
-                    let mut depth = d.borrow_mut();
-                    *depth -= 1;
-                });
+                decrement_savepoint_depth();
 
                 // Discard the snapshot (savepoint committed)
                 QUEUE_SNAPSHOTS.with(|s| {
                     s.borrow_mut().pop();
                 });
-
             }
             _ => {
                 // Ignore other subtransaction events
@@ -238,7 +166,27 @@ unsafe extern "C-unwind" fn tview_subxact_callback(
     }
 }
 
-/// Handle `PRE_COMMIT` event: flush the queue and refresh TVIEWs
+/// Decrement `SAVEPOINT_DEPTH` with saturating subtraction.
+///
+/// Emits a warning if the depth is already 0, which indicates unexpected
+/// event ordering (e.g., extension loaded mid-transaction).
+fn decrement_savepoint_depth() {
+    SAVEPOINT_DEPTH.with(|d| {
+        let mut depth = d.borrow_mut();
+        if *depth == 0 {
+            warning!("pg_tviews: subxact depth underflow — event ordering unexpected");
+        }
+        *depth = depth.saturating_sub(1);
+    });
+}
+
+/// Flush the refresh queue: process all pending TVIEW refreshes.
+///
+/// Called by the `ProcessUtility` hook when intercepting COMMIT, **before**
+/// the actual commit begins. SPI must be available when this is called.
+///
+/// **Must NOT be called from transaction callbacks** (`PRE_COMMIT`, `COMMIT`, `ABORT`)
+/// because `PostgreSQL` does not allow SPI queries during those callbacks.
 ///
 /// This implementation correctly handles propagation by using a local queue
 /// for discovered parent refreshes. The workflow:
@@ -255,14 +203,13 @@ unsafe extern "C-unwind" fn tview_subxact_callback(
 /// - Dependency order respected (topological sort per iteration)
 /// - Propagation coalesced (parents discovered during refresh added to queue)
 /// - Transaction-safe (fail-fast aborts transaction on first error)
-fn handle_pre_commit() -> TViewResult<()> {
+pub fn flush_refresh_queue() -> TViewResult<()> {
     // Take initial snapshot from triggers
     let mut pending = take_queue_snapshot();
 
     if pending.is_empty() {
         return Ok(());
     }
-
 
     // Start timing the entire refresh operation
     let refresh_timer = crate::metrics::metrics_api::record_refresh_start();
@@ -271,52 +218,43 @@ fn handle_pre_commit() -> TViewResult<()> {
     let graph = super::cache::graph_cache::load_cached()?;
 
     // Track processed keys to avoid duplicates
-    let mut processed: std::collections::HashSet<super::key::RefreshKey> = std::collections::HashSet::new();
+    // Pre-allocate with capacity based on initial pending size
+    let mut processed: std::collections::HashSet<super::key::RefreshKey> =
+        std::collections::HashSet::with_capacity(pending.len().max(16));
 
-    // Process queue until empty (handles propagation)
+    // Outer drain loop: after the inner loop empties `pending`, check for
+    // late-enqueued items from triggers that fired during refresh (e.g.,
+    // pg_treekey cascading child rows in tb_location).  The `processed` set
+    // carries across drain passes so already-refreshed keys are not repeated.
     let mut iteration = 1;
-    while !pending.is_empty() {
-        // Sort this batch by dependency order
-        let sorted_keys = graph.sort_keys(pending.drain().collect());
+    loop {
+        // Inner loop: process pending until empty (propagation via parents)
+        while !pending.is_empty() {
+            // Sort this batch by dependency order
+            let sorted_keys = graph.sort_keys(pending.drain().collect());
 
+            // Group keys by entity for bulk refresh
+            // Pre-allocate with estimated entity count (typically 3-10 entities)
+            let mut keys_by_entity: std::collections::HashMap<String, Vec<super::key::RefreshKey>> =
+                std::collections::HashMap::with_capacity(8);
 
-        // Group keys by entity for bulk refresh
-        let mut keys_by_entity: std::collections::HashMap<String, Vec<super::key::RefreshKey>> =
-            std::collections::HashMap::new();
-
-        for key in sorted_keys {
-            // Skip if already processed (deduplication)
-            if !processed.insert(key.clone()) {
-                continue;
-            }
-            keys_by_entity.entry(key.entity.clone()).or_default().push(key);
-        }
-
-        // Process each entity group
-        for (entity, entity_keys) in keys_by_entity {
-            if entity_keys.len() == 1 {
-                // Single key: use existing individual refresh
-                let key = &entity_keys[0];
-                let parents = refresh_and_get_parents(key)?;
-
-                // Add discovered parents to pending queue
-                for parent_key in parents {
-                    if !processed.contains(&parent_key) {
-                        pending.insert(parent_key);
-                    }
+            for key in sorted_keys {
+                // Skip if already processed (deduplication)
+                if !processed.insert(key.clone()) {
+                    continue;
                 }
-            } else {
-                // Multiple keys for same entity: use bulk refresh
-                let pks: Vec<i64> = entity_keys.iter().map(|k| k.pk).collect();
+                keys_by_entity
+                    .entry(key.entity.clone())
+                    .or_default()
+                    .push(key);
+            }
 
-
-                // Bulk refresh this entity
-                // FAIL-FAST: Propagate error immediately to abort transaction
-                crate::refresh::refresh_bulk(&entity, &pks)?;
-
-                // Discover parents for all keys in this entity group
-                for key in &entity_keys {
-                    let parents = crate::propagate::find_parents_for(key)?;
+            // Process each entity group
+            for (entity, entity_keys) in keys_by_entity {
+                if entity_keys.len() == 1 {
+                    // Single key: use existing individual refresh
+                    let key = &entity_keys[0];
+                    let parents = refresh_and_get_parents(key, &graph)?;
 
                     // Add discovered parents to pending queue
                     for parent_key in parents {
@@ -324,22 +262,68 @@ fn handle_pre_commit() -> TViewResult<()> {
                             pending.insert(parent_key);
                         }
                     }
+                } else {
+                    // Multiple keys for same entity: use bulk refresh (PK-only path)
+                    // Pre-allocate Vec based on PK-only keys (exclude dedup keys)
+                    let mut pks =
+                        Vec::with_capacity(entity_keys.iter().filter(|k| !k.is_dedup()).count());
+                    for key in &entity_keys {
+                        if !key.is_dedup() {
+                            pks.push(key.pk);
+                        }
+                    }
+
+                    // Bulk refresh this entity
+                    // FAIL-FAST: Propagate error immediately to abort transaction
+                    crate::refresh::refresh_bulk(&entity, &pks)?;
+
+                    // Discover parents for all keys in this entity group (P-07: batched)
+                    // Instead of N × M separate queries, issue M batched queries (one per parent entity)
+                    let parent_map = crate::propagate::find_parents_batch(&entity_keys, &graph)?;
+
+                    // Add discovered parents to pending queue
+                    for parent_keys in parent_map.values() {
+                        for parent_key in parent_keys {
+                            if !processed.contains(parent_key) {
+                                pending.insert(parent_key.clone());
+                            }
+                        }
+                    }
                 }
+            }
+
+            iteration += 1;
+
+            // Safety check: prevent infinite loops
+            let max_depth = crate::config::max_propagation_depth();
+            if iteration > max_depth {
+                return Err(crate::TViewError::PropagationDepthExceeded {
+                    max_depth,
+                    processed: processed.len(),
+                });
             }
         }
 
-        iteration += 1;
-
-        // Safety check: prevent infinite loops
-        let max_depth = crate::config::max_propagation_depth();
-        if iteration > max_depth {
-            return Err(crate::TViewError::PropagationDepthExceeded {
-                max_depth,
-                processed: processed.len(),
-            });
+        // Drain any items enqueued by triggers that fired during refresh
+        let late = take_queue_snapshot();
+        if late.is_empty() {
+            break;
         }
+        pending = late;
     }
 
+    // Buffer batched audit entries: one per entity with aggregated row count.
+    // Actual INSERT happens in flush_audit_buffer() called from the COMMIT hook.
+    {
+        let mut entity_counts: std::collections::HashMap<&str, i64> =
+            std::collections::HashMap::new();
+        for key in &processed {
+            *entity_counts.entry(&key.entity).or_insert(0) += 1;
+        }
+        for (entity, count) in entity_counts {
+            crate::audit::log_refresh(entity, count);
+        }
+    }
 
     // Record metrics
     crate::metrics::metrics_api::record_refresh_complete(
@@ -362,68 +346,31 @@ fn handle_pre_commit() -> TViewResult<()> {
 ///
 /// This function returns parent keys for queue processing instead of
 /// calling `refresh_pk()` recursively.
-fn refresh_and_get_parents(key: &super::key::RefreshKey) -> TViewResult<Vec<super::key::RefreshKey>> {
+fn refresh_and_get_parents(
+    key: &super::key::RefreshKey,
+    graph: &super::EntityDepGraph,
+) -> TViewResult<Vec<super::key::RefreshKey>> {
     // Load metadata
     use crate::catalog::TviewMeta;
-    let meta = TviewMeta::load_by_entity(&key.entity)?
-        .ok_or_else(|| crate::TViewError::MetadataNotFound {
+    let meta = TviewMeta::load_by_entity(&key.entity)?.ok_or_else(|| {
+        crate::TViewError::MetadataNotFound {
             entity: key.entity.clone(),
-        })?;
+        }
+    })?;
 
-    // Refresh this entity (existing logic)
-    crate::refresh::refresh_pk(meta.view_oid, key.pk)?;
+    // Refresh this entity — dispatch on key type
+    if let Some(dedup) = &key.dedup_key {
+        crate::refresh::refresh_by_dedup_key(meta.view_oid, dedup)?;
+    } else {
+        crate::refresh::refresh_pk(meta.view_oid, key.pk)?;
+    }
 
     // Find parent entities (NEW: returns keys instead of refreshing)
-    let parent_keys = crate::propagate::find_parents_for(key)?;
+    let parent_keys = crate::propagate::find_parents_for(key, graph)?;
 
     Ok(parent_keys)
 }
 
-/// Handle PREPARE TRANSACTION event: persist queue to database
-///
-/// This ensures that 2PC transactions don't lose pending refreshes.
-/// The queue is serialized and stored in `pg_tview_pending_refreshes`.
-fn handle_prepare() -> TViewResult<()> {
-    // Get global transaction ID (GID) captured by ProcessUtility hook
-    let gid = get_prepared_transaction_id()?;
-
-    // Take snapshot of current queue
-    let queue = take_queue_snapshot();
-
-    if queue.is_empty() {
-        // No refreshes pending, nothing to persist
-        return Ok(());
-    }
-
-
-    // Serialize queue using JSONB format (configurable in future)
-    let serialized = super::persistence::SerializedQueue::from_queue(queue);
-    #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
-    let queue_size = serialized.keys.len() as i32; // Safe: Queue size is bounded by GUC max_prepared_transactions (typically < 1000)
-    let queue_jsonb = serialized.into_jsonb()?;
-
-    // Store in persistent table
-    let insert_args = vec![
-        unsafe { DatumWithOid::new(gid, PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value()) },
-        unsafe { DatumWithOid::new(queue_jsonb, PgOid::BuiltIn(PgBuiltInOids::JSONBOID).value()) },
-        unsafe { DatumWithOid::new(queue_size, PgOid::BuiltIn(PgBuiltInOids::INT4OID).value()) },
-    ];
-    Spi::run_with_args(
-        "INSERT INTO pg_tview_pending_refreshes
-         (gid, refresh_queue, queue_size, expires_at)
-         VALUES ($1, $2, $3, now() + interval '24 hours')",
-        &insert_args,
-    )?;
-
-    // Clear in-memory queue (transaction is prepared, not committed)
-    clear_queue();
-
-    Ok(())
-}
-
-/// Get the global transaction ID for the currently preparing transaction
-///
-/// This retrieves the GID captured by the `ProcessUtility` hook during PREPARE TRANSACTION.
-fn get_prepared_transaction_id() -> TViewResult<String> {
-    crate::hooks::get_prepared_transaction_id()
-}
+// NOTE: Full 2PC support (PREPARE TRANSACTION with queue persistence) is not
+// implemented in 0.1.0. The ProcessUtility hook rejects PREPARE TRANSACTION
+// when TVIEW refreshes are pending. See hooks.rs for the guard.

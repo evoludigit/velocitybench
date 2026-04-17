@@ -6,10 +6,12 @@ Compares current performance against baseline and detects significant regression
 """
 
 import json
-import statistics
+import subprocess
 import sys
 import time
 from dataclasses import dataclass
+from typing import Dict, Tuple, List
+import statistics
 
 
 @dataclass
@@ -21,7 +23,7 @@ class BenchmarkResult:
     n: int
 
 
-def load_baseline(path: str = "baseline.json") -> dict:
+def load_baseline(path: str = "baseline.json") -> Dict:
     """Load baseline performance data"""
     try:
         with open(path) as f:
@@ -96,10 +98,10 @@ def run_benchmark_simulation(name: str, iterations: int = 10) -> BenchmarkResult
 
 
 def detect_regression(
-    baseline: dict,
+    baseline: Dict,
     current: BenchmarkResult,
     threshold: float = 0.10,  # 10% regression threshold
-) -> tuple[bool, float, str]:
+) -> Tuple[bool, float, str]:
     """
     Detect if current performance is significantly worse than baseline
 
@@ -127,7 +129,7 @@ def detect_regression(
     return is_regression and percent_change > 0, percent_change, msg
 
 
-def save_results(results: list[BenchmarkResult], filename: str):
+def save_results(results: List[BenchmarkResult], filename: str):
     """Save benchmark results to JSON file"""
     data = {
         "timestamp": time.time(),

@@ -7,9 +7,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
           components: clippy
       - name: Install PostgreSQL 16 (Ubuntu default)
         run: |
@@ -21,7 +20,7 @@ jobs:
           sudo systemctl enable postgresql
       - name: Install pgrx
         run: |
-          cargo install --locked cargo-pgrx
+          cargo install --locked cargo-pgrx --version 0.16.1
           cargo pgrx init --pg16 /usr/lib/postgresql/16/bin/pg_config
       - name: Run strict clippy with efficient jsonb_delta focus
         run: |
@@ -34,3 +33,10 @@ jobs:
             -A clippy::missing_errors_doc \
             -A clippy::module_name_repetitions \
             -A clippy::multiple_crate_versions
+      - name: Check for SQL quote-doubling anti-pattern
+        run: |
+          # Exclude ddl/convert.rs:370 — justified: DDL VALUES clause, data from DB, ::jsonb cast
+          if grep -rn "replace.*'\\\\''.*''" src/ | grep -v 'ddl/convert.rs.*escaped_data'; then
+            echo "::error::Found quote-doubling pattern. Use parameterized queries instead."
+            exit 1
+          fi

@@ -1,4 +1,3 @@
-
 use std::fmt;
 
 pub mod testing;
@@ -8,45 +7,30 @@ pub mod testing;
 pub enum TViewError {
     // ============ Metadata Errors (P0xxx) ============
     /// TVIEW metadata not found
-    MetadataNotFound {
-        entity: String,
-    },
+    MetadataNotFound { entity: String },
 
     /// TVIEW already exists
-    TViewAlreadyExists {
-        name: String,
-    },
+    TViewAlreadyExists { name: String },
 
     /// Invalid TVIEW name format
-    InvalidTViewName {
-        name: String,
-        reason: String,
-    },
+    InvalidTViewName { name: String, reason: String },
+
+    /// Invalid function input parameter
+    InvalidInput { parameter: String, reason: String },
 
     // ============ Dependency Errors (55xxx) ============
     /// Circular dependency detected
-    CircularDependency {
-        cycle: Vec<String>,
-    },
+    CircularDependency { cycle: Vec<String> },
 
     /// Maximum dependency depth exceeded
-    DependencyDepthExceeded {
-        depth: usize,
-        max_depth: usize,
-    },
+    DependencyDepthExceeded { depth: usize, max_depth: usize },
 
     /// Dependency resolution failed
-    DependencyResolutionFailed {
-        view_name: String,
-        reason: String,
-    },
+    DependencyResolutionFailed { view_name: String, reason: String },
 
     // ============ SQL Parsing Errors (42xxx) ============
     /// Invalid SELECT statement
-    InvalidSelectStatement {
-        sql: String,
-        reason: String,
-    },
+    InvalidSelectStatement { sql: String, reason: String },
 
     /// Required column missing
     RequiredColumnMissing {
@@ -55,10 +39,7 @@ pub enum TViewError {
     },
 
     /// Column type inference failed
-    TypeInferenceFailed {
-        column_name: String,
-        reason: String,
-    },
+    TypeInferenceFailed { column_name: String, reason: String },
 
     // ============ Extension Dependency Errors (58xxx) ============
     /// `jsonb_delta` extension not installed
@@ -73,15 +54,10 @@ pub enum TViewError {
 
     // ============ Concurrency Errors (40xxx) ============
     /// Lock acquisition timeout
-    LockTimeout {
-        resource: String,
-        timeout_ms: u64,
-    },
+    LockTimeout { resource: String, timeout_ms: u64 },
 
     /// Deadlock detected
-    DeadlockDetected {
-        context: String,
-    },
+    DeadlockDetected { context: String },
 
     // ============ Refresh Errors (54xxx) ============
     /// Cascade depth limit exceeded
@@ -98,40 +74,24 @@ pub enum TViewError {
     },
 
     /// Batch operation too large
-    BatchTooLarge {
-        size: usize,
-        max_size: usize,
-    },
+    BatchTooLarge { size: usize, max_size: usize },
 
     // ============ Graph and Propagation Errors ============
     /// Dependency cycle detected in entity graph
-    DependencyCycle {
-        entities: Vec<String>,
-    },
+    DependencyCycle { entities: Vec<String> },
 
     /// Propagation exceeded maximum depth (possible infinite loop)
-    PropagationDepthExceeded {
-        max_depth: usize,
-        processed: usize,
-    },
+    PropagationDepthExceeded { max_depth: usize, processed: usize },
 
     // ============ I/O and System Errors (XX000) ============
     /// `PostgreSQL` catalog operation failed
-    CatalogError {
-        operation: String,
-        pg_error: String,
-    },
+    CatalogError { operation: String, pg_error: String },
 
     /// SPI operation failed
-    SpiError {
-        query: String,
-        error: String,
-    },
+    SpiError { query: String, error: String },
 
     /// Serialization/deserialization failed
-    SerializationError {
-        message: String,
-    },
+    SerializationError { message: String },
 
     /// Configuration error (invalid GUC values)
     ConfigError {
@@ -141,10 +101,7 @@ pub enum TViewError {
     },
 
     /// Cache error (poisoned mutex, corruption)
-    CacheError {
-        cache_name: String,
-        reason: String,
-    },
+    CacheError { cache_name: String, reason: String },
 
     /// FFI callback error (panic in C context)
     CallbackError {
@@ -153,10 +110,7 @@ pub enum TViewError {
     },
 
     /// Metrics error (tracking failure)
-    MetricsError {
-        operation: String,
-        error: String,
-    },
+    MetricsError { operation: String, error: String },
 
     /// Internal error (bug in extension)
     InternalError {
@@ -174,20 +128,31 @@ impl TViewError {
             Self::MetadataNotFound { .. } => "P0001", // Raise exception
             Self::TViewAlreadyExists { .. } => "42710", // Duplicate object
             Self::InvalidTViewName { .. } => "42602", // Invalid name
+            Self::InvalidInput { .. } => "22023",     // Invalid parameter value
 
             Self::CircularDependency { .. } | Self::DependencyCycle { .. } => "55P03", // Lock not available (cycle)
-            Self::DependencyDepthExceeded { .. } | Self::CascadeDepthExceeded { .. } | Self::PropagationDepthExceeded { .. } => "54001", // Statement too complex
+            Self::DependencyDepthExceeded { .. }
+            | Self::CascadeDepthExceeded { .. }
+            | Self::PropagationDepthExceeded { .. } => "54001", // Statement too complex
             Self::DependencyResolutionFailed { .. } => "55000", // Object not in prerequisite state
 
             Self::InvalidSelectStatement { .. } => "42601", // Syntax error
-            Self::RequiredColumnMissing { .. } => "42703", // Undefined column
-            Self::TypeInferenceFailed { .. } => "42804", // Datatype mismatch
+            Self::RequiredColumnMissing { .. } => "42703",  // Undefined column
+            Self::TypeInferenceFailed { .. } => "42804",    // Datatype mismatch
 
             Self::JsonbIvmNotInstalled | Self::ExtensionVersionMismatch { .. } => "58P01", // Undefined file (extension)
 
             Self::LockTimeout { .. } | Self::DeadlockDetected { .. } => "40P01", // Deadlock detected (timeout)
 
-            Self::RefreshFailed { .. } | Self::CatalogError { .. } | Self::SpiError { .. } | Self::SerializationError { .. } | Self::ConfigError { .. } | Self::CacheError { .. } | Self::CallbackError { .. } | Self::MetricsError { .. } | Self::InternalError { .. } => "XX000", // Internal error
+            Self::RefreshFailed { .. }
+            | Self::CatalogError { .. }
+            | Self::SpiError { .. }
+            | Self::SerializationError { .. }
+            | Self::ConfigError { .. }
+            | Self::CacheError { .. }
+            | Self::CallbackError { .. }
+            | Self::MetricsError { .. }
+            | Self::InternalError { .. } => "XX000", // Internal error
             Self::BatchTooLarge { .. } => "54000", // Program limit exceeded
         }
     }
@@ -195,7 +160,11 @@ impl TViewError {
     /// Create internal error with file/line info
     #[must_use]
     pub const fn internal(message: String, file: &'static str, line: u32) -> Self {
-        Self::InternalError { message, file, line }
+        Self::InternalError {
+            message,
+            file,
+            line,
+        }
     }
 }
 
@@ -211,6 +180,9 @@ impl fmt::Display for TViewError {
             Self::InvalidTViewName { name, reason } => {
                 write!(f, "Invalid TVIEW name '{name}': {reason}")
             }
+            Self::InvalidInput { parameter, reason } => {
+                write!(f, "Invalid input for parameter '{parameter}': {reason}")
+            }
             Self::CircularDependency { cycle } => {
                 write!(f, "Circular dependency detected: {}", cycle.join(" → "))
             }
@@ -218,73 +190,151 @@ impl fmt::Display for TViewError {
                 write!(f, "Dependency depth {depth} exceeds maximum {max_depth}")
             }
             Self::DependencyResolutionFailed { view_name, reason } => {
-                write!(f, "Failed to resolve dependencies for '{view_name}': {reason}")
+                write!(
+                    f,
+                    "Failed to resolve dependencies for '{view_name}': {reason}"
+                )
             }
             Self::InvalidSelectStatement { sql, reason } => {
-                write!(f, "Invalid SELECT statement: {reason}\nSQL: {}",
-                       if sql.len() > 100 { &sql[..100] } else { sql })
+                write!(
+                    f,
+                    "Invalid SELECT statement: {reason}\nSQL: {}",
+                    if sql.len() > 100 { &sql[..100] } else { sql }
+                )
             }
-            Self::RequiredColumnMissing { column_name, context } => {
+            Self::RequiredColumnMissing {
+                column_name,
+                context,
+            } => {
                 write!(f, "Required column '{column_name}' missing in {context}")
             }
-            Self::TypeInferenceFailed { column_name, reason } => {
-                write!(f, "Failed to infer type for column '{column_name}': {reason}")
+            Self::TypeInferenceFailed {
+                column_name,
+                reason,
+            } => {
+                write!(
+                    f,
+                    "Failed to infer type for column '{column_name}': {reason}"
+                )
             }
             Self::JsonbIvmNotInstalled => {
-                write!(f, "Required extension 'jsonb_delta' is not installed. Run: CREATE EXTENSION jsonb_delta;")
+                write!(
+                    f,
+                    "Required extension 'jsonb_delta' is not installed. Run: CREATE EXTENSION jsonb_delta;"
+                )
             }
-            Self::ExtensionVersionMismatch { extension, required, found } => {
-                write!(f, "Extension '{extension}' version mismatch: required {required}, found {found}")
+            Self::ExtensionVersionMismatch {
+                extension,
+                required,
+                found,
+            } => {
+                write!(
+                    f,
+                    "Extension '{extension}' version mismatch: required {required}, found {found}"
+                )
             }
-            Self::LockTimeout { resource, timeout_ms } => {
-                write!(f, "Lock timeout on resource '{resource}' after {timeout_ms}ms")
+            Self::LockTimeout {
+                resource,
+                timeout_ms,
+            } => {
+                write!(
+                    f,
+                    "Lock timeout on resource '{resource}' after {timeout_ms}ms"
+                )
             }
             Self::DeadlockDetected { context } => {
                 write!(f, "Deadlock detected in {context}")
             }
-            Self::CascadeDepthExceeded { current_depth, max_depth } => {
-                write!(f, "Cascade depth {current_depth} exceeds maximum {max_depth}. Possible infinite cascade loop.")
+            Self::CascadeDepthExceeded {
+                current_depth,
+                max_depth,
+            } => {
+                write!(
+                    f,
+                    "Cascade depth {current_depth} exceeds maximum {max_depth}. Possible infinite cascade loop."
+                )
             }
-            Self::RefreshFailed { entity, pk_value, reason } => {
-                write!(f, "Failed to refresh TVIEW '{entity}' row {pk_value}: {reason}")
+            Self::RefreshFailed {
+                entity,
+                pk_value,
+                reason,
+            } => {
+                write!(
+                    f,
+                    "Failed to refresh TVIEW '{entity}' row {pk_value}: {reason}"
+                )
             }
             Self::BatchTooLarge { size, max_size } => {
                 write!(f, "Batch size {size} exceeds maximum {max_size}")
             }
             Self::DependencyCycle { entities } => {
-                write!(f, "Dependency cycle detected in entity graph: {}", entities.join(" -> "))
+                write!(
+                    f,
+                    "Dependency cycle detected in entity graph: {}",
+                    entities.join(" -> ")
+                )
             }
-            Self::PropagationDepthExceeded { max_depth, processed } => {
+            Self::PropagationDepthExceeded {
+                max_depth,
+                processed,
+            } => {
                 write!(
                     f,
                     "Propagation exceeded maximum depth of {max_depth} iterations ({processed} entities processed). \
                      Possible infinite loop or extremely deep dependency chain."
                 )
             }
-            Self::CatalogError { operation, pg_error } => {
+            Self::CatalogError {
+                operation,
+                pg_error,
+            } => {
                 write!(f, "Catalog operation '{operation}' failed: {pg_error}")
             }
             Self::SpiError { query, error } => {
-                write!(f, "SPI query failed: {error}\nQuery: {}",
-                       if query.len() > 100 { &query[..100] } else { query })
+                write!(
+                    f,
+                    "SPI query failed: {error}\nQuery: {}",
+                    if query.len() > 100 {
+                        &query[..100]
+                    } else {
+                        query
+                    }
+                )
             }
             Self::SerializationError { message } => {
                 write!(f, "Serialization error: {message}")
             }
-            Self::ConfigError { setting, value, reason } => {
-                write!(f, "Configuration error for '{setting}': {reason} (value: {value})")
+            Self::ConfigError {
+                setting,
+                value,
+                reason,
+            } => {
+                write!(
+                    f,
+                    "Configuration error for '{setting}': {reason} (value: {value})"
+                )
             }
             Self::CacheError { cache_name, reason } => {
                 write!(f, "Cache '{cache_name}' error: {reason}")
             }
-            Self::CallbackError { callback_name, error } => {
+            Self::CallbackError {
+                callback_name,
+                error,
+            } => {
                 write!(f, "FFI callback '{callback_name}' failed: {error}")
             }
             Self::MetricsError { operation, error } => {
                 write!(f, "Metrics operation '{operation}' failed: {error}")
             }
-            Self::InternalError { message, file, line } => {
-                write!(f, "Internal error at {file}:{line}: {message}\nPlease report this bug.")
+            Self::InternalError {
+                message,
+                file,
+                line,
+            } => {
+                write!(
+                    f,
+                    "Internal error at {file}:{line}: {message}\nPlease report this bug."
+                )
             }
         }
     }
@@ -342,14 +392,14 @@ impl From<std::io::Error> for TViewError {
     }
 }
 
-/// Convert `TViewError` to pgrx error (for raising to `PostgreSQL`)
+/// Convert `TViewError` to pgrx `SpiError` for use in SPI closures.
+///
+/// Maps to the closest `SpiErrorCodes` variant. Most callers wrap the
+/// result back into `TViewError` via `map_err`, so the specific variant
+/// mainly affects error messages in SPI contexts.
 impl From<TViewError> for pgrx::spi::Error {
-    fn from(e: TViewError) -> Self {
-        let _sqlstate = e.sqlstate();
-        let _message = e.to_string();
-
-        // Map to pgrx error levels
-        Self::InvalidPosition
+    fn from(_e: TViewError) -> Self {
+        Self::SpiError(pgrx::spi::SpiErrorCodes::OpUnknown)
     }
 }
 
@@ -407,7 +457,11 @@ mod tests {
         let err = internal_error!("Test error at {}", "location");
 
         match err {
-            TViewError::InternalError { message, file, line } => {
+            TViewError::InternalError {
+                message,
+                file,
+                line,
+            } => {
                 assert!(message.contains("Test error"));
                 assert!(file.ends_with("mod.rs"));
                 assert!(line > 0);
@@ -419,36 +473,109 @@ mod tests {
     #[test]
     fn test_all_error_sqlstates_unique() {
         let errors = vec![
-            TViewError::MetadataNotFound { entity: "test".to_string() },
-            TViewError::TViewAlreadyExists { name: "test".to_string() },
-            TViewError::InvalidTViewName { name: "test".to_string(), reason: "test".to_string() },
+            TViewError::MetadataNotFound {
+                entity: "test".to_string(),
+            },
+            TViewError::TViewAlreadyExists {
+                name: "test".to_string(),
+            },
+            TViewError::InvalidTViewName {
+                name: "test".to_string(),
+                reason: "test".to_string(),
+            },
+            TViewError::InvalidInput {
+                parameter: "test".to_string(),
+                reason: "test".to_string(),
+            },
             TViewError::CircularDependency { cycle: vec![] },
-            TViewError::DependencyDepthExceeded { depth: 1, max_depth: 1 },
-            TViewError::DependencyResolutionFailed { view_name: "test".to_string(), reason: "test".to_string() },
-            TViewError::InvalidSelectStatement { sql: "test".to_string(), reason: "test".to_string() },
-            TViewError::RequiredColumnMissing { column_name: "test".to_string(), context: "test".to_string() },
-            TViewError::TypeInferenceFailed { column_name: "test".to_string(), reason: "test".to_string() },
+            TViewError::DependencyDepthExceeded {
+                depth: 1,
+                max_depth: 1,
+            },
+            TViewError::DependencyResolutionFailed {
+                view_name: "test".to_string(),
+                reason: "test".to_string(),
+            },
+            TViewError::InvalidSelectStatement {
+                sql: "test".to_string(),
+                reason: "test".to_string(),
+            },
+            TViewError::RequiredColumnMissing {
+                column_name: "test".to_string(),
+                context: "test".to_string(),
+            },
+            TViewError::TypeInferenceFailed {
+                column_name: "test".to_string(),
+                reason: "test".to_string(),
+            },
             TViewError::JsonbIvmNotInstalled,
-            TViewError::ExtensionVersionMismatch { extension: "test".to_string(), required: "1".to_string(), found: "2".to_string() },
-            TViewError::LockTimeout { resource: "test".to_string(), timeout_ms: 1000 },
-            TViewError::DeadlockDetected { context: "test".to_string() },
-            TViewError::CascadeDepthExceeded { current_depth: 1, max_depth: 1 },
-            TViewError::RefreshFailed { entity: "test".to_string(), pk_value: 1, reason: "test".to_string() },
-            TViewError::BatchTooLarge { size: 1, max_size: 1 },
-            TViewError::CatalogError { operation: "test".to_string(), pg_error: "test".to_string() },
-            TViewError::SpiError { query: "test".to_string(), error: "test".to_string() },
-            TViewError::SerializationError { message: "test".to_string() },
-            TViewError::ConfigError { setting: "test".to_string(), value: "test".to_string(), reason: "test".to_string() },
-            TViewError::CacheError { cache_name: "test".to_string(), reason: "test".to_string() },
-            TViewError::CallbackError { callback_name: "test".to_string(), error: "test".to_string() },
-            TViewError::MetricsError { operation: "test".to_string(), error: "test".to_string() },
-            TViewError::InternalError { message: "test".to_string(), file: "test", line: 1 },
+            TViewError::ExtensionVersionMismatch {
+                extension: "test".to_string(),
+                required: "1".to_string(),
+                found: "2".to_string(),
+            },
+            TViewError::LockTimeout {
+                resource: "test".to_string(),
+                timeout_ms: 1000,
+            },
+            TViewError::DeadlockDetected {
+                context: "test".to_string(),
+            },
+            TViewError::CascadeDepthExceeded {
+                current_depth: 1,
+                max_depth: 1,
+            },
+            TViewError::RefreshFailed {
+                entity: "test".to_string(),
+                pk_value: 1,
+                reason: "test".to_string(),
+            },
+            TViewError::BatchTooLarge {
+                size: 1,
+                max_size: 1,
+            },
+            TViewError::CatalogError {
+                operation: "test".to_string(),
+                pg_error: "test".to_string(),
+            },
+            TViewError::SpiError {
+                query: "test".to_string(),
+                error: "test".to_string(),
+            },
+            TViewError::SerializationError {
+                message: "test".to_string(),
+            },
+            TViewError::ConfigError {
+                setting: "test".to_string(),
+                value: "test".to_string(),
+                reason: "test".to_string(),
+            },
+            TViewError::CacheError {
+                cache_name: "test".to_string(),
+                reason: "test".to_string(),
+            },
+            TViewError::CallbackError {
+                callback_name: "test".to_string(),
+                error: "test".to_string(),
+            },
+            TViewError::MetricsError {
+                operation: "test".to_string(),
+                error: "test".to_string(),
+            },
+            TViewError::InternalError {
+                message: "test".to_string(),
+                file: "test",
+                line: 1,
+            },
         ];
 
         let sqlstates: Vec<&str> = errors.iter().map(TViewError::sqlstate).collect();
         let unique_sqlstates: std::collections::HashSet<&str> = sqlstates.iter().copied().collect();
 
         // All SQLSTATEs should be unique (though some may share codes intentionally)
-        assert!(unique_sqlstates.len() >= 15, "Too many duplicate SQLSTATE codes");
+        assert!(
+            unique_sqlstates.len() >= 15,
+            "Too many duplicate SQLSTATE codes"
+        );
     }
 }

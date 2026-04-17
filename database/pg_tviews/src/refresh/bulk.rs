@@ -3,13 +3,13 @@
 //! Provides efficient refresh of multiple rows in a single operation.
 //! Reduces query count from N queries to 2 queries for N rows.
 
+use crate::catalog::TviewMeta;
+use crate::utils::{lookup_view_for_source, quote_identifier};
+use crate::TViewResult;
+use pgrx::datum::DatumWithOid;
 use pgrx::prelude::*;
 use pgrx::spi;
 use pgrx::JsonB;
-use pgrx::datum::DatumWithOid;
-use crate::catalog::TviewMeta;
-use crate::utils::lookup_view_for_source;
-use crate::TViewResult;
 
 /// Refresh multiple rows of the same entity in a single operation
 ///
@@ -48,8 +48,8 @@ pub fn refresh_bulk(entity: &str, pks: &[i64]) -> TViewResult<()> {
     }
 
     // Load metadata once
-    let meta = TviewMeta::load_by_entity(entity)?
-        .ok_or_else(|| crate::TViewError::MetadataNotFound {
+    let meta =
+        TviewMeta::load_by_entity(entity)?.ok_or_else(|| crate::TViewError::MetadataNotFound {
             entity: entity.to_string(),
         })?;
 
@@ -57,9 +57,11 @@ pub fn refresh_bulk(entity: &str, pks: &[i64]) -> TViewResult<()> {
     let view_name = lookup_view_for_source(meta.view_oid)?;
     let pk_col = format!("pk_{entity}");
 
-    // SAFE: Use ANY($1) with array parameter (prevents SQL injection)
+    let data_col = "data";
     let query = format!(
-        "SELECT * FROM {} WHERE {} = ANY($1)",
+        "SELECT {}, {} FROM {} WHERE {} = ANY($1)",
+        quote_identifier(&pk_col),
+        quote_identifier(data_col),
         quote_identifier(&view_name),
         quote_identifier(&pk_col)
     );
@@ -67,32 +69,33 @@ pub fn refresh_bulk(entity: &str, pks: &[i64]) -> TViewResult<()> {
     Spi::connect(|client| {
         // Create PostgreSQL BIGINT[] array from Vec<i64>
         let args = vec![unsafe {
-            DatumWithOid::new(pks.to_vec(), PgOid::BuiltIn(PgBuiltInOids::INT8ARRAYOID).value())
+            DatumWithOid::new(
+                pks.to_vec(),
+                PgOid::BuiltIn(PgBuiltInOids::INT8ARRAYOID).value(),
+            )
         }];
-        let rows = client.select(
-            &query,
-            None,
-            &args,
-        )?;
+        let rows = client.select(&query, None, &args)?;
 
         // Batch update using UPDATE ... FROM unnest()
-        let tv_name = relname_from_oid(meta.tview_oid)?;
+        let tv_name = crate::utils::relname_from_oid(meta.tview_oid)?;
 
         // Collect data for update
         let mut update_pks: Vec<i64> = Vec::new();
         let mut update_data: Vec<JsonB> = Vec::new();
 
         for row in rows {
-            let pk: i64 = row[&pk_col as &str].value()?
-                .ok_or_else(|| spi::Error::from(crate::TViewError::SpiError {
+            let pk: i64 = row[&pk_col as &str].value()?.ok_or_else(|| {
+                spi::Error::from(crate::TViewError::SpiError {
                     query: String::new(),
                     error: format!("{pk_col} column is NULL"),
-                }))?;
-            let data: JsonB = row["data"].value()?
-                .ok_or_else(|| spi::Error::from(crate::TViewError::SpiError {
+                })
+            })?;
+            let data: JsonB = row["data"].value()?.ok_or_else(|| {
+                spi::Error::from(crate::TViewError::SpiError {
                     query: String::new(),
                     error: "data column is NULL".to_string(),
-                }))?;
+                })
+            })?;
             update_pks.push(pk);
             update_data.push(data);
         }
@@ -119,37 +122,23 @@ pub fn refresh_bulk(entity: &str, pks: &[i64]) -> TViewResult<()> {
         Spi::run_with_args(
             &update_query,
             &[
-                unsafe { DatumWithOid::new(update_pks, PgOid::BuiltIn(PgBuiltInOids::INT8ARRAYOID).value()) },
-                unsafe { DatumWithOid::new(update_data, PgOid::BuiltIn(PgBuiltInOids::JSONBARRAYOID).value()) },
+                unsafe {
+                    DatumWithOid::new(
+                        update_pks,
+                        PgOid::BuiltIn(PgBuiltInOids::INT8ARRAYOID).value(),
+                    )
+                },
+                unsafe {
+                    DatumWithOid::new(
+                        update_data,
+                        PgOid::BuiltIn(PgBuiltInOids::JSONBARRAYOID).value(),
+                    )
+                },
             ],
         )?;
 
         Ok(())
     })
-}
-
-/// Helper: Quote identifier safely
-pub fn quote_identifier(name: &str) -> String {
-    // Use PostgreSQL's `quote_ident()` for safety
-    let quote_args = vec![unsafe { DatumWithOid::new(name, PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value()) }];
-    match Spi::get_one_with_args::<String>(
-        "SELECT quote_ident($1)",
-        &quote_args,
-    ) {
-        Ok(Some(quoted)) => quoted,
-        _ => format!("\"{}\"", name.replace('"', "\"\"")),
-    }
-}
-
-/// Helper: Look up TVIEW table name given its OID
-fn relname_from_oid(oid: pg_sys::Oid) -> spi::Result<String> {
-    crate::utils::spi_get_string(&format!(
-        "SELECT relname::text FROM pg_class WHERE oid = {oid:?}"
-    ))?
-    .ok_or_else(|| spi::Error::from(crate::TViewError::SpiError {
-        query: format!("SELECT relname FROM pg_class WHERE oid = {oid:?}"),
-        error: "No pg_class entry found".to_string(),
-    }))
 }
 
 #[cfg(test)]
@@ -160,16 +149,5 @@ mod tests {
     fn test_refresh_bulk_empty() {
         // Empty PK list should succeed without doing anything
         assert!(refresh_bulk("test", &[]).is_ok());
-    }
-
-    #[test]
-    fn test_quote_identifier() {
-        // Test basic identifier quoting
-        let result = quote_identifier("test_table");
-        assert_eq!(result, "\"test_table\"");
-
-        // Test identifier with special characters
-        let result = quote_identifier("test-table");
-        assert_eq!(result, "\"test-table\"");
     }
 }

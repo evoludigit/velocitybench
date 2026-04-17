@@ -3,8 +3,6 @@
 **Version**: 0.1.0-beta.1
 **Last Updated**: December 11, 2025
 
-> **Trinity Pattern Reference**: All examples follow the pattern from [.phases/excellence-roadmap/00-TRINITY-PATTERN-REFERENCE.md](../../.phases/excellence-roadmap/00-TRINITY-PATTERN-REFERENCE.md)
-
 ## Overview
 
 pg_tviews provides powerful SQL generation capabilities that require careful security considerations. This guide covers SQL injection prevention, access control, and secure usage patterns.
@@ -22,7 +20,7 @@ SELECT pg_tviews_create('tv_post', $$
     jsonb_build_object(
       'id', tb_post.id,
       'title', tb_post.title,
-      'userId', tb_user.id
+      'user_id', tb_user.id
     ) as data
   FROM tb_post
   INNER JOIN tb_user ON tb_post.fk_user = tb_user.pk_user
@@ -76,7 +74,7 @@ SELECT
   jsonb_build_object(
     'id', tb_user.id,
     'username', tb_user.username,
-    'passwordHash', tb_user.password_hash  -- DON'T EXPOSE!
+    'password_hash', tb_user.password_hash  -- DON'T EXPOSE!
   ) as data
 FROM tb_user;
 ```
@@ -91,7 +89,7 @@ SELECT
     'id', tb_user.id,
     'username', tb_user.username,
     'email', tb_user.email,
-    'createdAt', tb_user.created_at
+    'created_at', tb_user.created_at
   ) as data
 FROM tb_user;
 ```

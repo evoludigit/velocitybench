@@ -2763,7 +2763,7 @@ def format_report(
             "|-----------|----------|----:|-----------:|-----------:|--------------:|------------:|",
         ]
         # Sort by Q1 RPS descending (same order as summary table) for easy cross-reference.
-        q1_rps: dict[str, float] = {r.framework: r.rps for r in all_q1_sorted}
+        q1_rps: dict[str, float] = {r.framework: r.median_rps for r in all_q1_sorted}
         sorted_fws = sorted(
             resource_metrics.values(),
             key=lambda m: q1_rps.get(m.fw_name, 0),

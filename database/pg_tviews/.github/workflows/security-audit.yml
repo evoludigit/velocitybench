@@ -2,7 +2,7 @@ name: Security Audit
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main]
   pull_request:
   schedule:
     - cron: '0 0 * * *'  # Daily at midnight UTC
@@ -15,12 +15,10 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-audit and jq
         run: |

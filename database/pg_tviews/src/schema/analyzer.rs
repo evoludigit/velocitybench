@@ -24,6 +24,7 @@
 
 use crate::catalog::DependencyType;
 use regex::Regex;
+use std::sync::LazyLock;
 
 /// Regex pattern template for nested object detection
 /// Matches: '`key_name`', `v_something`.data
@@ -33,6 +34,20 @@ const NESTED_PATTERN_TEMPLATE: &str = r"'(\w+)',\s*{}.data";
 /// Matches: '`array_name`', `jsonb_agg`(`v_something`.data ...)
 /// Also handles COALESCE wrapper: COALESCE(`jsonb_agg`(...), '[]'::`jsonb`)
 const ARRAY_PATTERN_TEMPLATE: &str = r"'(\w+)',\s*(?:coalesce\s*\()?\s*jsonb_agg\s*\(\s*{}.data";
+
+/// Cached regex for inline array aggregation (no `v_entity.data` reference)
+/// Matches: '`array_name`', `jsonb_agg`(`jsonb_build_object`(...))
+/// Also handles COALESCE wrapper
+static INLINE_ARRAY_PATTERN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"'(\w+)',\s*(?:coalesce\s*\()?\s*jsonb_agg\s*\(\s*jsonb_build_object\s*\(")
+        .expect("INLINE_ARRAY_PATTERN_REGEX is valid")
+});
+
+/// Cached regex for detecting 'array_name', jsonb_agg(v_something.data ...)
+static ARRAY_PATTERN_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"'(\w+)',\s*(?:coalesce\s*\()?\s*jsonb_agg\s*\(\s*v_(\w+)\.data")
+        .expect("ARRAY_PATTERN_REGEX is valid")
+});
 
 /// Default match key for array dependencies
 const DEFAULT_ARRAY_MATCH_KEY: &str = "id";
@@ -86,10 +101,7 @@ impl DependencyInfo {
 /// # Returns
 /// Vector of `DependencyInfo`, one per FK column (order matches input)
 #[must_use]
-pub fn analyze_dependencies(
-    select_sql: &str,
-    fk_columns: &[String],
-) -> Vec<DependencyInfo> {
+pub fn analyze_dependencies(select_sql: &str, fk_columns: &[String]) -> Vec<DependencyInfo> {
     let mut deps = Vec::new();
 
     for fk_col in fk_columns {
@@ -130,9 +142,7 @@ fn infer_view_name(fk_col: &str) -> Option<String> {
 /// Detect how a single FK is used in the SELECT statement
 fn detect_dependency_type(select_sql: &str, fk_col: &str) -> DependencyInfo {
     // Normalize SQL: remove extra whitespace, make lowercase for pattern matching
-    let sql_normalized = select_sql
-        .replace(['\n', '\t'], " ")
-        .to_lowercase();
+    let sql_normalized = select_sql.replace(['\n', '\t'], " ").to_lowercase();
 
     // Try to infer view name from FK column
     let Some(view_name) = infer_view_name(fk_col) else {
@@ -144,13 +154,12 @@ fn detect_dependency_type(select_sql: &str, fk_col: &str) -> DependencyInfo {
     // Look for: 'key_name', v_something.data
     // Example: 'author', v_user.data
     let nested_pattern = NESTED_PATTERN_TEMPLATE.replace("{}", &regex::escape(&view_name));
-    if let Ok(re) = Regex::new(&nested_pattern) {
-        if let Some(captures) = re.captures(&sql_normalized) {
-            if let Some(key_match) = captures.get(1) {
-                let key_name = key_match.as_str().to_string();
-                return DependencyInfo::nested_object(key_name);
-            }
-        }
+    if let Ok(re) = Regex::new(&nested_pattern)
+        && let Some(captures) = re.captures(&sql_normalized)
+        && let Some(key_match) = captures.get(1)
+    {
+        let key_name = key_match.as_str().to_string();
+        return DependencyInfo::nested_object(key_name);
     }
 
     // Pattern 2: Array Aggregation
@@ -158,14 +167,13 @@ fn detect_dependency_type(select_sql: &str, fk_col: &str) -> DependencyInfo {
     // Example: 'comments', jsonb_agg(v_comment.data ORDER BY ...)
     // Also handles COALESCE wrapper
     let array_pattern = ARRAY_PATTERN_TEMPLATE.replace("{}", &regex::escape(&view_name));
-    if let Ok(re) = Regex::new(&array_pattern) {
-        if let Some(captures) = re.captures(&sql_normalized) {
-            if let Some(key_match) = captures.get(1) {
-                let array_name = key_match.as_str().to_string();
-                // Convention: arrays use "id" as match key
-                return DependencyInfo::array(array_name, DEFAULT_ARRAY_MATCH_KEY.to_string());
-            }
-        }
+    if let Ok(re) = Regex::new(&array_pattern)
+        && let Some(captures) = re.captures(&sql_normalized)
+        && let Some(key_match) = captures.get(1)
+    {
+        let array_name = key_match.as_str().to_string();
+        // Convention: arrays use "id" as match key
+        return DependencyInfo::array(array_name, DEFAULT_ARRAY_MATCH_KEY.to_string());
     }
 
     // Default: Scalar (FK exists but not used in JSONB composition)
@@ -176,27 +184,34 @@ fn detect_dependency_type(select_sql: &str, fk_col: &str) -> DependencyInfo {
 /// This finds arrays that aggregate data from other TVIEWs, even if no direct FK exists
 fn detect_array_dependencies(select_sql: &str) -> Vec<DependencyInfo> {
     let mut deps = Vec::new();
+    let mut seen_keys = std::collections::HashSet::new();
 
     // Normalize SQL for pattern matching
-    let sql_normalized = select_sql
-        .replace(['\n', '\t'], " ")
-        .to_lowercase();
+    let sql_normalized = select_sql.replace(['\n', '\t'], " ").to_lowercase();
 
-    // Pattern to match: 'array_name', jsonb_agg(v_something.data ...)
-    // Captures: (1) array_name, (2) view_name
-    let array_pattern = r"'(\w+)',\s*(?:coalesce\s*\()?\s*jsonb_agg\s*\(\s*v_(\w+)\.data";
-    let Ok(re) = Regex::new(array_pattern) else {
-        return deps; // Return empty if regex fails
-    };
+    // Pattern 1: 'array_name', jsonb_agg(v_something.data ...) — uses cached regex
+    for capture in ARRAY_PATTERN_REGEX.captures_iter(&sql_normalized) {
+        if let Some(array_name) = capture.get(1) {
+            let key = array_name.as_str().to_string();
+            if seen_keys.insert(key.clone()) {
+                deps.push(DependencyInfo::array(
+                    key,
+                    DEFAULT_ARRAY_MATCH_KEY.to_string(),
+                ));
+            }
+        }
+    }
 
-    for capture in re.captures_iter(&sql_normalized) {
-        if let (Some(array_name), Some(view_entity)) = (capture.get(1), capture.get(2)) {
-            let array_name = array_name.as_str().to_string();
-            let _view_name = format!("v_{}", view_entity.as_str());
-
-            // Create array dependency info
-            let dep_info = DependencyInfo::array(array_name, DEFAULT_ARRAY_MATCH_KEY.to_string());
-            deps.push(dep_info);
+    // Pattern 2: 'array_name', jsonb_agg(jsonb_build_object(...)) — uses cached regex
+    for capture in INLINE_ARRAY_PATTERN_REGEX.captures_iter(&sql_normalized) {
+        if let Some(array_name) = capture.get(1) {
+            let key = array_name.as_str().to_string();
+            if seen_keys.insert(key.clone()) {
+                deps.push(DependencyInfo::array(
+                    key,
+                    DEFAULT_ARRAY_MATCH_KEY.to_string(),
+                ));
+            }
         }
     }
 
@@ -277,7 +292,11 @@ mod tests {
             LEFT JOIN v_comment ON v_comment.fk_post = pk_post
             GROUP BY pk_post, fk_user, fk_category, v_user.data, v_category.data
         ";
-        let fk_cols = vec!["fk_user".to_string(), "fk_category".to_string(), "fk_comment".to_string()];
+        let fk_cols = vec![
+            "fk_user".to_string(),
+            "fk_category".to_string(),
+            "fk_comment".to_string(),
+        ];
 
         let deps = analyze_dependencies(sql, &fk_cols);
 
@@ -295,6 +314,27 @@ mod tests {
         assert_eq!(deps[2].dep_type, DependencyType::Array);
         assert_eq!(deps[2].jsonb_path, Some(vec!["comments".to_string()]));
         assert_eq!(deps[2].array_match_key, Some("id".to_string()));
+    }
+
+    #[test]
+    fn test_detect_inline_jsonb_agg() {
+        let sql = "SELECT pk_post, jsonb_build_object(
+            'title', p.title,
+            'comments', COALESCE(jsonb_agg(
+                jsonb_build_object('id', c.pk_comment, 'text', c.text)
+                ORDER BY c.pk_comment
+            ) FILTER (WHERE c.pk_comment IS NOT NULL), '[]'::jsonb)
+        ) AS data FROM tb_post p LEFT JOIN tb_comment c ON c.fk_post = p.pk_post";
+        let fk_cols = vec!["fk_user".to_string()];
+
+        let deps = analyze_dependencies(sql, &fk_cols);
+
+        // fk_user is scalar (no v_user.data reference) + 1 inline array dep
+        assert!(
+            deps.iter().any(|d| d.dep_type == DependencyType::Array
+                && d.jsonb_path == Some(vec!["comments".to_string()])),
+            "Should detect inline jsonb_agg array dependency for 'comments'"
+        );
     }
 
     #[test]

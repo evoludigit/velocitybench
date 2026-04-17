@@ -1,6 +1,6 @@
-use std::collections::{HashMap, HashSet, VecDeque};
-use pgrx::prelude::*;
 use crate::TViewResult;
+use pgrx::prelude::*;
+use std::collections::{HashMap, HashSet, VecDeque};
 
 /// Entity dependency graph for refresh ordering
 ///
@@ -15,12 +15,12 @@ use crate::TViewResult;
 pub struct EntityDepGraph {
     /// Parent relationships: entity -> list of entities that depend on it
     /// Example: "user" -> `["post", "feed"]`
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Reason: public API for graph introspection; populated during load()
     pub parents: HashMap<String, Vec<String>>,
 
     /// Child relationships: entity -> list of entities it depends on
     /// Example: "post" -> `["user"]`
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Reason: public API for graph introspection; populated during load()
     pub children: HashMap<String, Vec<String>>,
 
     /// Topological order (refresh from low to high dependency)
@@ -42,7 +42,8 @@ impl EntityDepGraph {
             let rows = client.select(query, None, &[])?;
 
             for row in rows {
-                let entity: String = row["entity"].value()
+                let entity: String = row["entity"]
+                    .value()
                     .map_err(|e| crate::TViewError::SpiError {
                         query: query.to_string(),
                         error: format!("Failed to get entity: {e}"),
@@ -51,11 +52,13 @@ impl EntityDepGraph {
                         query: query.to_string(),
                         error: "entity column is NULL".to_string(),
                     })?;
-                let fk_columns: Option<Vec<String>> = row["fk_columns"].value()
-                    .map_err(|e| crate::TViewError::SpiError {
-                        query: query.to_string(),
-                        error: format!("Failed to get fk_columns: {e}"),
-                    })?;
+                let fk_columns: Option<Vec<String>> =
+                    row["fk_columns"]
+                        .value()
+                        .map_err(|e| crate::TViewError::SpiError {
+                            query: query.to_string(),
+                            error: format!("Failed to get fk_columns: {e}"),
+                        })?;
 
                 all_entities.insert(entity.clone());
 
@@ -64,15 +67,17 @@ impl EntityDepGraph {
                         // FK column format: "fk_<entity>"
                         // Example: "fk_user" -> "user"
                         if let Some(parent_entity) = fk_col.strip_prefix("fk_") {
-            // Register parent relationship
-            parents.entry(parent_entity.to_string())
-                .or_default()
-                .push(entity.clone());
+                            // Register parent relationship
+                            parents
+                                .entry(parent_entity.to_string())
+                                .or_default()
+                                .push(entity.clone());
 
-            // Register child relationship
-            children.entry(entity.clone())
-                .or_default()
-                .push(parent_entity.to_string());
+                            // Register child relationship
+                            children
+                                .entry(entity.clone())
+                                .or_default()
+                                .push(parent_entity.to_string());
                         }
                     }
                 }
@@ -94,26 +99,20 @@ impl EntityDepGraph {
     /// Sort refresh keys by dependency order
     ///
     /// Keys are grouped by entity, then sorted by `topo_order`.
-    /// Within each entity group, PK order is preserved.
+    /// Within each entity group, insertion order is preserved.
+    /// Both PK and dedup keys are retained as-is.
     pub fn sort_keys(&self, keys: Vec<super::key::RefreshKey>) -> Vec<super::key::RefreshKey> {
-        // Group by entity
-        let mut groups: HashMap<String, Vec<i64>> = HashMap::new();
+        // Group by entity, preserving full RefreshKey values
+        let mut groups: HashMap<String, Vec<super::key::RefreshKey>> = HashMap::new();
         for key in keys {
-            groups.entry(key.entity.clone())
-                .or_default()
-                .push(key.pk);
+            groups.entry(key.entity.clone()).or_default().push(key);
         }
 
-        // Sort entities by topo_order
+        // Emit groups in topological order
         let mut sorted_keys = Vec::new();
         for entity in &self.topo_order {
-            if let Some(pks) = groups.get(entity) {
-                for pk in pks {
-                    sorted_keys.push(super::key::RefreshKey {
-                        entity: entity.clone(),
-                        pk: *pk,
-                    });
-                }
+            if let Some(ks) = groups.remove(entity) {
+                sorted_keys.extend(ks);
             }
         }
 
@@ -140,13 +139,13 @@ fn topological_sort(
 
     // Start with entities that have no dependencies
     let mut queue: VecDeque<String> = VecDeque::new();
-        for (entity, &degree) in &in_degree {
-            if degree == 0 {
-                queue.push_back(entity.clone());
-            }
+    for (entity, &degree) in &in_degree {
+        if degree == 0 {
+            queue.push_back(entity.clone());
         }
+    }
 
-        let mut result = Vec::new();
+    let mut result = Vec::new();
 
     while let Some(entity) = queue.pop_front() {
         result.push(entity.clone());
@@ -164,21 +163,60 @@ fn topological_sort(
         }
     }
 
-    // Check for cycles
-    if result.len() != entities.len() {
+    // Check for cycles (only count entities in the original set;
+    // FK references to non-TVIEW entities like "user" are external and shouldn't
+    // cause cycle detection failures)
+    let result_in_set = result.iter().filter(|e| entities.contains(*e)).count();
+    if result_in_set != entities.len() {
         return Err(crate::TViewError::DependencyCycle {
             entities: entities.iter().cloned().collect(),
         });
     }
 
-        Ok(result)
-    }
+    Ok(result)
+}
 
-
-
-    #[cfg(test)]
+#[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_sort_keys_preserves_dedup_keys() {
+        // Build a simple graph: company -> user -> post
+        let graph = EntityDepGraph {
+            parents: HashMap::new(),
+            children: HashMap::new(),
+            topo_order: vec!["company".into(), "user".into(), "post".into()],
+        };
+
+        let keys = vec![
+            super::super::key::RefreshKey::pk("post", 10),
+            super::super::key::RefreshKey::dedup("user", "some-uuid"),
+            super::super::key::RefreshKey::pk("company", 1),
+            super::super::key::RefreshKey::pk("user", 42),
+            super::super::key::RefreshKey::dedup("post", "dedup-val"),
+        ];
+
+        let sorted = graph.sort_keys(keys);
+
+        // All 5 keys must be present
+        assert_eq!(sorted.len(), 5);
+
+        // Dedup keys must survive with their dedup_key field intact
+        let dedup_keys: Vec<_> = sorted.iter().filter(|k| k.is_dedup()).collect();
+        assert_eq!(dedup_keys.len(), 2);
+
+        // Verify specific dedup keys are present with correct fields
+        assert!(sorted.contains(&super::super::key::RefreshKey::dedup("user", "some-uuid")));
+        assert!(sorted.contains(&super::super::key::RefreshKey::dedup("post", "dedup-val")));
+
+        // Verify topological order: company entities before user, user before post
+        let first_company = sorted.iter().position(|k| k.entity == "company").unwrap();
+        let first_user = sorted.iter().position(|k| k.entity == "user").unwrap();
+        let first_post = sorted.iter().position(|k| k.entity == "post").unwrap();
+        assert!(first_company < first_user);
+        assert!(first_user < first_post);
+    }
 
     #[test]
     fn test_topological_sort() {
@@ -189,7 +227,9 @@ mod tests {
         // feed -> post
 
         let entities: HashSet<String> = ["company", "user", "post", "feed"]
-            .iter().map(|&s| s.to_string()).collect();
+            .iter()
+            .map(|&s| s.to_string())
+            .collect();
 
         let mut children: HashMap<String, Vec<String>> = HashMap::new();
         children.insert("user".to_string(), vec!["company".to_string()]);

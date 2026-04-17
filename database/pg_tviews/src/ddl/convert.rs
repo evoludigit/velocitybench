@@ -3,9 +3,11 @@
 //! This module handles converting a table that was created by standard
 //! `PostgreSQL` DDL into a proper TVIEW structure.
 
-use pgrx::prelude::*;
 use crate::error::{TViewError, TViewResult};
 use crate::schema::TViewSchema;
+use crate::utils::quote_identifier;
+use pgrx::datum::DatumWithOid;
+use pgrx::prelude::*;
 
 /// Convert an existing table to a TVIEW
 ///
@@ -27,11 +29,8 @@ use crate::schema::TViewSchema;
 ///
 /// # Errors
 /// Returns error if table doesn't exist, conversion fails, or rollback is needed
-pub fn convert_existing_table_to_tview(
-    table_name: &str,
-) -> TViewResult<()> {
+pub fn convert_existing_table_to_tview(table_name: &str) -> TViewResult<()> {
     let entity_name = extract_entity_name(table_name)?;
-
 
     do_conversion(table_name, entity_name)?;
 
@@ -54,20 +53,16 @@ fn do_conversion(table_name: &str, entity_name: &str) -> TViewResult<()> {
     // Step 5: Drop the existing table.
     // Must use spi_run_ddl (non-atomic SPI) because this runs inside an event trigger
     // which provides an atomic SPI context where DDL is otherwise forbidden on PG18.
-    crate::utils::spi_run_ddl(&format!("DROP TABLE {table_name} CASCADE"))
-        .map_err(|e| TViewError::SpiError {
-            query: format!("DROP TABLE {table_name} CASCADE"),
+    let qi_table = quote_identifier(table_name);
+    crate::utils::spi_run_ddl(&format!("DROP TABLE {qi_table} CASCADE")).map_err(|e| {
+        TViewError::SpiError {
+            query: format!("DROP TABLE {qi_table} CASCADE"),
             error: e,
-        })?;
+        }
+    })?;
 
     // Step 6: Reconstruct as proper TVIEW
-    reconstruct_as_tview(
-        table_name,
-        entity_name,
-        &schema,
-        &base_tables,
-        &data_backup,
-    )?;
+    reconstruct_as_tview(table_name, entity_name, &schema, &base_tables, &data_backup)?;
 
     Ok(())
 }
@@ -77,15 +72,20 @@ fn validate_tview_structure(table_name: &str, _entity_name: &str) -> TViewResult
     let columns = get_table_columns(table_name)?;
 
     // Validate required columns exist and have correct types
-    let id_col = columns.iter().find(|c| c.name == "id")
-        .ok_or_else(|| TViewError::RequiredColumnMissing {
+    let id_col = columns.iter().find(|c| c.name == "id").ok_or_else(|| {
+        TViewError::RequiredColumnMissing {
             column_name: "id".to_string(),
             context: format!(
                 "Table '{}' must have an 'id' column (UUID). Found: {}",
                 table_name,
-                columns.iter().map(|c| c.name.clone()).collect::<Vec<_>>().join(", ")
+                columns
+                    .iter()
+                    .map(|c| c.name.clone())
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ),
-        })?;
+        }
+    })?;
     if id_col.data_type != "uuid" {
         return Err(TViewError::InvalidSelectStatement {
             sql: table_name.to_string(),
@@ -93,15 +93,20 @@ fn validate_tview_structure(table_name: &str, _entity_name: &str) -> TViewResult
         });
     }
 
-    let data_col = columns.iter().find(|c| c.name == "data")
-        .ok_or_else(|| TViewError::RequiredColumnMissing {
+    let data_col = columns.iter().find(|c| c.name == "data").ok_or_else(|| {
+        TViewError::RequiredColumnMissing {
             column_name: "data".to_string(),
             context: format!(
                 "Table '{}' must have a 'data' column (JSONB). Found: {}",
                 table_name,
-                columns.iter().map(|c| c.name.clone()).collect::<Vec<_>>().join(", ")
+                columns
+                    .iter()
+                    .map(|c| c.name.clone())
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ),
-        })?;
+        }
+    })?;
     if data_col.data_type != "jsonb" {
         return Err(TViewError::InvalidSelectStatement {
             sql: table_name.to_string(),
@@ -116,7 +121,7 @@ fn validate_tview_structure(table_name: &str, _entity_name: &str) -> TViewResult
 struct ColumnInfo {
     name: String,
     data_type: String,
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Reason: parsed from catalog but not yet used in DDL generation
     is_nullable: bool,
 }
 
@@ -124,15 +129,17 @@ fn get_table_columns(table_name: &str) -> TViewResult<Vec<ColumnInfo>> {
     let mut columns = Vec::new();
 
     Spi::connect(|client| {
-        let query = format!(
+        let args = vec![unsafe {
+            DatumWithOid::new(table_name, PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value())
+        }];
+        let results = client.select(
             "SELECT column_name, data_type, is_nullable
              FROM information_schema.columns
-             WHERE table_name = '{}'
+             WHERE table_name = $1
              ORDER BY ordinal_position",
-            table_name.replace('\'', "''")
-        );
-
-        let results = client.select(&query, None, &[])?;
+            None,
+            &args,
+        )?;
 
         for row in results {
             columns.push(ColumnInfo {
@@ -152,14 +159,20 @@ fn infer_schema_from_table(table_name: &str) -> TViewResult<TViewSchema> {
     let columns = get_table_columns(table_name)?;
 
     // Find the pk_* column
-    let pk_col = columns.iter().find(|c| c.name.starts_with("pk_"))
+    let pk_col = columns
+        .iter()
+        .find(|c| c.name.starts_with("pk_"))
         .ok_or_else(|| TViewError::RequiredColumnMissing {
             column_name: "pk_<entity>".to_string(),
             context: format!(
                 "Table '{}' must have a primary key column named 'pk_<entity>' \
                  (e.g., pk_user, pk_post). Found: {}",
                 table_name,
-                columns.iter().map(|c| c.name.clone()).collect::<Vec<_>>().join(", ")
+                columns
+                    .iter()
+                    .map(|c| c.name.clone())
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ),
         })?;
     // Safe: guaranteed by the starts_with("pk_") predicate above
@@ -180,7 +193,8 @@ fn infer_schema_from_table(table_name: &str) -> TViewResult<TViewSchema> {
 
 fn backup_table_data(table_name: &str, _schema: &TViewSchema) -> TViewResult<Vec<BackupRow>> {
     let backup = Spi::connect(|client| {
-        let query = format!("SELECT * FROM {table_name}");
+        let qi_table = quote_identifier(table_name);
+        let query = format!("SELECT * FROM {qi_table}");
         let results = client.select(&query, None, &[])?;
 
         let mut backup = Vec::new();
@@ -195,10 +209,7 @@ fn backup_table_data(table_name: &str, _schema: &TViewSchema) -> TViewResult<Vec
             let id = row["id"].value()?; // UUID can be NULL in some cases
             let data = row["data"].value()?; // JSONB should not be NULL but handle gracefully
 
-            backup.push(BackupRow {
-                id,
-                data,
-            });
+            backup.push(BackupRow { id, data });
         }
 
         Ok::<_, spi::Error>(backup)
@@ -230,7 +241,8 @@ fn infer_base_tables_from_data(table_name: &str) -> TViewResult<Vec<String>> {
 
     Spi::connect(|client| {
         // Sample a few rows to analyze data patterns
-        let query = format!("SELECT data FROM {table_name} LIMIT 5");
+        let qi_table = quote_identifier(table_name);
+        let query = format!("SELECT data FROM {qi_table} LIMIT 5");
         let results = client.select(&query, None, &[])?;
 
         for row in results {
@@ -288,31 +300,33 @@ fn extract_table_references(json: &serde_json::Value, tables: &mut Vec<String>) 
 
 /// Check if a table exists in the current database
 fn table_exists(table_name: &str) -> bool {
-    Spi::get_one::<bool>(&format!(
-        "SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name = '{}')",
-        table_name.replace('\'', "''")
-    )).unwrap_or(Some(false)).unwrap_or(false)
+    let args = vec![unsafe {
+        DatumWithOid::new(table_name, PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value())
+    }];
+    Spi::get_one_with_args::<bool>(
+        "SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name = $1)",
+        &args,
+    )
+    .unwrap_or(Some(false))
+    .unwrap_or(false)
 }
 
 /// Check for user-provided base table hints in table comment
 /// Format: COMMENT ON TABLE `tv_entity` IS '`TVIEW_BASES`: `tb_table1`, `tb_table2`';
 fn get_base_table_hints(table_name: &str) -> TViewResult<Option<Vec<String>>> {
-    let query = format!(
+    let args = vec![unsafe {
+        DatumWithOid::new(table_name, PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value())
+    }];
+    let comment: Option<String> = Spi::get_one_with_args(
         "SELECT obj_description(oid, 'pg_class') as comment
          FROM pg_class
-         WHERE relname = '{}'",
-        table_name.replace('\'', "''")
-    );
-
-    let comment: Option<String> = Spi::get_one(&query)?;
+         WHERE relname = $1",
+        &args,
+    )?;
 
     if let Some(comment) = comment {
         // Look for TVIEW_BASES: pattern
-        if let Some(bases_part) = comment
-            .split("TVIEW_BASES:")
-            .nth(1)
-            .map(str::trim)
-        {
+        if let Some(bases_part) = comment.split("TVIEW_BASES:").nth(1).map(str::trim) {
             // Parse comma-separated list
             let tables: Vec<String> = bases_part
                 .split(',')
@@ -338,34 +352,54 @@ fn reconstruct_as_tview(
 ) -> TViewResult<()> {
     // Step 1: Create the backing view
     let view_name = format!("v_{entity_name}");
+    let qi_view = quote_identifier(&view_name);
+    let qi_table = quote_identifier(table_name);
 
     // Create view that preserves the backed up data
     if data_backup.is_empty() {
         // Empty table: create view with proper structure but no rows
         Spi::run(&format!(
-            "CREATE VIEW {view_name} AS SELECT
+            "CREATE VIEW {qi_view} AS SELECT
                 NULL::uuid as id,
                 NULL::jsonb as data
              WHERE false"
         ))?;
     } else {
-        // Non-empty table: reconstruct with actual data
+        // Non-empty table: reconstruct with actual data.
+        // Use PostgreSQL's quote_literal() for safe escaping of JSONB values
+        // in the VALUES clause (parameterized queries can't be used inside
+        // CREATE VIEW definitions).
         let mut values = Vec::new();
         for row in data_backup {
             if let (Some(id), Some(data)) = (&row.id, &row.data) {
-                values.push(format!("('{id}'::uuid, '{data}')"));
+                let id_ref: &str = id;
+                let data_ref: &str = data;
+                let escaped = Spi::get_one_with_args::<String>(
+                    "SELECT quote_literal($1)::text || '::uuid, ' || quote_literal($2)::text || '::jsonb'",
+                    &[
+                        unsafe { DatumWithOid::new(id_ref, PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value()) },
+                        unsafe { DatumWithOid::new(data_ref, PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value()) },
+                    ],
+                ).map_err(|e| TViewError::SpiError {
+                    query: "quote_literal for backup row".to_string(),
+                    error: e.to_string(),
+                })?.ok_or_else(|| TViewError::SpiError {
+                    query: "quote_literal for backup row".to_string(),
+                    error: "NULL result from quote_literal".to_string(),
+                })?;
+                values.push(format!("({escaped})"));
             }
         }
 
         Spi::run(&format!(
-            "CREATE VIEW {} AS SELECT * FROM (VALUES {}) AS t(id, data)",
-            view_name, values.join(", ")
+            "CREATE VIEW {qi_view} AS SELECT * FROM (VALUES {}) AS t(id, data)",
+            values.join(", ")
         ))?;
     }
 
     // Step 2: Create the TVIEW wrapper
     Spi::run(&format!(
-        "CREATE VIEW {table_name} AS SELECT * FROM {view_name}"
+        "CREATE VIEW {qi_table} AS SELECT * FROM {qi_view}"
     ))?;
 
     // Step 3: Register metadata
@@ -380,37 +414,50 @@ fn register_tview_metadata(
     tview_name: &str,
     _schema: &TViewSchema,
 ) -> TViewResult<()> {
-    // Get OIDs
-    let view_oid = Spi::get_one::<pg_sys::Oid>(&format!(
-        "SELECT oid FROM pg_class WHERE relname = '{view_name}'"
-    ))?.ok_or_else(|| TViewError::CatalogError {
+    // Get OIDs (parameterized to prevent injection)
+    let view_args = vec![unsafe {
+        DatumWithOid::new(view_name, PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value())
+    }];
+    let view_oid = Spi::get_one_with_args::<pg_sys::Oid>(
+        "SELECT oid FROM pg_class WHERE relname = $1",
+        &view_args,
+    )?
+    .ok_or_else(|| TViewError::CatalogError {
         operation: format!("Get OID for view {view_name}"),
         pg_error: "View not found".to_string(),
     })?;
 
-    let table_oid = Spi::get_one::<pg_sys::Oid>(&format!(
-        "SELECT oid FROM pg_class WHERE relname = '{tview_name}'"
-    ))?.ok_or_else(|| TViewError::CatalogError {
+    let table_args = vec![unsafe {
+        DatumWithOid::new(tview_name, PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value())
+    }];
+    let table_oid = Spi::get_one_with_args::<pg_sys::Oid>(
+        "SELECT oid FROM pg_class WHERE relname = $1",
+        &table_args,
+    )?
+    .ok_or_else(|| TViewError::CatalogError {
         operation: format!("Get OID for table {tview_name}"),
         pg_error: "Table not found".to_string(),
     })?;
 
     // Insert metadata
-    let definition = format!("SELECT * FROM {view_name}");
-    Spi::run(&format!(
+    let definition = format!("SELECT * FROM {}", quote_identifier(view_name));
+    let insert_sql = format!(
         "INSERT INTO pg_tview_meta (entity, view_oid, table_oid, definition, fk_columns, uuid_fk_columns)
-         VALUES ('{}', {}, {}, '{}', '{{}}', '{{}}')
+         VALUES ($1, {}, {}, $2, '{{}}', '{{}}')
          ON CONFLICT (entity) DO UPDATE SET
             view_oid = EXCLUDED.view_oid,
             table_oid = EXCLUDED.table_oid,
             definition = EXCLUDED.definition,
             fk_columns = EXCLUDED.fk_columns,
             uuid_fk_columns = EXCLUDED.uuid_fk_columns",
-        entity_name.replace('\'', "''"),
         view_oid.to_u32(),
         table_oid.to_u32(),
-        definition.replace('\'', "''")
-    ))?;
+    );
+    let args = [
+        unsafe { DatumWithOid::new(entity_name, PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value()) },
+        unsafe { DatumWithOid::new(definition, PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value()) },
+    ];
+    Spi::run_with_args(&insert_sql, &args)?;
 
     Ok(())
 }
@@ -422,7 +469,8 @@ struct BackupRow {
 }
 
 fn extract_entity_name(table_name: &str) -> TViewResult<&str> {
-    table_name.strip_prefix("tv_")
+    table_name
+        .strip_prefix("tv_")
         .ok_or_else(|| TViewError::InvalidSelectStatement {
             sql: table_name.to_string(),
             reason: "Table name must start with tv_".to_string(),

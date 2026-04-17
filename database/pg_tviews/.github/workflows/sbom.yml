@@ -10,12 +10,10 @@ jobs:
   sbom:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Install SBOM tools
         run: |
@@ -23,13 +21,13 @@ jobs:
           cargo install cargo-cyclonedx
 
       - name: Install pgrx
-        run: cargo install --locked cargo-pgrx
+        run: cargo install --locked cargo-pgrx --version 0.16.1
 
       - name: Generate SBOM
         run: ./scripts/generate-sbom.sh
 
       - name: Upload SBOM artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: sbom
           path: sbom/*
@@ -44,7 +42,7 @@ jobs:
           output: 'sbom-trivy-results.sarif'
 
       - name: Upload SBOM vulnerability scan results
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
           sarif_file: 'sbom-trivy-results.sarif'

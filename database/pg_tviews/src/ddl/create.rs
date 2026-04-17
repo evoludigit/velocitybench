@@ -1,11 +1,13 @@
-use pgrx::prelude::*;
-use crate::schema::{TViewSchema, inference::infer_schema, analyzer::analyze_dependencies};
 use crate::error::{TViewError, TViewResult};
+use crate::schema::{TViewSchema, analyzer::analyze_dependencies, inference::infer_schema};
+use crate::utils::quote_identifier;
+use pgrx::datum::DatumWithOid;
+use pgrx::prelude::*;
 
 /// Resolve the target schema for creating TVIEW objects.
 ///
 /// Uses `current_schema()` to respect the active `search_path`, matching
-/// standard PostgreSQL convention for unqualified DDL statements.
+/// standard `PostgreSQL` convention for unqualified DDL statements.
 fn current_schema() -> TViewResult<String> {
     crate::utils::spi_get_string("SELECT current_schema()::text")
         .map_err(|e| TViewError::CatalogError {
@@ -18,15 +20,173 @@ fn current_schema() -> TViewResult<String> {
         })
 }
 
+/// Expand `SELECT * FROM [schema.]source` to an explicit column list.
+///
+/// When the SELECT is just `SELECT * FROM …`, pg_tviews cannot infer the
+/// Trinity schema (pk_*, id, data columns) from the wildcard at parse time.
+/// This function detects that pattern and expands it by querying
+/// `information_schema.columns` for the source view/table's actual columns,
+/// preserving their declaration order.
+///
+/// Returns the original SQL unchanged if it is not a simple `SELECT *`.
+///
+/// # Errors
+/// Returns error only if the `information_schema` query itself fails.
+/// A missing source or empty column list silently returns the original SQL
+/// so the caller can fall through to the normal error path.
+fn expand_select_star_if_needed(select_sql: &str) -> TViewResult<String> {
+    let trimmed = select_sql.trim();
+    let lower = trimmed.to_lowercase();
+
+    // Must start with SELECT
+    let after_kw = lower.strip_prefix("select").unwrap_or("").trim_start();
+
+    // Must have * immediately after SELECT (not SELECT DISTINCT * or SELECT t.*)
+    let after_star = match after_kw.strip_prefix('*') {
+        Some(rest) => rest.trim_start(),
+        None => return Ok(select_sql.to_string()),
+    };
+
+    // The token after * must be FROM (no other clauses like WHERE before FROM)
+    let after_from = match after_star.strip_prefix("from") {
+        Some(rest)
+            if rest
+                .chars()
+                .next()
+                .map(|c| c.is_ascii_whitespace())
+                .unwrap_or(true) =>
+        {
+            rest.trim_start()
+        }
+        _ => return Ok(select_sql.to_string()),
+    };
+
+    // Extract the source name: everything after FROM up to whitespace/semicolon
+    let source_qualified = after_from
+        .trim_end_matches(';')
+        .trim()
+        .split_ascii_whitespace()
+        .next()
+        .unwrap_or("");
+
+    if source_qualified.is_empty() {
+        return Ok(select_sql.to_string());
+    }
+
+    // Parse optional schema qualifier: "schema.table" or just "table"
+    let (schema_name, table_name) = match source_qualified.split_once('.') {
+        Some((s, t)) => (
+            Some(s.trim_matches('"').to_string()),
+            t.trim_matches('"').to_string(),
+        ),
+        None => (None, source_qualified.trim_matches('"').to_string()),
+    };
+
+    // Query information_schema.columns for the column names in order
+    let columns: Vec<String> = if let Some(ref schema) = schema_name {
+        let args = vec![
+            unsafe {
+                pgrx::datum::DatumWithOid::new(
+                    table_name.as_str(),
+                    pgrx::prelude::PgOid::BuiltIn(pgrx::prelude::PgBuiltInOids::TEXTOID).value(),
+                )
+            },
+            unsafe {
+                pgrx::datum::DatumWithOid::new(
+                    schema.as_str(),
+                    pgrx::prelude::PgOid::BuiltIn(pgrx::prelude::PgBuiltInOids::TEXTOID).value(),
+                )
+            },
+        ];
+        pgrx::prelude::Spi::connect(|client| {
+            let rows = client.select(
+                "SELECT column_name::text \
+                 FROM information_schema.columns \
+                 WHERE table_name = $1 AND table_schema = $2 \
+                 ORDER BY ordinal_position",
+                None,
+                &args,
+            )?;
+            let mut result = Vec::new();
+            for row in rows {
+                if let Some(col) = row[1]
+                    .value::<String>()
+                    .map_err(|e| TViewError::CatalogError {
+                        operation: "expand_select_star: read column_name".to_string(),
+                        pg_error: format!("{e:?}"),
+                    })?
+                {
+                    result.push(col);
+                }
+            }
+            Ok(result)
+        })
+        .map_err(|e: pgrx::spi::Error| TViewError::SpiError {
+            query: "expand_select_star: information_schema query".to_string(),
+            error: e.to_string(),
+        })?
+    } else {
+        let args = vec![unsafe {
+            pgrx::datum::DatumWithOid::new(
+                table_name.as_str(),
+                pgrx::prelude::PgOid::BuiltIn(pgrx::prelude::PgBuiltInOids::TEXTOID).value(),
+            )
+        }];
+        pgrx::prelude::Spi::connect(|client| {
+            let rows = client.select(
+                "SELECT column_name::text \
+                 FROM information_schema.columns \
+                 WHERE table_name = $1 \
+                 ORDER BY ordinal_position",
+                None,
+                &args,
+            )?;
+            let mut result = Vec::new();
+            for row in rows {
+                if let Some(col) = row[1]
+                    .value::<String>()
+                    .map_err(|e| TViewError::CatalogError {
+                        operation: "expand_select_star: read column_name".to_string(),
+                        pg_error: format!("{e:?}"),
+                    })?
+                {
+                    result.push(col);
+                }
+            }
+            Ok(result)
+        })
+        .map_err(|e: pgrx::spi::Error| TViewError::SpiError {
+            query: "expand_select_star: information_schema query".to_string(),
+            error: e.to_string(),
+        })?
+    };
+
+    if columns.is_empty() {
+        // Source not found or no columns — fall through to normal path
+        return Ok(select_sql.to_string());
+    }
+
+    // Build explicit SELECT preserving original source reference (with schema prefix)
+    let col_list = columns.join(", ");
+    Ok(format!("SELECT {col_list} FROM {source_qualified}"))
+}
+
 /// Create a TVIEW with atomic rollback on error
 ///
 /// This is the main entry point for CREATE TABLE tv_ AS SELECT .... `PostgreSQL`'s transaction
 /// system automatically provides atomicity - if any step fails, all changes
 /// are rolled back.
 ///
+/// `schema_override` is the explicit schema name extracted from the DDL statement
+/// (e.g. `"public"` for `CREATE TABLE public.tv_org AS SELECT …`).  When `None`,
+/// the target schema is resolved from `current_schema()` at call time.  Callers
+/// that intercept a schema-qualified DDL statement MUST pass the schema here so
+/// that the TVIEW lands in the correct schema even when the database's
+/// `search_path` would resolve `current_schema()` to a different schema.
+///
 /// Steps:
 /// 1. Check if TVIEW already exists
-/// 2. Infer schema from SELECT statement
+/// 2. Expand SELECT * if needed, then infer schema from SELECT statement
 /// 3. Create backing view v_<entity>
 /// 4. Create materialized table tv_<entity>
 /// 5. Populate initial data
@@ -38,8 +198,8 @@ fn current_schema() -> TViewResult<String> {
 pub fn create_tview(
     tview_name: &str,
     select_sql: &str,
+    schema_override: Option<&str>,
 ) -> TViewResult<()> {
-
     // Step 1: Check if TVIEW already exists
     let exists = tview_exists(tview_name)?;
     if exists {
@@ -50,7 +210,15 @@ pub fn create_tview(
 
     // Step 1.5: Extract entity name from tview_name
     // Support both "tv_entity" and just "entity" formats
-    let entity_name = tview_name.strip_prefix("tv_").map_or(tview_name, |stripped| stripped);
+    let entity_name = tview_name
+        .strip_prefix("tv_")
+        .map_or(tview_name, |stripped| stripped);
+
+    // Step 1.6: Expand SELECT * → explicit column list so infer_schema can
+    // recognise the Trinity Pattern (pk_*, id, data) even when the DDL uses
+    // `CREATE TABLE tv_foo AS SELECT * FROM v_foo_base`.
+    let select_sql = expand_select_star_if_needed(select_sql)?;
+    let select_sql = select_sql.as_str();
 
     // Step 2: Infer schema from SELECT
     // If SELECT doesn't have TVIEW format (pk_<entity>, id, data), create a prepared view first
@@ -65,12 +233,25 @@ pub fn create_tview(
         (select_sql.to_string(), schema)
     };
 
-    let entity_name = final_schema.entity_name.as_ref()
-        .ok_or_else(|| TViewError::RequiredColumnMissing {
-            column_name: format!("pk_{}", tview_name.strip_prefix("tv_").unwrap_or(tview_name)),
-            context: "pg_tviews requires a Trinity Pattern primary key column named \
-                      \"pk_<entity>\" (e.g., pk_user, pk_post)".to_string(),
-        })?;
+    let entity_name =
+        final_schema
+            .entity_name
+            .as_ref()
+            .ok_or_else(|| TViewError::RequiredColumnMissing {
+                column_name: format!(
+                    "pk_{}",
+                    tview_name.strip_prefix("tv_").unwrap_or(tview_name)
+                ),
+                context: "pg_tviews requires a Trinity Pattern primary key column named \
+                      \"pk_<entity>\" (e.g., pk_user, pk_post)"
+                    .to_string(),
+            })?;
+
+    // Validate entity_name inferred from the SELECT to prevent SQL injection
+    // (tview_name is validated at the pg_extern boundary, but entity_name comes
+    // from infer_schema and could contain metacharacters if the user crafts a
+    // malicious column alias like pk_evil'injection).
+    crate::validation::validate_sql_identifier(entity_name, "entity_name")?;
 
     // Derive the canonical materialized-table name: always tv_<entity>.
     // This normalises both calling conventions:
@@ -78,21 +259,38 @@ pub fn create_tview(
     //   pg_tviews_create('tv_post', ...) → tv_post
     let tv_table_name = format!("tv_{entity_name}");
 
-    // Resolve the target schema once, respecting the active search_path.
-    let schema_name = current_schema()?;
+    // Resolve the target schema.  Prefer the caller-supplied override (extracted from
+    // the DDL statement) so that `CREATE TABLE public.tv_foo AS SELECT …` always
+    // creates in "public" even when the database default search_path resolves
+    // `current_schema()` to a different schema (e.g. "app").
+    let schema_name = match schema_override {
+        Some(s) => s.to_string(),
+        None => current_schema()?,
+    };
 
     // Step 3: Create backing view v_<entity>
     let view_name = format!("v_{entity_name}");
     create_backing_view(&view_name, &final_select_sql, &schema_name)?;
 
+    // Extract DISTINCT ON keys from SQL
+    let distinct_on_keys =
+        crate::schema::parser::extract_distinct_on_keys(&final_select_sql).unwrap_or_default();
+
     // Step 4: Create materialized table tv_<entity>
-    create_materialized_table(&tv_table_name, &final_schema, &schema_name)?;
+    create_materialized_table(
+        &tv_table_name,
+        &final_schema,
+        &schema_name,
+        &distinct_on_keys,
+    )?;
 
     // Step 5: Populate initial data
     populate_initial_data(&tv_table_name, &view_name, &final_schema, &schema_name)?;
 
-    // Step 6: Find base table dependencies
-    let dep_graph = crate::dependency::find_base_tables(&view_name)?;
+    // Step 6: Find base table dependencies.
+    // Pass schema_name so the view OID lookup searches in the correct schema even when
+    // current_schema() resolves to a different schema due to the database search_path.
+    let dep_graph = crate::dependency::find_base_tables(&view_name, Some(&schema_name))?;
 
     // Step 7: Register metadata (with dependencies)
     register_metadata(
@@ -103,6 +301,7 @@ pub fn create_tview(
         &final_schema,
         &dep_graph.base_tables,
         &schema_name,
+        &distinct_on_keys,
     )?;
 
     // Step 8: Install triggers on base tables
@@ -115,11 +314,11 @@ pub fn create_tview(
     // Invalidate caches since new TVIEW was created
     crate::queue::cache::invalidate_all_caches();
 
-    // Log the creation for audit trail
-    if let Err(e) = crate::audit::log_create(entity_name, select_sql) {
-        warning!("Failed to log TVIEW creation: {}", e);
+    // Buffer and flush audit entry immediately (we're in SPI context)
+    crate::audit::log_create(entity_name, select_sql);
+    if let Err(e) = crate::audit::flush_audit_buffer() {
+        warning!("Failed to flush audit after CREATE: {}", e);
     }
-
 
     Ok(())
 }
@@ -127,11 +326,14 @@ pub fn create_tview(
 /// Check if a TVIEW already exists
 fn tview_exists(tview_name: &str) -> TViewResult<bool> {
     let entity_name = tview_name.trim_start_matches("tv_");
+    let args = vec![unsafe {
+        DatumWithOid::new(entity_name, PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value())
+    }];
 
-    Spi::get_one::<bool>(&format!(
-        "SELECT COUNT(*) > 0 FROM pg_tview_meta WHERE entity = '{}'",
-        entity_name.replace('\'', "''")
-    ))
+    Spi::get_one_with_args::<bool>(
+        "SELECT COUNT(*) > 0 FROM pg_tview_meta WHERE entity = $1",
+        &args,
+    )
     .map_err(|e| TViewError::CatalogError {
         operation: format!("Check TVIEW exists: {tview_name}"),
         pg_error: format!("{e:?}"),
@@ -141,9 +343,9 @@ fn tview_exists(tview_name: &str) -> TViewResult<bool> {
 
 /// Create the backing view that contains the user's SELECT definition
 fn create_backing_view(view_name: &str, select_sql: &str, schema_name: &str) -> TViewResult<()> {
-    let create_view_sql = format!(
-        "CREATE VIEW {schema_name}.{view_name} AS {select_sql}"
-    );
+    let qi_schema = quote_identifier(schema_name);
+    let qi_view = quote_identifier(view_name);
+    let create_view_sql = format!("CREATE VIEW {qi_schema}.{qi_view} AS {select_sql}");
 
     crate::utils::spi_run_ddl(&create_view_sql).map_err(|e| TViewError::SpiError {
         query: create_view_sql.clone(),
@@ -151,15 +353,21 @@ fn create_backing_view(view_name: &str, select_sql: &str, schema_name: &str) -> 
     })?;
 
     // Verify the view was created (schema-qualified to avoid false positives across schemas)
-    let check_sql = format!(
+    let check_args = vec![
+        unsafe { DatumWithOid::new(view_name, PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value()) },
+        unsafe { DatumWithOid::new(schema_name, PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value()) },
+    ];
+    let exists = Spi::get_one_with_args::<i32>(
         "SELECT 1 FROM pg_class c \
          JOIN pg_namespace n ON c.relnamespace = n.oid \
-         WHERE c.relname = '{view_name}' AND n.nspname = '{schema_name}' AND c.relkind = 'v'"
-    );
-    let exists = Spi::get_one::<i32>(&check_sql).map_err(|e| TViewError::SpiError {
-        query: check_sql,
+         WHERE c.relname = $1 AND n.nspname = $2 AND c.relkind = 'v'",
+        &check_args,
+    )
+    .map_err(|e| TViewError::SpiError {
+        query: format!("Check view {schema_name}.{view_name} exists"),
         error: e.to_string(),
-    })?.is_some();
+    })?
+    .is_some();
 
     if !exists {
         return Err(TViewError::CatalogError {
@@ -171,48 +379,233 @@ fn create_backing_view(view_name: &str, select_sql: &str, schema_name: &str) -> 
     Ok(())
 }
 
+/// Map a scalar PostgreSQL type name to an uppercase SQL type string for CREATE TABLE.
+///
+/// Handles both `information_schema.data_type` values (e.g. `"boolean"`, `"uuid"`) and
+/// `udt_name` values for extension types (e.g. `"ltree"`, `"geometry"`).
+/// Unknown names fall back to `TEXT`.
+fn scalar_pg_type_to_sql(pg_type: &str) -> &'static str {
+    match pg_type {
+        // ── Boolean ───────────────────────────────────────────────────────────
+        "boolean" => "BOOLEAN",
+        // ── UUID ──────────────────────────────────────────────────────────────
+        "uuid" => "UUID",
+        // ── JSON / JSONB ───────────────────────────────────────────────────────
+        "jsonb" => "JSONB",
+        "json" => "JSON",
+        // ── Exact numerics ────────────────────────────────────────────────────
+        "bigint" | "int8" => "BIGINT",
+        "integer" | "int4" | "int" => "INTEGER",
+        "smallint" | "int2" => "SMALLINT",
+        "numeric" | "decimal" => "NUMERIC",
+        // ── Floating point ────────────────────────────────────────────────────
+        "real" | "float4" => "REAL",
+        "double precision" | "float8" => "DOUBLE PRECISION",
+        // ── Date / time ───────────────────────────────────────────────────────
+        "timestamp with time zone" | "timestamptz" => "TIMESTAMPTZ",
+        "timestamp without time zone" | "timestamp" => "TIMESTAMP",
+        "date" => "DATE",
+        "time with time zone" | "timetz" => "TIMETZ",
+        "time without time zone" | "time" => "TIME",
+        "interval" => "INTERVAL",
+        // ── Network / binary ─────────────────────────────────────────────────
+        "inet" => "INET",
+        "cidr" => "CIDR",
+        "macaddr" => "MACADDR",
+        "macaddr8" => "MACADDR8",
+        "bytea" => "BYTEA",
+        // ── Text search ───────────────────────────────────────────────────────
+        "tsvector" => "TSVECTOR",
+        "tsquery" => "TSQUERY",
+        // ── Range types ───────────────────────────────────────────────────────
+        "int4range" => "INT4RANGE",
+        "int8range" => "INT8RANGE",
+        "numrange" => "NUMRANGE",
+        "tsrange" => "TSRANGE",
+        "tstzrange" => "TSTZRANGE",
+        "daterange" => "DATERANGE",
+        // ── Built-in geometric ────────────────────────────────────────────────
+        "point" => "POINT",
+        "line" => "LINE",
+        "lseg" => "LSEG",
+        "box" => "BOX",
+        "path" => "PATH",
+        "polygon" => "POLYGON",
+        "circle" => "CIRCLE",
+        // ── Extension / user-defined types (udt_name, e.g. ltree, geometry) ──
+        // Known extension types — resolved via PostgreSQL search_path at runtime.
+        "ltree" => "LTREE",
+        "lquery" => "LQUERY",
+        "ltxtquery" => "LTXTQUERY",
+        "geometry" => "GEOMETRY",
+        "geography" => "GEOGRAPHY",
+        "hstore" => "HSTORE",
+        "citext" => "CITEXT",
+        // ── Other ─────────────────────────────────────────────────────────────
+        "money" => "MONEY",
+        "bit" => "BIT",
+        "bit varying" => "BIT VARYING",
+        "xml" => "XML",
+        // text, character varying, character, unknown → TEXT
+        _ => "TEXT",
+    }
+}
+
+/// Resolve an `information_schema.columns` row (data_type + udt_name) to a SQL type
+/// string suitable for a CREATE TABLE column definition.
+///
+/// Handles the three cases PostgreSQL presents:
+/// - Built-in scalar: `data_type` is the canonical name, `udt_name` is redundant.
+/// - Extension / user-defined: `data_type = "USER-DEFINED"`, `udt_name` is the type name.
+/// - Array: `data_type = "ARRAY"`, `udt_name` is `_<element_udt_name>` (e.g. `_uuid`).
+fn resolve_pg_column_type(data_type: &str, udt_name: Option<&str>) -> String {
+    match data_type {
+        "USER-DEFINED" => {
+            // udt_name holds the extension type name (ltree, geometry, hstore, citext, …)
+            udt_name
+                .map(|u| scalar_pg_type_to_sql(u).to_string())
+                .unwrap_or_else(|| "TEXT".to_string())
+        }
+        "ARRAY" => {
+            // udt_name is "_<element>" (e.g. "_uuid" → UUID[], "_ltree" → LTREE[])
+            let element_sql = udt_name
+                .and_then(|u| u.strip_prefix('_'))
+                .map(scalar_pg_type_to_sql)
+                .unwrap_or("TEXT");
+            format!("{element_sql}[]")
+        }
+        other => scalar_pg_type_to_sql(other).to_string(),
+    }
+}
+
 /// Create the materialized table with proper schema inferred from the backing view
 fn create_materialized_table(
     tview_name: &str,
     schema: &TViewSchema,
     schema_name: &str,
+    distinct_on_keys: &[String],
 ) -> TViewResult<()> {
+    let qi_schema = quote_identifier(schema_name);
+    let qi_tview = quote_identifier(tview_name);
+
+    // For DISTINCT ON TVIEWs the dedup key is the table PK; pk_<entity> becomes a plain column.
+    let first_dedup = distinct_on_keys.first().map(String::as_str);
+    let is_distinct_on = first_dedup.is_some();
+
     // Build column definitions based on inferred schema
     let mut columns = Vec::new();
 
-    // Primary key column (if exists)
+    // Primary key column
     if let Some(pk) = &schema.pk_column {
-        columns.push(format!("{pk} BIGINT PRIMARY KEY"));
+        if is_distinct_on && first_dedup != Some(pk.as_str()) {
+            // DISTINCT ON TVIEW: pk_<entity> is a plain column, not the table PK
+            columns.push(format!("{} BIGINT", quote_identifier(pk)));
+        } else if is_distinct_on {
+            // pk_<entity> is itself the dedup key — make it the PK
+            columns.push(format!("{} BIGINT PRIMARY KEY", quote_identifier(pk)));
+        } else {
+            columns.push(format!("{} BIGINT PRIMARY KEY", quote_identifier(pk)));
+        }
     }
 
     // ID column (Trinity identifier)
     if let Some(id) = &schema.id_column {
-        columns.push(format!("{id} UUID NOT NULL"));
+        if first_dedup == Some(id.as_str()) {
+            // Dedup key on `id` — make it the table PK with a UNIQUE constraint
+            columns.push(format!("{} UUID PRIMARY KEY", quote_identifier(id)));
+        } else {
+            columns.push(format!("{} UUID NOT NULL", quote_identifier(id)));
+        }
     }
 
     // Identifier column (optional Trinity identifier)
     if let Some(identifier) = &schema.identifier_column {
-        columns.push(format!("{identifier} TEXT"));
+        columns.push(format!("{} TEXT", quote_identifier(identifier)));
     }
 
     // Data column (JSONB read model)
     if let Some(data) = &schema.data_column {
-        columns.push(format!("{data} JSONB"));
+        columns.push(format!("{} JSONB", quote_identifier(data)));
     }
 
     // Foreign key columns (for lineage tracking)
     for fk in &schema.fk_columns {
-        columns.push(format!("{fk} BIGINT"));
+        columns.push(format!("{} BIGINT", quote_identifier(fk)));
     }
+
+    // Fetch actual column types from the backing view to guard against name-based
+    // type mismatches. A column ending in `_id` is inferred as UUID by infer_schema,
+    // but it may actually be TEXT (e.g. customer_contract_id, provider_contract_id).
+    let entity = tview_name.strip_prefix("tv_").unwrap_or(tview_name);
+    let view_name_for_types = format!("v_{entity}");
+    let actual_col_types: std::collections::HashMap<String, String> = {
+        let args = vec![
+            unsafe {
+                DatumWithOid::new(
+                    view_name_for_types.as_str(),
+                    PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value(),
+                )
+            },
+            unsafe {
+                DatumWithOid::new(
+                    schema_name,
+                    PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value(),
+                )
+            },
+        ];
+        Spi::connect(|client| {
+            let rows = client.select(
+                "SELECT column_name::text, data_type::text, udt_name::text \
+                 FROM information_schema.columns \
+                 WHERE table_name = $1 AND table_schema = $2",
+                None,
+                &args,
+            )?;
+            let mut map = std::collections::HashMap::new();
+            for row in rows {
+                let name = row[1].value::<String>()?;
+                let data_type = row[2].value::<String>()?;
+                let udt_name = row[3].value::<String>()?;
+                if let Some(n) = name {
+                    // Resolve to the final SQL type string immediately so call sites
+                    // can use the value directly without further translation.
+                    let sql_type = resolve_pg_column_type(
+                        data_type.as_deref().unwrap_or("text"),
+                        udt_name.as_deref(),
+                    );
+                    map.insert(n, sql_type);
+                }
+            }
+            Ok::<std::collections::HashMap<String, String>, pgrx::spi::Error>(map)
+        })
+        .unwrap_or_default()
+    };
 
     // UUID foreign key columns (for filtering)
+    // Verify the actual view column type — a column ending in _id may be TEXT
+    // (e.g. customer_contract_id, provider_contract_id stored as TEXT, not UUID).
     for uuid_fk in &schema.uuid_fk_columns {
-        columns.push(format!("{uuid_fk} UUID"));
+        let sql_type = actual_col_types
+            .get(uuid_fk.as_str())
+            .map(String::as_str)
+            .unwrap_or("UUID"); // if not found, trust name-based inference
+        columns.push(format!("{} {sql_type}", quote_identifier(uuid_fk)));
     }
 
-    // Additional columns with inferred types
+    // Additional columns: prefer the actual view column type over name-based inference.
+    // Fixes mismatches like BOOLEAN inferred as TEXT, DATE inferred as TEXT, UUID[]
+    // inferred as TEXT, LTREE inferred as TEXT, etc.
     for (col_name, col_type) in &schema.additional_columns_with_types {
-        columns.push(format!("{col_name} {col_type}"));
+        let effective_type = actual_col_types
+            .get(col_name.as_str())
+            .map(String::as_str)
+            .unwrap_or(col_type.as_str());
+        let qi_col = quote_identifier(col_name);
+        if first_dedup == Some(col_name.as_str()) {
+            columns.push(format!("{qi_col} {effective_type} PRIMARY KEY"));
+        } else {
+            columns.push(format!("{qi_col} {effective_type}"));
+        }
     }
 
     // Add timestamps for tracking
@@ -221,9 +614,7 @@ fn create_materialized_table(
 
     let columns_sql = columns.join(",\n    ");
 
-    let create_table_sql = format!(
-        "CREATE TABLE {schema_name}.{tview_name} (\n    {columns_sql}\n)"
-    );
+    let create_table_sql = format!("CREATE TABLE {qi_schema}.{qi_tview} (\n    {columns_sql}\n)");
 
     crate::utils::spi_run_ddl(&create_table_sql).map_err(|e| TViewError::SpiError {
         query: create_table_sql,
@@ -237,12 +628,21 @@ fn create_materialized_table(
 }
 
 /// Create indexes on the materialized table for optimal query performance
-fn create_tview_indexes(tview_name: &str, schema: &TViewSchema, schema_name: &str) -> TViewResult<()> {
+fn create_tview_indexes(
+    tview_name: &str,
+    schema: &TViewSchema,
+    schema_name: &str,
+) -> TViewResult<()> {
+    let qi_schema = quote_identifier(schema_name);
+    let qi_tview = quote_identifier(tview_name);
+
     // Index on ID column (Trinity identifier)
     if let Some(id) = &schema.id_column {
         let idx_name = format!("idx_{tview_name}_{id}");
         let create_idx = format!(
-            "CREATE INDEX {idx_name} ON {schema_name}.{tview_name} ({id})"
+            "CREATE INDEX {} ON {qi_schema}.{qi_tview} ({})",
+            quote_identifier(&idx_name),
+            quote_identifier(id),
         );
         crate::utils::spi_run_ddl(&create_idx).map_err(|e| TViewError::SpiError {
             query: create_idx.clone(),
@@ -254,7 +654,9 @@ fn create_tview_indexes(tview_name: &str, schema: &TViewSchema, schema_name: &st
     for uuid_fk in &schema.uuid_fk_columns {
         let idx_name = format!("idx_{tview_name}_{uuid_fk}");
         let create_idx = format!(
-            "CREATE INDEX {idx_name} ON {schema_name}.{tview_name} ({uuid_fk})"
+            "CREATE INDEX {} ON {qi_schema}.{qi_tview} ({})",
+            quote_identifier(&idx_name),
+            quote_identifier(uuid_fk),
         );
         crate::utils::spi_run_ddl(&create_idx).map_err(|e| TViewError::SpiError {
             query: create_idx.clone(),
@@ -266,7 +668,9 @@ fn create_tview_indexes(tview_name: &str, schema: &TViewSchema, schema_name: &st
     if let Some(data) = &schema.data_column {
         let idx_name = format!("idx_{tview_name}_{data}_gin");
         let create_idx = format!(
-            "CREATE INDEX {idx_name} ON {schema_name}.{tview_name} USING GIN ({data})"
+            "CREATE INDEX {} ON {qi_schema}.{qi_tview} USING GIN ({})",
+            quote_identifier(&idx_name),
+            quote_identifier(data),
         );
         crate::utils::spi_run_ddl(&create_idx).map_err(|e| TViewError::SpiError {
             query: create_idx.clone(),
@@ -278,7 +682,12 @@ fn create_tview_indexes(tview_name: &str, schema: &TViewSchema, schema_name: &st
 }
 
 /// Populate the materialized table with initial data from the backing view
-fn populate_initial_data(tview_name: &str, view_name: &str, schema: &TViewSchema, schema_name: &str) -> TViewResult<()> {
+fn populate_initial_data(
+    tview_name: &str,
+    view_name: &str,
+    schema: &TViewSchema,
+    schema_name: &str,
+) -> TViewResult<()> {
     // Build column list from schema (excluding created_at/updated_at which have defaults)
     let mut select_columns = Vec::new();
     let mut insert_columns = Vec::new();
@@ -313,12 +722,19 @@ fn populate_initial_data(tview_name: &str, view_name: &str, schema: &TViewSchema
         select_columns.push(col.clone());
     }
 
-    let insert_column_list = insert_columns.join(", ");
+    let qi_schema = quote_identifier(schema_name);
+    let qi_tview = quote_identifier(tview_name);
+    let qi_view = quote_identifier(view_name);
+    let insert_column_list = insert_columns
+        .iter()
+        .map(|c| quote_identifier(c))
+        .collect::<Vec<_>>()
+        .join(", ");
     let select_column_list = select_columns.join(", ");
 
     let insert_sql = format!(
-        "INSERT INTO {schema_name}.{tview_name} ({insert_column_list}) \
-         SELECT {select_column_list} FROM {schema_name}.{view_name}"
+        "INSERT INTO {qi_schema}.{qi_tview} ({insert_column_list}) \
+         SELECT {select_column_list} FROM {qi_schema}.{qi_view}"
     );
 
     Spi::run(&insert_sql).map_err(|e| TViewError::SpiError {
@@ -329,7 +745,7 @@ fn populate_initial_data(tview_name: &str, view_name: &str, schema: &TViewSchema
     Ok(())
 }
 
-/// Quote a string for use in a PostgreSQL array literal.
+/// Quote a string for use in a `PostgreSQL` array literal.
 ///
 /// Empty strings and strings containing special characters must be double-quoted
 /// to avoid producing invalid array literals like `'{,}'`.
@@ -342,6 +758,7 @@ fn pg_array_elem(s: &str) -> String {
 }
 
 /// Register the TVIEW in metadata tables
+#[allow(clippy::too_many_arguments)] // Reason: all args are distinct registration fields with no natural grouping
 fn register_metadata(
     entity_name: &str,
     view_name: &str,
@@ -350,60 +767,93 @@ fn register_metadata(
     schema: &TViewSchema,
     dependencies: &[pg_sys::Oid],
     schema_name: &str,
+    distinct_on_keys: &[String],
 ) -> TViewResult<()> {
+    // Detect whether the definition is a UNION / UNION ALL query.
+    // CTE bodies are inside (...) so their UNION is at depth > 0 and not matched.
+    let is_union = {
+        let sql_lower = definition_sql.to_lowercase();
+        crate::schema::parser::find_outer_union(&sql_lower, 0).is_some()
+    };
+
     // Analyze dependencies to populate type/path/match_key info
     let dep_infos = analyze_dependencies(definition_sql, &schema.fk_columns);
 
     // Serialize schema information (quoted for safe PostgreSQL array literals)
-    let fk_columns = schema.fk_columns.iter()
+    let fk_columns = schema
+        .fk_columns
+        .iter()
         .map(|s| pg_array_elem(s))
         .collect::<Vec<_>>()
         .join(",");
-    let uuid_fk_columns = schema.uuid_fk_columns.iter()
+    let uuid_fk_columns = schema
+        .uuid_fk_columns
+        .iter()
         .map(|s| pg_array_elem(s))
         .collect::<Vec<_>>()
         .join(",");
 
     // Serialize dependency types
-    let dep_types = dep_infos.iter()
+    let dep_types = dep_infos
+        .iter()
         .map(|d| pg_array_elem(d.dep_type.as_str()))
         .collect::<Vec<_>>()
         .join(",");
 
     // Serialize dependency paths (TEXT[] format, empty string for None)
-    let dep_paths = dep_infos.iter()
-        .map(|d| pg_array_elem(&d.jsonb_path.as_ref().map_or_else(String::new, |path| path.join("."))))
+    let dep_paths = dep_infos
+        .iter()
+        .map(|d| {
+            pg_array_elem(
+                &d.jsonb_path
+                    .as_ref()
+                    .map_or_else(String::new, |path| path.join(".")),
+            )
+        })
         .collect::<Vec<_>>()
         .join(",");
 
     // Serialize array match keys (empty string for None)
-    let array_keys = dep_infos.iter()
+    let array_keys = dep_infos
+        .iter()
         .map(|d| pg_array_elem(&d.array_match_key.clone().unwrap_or_default()))
         .collect::<Vec<_>>()
         .join(",");
 
     // Serialize dependencies as OID array
-    let deps_str = dependencies.iter()
+    let deps_str = dependencies
+        .iter()
         .map(|oid| oid.to_u32().to_string())
         .collect::<Vec<_>>()
         .join(",");
 
-    // Get OIDs for the created objects (schema-qualified to avoid false matches
-    // when identical names exist in multiple schemas)
-    let view_oid_result = Spi::get_one::<pg_sys::Oid>(&format!(
+    // Get OIDs for the created objects (schema-qualified, parameterized to prevent injection)
+    let view_oid_args = vec![
+        unsafe { DatumWithOid::new(view_name, PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value()) },
+        unsafe { DatumWithOid::new(schema_name, PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value()) },
+    ];
+    let view_oid_result = Spi::get_one_with_args::<pg_sys::Oid>(
         "SELECT c.oid FROM pg_class c \
          JOIN pg_namespace n ON c.relnamespace = n.oid \
-         WHERE c.relname = '{view_name}' AND n.nspname = '{schema_name}' AND c.relkind = 'v'"
-    )).map_err(|e| TViewError::CatalogError {
+         WHERE c.relname = $1 AND n.nspname = $2 AND c.relkind = 'v'",
+        &view_oid_args,
+    )
+    .map_err(|e| TViewError::CatalogError {
         operation: format!("Get OID for view {schema_name}.{view_name}"),
         pg_error: e.to_string(),
     })?;
 
-    let table_oid_result = Spi::get_one::<pg_sys::Oid>(&format!(
+    let table_oid_args = vec![
+        unsafe { DatumWithOid::new(tview_name, PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value()) },
+        unsafe { DatumWithOid::new(schema_name, PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value()) },
+    ];
+    let table_oid_result = Spi::get_one_with_args::<pg_sys::Oid>(
         "SELECT c.oid FROM pg_class c \
          JOIN pg_namespace n ON c.relnamespace = n.oid \
-         WHERE c.relname = '{tview_name}' AND n.nspname = '{schema_name}' AND c.relkind = 'r'"
-    )).map_err(|e| TViewError::CatalogError {
+         WHERE c.relname = $1 AND n.nspname = $2 AND c.relkind = 'r'",
+        &table_oid_args,
+    )
+    .map_err(|e| TViewError::CatalogError {
         operation: format!("Get OID for table {schema_name}.{tview_name}"),
         pg_error: e.to_string(),
     })?;
@@ -418,7 +868,14 @@ fn register_metadata(
         pg_error: "Table OID not found".to_string(),
     })?;
 
-    // Insert metadata record
+    // Serialize distinct_on_keys as a PostgreSQL array literal
+    let distinct_on_str = distinct_on_keys
+        .iter()
+        .map(|s| pg_array_elem(s))
+        .collect::<Vec<_>>()
+        .join(",");
+
+    // Insert metadata record (entity + definition parameterized; OIDs and array literals are safe internal values)
     let insert_meta_sql = format!(
         "INSERT INTO pg_tview_meta (
             entity,
@@ -430,22 +887,33 @@ fn register_metadata(
             uuid_fk_columns,
             dependency_types,
             dependency_paths,
-            array_match_keys
-        ) VALUES ('{}', {}, {}, '{}', '{{{}}}', '{{{}}}', '{{{}}}', '{{{}}}', '{{{}}}', '{{{}}}')
+            array_match_keys,
+            distinct_on_keys,
+            is_union
+        ) VALUES ($1, {}, {}, $2, '{{{}}}', '{{{}}}', '{{{}}}', '{{{}}}', '{{{}}}', '{{{}}}', '{{{}}}', {})
         ON CONFLICT (entity) DO NOTHING",
-        entity_name.replace('\'', "''"),
         view_oid.to_u32(),
         table_oid.to_u32(),
-        definition_sql.replace('\'', "''"),
         deps_str,
         fk_columns,
         uuid_fk_columns,
         dep_types,
         dep_paths,
-        array_keys
+        array_keys,
+        distinct_on_str,
+        is_union
     );
 
-    Spi::run(&insert_meta_sql).map_err(|e| TViewError::SpiError {
+    let args = [
+        unsafe { DatumWithOid::new(entity_name, PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value()) },
+        unsafe {
+            DatumWithOid::new(
+                definition_sql,
+                PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value(),
+            )
+        },
+    ];
+    Spi::run_with_args(&insert_meta_sql, &args).map_err(|e| TViewError::SpiError {
         query: insert_meta_sql,
         error: e.to_string(),
     })?;
@@ -468,75 +936,85 @@ fn transform_raw_select_to_tview(
 ) -> TViewResult<(String, TViewSchema)> {
     // Create a temporary view to analyze the raw SELECT
     let temp_view_name = format!("_temp_raw_{entity_name}");
+    let qi_temp_view = quote_identifier(&temp_view_name);
 
     // First, create temp view to analyze columns
-    let create_temp = format!(
-        "CREATE TEMP VIEW {temp_view_name} AS {select_sql}"
-    );
+    let create_temp = format!("CREATE TEMP VIEW {qi_temp_view} AS {select_sql}");
 
     crate::utils::spi_run_ddl(&create_temp).map_err(|e| TViewError::SpiError {
         query: create_temp.clone(),
         error: e,
     })?;
 
-    // Get columns from temp view
+    // Get columns from temp view (parameterized lookup)
     // Cast to text to avoid sql_identifier domain type issues
-    let get_columns_sql = format!(
-        "SELECT column_name::text, data_type::text
+    let get_columns_sql = "SELECT column_name::text, data_type::text
          FROM information_schema.columns
-         WHERE table_name = '{temp_view_name}'
-         ORDER BY ordinal_position"
-    );
+         WHERE table_name = $1
+         ORDER BY ordinal_position";
 
+    let temp_view_args = vec![unsafe {
+        DatumWithOid::new(
+            temp_view_name.as_str(),
+            PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value(),
+        )
+    }];
     let columns: Vec<(String, String)> = Spi::connect(|client| {
-        let rows = client.select(&get_columns_sql, None, &[])?;
+        let rows = client.select(get_columns_sql, None, &temp_view_args)?;
         let mut result = Vec::new();
         for row in rows {
-            let col_name: String = row[1].value()?
-                .ok_or_else(|| spi::Error::from(crate::TViewError::SpiError {
-                    query: get_columns_sql.clone(),
+            let col_name: String = row[1].value()?.ok_or_else(|| {
+                spi::Error::from(crate::TViewError::SpiError {
+                    query: get_columns_sql.to_string(),
                     error: "column name is NULL".to_string(),
-                }))?;
-            let data_type: String = row[2].value()?
-                .ok_or_else(|| spi::Error::from(crate::TViewError::SpiError {
-                    query: get_columns_sql.clone(),
+                })
+            })?;
+            let data_type: String = row[2].value()?.ok_or_else(|| {
+                spi::Error::from(crate::TViewError::SpiError {
+                    query: get_columns_sql.to_string(),
                     error: "data type is NULL".to_string(),
-                }))?;
+                })
+            })?;
             result.push((col_name, data_type));
         }
         Ok(result)
-    }).map_err(|e: spi::Error| TViewError::CatalogError {
+    })
+    .map_err(|e: spi::Error| TViewError::CatalogError {
         operation: "Get columns from temp view".to_string(),
         pg_error: format!("{e:?}"),
     })?;
 
     // Drop temp view
-    crate::utils::spi_run_ddl(&format!("DROP VIEW {temp_view_name}")).ok();
+    crate::utils::spi_run_ddl(&format!("DROP VIEW {qi_temp_view}")).ok();
 
     // Find primary key column (look for 'id' or first integer/bigint column)
-    let pk_source_col = columns.iter()
+    let pk_source_col = columns
+        .iter()
         .find(|(name, _)| name == "id")
-        .or_else(|| columns.iter().find(|(_, typ)| {
-            typ.contains("int") || typ.contains("serial")
-        }))
+        .or_else(|| {
+            columns
+                .iter()
+                .find(|(_, typ)| typ.contains("int") || typ.contains("serial"))
+        })
         .map(|(name, _)| name.clone())
         .ok_or_else(|| TViewError::InvalidSelectStatement {
             sql: select_sql.to_string(),
-            reason: "No suitable primary key column found (need 'id' or an integer column)".to_string(),
+            reason: "No suitable primary key column found (need 'id' or an integer column)"
+                .to_string(),
         })?;
 
     // Build explicit column lists for clarity and control
 
     // 1. Build the source column list (from the subquery)
-    let _source_columns: Vec<String> = columns.iter()
+    let _source_columns: Vec<String> = columns
+        .iter()
         .map(|(name, _)| format!("source.{name}"))
         .collect();
 
     // 2. Build JSONB data column pairs explicitly
-    let data_columns: Vec<String> = columns.iter()
-        .map(|(name, _)| {
-            format!("'{name}', source.{name}")
-        })
+    let data_columns: Vec<String> = columns
+        .iter()
+        .map(|(name, _)| format!("'{name}', source.{name}"))
         .collect();
 
     // 3. Generate transformed SELECT with explicit column references
@@ -553,7 +1031,6 @@ fn transform_raw_select_to_tview(
         select_sql
     );
 
-
     // Infer schema from transformed SELECT
     let schema = infer_schema(&transformed_select)?;
 
@@ -565,12 +1042,177 @@ fn transform_raw_select_to_tview(
 mod tests {
     use pgrx::prelude::*;
 
+    // ── Unit tests for type resolution (no database required) ──────────────────
+
+    #[test]
+    fn test_scalar_pg_type_boolean() {
+        assert_eq!(super::scalar_pg_type_to_sql("boolean"), "BOOLEAN");
+    }
+
+    #[test]
+    fn test_scalar_pg_type_uuid() {
+        assert_eq!(super::scalar_pg_type_to_sql("uuid"), "UUID");
+    }
+
+    #[test]
+    fn test_scalar_pg_type_numeric() {
+        assert_eq!(super::scalar_pg_type_to_sql("bigint"), "BIGINT");
+        assert_eq!(super::scalar_pg_type_to_sql("int8"), "BIGINT");
+        assert_eq!(super::scalar_pg_type_to_sql("integer"), "INTEGER");
+        assert_eq!(super::scalar_pg_type_to_sql("int4"), "INTEGER");
+        assert_eq!(super::scalar_pg_type_to_sql("smallint"), "SMALLINT");
+        assert_eq!(super::scalar_pg_type_to_sql("numeric"), "NUMERIC");
+        assert_eq!(super::scalar_pg_type_to_sql("decimal"), "NUMERIC");
+    }
+
+    #[test]
+    fn test_scalar_pg_type_floating_point() {
+        assert_eq!(super::scalar_pg_type_to_sql("real"), "REAL");
+        assert_eq!(super::scalar_pg_type_to_sql("float4"), "REAL");
+        assert_eq!(super::scalar_pg_type_to_sql("double precision"), "DOUBLE PRECISION");
+        assert_eq!(super::scalar_pg_type_to_sql("float8"), "DOUBLE PRECISION");
+    }
+
+    #[test]
+    fn test_scalar_pg_type_temporal() {
+        assert_eq!(
+            super::scalar_pg_type_to_sql("timestamp with time zone"),
+            "TIMESTAMPTZ"
+        );
+        assert_eq!(
+            super::scalar_pg_type_to_sql("timestamp without time zone"),
+            "TIMESTAMP"
+        );
+        assert_eq!(super::scalar_pg_type_to_sql("date"), "DATE");
+        assert_eq!(super::scalar_pg_type_to_sql("time"), "TIME");
+    }
+
+    #[test]
+    fn test_scalar_pg_type_json() {
+        assert_eq!(super::scalar_pg_type_to_sql("jsonb"), "JSONB");
+        assert_eq!(super::scalar_pg_type_to_sql("json"), "JSON");
+    }
+
+    #[test]
+    fn test_scalar_pg_type_extensions() {
+        assert_eq!(super::scalar_pg_type_to_sql("ltree"), "LTREE");
+        assert_eq!(super::scalar_pg_type_to_sql("lquery"), "LQUERY");
+        assert_eq!(super::scalar_pg_type_to_sql("geometry"), "GEOMETRY");
+        assert_eq!(super::scalar_pg_type_to_sql("geography"), "GEOGRAPHY");
+        assert_eq!(super::scalar_pg_type_to_sql("hstore"), "HSTORE");
+        assert_eq!(super::scalar_pg_type_to_sql("citext"), "CITEXT");
+    }
+
+    #[test]
+    fn test_scalar_pg_type_unknown_fallback() {
+        assert_eq!(super::scalar_pg_type_to_sql("unknown_type"), "TEXT");
+        assert_eq!(super::scalar_pg_type_to_sql(""), "TEXT");
+    }
+
+    #[test]
+    fn test_resolve_pg_column_type_builtin_scalar() {
+        assert_eq!(
+            super::resolve_pg_column_type("boolean", None),
+            "BOOLEAN"
+        );
+        assert_eq!(super::resolve_pg_column_type("uuid", None), "UUID");
+        assert_eq!(super::resolve_pg_column_type("bigint", None), "BIGINT");
+        assert_eq!(super::resolve_pg_column_type("text", None), "TEXT");
+    }
+
+    #[test]
+    fn test_resolve_pg_column_type_user_defined() {
+        assert_eq!(
+            super::resolve_pg_column_type("USER-DEFINED", Some("ltree")),
+            "LTREE"
+        );
+        assert_eq!(
+            super::resolve_pg_column_type("USER-DEFINED", Some("geometry")),
+            "GEOMETRY"
+        );
+        assert_eq!(
+            super::resolve_pg_column_type("USER-DEFINED", Some("hstore")),
+            "HSTORE"
+        );
+    }
+
+    #[test]
+    fn test_resolve_pg_column_type_user_defined_unknown() {
+        // Unknown USER-DEFINED type falls back to TEXT
+        assert_eq!(
+            super::resolve_pg_column_type("USER-DEFINED", Some("custom_type")),
+            "TEXT"
+        );
+    }
+
+    #[test]
+    fn test_resolve_pg_column_type_user_defined_missing_udt_name() {
+        // USER-DEFINED without udt_name falls back to TEXT
+        assert_eq!(
+            super::resolve_pg_column_type("USER-DEFINED", None),
+            "TEXT"
+        );
+    }
+
+    #[test]
+    fn test_resolve_pg_column_type_array_uuid() {
+        assert_eq!(
+            super::resolve_pg_column_type("ARRAY", Some("_uuid")),
+            "UUID[]"
+        );
+    }
+
+    #[test]
+    fn test_resolve_pg_column_type_array_text() {
+        assert_eq!(
+            super::resolve_pg_column_type("ARRAY", Some("_text")),
+            "TEXT[]"
+        );
+    }
+
+    #[test]
+    fn test_resolve_pg_column_type_array_integer() {
+        assert_eq!(
+            super::resolve_pg_column_type("ARRAY", Some("_int4")),
+            "INTEGER[]"
+        );
+    }
+
+    #[test]
+    fn test_resolve_pg_column_type_array_ltree() {
+        // Array of extension types: _ltree → LTREE[]
+        assert_eq!(
+            super::resolve_pg_column_type("ARRAY", Some("_ltree")),
+            "LTREE[]"
+        );
+    }
+
+    #[test]
+    fn test_resolve_pg_column_type_array_missing_udt_name() {
+        // ARRAY without udt_name falls back to TEXT[]
+        assert_eq!(
+            super::resolve_pg_column_type("ARRAY", None),
+            "TEXT[]"
+        );
+    }
+
+    #[test]
+    fn test_resolve_pg_column_type_array_unknown_element() {
+        // Array of unknown type: _unknown → TEXT[]
+        assert_eq!(
+            super::resolve_pg_column_type("ARRAY", Some("_unknown")),
+            "TEXT[]"
+        );
+    }
+
+    // ── Integration tests requiring database access ───────────────────────────
+
     #[test]
     fn test_tview_exists_non_existent() {
         // Compile-time check only — live DB tests use #[pg_test] below
     }
 
-    /// TVIEW objects are created in the schema that is first in search_path,
+    /// TVIEW objects are created in the schema that is first in `search_path`,
     /// not hardcoded to public.
     #[pg_test]
     fn test_create_tview_respects_search_path() {
@@ -579,53 +1221,70 @@ mod tests {
         Spi::run("CREATE TABLE tb_item (pk_item BIGSERIAL PRIMARY KEY, name TEXT)").unwrap();
         Spi::run("INSERT INTO tb_item VALUES (1, 'Widget')").unwrap();
 
-        Spi::run("SELECT pg_tviews_create('item', $$
+        Spi::run(
+            "SELECT pg_tviews_create('item', $$
             SELECT pk_item, jsonb_build_object('name', name) AS data
             FROM tb_item
-        $$)").unwrap();
+        $$)",
+        )
+        .unwrap();
 
         // tv_item must be in the target schema
         let in_target = Spi::get_one::<bool>(
             "SELECT COUNT(*) > 0 FROM pg_class c \
              JOIN pg_namespace n ON c.relnamespace = n.oid \
-             WHERE c.relname = 'tv_item' AND n.nspname = 'tview_test_ns'"
-        ).unwrap().unwrap_or(false);
+             WHERE c.relname = 'tv_item' AND n.nspname = 'tview_test_ns'",
+        )
+        .unwrap()
+        .unwrap_or(false);
         assert!(in_target, "tv_item should be in tview_test_ns, not public");
 
         // tv_item must NOT leak into public
         let in_public = Spi::get_one::<bool>(
             "SELECT COUNT(*) > 0 FROM pg_class c \
              JOIN pg_namespace n ON c.relnamespace = n.oid \
-             WHERE c.relname = 'tv_item' AND n.nspname = 'public'"
-        ).unwrap().unwrap_or(false);
+             WHERE c.relname = 'tv_item' AND n.nspname = 'public'",
+        )
+        .unwrap()
+        .unwrap_or(false);
         assert!(!in_public, "tv_item must not be created in public schema");
 
         // The backing view v_item must be in the same schema
         let view_in_target = Spi::get_one::<bool>(
             "SELECT COUNT(*) > 0 FROM pg_class c \
              JOIN pg_namespace n ON c.relnamespace = n.oid \
-             WHERE c.relname = 'v_item' AND n.nspname = 'tview_test_ns'"
-        ).unwrap().unwrap_or(false);
+             WHERE c.relname = 'v_item' AND n.nspname = 'tview_test_ns'",
+        )
+        .unwrap()
+        .unwrap_or(false);
         assert!(view_in_target, "v_item should be in tview_test_ns");
     }
 
-    /// With the default search_path, objects still land in public (regression guard).
+    /// With the default `search_path`, objects still land in public (regression guard).
     #[pg_test]
     fn test_create_tview_defaults_to_public() {
         Spi::run("SET search_path TO public").unwrap();
         Spi::run("CREATE TABLE tb_gadget (pk_gadget BIGSERIAL PRIMARY KEY, label TEXT)").unwrap();
         Spi::run("INSERT INTO tb_gadget VALUES (1, 'Gizmo')").unwrap();
 
-        Spi::run("SELECT pg_tviews_create('gadget', $$
+        Spi::run(
+            "SELECT pg_tviews_create('gadget', $$
             SELECT pk_gadget, jsonb_build_object('label', label) AS data
             FROM tb_gadget
-        $$)").unwrap();
+        $$)",
+        )
+        .unwrap();
 
         let in_public = Spi::get_one::<bool>(
             "SELECT COUNT(*) > 0 FROM pg_class c \
              JOIN pg_namespace n ON c.relnamespace = n.oid \
-             WHERE c.relname = 'tv_gadget' AND n.nspname = 'public'"
-        ).unwrap().unwrap_or(false);
-        assert!(in_public, "tv_gadget should be in public with default search_path");
+             WHERE c.relname = 'tv_gadget' AND n.nspname = 'public'",
+        )
+        .unwrap()
+        .unwrap_or(false);
+        assert!(
+            in_public,
+            "tv_gadget should be in public with default search_path"
+        );
     }
 }

@@ -144,7 +144,7 @@ services:
         condition: service_healthy
     volumes:
       - ./frameworks/fraiseql/fraiseql-tv.toml:/app/fraiseql-tv.toml
-      - ./frameworks/fraiseql/schema.compiled.json:/app/schema.compiled.json
+      - ./frameworks/fraiseql/schema_tv.compiled.json:/app/schema.compiled.json
     environment:
       - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
       - RUST_LOG=info
@@ -181,7 +181,7 @@ services:
         condition: service_healthy
     volumes:
       - ./frameworks/fraiseql/fraiseql-tv-nocache.toml:/app/fraiseql-tv-nocache.toml
-      - ./frameworks/fraiseql/schema.compiled.json:/app/schema.compiled.json
+      - ./frameworks/fraiseql/schema_tv.compiled.json:/app/schema.compiled.json
     environment:
       - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
       - RUST_LOG=info

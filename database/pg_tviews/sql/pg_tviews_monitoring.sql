@@ -1,5 +1,4 @@
--- Phase 9E: Production Monitoring
--- Enhanced monitoring views and functions for production deployments
+-- Production monitoring views and functions
 
 -- Real-time queue view
 CREATE OR REPLACE VIEW pg_tviews_queue_realtime AS
@@ -122,7 +121,6 @@ RETURNS TABLE (
     enqueued_at TIMESTAMPTZ
 )
 LANGUAGE plpgsql
-SECURITY DEFINER
 AS $$
 BEGIN
     -- This function would need to be implemented in Rust to access thread-local state
