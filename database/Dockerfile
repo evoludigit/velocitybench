@@ -29,8 +29,8 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
     --no-modify-path
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-# Install cargo-pgrx matching pg_tviews pgrx = "0.16.1"
-RUN cargo install --locked cargo-pgrx --version 0.16.1
+# Install cargo-pgrx matching pg_tviews pgrx = "0.17.0"
+RUN cargo install --locked cargo-pgrx --version 0.17.0
 
 # Initialize pgrx with the PostgreSQL 17 from the base image
 RUN cargo pgrx init --pg17 "$(which pg_config)"
@@ -50,14 +50,37 @@ RUN mkdir -p /ext && \
     echo "=== Extension files ===" && ls -la /ext/
 
 # ============================================================================
-# Stage 2: Build pg_jsonb_delta (same pgrx 0.16.1 — reuse Rust + pgrx init)
+# Stage 2: Build pg_jsonb_delta (pgrx 0.16.1 — separate builder)
 # ============================================================================
-FROM pg_tviews_builder AS pg_jsonb_delta_builder
+FROM postgres:17 AS pg_jsonb_delta_builder
 
+# Install build dependencies (Rust, PostgreSQL dev headers, build tools)
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    libssl-dev \
+    pkg-config \
+    postgresql-server-dev-17 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Rust stable toolchain (minimal profile)
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
+    --default-toolchain stable \
+    --profile minimal \
+    --no-modify-path
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Install cargo-pgrx matching jsonb_delta pgrx = "0.16.1"
+RUN cargo install --locked cargo-pgrx --version 0.16.1
+
+# Initialize pgrx with the PostgreSQL 17 from the base image
+RUN cargo pgrx init --pg17 "$(which pg_config)"
+
+# Copy jsonb_delta source (target/ excluded via .dockerignore)
 WORKDIR /build/pg_jsonb_delta
-RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
-RUN git clone --depth 1 https://github.com/evoludigit/jsonb_delta .
+COPY jsonb_delta/ .
 
+# Build and install the extension for pg17
 RUN cargo pgrx install --release
 
 RUN mkdir -p /ext_jsonb_delta && \
@@ -66,7 +89,22 @@ RUN mkdir -p /ext_jsonb_delta && \
     echo "=== jsonb_delta extension files ===" && ls -la /ext_jsonb_delta/
 
 # ============================================================================
-# Stage 3: Production PostgreSQL 17 image with pg_tviews + pg_jsonb_delta
+# Stage 3: Build pg_treekey (pgrx 0.17.0 — reuse pg_tviews builder)
+# ============================================================================
+FROM pg_tviews_builder AS pg_treekey_builder
+
+WORKDIR /build/pg_treekey
+COPY pg_treekey/ .
+
+RUN cargo pgrx install --release
+
+RUN mkdir -p /ext_pg_treekey && \
+    find /usr/share/postgresql/17/extension/ -name "pg_treekey*" -exec cp {} /ext_pg_treekey/ \; && \
+    cp /usr/lib/postgresql/17/lib/pg_treekey.so /ext_pg_treekey/ && \
+    echo "=== pg_treekey extension files ===" && ls -la /ext_pg_treekey/
+
+# ============================================================================
+# Stage 4: Production PostgreSQL 17 image with pg_tviews + pg_jsonb_delta + pg_treekey
 # ============================================================================
 FROM postgres:17
 
@@ -84,8 +122,17 @@ RUN cp /tmp/pg_jsonb_delta_ext/*.control /usr/share/postgresql/17/extension/ && 
     cp /tmp/pg_jsonb_delta_ext/*.so      /usr/lib/postgresql/17/lib/         && \
     rm -rf /tmp/pg_jsonb_delta_ext
 
+# Install pg_treekey
+COPY --from=pg_treekey_builder /ext_pg_treekey/ /tmp/pg_treekey_ext/
+RUN cp /tmp/pg_treekey_ext/*.control /usr/share/postgresql/17/extension/ && \
+    cp /tmp/pg_treekey_ext/*.sql     /usr/share/postgresql/17/extension/ && \
+    cp /tmp/pg_treekey_ext/*.so      /usr/lib/postgresql/17/lib/         && \
+    rm -rf /tmp/pg_treekey_ext
+
 # Verify installation
 RUN ls -la /usr/share/postgresql/17/extension/pg_tviews* && \
     ls -la /usr/lib/postgresql/17/lib/pg_tviews.so && \
     ls -la /usr/share/postgresql/17/extension/jsonb_delta* && \
-    ls -la /usr/lib/postgresql/17/lib/jsonb_delta.so
+    ls -la /usr/lib/postgresql/17/lib/jsonb_delta.so && \
+    ls -la /usr/share/postgresql/17/extension/pg_treekey* && \
+    ls -la /usr/lib/postgresql/17/lib/pg_treekey.so

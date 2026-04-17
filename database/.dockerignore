@@ -1,5 +1,9 @@
 pg_tviews/target
 pg_tviews/.git
+jsonb_delta/target
+jsonb_delta/.git
+pg_treekey/target
+pg_treekey/.git
 __pycache__
 *.pyc
 *.pyo
