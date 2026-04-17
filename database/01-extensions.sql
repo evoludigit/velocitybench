@@ -18,6 +18,13 @@ CREATE EXTENSION IF NOT EXISTS pg_tviews;
 -- Provides jsonb_merge_shallow(), jsonb_smart_patch_nested(), jsonb_array_update_where(), etc.
 CREATE EXTENSION IF NOT EXISTS jsonb_delta;
 
+-- ltree: Tree-like data structure support (required by pg_treekey)
+CREATE EXTENSION IF NOT EXISTS ltree;
+
+-- pg_treekey: Tree-key management and path operations (Rust, pgrx 0.17.0)
+-- Provides tree path management functions and cascading updates
+CREATE EXTENSION IF NOT EXISTS pg_treekey;
+
 -- Note: jsonb_ivm and pg_tview would be installed separately
 -- as they are external extensions that need to be compiled
 -- For now, we'll simulate their functionality with standard PostgreSQL features
