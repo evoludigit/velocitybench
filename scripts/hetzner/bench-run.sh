@@ -26,7 +26,10 @@ IMAGE="ubuntu-24.04"
 SUT_NAME="vb-sut"
 SUT_TYPE="ccx33"          # 8 vCPU / 32 GB dedicated — the machine readers rent
 LOADGEN_NAME="vb-loadgen"
-LOADGEN_TYPE="ccx23"      # 4 vCPU / 16 GB dedicated — k6 must not see steal
+# ccx23 was the plan, but the project's dedicated-core quota (8) is fully
+# consumed by the SUT and cpx31/cx32 are unorderable in fsn1. cpx42 gives k6
+# 8 shared vCPUs; the pre-sweep headroom gate proves it is not the bottleneck.
+LOADGEN_TYPE="cpx42"
 
 NETWORK_NAME="vb-net"
 NETWORK_RANGE="10.7.0.0/24"

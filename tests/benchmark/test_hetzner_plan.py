@@ -48,7 +48,7 @@ def test_plan_succeeds_without_hcloud_or_token():
 def test_plan_names_instance_types_and_label():
     out = _plan().stdout
     assert "ccx33" in out, "SUT type"
-    assert "ccx23" in out, "loadgen type"
+    assert "cpx42" in out, "loadgen type (dedicated-core quota fallback)"
     assert "velocitybench=2026-07" in out, "campaign label"
 
 
@@ -62,9 +62,9 @@ def test_plan_covers_full_lifecycle():
 def test_plan_reads_prices_from_yaml_not_hardcoded():
     src = SCRIPT.read_text()
     assert "0.2219" not in src, "price hardcoded — must come from the YAML"
-    assert "0.1378" not in src, "price hardcoded — must come from the YAML"
+    assert "0.1114" not in src, "price hardcoded — must come from the YAML"
     out = _plan().stdout
-    assert "0.2219" in out and "0.1378" in out, "plan must show YAML prices"
+    assert "0.2219" in out and "0.1114" in out, "plan must show YAML prices"
 
 
 def test_plan_destroy_is_label_scoped():

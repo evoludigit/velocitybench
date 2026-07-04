@@ -21,3 +21,12 @@ instances:
     ram_gb: 32
     price_month: 138.49
     price_hour: 0.2219
+  # Loadgen fallback (2026-07-05): the project's dedicated-core quota is 8 —
+  # fully consumed by the CCX33 SUT — and cpx31/cx32 are no longer orderable
+  # in fsn1. cpx42 = 8 shared vCPU; the pre-sweep headroom gate validates it.
+  # Price captured from `hcloud server-type describe cpx42` (net, fsn1).
+  cpx42:
+    vcpu: 8
+    ram_gb: 16
+    price_month: 69.49
+    price_hour: 0.1114
