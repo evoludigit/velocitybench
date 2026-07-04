@@ -1,4 +1,4 @@
-# FraiseQL v2.1.2 — Server Runtime Configuration (TV Tables + Audit Logging)
+# FraiseQL — Server Runtime Configuration (TV Tables + Audit Logging)
 # Audit logging enabled in compiled schema; compare M1 latency vs fraiseql-tv.
 
 schema_path = "schema_tv_audit.compiled.json"
@@ -21,3 +21,4 @@ cache_enabled = true
 
 [validation]
 max_query_complexity = 200
+

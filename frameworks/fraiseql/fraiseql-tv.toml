@@ -1,4 +1,4 @@
-# FraiseQL v2.1.2 — Server Runtime Configuration (TV Tables Variant)
+# FraiseQL — Server Runtime Configuration (TV Tables Variant)
 # VelocityBench Benchmark Environment
 #
 # Variant B: Pre-computed JSONB tables (tv_*)
@@ -24,3 +24,4 @@ cache_enabled = true
 
 [validation]
 max_query_complexity = 1000
+

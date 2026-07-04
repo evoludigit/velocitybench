@@ -10,11 +10,16 @@ services:
       # Data volume selector: xs (default), medium, large
       # Pass as: DATA_VOLUME=medium docker compose up postgres
       DATA_VOLUME: ${DATA_VOLUME:-xs}
+      # tv_* table persistence: logged (default, publishable profile) or unlogged
+      # (pg_tviews' compiled default — faster writes, truncated on crash).
+      # Applied at cluster init only; switching requires: docker compose down -v
+      TVIEW_PERSISTENCE: ${TVIEW_PERSISTENCE:-logged}
     ports:
       - "${POSTGRES_PORT:-5434}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/01-extensions.sql:/docker-entrypoint-initdb.d/01-extensions.sql
+      - ./database/01z-tview-persistence.sh:/docker-entrypoint-initdb.d/01z-tview-persistence.sh
       - ./database/fraiseql_cqrs_schema.sql:/docker-entrypoint-initdb.d/02-fraiseql-cqrs.sql
       - ./database/04-cqrs-extensions.sql:/docker-entrypoint-initdb.d/03-cqrs-extensions.sql
       - ./database/05-large-dataset.sql:/docker-entrypoint-initdb.d/04-seed.sql
@@ -60,7 +65,7 @@ services:
   # ============================================================================
 
   fraiseql:
-    # FraiseQL v2.1.2 — Variant A: v_* on-the-fly JSONB views
+    # FraiseQL — Variant A: v_* on-the-fly JSONB views
     build:
       context: ./frameworks/fraiseql
       args:
@@ -78,6 +83,9 @@ services:
       - RUST_LOG=info
       - FRAISEQL_CONFIG=fraiseql.toml
       - FRAISEQL_ENV=development
+      # Change-spine outbox off: no competitor writes an audit row per mutation;
+      # audit overhead is measured separately by the fraiseql-tv-audit variant.
+      - FRAISEQL_CHANGELOG_ENABLED=false
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8815/health"]
       interval: 30s
@@ -96,7 +104,7 @@ services:
       - velocitybench-benchmark
 
   fraiseql-v-nocache:
-    # FraiseQL v2.1.2 — Variant A (v_* views), cache disabled — raw JOIN baseline
+    # FraiseQL — Variant A (v_* views), cache disabled — raw JOIN baseline
     build:
       context: ./frameworks/fraiseql
       args:
@@ -114,6 +122,9 @@ services:
       - RUST_LOG=info
       - FRAISEQL_CONFIG=fraiseql-nocache.toml
       - FRAISEQL_ENV=development
+      # Change-spine outbox off: no competitor writes an audit row per mutation;
+      # audit overhead is measured separately by the fraiseql-tv-audit variant.
+      - FRAISEQL_CHANGELOG_ENABLED=false
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8815/health"]
       interval: 30s
@@ -132,7 +143,7 @@ services:
       - velocitybench-benchmark
 
   fraiseql-tv:
-    # FraiseQL v2.1.2 — Variant B: tv_* pre-computed JSONB tables
+    # FraiseQL — Variant B: tv_* pre-computed JSONB tables
     build:
       context: ./frameworks/fraiseql
       args:
@@ -151,6 +162,9 @@ services:
       - RUST_LOG=info
       - FRAISEQL_CONFIG=fraiseql-tv.toml
       - FRAISEQL_ENV=development
+      # Change-spine outbox off: no competitor writes an audit row per mutation;
+      # audit overhead is measured separately by the fraiseql-tv-audit variant.
+      - FRAISEQL_CHANGELOG_ENABLED=false
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8815/health"]
       interval: 30s
@@ -173,7 +187,7 @@ services:
       - velocitybench-benchmark
 
   fraiseql-tv-nocache:
-    # FraiseQL v2.1.2 — Variant B (tv_*), cache disabled — cold-read baseline
+    # FraiseQL — Variant B (tv_*), cache disabled — cold-read baseline
     build:
       context: ./frameworks/fraiseql
       args:
@@ -192,6 +206,9 @@ services:
       - RUST_LOG=info
       - FRAISEQL_CONFIG=fraiseql-tv-nocache.toml
       - FRAISEQL_ENV=development
+      # Change-spine outbox off: no competitor writes an audit row per mutation;
+      # audit overhead is measured separately by the fraiseql-tv-audit variant.
+      - FRAISEQL_CHANGELOG_ENABLED=false
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8815/health"]
       interval: 30s
@@ -210,7 +227,7 @@ services:
       - velocitybench-benchmark
 
   fraiseql-tv-audit:
-    # FraiseQL v2.1.2 — Variant C (tv_*), full audit mutations — measures production overhead
+    # FraiseQL — Variant C (tv_*), full audit mutations — measures production overhead
     build:
       context: ./frameworks/fraiseql
       args:
@@ -229,6 +246,9 @@ services:
       - RUST_LOG=info
       - FRAISEQL_CONFIG=fraiseql-tv-audit.toml
       - FRAISEQL_ENV=development
+      # Change-spine outbox off: no competitor writes an audit row per mutation;
+      # audit overhead is measured separately by the fraiseql-tv-audit variant.
+      - FRAISEQL_CHANGELOG_ENABLED=false
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8815/health"]
       interval: 30s

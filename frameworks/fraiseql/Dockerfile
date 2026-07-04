@@ -1,5 +1,10 @@
-# FraiseQL v2.2.0 Dockerfile for VelocityBench
+# FraiseQL Dockerfile for VelocityBench
 # Multi-stage build: Python schema gen -> CLI compile -> Debian runtime
+
+# Single source of truth for the FraiseQL version. The copied binaries must
+# report exactly this version; the build fails otherwise. Exported as
+# FRAISEQL_VERSION in the runtime image so benchmark runs can record it.
+ARG FRAISEQL_VERSION=2.10.0
 
 # Build argument: which schema variant to compile.
 #   schema.py    -> Variant A (v_* on-the-fly JSONB views) -- default
@@ -36,15 +41,17 @@ RUN python schema_source.py && \
      mv schema_tv_audit.json schema.json 2>/dev/null || true)
 
 # ============================================================================
-# Stage 2: Compile schema with fraiseql-cli v2.2.0
+# Stage 2: Compile schema with fraiseql-cli
 # The build directory intentionally has NO fraiseql.toml (server config)
 # to avoid auto-discovery conflicts with the CLI's TOML parser.
 # ============================================================================
 FROM debian:trixie-slim AS builder
 
-# Install fraiseql-cli (v2.2.0 release binary)
+ARG FRAISEQL_VERSION
+
 COPY fraiseql-cli /usr/local/bin/fraiseql-cli
-RUN chmod +x /usr/local/bin/fraiseql-cli
+RUN chmod +x /usr/local/bin/fraiseql-cli && \
+    fraiseql-cli --version | grep -F "${FRAISEQL_VERSION}"
 
 WORKDIR /build
 
@@ -56,9 +63,9 @@ COPY ${BUILD_TOML} ./fraiseql.toml
 # Compile schema: legacy JSON workflow (types/queries/mutations in schema.json)
 RUN fraiseql-cli compile schema.json --output schema.compiled.json
 
-# Copy fraiseql-server binary (v2.2.0 release)
 COPY fraiseql-server /usr/local/bin/fraiseql-server
-RUN chmod +x /usr/local/bin/fraiseql-server
+RUN chmod +x /usr/local/bin/fraiseql-server && \
+    fraiseql-server --version | grep -F "${FRAISEQL_VERSION}"
 
 # ============================================================================
 # Stage 3: Runtime image
@@ -82,6 +89,8 @@ COPY ${SERVER_TOML} ./fraiseql.toml
 RUN useradd -r -s /bin/false fraiseql
 USER fraiseql
 
+ARG FRAISEQL_VERSION
+ENV FRAISEQL_VERSION=${FRAISEQL_VERSION}
 ENV RUST_LOG=info
 ENV FRAISEQL_CONFIG=fraiseql.toml
 ENV DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark

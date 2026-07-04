@@ -1,4 +1,4 @@
-# FraiseQL v2.1.2 — Server Runtime Configuration (TV Tables, Cache DISABLED)
+# FraiseQL — Server Runtime Configuration (TV Tables, Cache DISABLED)
 # Cold-read baseline to measure LRU cache speedup.
 
 schema_path = "schema.compiled.json"
@@ -21,3 +21,4 @@ cache_enabled = false
 
 [validation]
 max_query_complexity = 1000
+

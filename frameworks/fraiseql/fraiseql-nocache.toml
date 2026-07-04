@@ -1,4 +1,4 @@
-# FraiseQL v2.1.2 — Server Runtime Configuration (v_* Views, Cache DISABLED)
+# FraiseQL — Server Runtime Configuration (v_* Views, Cache DISABLED)
 # Raw JOIN baseline — measures on-the-fly JSONB view cost without in-process cache.
 
 schema_path = "schema.compiled.json"
@@ -21,3 +21,4 @@ cache_enabled = false
 
 [validation]
 max_query_complexity = 1000
+
