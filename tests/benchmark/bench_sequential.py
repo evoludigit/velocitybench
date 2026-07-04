@@ -32,6 +32,8 @@ import argparse
 import hashlib
 import http.client
 import json
+import os
+import platform
 import random
 import re
 import shutil
@@ -192,15 +194,42 @@ _FRAISEQL_T1_SINGLE_QUERY = (
     "comments { id content author { id username fullName } } } }"
 )
 # FraiseQL T1 multi-root — parallel SQL execution via fraiseql v2 pipeline
-# Fires post(id) + comments(post_id, limit:10) as two concurrent SQL queries
+# Fires post(id) + comments(postId, limit:10) as two concurrent SQL queries
 # against tv_post and tv_comment (both indexed). No jsonb_agg, no v_post_full
 # composed view overhead. ~26% faster than postFull in benchmarks.
 _FRAISEQL_T1_MULTI_ROOT = (
     "query GetPostAndComments($id: ID!) { "
     "post(id: $id) { id title content author { id username fullName } } "
-    "comments(post_id: $id, limit: 10) { id content author { id username fullName } } "
+    "comments(postId: $id, limit: 10) { id content author { id username fullName } } "
     "}"
 )
+
+def target_url(url: str, host: str) -> str:
+    """Rebase a scenario URL onto the benchmark target host."""
+    return url.replace("http://localhost:", f"http://{host}:", 1)
+
+
+def apply_target_host(host: str) -> None:
+    """Rewrite every scenario, health, and graphql URL in FRAMEWORKS onto *host*.
+
+    Central chokepoint for the two-instance topology: the framework table keeps
+    localhost URLs (they encode per-framework port + path); the target host is
+    applied once at startup, before any URL is read.  Derived URLs (M1/M1d/C3
+    sentinels resolved later from Q1 entries) inherit the substitution.
+    """
+    if host == "localhost":
+        return
+    for fw_config in FRAMEWORKS.values():
+        fw_config["health_url"] = target_url(fw_config["health_url"], host)
+        if "graphql_url" in fw_config:
+            fw_config["graphql_url"] = target_url(fw_config["graphql_url"], host)
+        queries = fw_config["queries"]
+        for name, entry in queries.items():
+            if isinstance(entry, str) and entry.startswith("http://"):
+                queries[name] = target_url(entry, host)
+            elif isinstance(entry, tuple):
+                queries[name] = (target_url(entry[0], host), *entry[1:])
+
 
 FRAMEWORKS: dict[str, dict] = {
     # ------------------------------------------------------------------
@@ -1023,9 +1052,18 @@ class BenchResult:
     )  # (category, detail)
     skipped: bool = False
     skip_reason: str = ""
+    # Aggregates from an external load generator (k6). The Python path fills
+    # latencies_ms with raw samples; k6 reports pre-computed aggregates, which
+    # take precedence when set.
+    ext_requests: int | None = None
+    ext_p50_ms: float | None = None
+    ext_p95_ms: float | None = None
+    ext_p99_ms: float | None = None
 
     @property
     def requests_sent(self) -> int:
+        if self.ext_requests is not None:
+            return self.ext_requests
         return len(self.latencies_ms)
 
     @property
@@ -1036,10 +1074,14 @@ class BenchResult:
 
     @property
     def p50_ms(self) -> float:
+        if self.ext_p50_ms is not None:
+            return self.ext_p50_ms
         return statistics.median(self.latencies_ms) if self.latencies_ms else 0.0
 
     @property
     def p95_ms(self) -> float:
+        if self.ext_p95_ms is not None:
+            return self.ext_p95_ms
         if not self.latencies_ms:
             return 0.0
         s = sorted(self.latencies_ms)
@@ -1047,6 +1089,8 @@ class BenchResult:
 
     @property
     def p99_ms(self) -> float:
+        if self.ext_p99_ms is not None:
+            return self.ext_p99_ms
         if not self.latencies_ms:
             return 0.0
         s = sorted(self.latencies_ms)
@@ -1818,6 +1862,118 @@ def run_diagnose(fw_name: str, fw_config: dict) -> None:
 # ---------------------------------------------------------------------------
 
 
+_K6_SCRIPT = Path(__file__).parent / "k6" / "scenario.js"
+
+
+def _entry_to_k6_steps(entry, fw_type: str, query_name: str) -> list[dict]:
+    """Translate a FRAMEWORKS scenario entry into k6 scenario.js steps.
+
+    Mirrors the dispatch in run_scenario's _run_workers exactly, so both load
+    generators execute the identical request sequence per cycle. One k6
+    iteration == one cycle (single request, or the full chain for composites).
+    """
+    def gql(url: str, body: str) -> dict:
+        return {"method": "POST", "url": url, "body": body, "validate": "graphql"}
+
+    if isinstance(entry, dict):
+        mode = entry.get("mode")
+        if mode == "apq":
+            return [gql(entry["url"], entry["payload"].decode())]
+        if mode == "apq_vars":
+            return [{
+                "method": "POST", "url": entry["url"],
+                "bodies": [p.decode() for p in entry["payloads"]],
+                "validate": "graphql",
+            }]
+        if mode == "graphql_composite":
+            return [gql(entry["url"], p.decode()) for p in entry["payloads"]]
+        if mode == "composite":
+            return [{"method": "GET", "url": u, "validate": "rest"} for u in entry["urls"]]
+        if mode == "mc1_cascade":
+            return [{
+                "method": "POST", "url": entry["url"],
+                "bodies": [
+                    json.dumps({"query": entry["query"], "variables": v})
+                    for v in entry["variables"]
+                ],
+                "validate": "graphql",
+            }]
+        if mode == "mc1_classical":
+            return [
+                gql(entry["url"], entry["m1_payload"].decode()),
+                gql(entry["url"], entry["q1_payload"].decode()),
+            ]
+        raise ValueError(f"unknown scenario mode for k6: {mode!r}")
+    if fw_type == "graphql":
+        if len(entry) == 3:
+            url, query, variables = entry
+            return [{
+                "method": "POST", "url": url,
+                "bodies": [json.dumps({"query": query, "variables": v}) for v in variables],
+                "validate": "graphql",
+            }]
+        url, query = entry
+        return [gql(url, json.dumps({"query": query}))]
+    if query_name == "M1":
+        return [{"method": "PUT", "url": entry, "body": json.dumps({"bio": "bench"}),
+                 "validate": "rest"}]
+    return [{"method": "GET", "url": entry, "validate": "rest"}]
+
+
+def _run_k6(
+    steps: list[dict], concurrency: int, secs: int,
+) -> tuple[int, int, dict[str, float]]:
+    """Run one k6 pass. Returns (ok_cycles, error_count, latency_ms_percentiles).
+
+    Raises RuntimeError when k6 itself fails — a broken load generator must
+    abort the sweep, not degrade into silent zeros.
+    """
+    import tempfile
+
+    with tempfile.TemporaryDirectory(prefix="bench-k6-") as td:
+        config_path = Path(td) / "scenario.json"
+        summary_path = Path(td) / "summary.json"
+        config_path.write_text(json.dumps({
+            "concurrency": concurrency,
+            "duration_secs": secs,
+            "steps": steps,
+        }))
+        proc = subprocess.run(
+            [
+                "k6", "run", "--quiet", "--no-usage-report",
+                "--summary-export", str(summary_path),
+                str(_K6_SCRIPT),
+            ],
+            env={**os.environ, "SCENARIO_CONFIG": str(config_path)},
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if proc.returncode != 0 or not summary_path.exists():
+            raise RuntimeError(
+                f"k6 run failed (rc={proc.returncode}): {proc.stderr.strip()[-500:]}"
+            )
+        metrics = json.loads(summary_path.read_text())["metrics"]
+
+    iterations = int(metrics.get("iterations", {}).get("count", 0))
+    fails = int(metrics.get("checks", {}).get("fails", 0))
+    lat = metrics.get("iteration_duration", {})
+    percentiles = {
+        "p50": float(lat.get("med", 0.0)),
+        "p95": float(lat.get("p(95)", 0.0)),
+        "p99": float(lat.get("p(99)", 0.0)),
+    }
+    return max(0, iterations - fails), fails, percentiles
+
+
+def k6_version() -> str | None:
+    if not shutil.which("k6"):
+        return None
+    out = subprocess.run(["k6", "version"], capture_output=True, text=True, check=False)
+    match = re.search(r"v[\d.]+", out.stdout)
+    return match[0] if match else "unknown"
+
+
 def run_scenario(
     fw_name: str,
     fw_config: dict,
@@ -1825,6 +1981,7 @@ def run_scenario(
     concurrency: int,
     duration_secs: int,
     warmup_secs: int,
+    loadgen: str = "python",
 ) -> BenchResult:
     # Per-framework warmup override (e.g. cache-enabled fraiseql needs 30s to fill LRU).
     warmup_secs = fw_config.get("warmup_secs", warmup_secs)
@@ -1843,6 +2000,32 @@ def run_scenario(
         return result
 
     fw_type = fw_config["type"]
+
+    if loadgen == "k6":
+        steps = _entry_to_k6_steps(entry, fw_type, query_name)
+        print(f"    warmup {warmup_secs}s...", end=" ", flush=True)
+        _run_k6(steps, concurrency, warmup_secs)
+        print("done", flush=True)
+        if query_name in ("M1", "M1d", "MC1", "M1_APQ"):
+            _reset_postgres_state()
+        print(f"    measuring {duration_secs}s...", end=" ", flush=True)
+        ok_cycles, errors, pct = _run_k6(steps, concurrency, duration_secs)
+        result.ext_requests = ok_cycles
+        result.ext_p50_ms = pct["p50"]
+        result.ext_p95_ms = pct["p95"]
+        result.ext_p99_ms = pct["p99"]
+        result.errors = errors
+        if errors:
+            result.error_breakdown = {"check_failed": errors}
+        print(
+            f"{result.rps:.0f} RPS  "
+            f"p50={result.p50_ms:.1f}ms  "
+            f"p95={result.p95_ms:.1f}ms  "
+            f"p99={result.p99_ms:.1f}ms  "
+            f"errors={result.errors}",
+            flush=True,
+        )
+        return result
 
     def _run_workers(
         secs: int,
@@ -1992,6 +2175,86 @@ def _compose(*args: str, check: bool = True) -> subprocess.CompletedProcess:
         text=True,
         check=check,
     )
+
+
+def detect_tview_persistence() -> str | None:
+    """Read the live persistence mode of the pg_tviews tv_* tables.
+
+    Returns 'logged', 'unlogged', or 'mixed'; None when postgres is not
+    reachable via docker compose. tvd_* delta tables are excluded — only the
+    pg_tviews-managed tables carry the UNLOGGED durability trade.
+    """
+    query = (
+        "SELECT DISTINCT relpersistence FROM pg_class"
+        " WHERE relname LIKE 'tv\\_%' AND relkind = 'r'"
+        " AND relnamespace = 'benchmark'::regnamespace;"
+    )
+    result = _compose(
+        "exec", "-T", "postgres",
+        "psql", "-U", "benchmark", "-d", "velocitybench_benchmark",
+        "--csv", "--tuples-only",
+        "-c", query,
+        check=False,
+    )
+    if result.returncode != 0 or not result.stdout.strip():
+        return None
+    modes = set(result.stdout.split())
+    if modes == {"p"}:
+        return "logged"
+    if modes == {"u"}:
+        return "unlogged"
+    return "mixed"
+
+
+def probe_framework_version(health_url: str) -> str | None:
+    """Best-effort framework version from a JSON health endpoint's `version` key."""
+    try:
+        with urllib.request.urlopen(health_url, timeout=2) as resp:
+            body = json.loads(resp.read().decode())
+        version = body.get("version") if isinstance(body, dict) else None
+        return str(version) if version else None
+    except (urllib.error.URLError, OSError, ValueError):
+        return None
+
+
+def _postgres_version() -> str | None:
+    result = _compose(
+        "exec", "-T", "postgres",
+        "psql", "-U", "benchmark", "-d", "velocitybench_benchmark",
+        "--tuples-only", "-c", "SHOW server_version;",
+        check=False,
+    )
+    return result.stdout.strip() or None if result.returncode == 0 else None
+
+
+def _cpu_model() -> str | None:
+    try:
+        for line in Path("/proc/cpuinfo").read_text().splitlines():
+            if line.startswith("model name"):
+                return line.split(":", 1)[1].strip()
+    except OSError:
+        pass
+    return None
+
+
+def collect_run_environment(args: argparse.Namespace, tview_mode: str | None) -> dict:
+    """Reproducibility metadata stamped into every run JSON."""
+    return {
+        "timestamp": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "cpu_model": _cpu_model(),
+        "kernel": platform.release(),
+        "postgres_version": _postgres_version(),
+        "load_generator": (
+            f"k6-{k6_version()}" if args.loadgen == "k6"
+            else f"python-{platform.python_version()}-threadpool"
+        ),
+        "target_host": args.target_host,
+        "concurrency": args.concurrency,
+        "duration_secs": args.duration,
+        "warmup_secs": args.warmup,
+        "passes": args.passes,
+        "tview_mode": tview_mode,
+    }
 
 
 def start_service(service: str, health_url: str, timeout_secs: int = 60, *, no_build: bool = False) -> None:
@@ -2961,6 +3224,34 @@ def main() -> None:
         help="Run the framework list N times with randomised order on passes 2+ and report "
              "median ± σ across passes (default: 1 — single canonical run).",
     )
+    parser.add_argument(
+        "--target-host",
+        default="localhost",
+        metavar="HOST",
+        help="Host serving the framework containers (default: localhost). "
+             "All scenario, health, and graphql URLs are rebased onto this host.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print the resolved scenario URL plan and exit without touching Docker.",
+    )
+    parser.add_argument(
+        "--loadgen",
+        choices=["k6", "python"],
+        default="k6",
+        help="Load generator for the measurement path (default: k6). The Python "
+             "ThreadPool generator saturates at ~6.5k RPS under the GIL — below the "
+             "fastest frameworks — and is kept only for debugging (--loadgen python).",
+    )
+    parser.add_argument(
+        "--tview-mode",
+        choices=["logged", "unlogged"],
+        default="logged",
+        help="Claimed persistence of the pg_tviews tv_* tables (default: logged — the "
+             "publishable profile). The live DB is checked before the sweep; a mismatch "
+             "aborts. Recreate the postgres volume with TVIEW_PERSISTENCE=<mode> to switch.",
+    )
     args = parser.parse_args()
 
     if args.broken_only:
@@ -2971,6 +3262,26 @@ def main() -> None:
         print(f"Unknown frameworks: {unknown}", file=sys.stderr)
         print(f"Available: {list(FRAMEWORKS)}", file=sys.stderr)
         sys.exit(1)
+
+    apply_target_host(args.target_host)
+
+    if args.loadgen == "k6" and not args.dry_run and k6_version() is None:
+        print(
+            "k6 not found on PATH — install k6 or rerun with --loadgen python "
+            "(debug only; the Python generator lacks headroom for real sweeps).",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    if args.dry_run:
+        print(f"Dry run — target host: {args.target_host}")
+        for fw_name in args.frameworks:
+            fw_config = FRAMEWORKS[fw_name]
+            print(f"{fw_name}  (health: {fw_config['health_url']})")
+            for query_name, entry in fw_config["queries"].items():
+                url = entry[0] if isinstance(entry, tuple) else entry
+                print(f"  {query_name:<8} {url}")
+        return
 
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     date_str = datetime.now().strftime("%Y-%m-%d")
@@ -2993,6 +3304,7 @@ def main() -> None:
 
     all_results: list[BenchResult] = []
     all_resource_metrics: dict[str, FrameworkResourceMetrics] = {}
+    framework_versions: dict[str, str] = {}
 
     # Collect database footprint once — before any framework runs so mutation workloads
     # don't inflate sizes.  Best-effort: returns [] if postgres is not yet up.
@@ -3009,6 +3321,27 @@ def main() -> None:
         )
     else:
         print("skipped (postgres not available)", flush=True)
+
+    # TVIEW persistence guard: UNLOGGED tv_* tables are a durability trade that
+    # must never ride into a run unnoticed. Abort on any mismatch with the
+    # claimed mode; skip only when postgres is genuinely unreachable (it will
+    # be started per-framework, and fraiseql runs without it are skipped anyway).
+    print("Validating tv_* persistence...", end=" ", flush=True)
+    live_tview_mode = detect_tview_persistence()
+    if live_tview_mode is None:
+        print("skipped (postgres not available)", flush=True)
+    elif live_tview_mode != args.tview_mode:
+        print(f"MISMATCH ✗ (live: {live_tview_mode}, claimed: {args.tview_mode})", flush=True)
+        print(
+            f"tv_* tables are {live_tview_mode} but this run claims --tview-mode "
+            f"{args.tview_mode}. Recreate the postgres volume with "
+            f"TVIEW_PERSISTENCE={args.tview_mode} (docker compose down -v && up), "
+            f"or rerun with --tview-mode {live_tview_mode}.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    else:
+        print(f"{live_tview_mode} ✓", flush=True)
     print()
 
     # Build flat run schedule: pass 1 preserves canonical order; subsequent passes are
@@ -3064,6 +3397,11 @@ def main() -> None:
                 continue
         else:
             healthy = True
+
+        if fw_name not in framework_versions:
+            fw_version = probe_framework_version(fw_config["health_url"])
+            if fw_version:
+                framework_versions[fw_name] = fw_version
 
         if args.diagnose:
             run_diagnose(fw_name, fw_config)
@@ -3508,6 +3846,7 @@ def main() -> None:
                 args.concurrency,
                 args.duration,
                 args.warmup,
+                loadgen=args.loadgen,
             )
             r.pass_num = pass_num
             all_results.append(r)
@@ -3566,7 +3905,11 @@ def main() -> None:
         }
         for r in all_results
     ]
-    json_data_out: dict = {"results": json_data}
+    json_data_out: dict = {
+        "environment": collect_run_environment(args, live_tview_mode),
+        "framework_versions": framework_versions,
+        "results": json_data,
+    }
     # For multi-pass runs, also emit per-(framework, query) aggregates
     if args.passes > 1:
         all_aggs = _aggregate_results(all_results)
