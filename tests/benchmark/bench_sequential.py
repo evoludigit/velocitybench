@@ -2359,6 +2359,7 @@ def collect_run_environment(args: argparse.Namespace, tview_mode: str | None) ->
         "concurrency": args.concurrency,
         "duration_secs": args.duration,
         "warmup_secs": args.warmup,
+        "cooldown_secs": args.cooldown,
         "passes": args.passes,
         "tview_mode": tview_mode,
     }
@@ -3173,6 +3174,8 @@ def format_report(
     date_str: str,
     resource_metrics: dict[str, FrameworkResourceMetrics] | None = None,
     db_footprint: list[DbTableSize] | None = None,
+    environment: dict | None = None,
+    framework_versions: dict[str, str] | None = None,
 ) -> str:
     detailed = getattr(args, "detailed_errors", False)
     passes = getattr(args, "passes", 1)
@@ -3197,6 +3200,65 @@ def format_report(
         f"**Measurement**: {args.duration}s per scenario  ",
         f"**Warmup**: {args.warmup}s per scenario  ",
         f"**Cooldown**: {args.cooldown}s between frameworks  ",
+        "",
+        "---",
+    ]
+
+    # Methodology block — every fact a reader needs to reproduce or dismiss the
+    # run, generated from the recorded environment (never hand-edited).
+    if environment:
+        tview_mode = environment.get("tview_mode")
+        if tview_mode == "logged":
+            tview_stamp = "logged (WAL-durable — publishable profile)"
+        elif tview_mode == "unlogged":
+            tview_stamp = "UNLOGGED (durability trade — NOT the publishable profile)"
+        else:
+            tview_stamp = "unknown (postgres not probed)"
+        lines += [
+            "",
+            "## Methodology",
+            "",
+            "| | |",
+            "|---|---|",
+            f"| Host CPU | {environment.get('cpu_model', 'unknown')} |",
+            f"| Kernel | {environment.get('kernel', 'unknown')} |",
+            f"| PostgreSQL | {environment.get('postgres_version', 'unknown')} |",
+            f"| Load generator | {environment.get('load_generator', 'unknown')} |",
+            f"| Target host | {environment.get('target_host', 'localhost')} |",
+            f"| `tv_*` persistence | {tview_stamp} |",
+            "| Dataset | MEDIUM — 10 000 users · 50 000 posts · 200 000 comments |",
+            f"| Concurrency | {environment.get('concurrency', args.concurrency)} workers |",
+            f"| Measurement / warmup / cooldown | {environment.get('duration_secs', args.duration)}s"
+            f" / {environment.get('warmup_secs', args.warmup)}s"
+            f" / {environment.get('cooldown_secs', args.cooldown)}s |",
+            f"| Passes | {environment.get('passes', passes)} |",
+            f"| Run timestamp | {environment.get('timestamp', date_str)} |",
+        ]
+        if framework_versions:
+            lines += [
+                "",
+                "### Framework Versions",
+                "",
+                "| Framework | Version |",
+                "|-----------|---------|",
+            ]
+            lines += [
+                f"| {fw} | {ver} |" for fw, ver in sorted(framework_versions.items())
+            ]
+
+    # Honesty section — load-bearing for the publishable report; never removed.
+    lines += [
+        "",
+        "## Reading These Numbers",
+        "",
+        "- **Same-run rule**: every number below comes from one sequential sweep on one "
+        "host. Compare rows within this report only — never across reports or hardware.",
+        "- **Q1 honesty note**: Q1 is a flat 20-row SELECT — the scenario where a "
+        "schema-to-API engine has the least to offer over a hand-tuned endpoint, and "
+        "FraiseQL's position there is mid-pack. The architectural gap appears in nested "
+        "reads (Q2b, Q3), mutations (M1), and consistency cycles (MC1).",
+        "- **Errors disqualify**: a row with a non-zero error count is reported but not "
+        "comparable; publishable tables require 0% errors.",
         "",
         "---",
     ]
@@ -3450,6 +3512,95 @@ def format_report(
 
 
 # ---------------------------------------------------------------------------
+# Report regeneration from run JSON
+# ---------------------------------------------------------------------------
+
+
+def regenerate_report_from_json(json_path: Path) -> str:
+    """Rebuild the full markdown report from a run JSON — zero hand-editing.
+
+    Byte-stable: the same JSON always produces the same markdown (all report
+    inputs, including the timestamp, come from the recorded document). This is
+    the entry point Phase 07 visual work builds on without touching sweep code.
+    """
+    doc = json.loads(Path(json_path).read_text())
+    env = doc.get("environment", {})
+
+    args = argparse.Namespace(
+        concurrency=env.get("concurrency", 0),
+        duration=env.get("duration_secs", 0),
+        warmup=env.get("warmup_secs", 0),
+        cooldown=env.get("cooldown_secs", 0),
+        passes=env.get("passes", 1),
+        detailed_errors=False,
+    )
+
+    def _row_duration(row: dict) -> float:
+        # Pre-July JSONs lack the environment block; rps must survive the
+        # round trip, so derive the duration the recorded rps implies.
+        duration = env.get("duration_secs", 0)
+        if duration:
+            return duration
+        rps, requests = row.get("rps") or 0, row.get("requests") or 0
+        return requests / rps if rps else 0
+
+    results = [
+        BenchResult(
+            framework=row["framework"],
+            query_name=row["query"],
+            duration_secs=_row_duration(row),
+            concurrency=env.get("concurrency", 0),
+            pass_num=row.get("pass", 1),
+            errors=row.get("errors", 0),
+            error_breakdown=row.get("error_breakdown") or {},
+            skipped=row.get("skipped", False),
+            skip_reason=row.get("skip_reason") or "",
+            ext_requests=row.get("requests"),
+            ext_p50_ms=row.get("p50_ms"),
+            ext_p95_ms=row.get("p95_ms"),
+            ext_p99_ms=row.get("p99_ms"),
+            rss_steady_mb=row.get("rss_steady_mb"),
+            rss_max_mb=row.get("rss_max_mb"),
+            cold_start_ms=row.get("cold_start_ms"),
+        )
+        for row in doc.get("results", [])
+    ]
+
+    resource_metrics = {
+        m["framework"]: FrameworkResourceMetrics(
+            fw_name=m["framework"],
+            loc=m.get("loc", 0),
+            complexity_per_100_loc=m.get("complexity_per_100_loc", 0.0),
+            image_mb=m.get("image_mb", 0.0),
+            peak_ram_mb=m.get("peak_ram_mb", 0.0),
+            avg_cpu_pct=m.get("avg_cpu_pct", 0.0),
+        )
+        for m in doc.get("resource_metrics", [])
+    }
+
+    db_footprint = [
+        DbTableSize(
+            tablename=t["table"],
+            total_bytes=t["total_bytes"],
+            heap_bytes=t["heap_bytes"],
+            indexes_bytes=t["indexes_bytes"],
+        )
+        for t in doc.get("db_footprint", [])
+    ]
+
+    date_str = env.get("timestamp", "")[:10] or "unknown-date"
+    return format_report(
+        results,
+        args,
+        date_str,
+        resource_metrics=resource_metrics or None,
+        db_footprint=db_footprint or None,
+        environment=env,
+        framework_versions=doc.get("framework_versions") or None,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -3581,6 +3732,15 @@ def main() -> None:
              "(debugging only — a published sweep must run the gate).",
     )
     parser.add_argument(
+        "--from-json",
+        type=Path,
+        default=None,
+        metavar="RUN_JSON",
+        help="Regenerate the markdown report from an existing run JSON and exit "
+             "— no Docker, no load generation. Writes next to the JSON unless "
+             "--output is given.",
+    )
+    parser.add_argument(
         "--tview-mode",
         choices=["logged", "unlogged"],
         default="logged",
@@ -3589,6 +3749,16 @@ def main() -> None:
              "aborts. Recreate the postgres volume with TVIEW_PERSISTENCE=<mode> to switch.",
     )
     args = parser.parse_args()
+
+    if args.from_json:
+        report = regenerate_report_from_json(args.from_json)
+        output_path = (
+            Path(args.output) if args.output else args.from_json.with_suffix(".md")
+        )
+        output_path.write_text(report)
+        print(report)
+        print(f"\nReport regenerated to: {output_path}")
+        return
 
     if args.broken_only:
         args.frameworks = [fw for fw in BROKEN_FRAMEWORKS if fw in FRAMEWORKS]
@@ -4235,10 +4405,13 @@ def main() -> None:
             time.sleep(args.cooldown)
         print()
 
+    run_environment = collect_run_environment(args, live_tview_mode)
     report = format_report(
         all_results, args, date_str,
         resource_metrics=all_resource_metrics if all_resource_metrics else None,
         db_footprint=db_footprint if db_footprint else None,
+        environment=run_environment,
+        framework_versions=framework_versions or None,
     )
 
     output_path = (
@@ -4274,7 +4447,7 @@ def main() -> None:
         for r in all_results
     ]
     json_data_out: dict = {
-        "environment": collect_run_environment(args, live_tview_mode),
+        "environment": run_environment,
         "framework_versions": framework_versions,
         "results": json_data,
     }
