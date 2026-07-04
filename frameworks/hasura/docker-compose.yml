@@ -5,7 +5,8 @@ version: '3.8'
 
 services:
   hasura:
-    image: hasura/graphql-engine:v2.36.0
+    # Keep in lockstep with the root docker-compose.yml (single pinned version).
+    image: hasura/graphql-engine:v2.49.3-ce.cli-migrations-v3
     ports:
       - "4000:8080"  # Map Hasura's 8080 to standardized GraphQL port 4000
     environment:

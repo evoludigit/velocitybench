@@ -489,26 +489,33 @@ services:
       - velocitybench-benchmark
 
   hasura:
-    image: hasura/graphql-engine:v2.36.0
+    # cli-migrations variant applies /hasura-metadata non-interactively before
+    # serving — a fresh clone reproduces the exact Hasura config on `up`.
+    image: hasura/graphql-engine:v2.49.3-ce.cli-migrations-v3
     ports:
       - "4000:8080"  # Standardized GraphQL port
     depends_on:
       postgres:
-        condition: service_started
+        condition: service_healthy
     environment:
       - HASURA_GRAPHQL_DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
+      - HASURA_GRAPHQL_METADATA_DIR=/hasura-metadata
       - HASURA_GRAPHQL_ENABLE_CONSOLE=false  # Disabled for benchmarks
       - HASURA_GRAPHQL_DEV_MODE=false
       - HASURA_GRAPHQL_ADMIN_SECRET=benchmark-admin
       - HASURA_GRAPHQL_UNAUTHORIZED_ROLE=public
+      # Per-request http-log would measure the logger, not the engine.
+      - HASURA_GRAPHQL_ENABLED_LOG_TYPES=startup
     volumes:
       - ./frameworks/hasura/metadata:/hasura-metadata
     healthcheck:
-      test: ["CMD", "wget", "-qO", "/dev/null", "http://localhost:8080/healthz"]
+      # strict=true fails on inconsistent metadata — a half-applied config
+      # must never pass the pre-warmup health gate.
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://localhost:8080/healthz?strict=true"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 60s
     deploy:
       resources:
         limits:
@@ -516,6 +523,7 @@ services:
           cpus: '2.0'
     profiles:
       - hasura
+      - benchmark
     networks:
       - velocitybench-benchmark
 

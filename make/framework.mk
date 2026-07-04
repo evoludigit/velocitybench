@@ -134,15 +134,19 @@ parity-test:
 	  -v --tb=short --no-header
 	@echo "✓ Parity tests passed"
 
-# Run k6 against a single framework.
-# Usage: make bench-one FRAMEWORK=go-gqlgen
+# Benchmark a single framework through the canonical sequential runner
+# (k6 load generator, full scenario row set, run JSON + report emitted).
+# Usage: make bench-one FRAMEWORK=go-gqlgen [DURATION=20] [CONCURRENCY=40]
 bench-one:
 	@if [ -z "$(FRAMEWORK)" ]; then \
 		echo "Error: FRAMEWORK is required"; \
 		echo "Usage: make bench-one FRAMEWORK=<name>"; \
 		exit 1; \
 	fi
-	k6 run --env FRAMEWORK=$(FRAMEWORK) $(PROJECT_ROOT)tests/benchmark/k6/full_suite.js
+	$(PROJECT_ROOT)venv/bin/python $(PROJECT_ROOT)tests/benchmark/bench_sequential.py \
+	  --frameworks $(FRAMEWORK) \
+	  $(if $(DURATION),--duration $(DURATION),) \
+	  $(if $(CONCURRENCY),--concurrency $(CONCURRENCY),)
 
 # Run k6 against all 8 frameworks (parity gate first).
 # Usage: make bench-all

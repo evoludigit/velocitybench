@@ -66,6 +66,20 @@ _GQL_Q2b = "{ posts(limit: 10) { id title author { username fullName } } }"
 _PG_Q1 = "{ allTbUsers(first: 20) { nodes { id username fullName } } }"
 _PG_Q2 = "{ allTbPosts(first: 10) { nodes { id title } } }"
 _PG_Q2b = "{ allTbPosts(first: 10) { nodes { id title tbUserByFkAuthor { username fullName } } } }"
+
+# Hasura: metadata renames root fields and columns to the cross-framework shape
+# (users/posts/comments, camelCase), so the standard _GQL_* documents apply
+# verbatim. Only filter args (boolean where-expressions) and the update
+# mutation shape (where + _set + returning) are Hasura-native.
+_HASURA_F1 = "{ posts(where: {published: {_eq: true}}, limit: 10) { id title } }"
+_HASURA_F2 = (
+    "{ posts(where: {published: {_eq: true}}, limit: 10)"
+    " { id title author { username fullName } } }"
+)
+_HASURA_M1_TMPL = (
+    'mutation {{ updateUser(where: {{id: {{_eq: "{user_id}"}}}}, _set: {{bio: "bench"}})'
+    " {{ returning {{ id bio }} }} }}"
+)
 _GQL_Q3 = "{ comments(limit: 20) { id content author { username } post { title } } }"
 _GQL_M1_TMPL = (
     'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "bench" }}) {{ id bio }} }}'
@@ -179,6 +193,14 @@ _PG_T1_TMPL = (
     "tbCommentsByFkPost(first: 10) {{ nodes {{ id content tbUserByFkAuthor {{ username }} }} }} "
     "}} }}"
 )
+# Hasura T1: single-post lookup via where (tb_post's pk is the serial pk_post;
+# the benchmark id is a uuid column, so *_by_pk is not addressable by it).
+_HASURA_T1_TMPL = (
+    '{{ posts(where: {{id: {{_eq: "{post_id}"}}}}) {{ id title content '
+    "author {{ username fullName bio }} "
+    "comments(limit: 10) {{ id content author {{ username }} }} "
+    "}} }}"
+)
 # FraiseQL T1: 2 sequential GraphQL calls (legacy — post doesn't nest comments in tview)
 _FRAISEQL_T1_POST_TMPL = (
     '{{ post(id: "{post_id}") {{ id title content author {{ username fullName bio }} }} }}'
@@ -221,6 +243,8 @@ def apply_target_host(host: str) -> None:
         return
     for fw_config in FRAMEWORKS.values():
         fw_config["health_url"] = target_url(fw_config["health_url"], host)
+        if "version_url" in fw_config:
+            fw_config["version_url"] = target_url(fw_config["version_url"], host)
         if "graphql_url" in fw_config:
             fw_config["graphql_url"] = target_url(fw_config["graphql_url"], host)
         queries = fw_config["queries"]
@@ -780,6 +804,36 @@ FRAMEWORKS: dict[str, dict] = {
         "t1_template": "postgraphile",
     },
     # ------------------------------------------------------------------
+    # Schema-to-API engines (no resolver code — API generated from the DB)
+    # ------------------------------------------------------------------
+    "hasura": {
+        "compose_service": "hasura",
+        "type": "graphql",
+        "language": "Haskell",
+        "category": "graphql-schema-first",
+        "no_build": True,  # upstream image (cli-migrations variant); nothing to build
+        "queries": {
+            "Q1": ("http://localhost:4000/v1/graphql", _GQL_Q1),
+            "Q2": ("http://localhost:4000/v1/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:4000/v1/graphql", _GQL_Q2b),
+            "Q3": ("http://localhost:4000/v1/graphql", _GQL_Q3),
+            "F1": ("http://localhost:4000/v1/graphql", _HASURA_F1),
+            "F2": ("http://localhost:4000/v1/graphql", _HASURA_F2),
+            "M1": "M1",
+            "T1": "T1",
+        },
+        # strict=true fails while metadata is inconsistent — the warmup window
+        # must not open before the config is fully applied. /healthz is plain
+        # text; version comes from the JSON /v1/version endpoint.
+        "health_url": "http://localhost:4000/healthz?strict=true",
+        "version_url": "http://localhost:4000/v1/version",
+        # Metadata reconciliation makes cold boots slower than a plain app server —
+        # the health gate must not start the warmup window early.
+        "start_timeout": 120,
+        "m1_template": _HASURA_M1_TMPL,
+        "t1_template": "hasura",
+    },
+    # ------------------------------------------------------------------
     # C# / .NET frameworks
     # ------------------------------------------------------------------
     "csharp-dotnet": {
@@ -991,6 +1045,8 @@ DEFAULT_FRAMEWORK_ORDER = [
     "graphql-yoga",
     "mercurius",
     "postgraphile",
+    # Haskell (schema-to-API engine, upstream image)
+    "hasura",
     # Python
     "strawberry",
     "graphene",
@@ -3399,7 +3455,9 @@ def main() -> None:
             healthy = True
 
         if fw_name not in framework_versions:
-            fw_version = probe_framework_version(fw_config["health_url"])
+            fw_version = probe_framework_version(
+                fw_config.get("version_url", fw_config["health_url"])
+            )
             if fw_version:
                 framework_versions[fw_name] = fw_version
 
@@ -3712,6 +3770,10 @@ def main() -> None:
                             print(f"  T1: resolved post UUID {post_id[:8]}... (fraiseql composite)", flush=True)
                         elif t1_tmpl_key == "postgraphile":
                             t1_query = _PG_T1_TMPL.format(post_id=post_id)
+                            fw_config["queries"]["T1"] = (gql_url, t1_query)
+                            print(f"  T1: resolved post UUID {post_id[:8]}... (GraphQL single query)", flush=True)
+                        elif t1_tmpl_key == "hasura":
+                            t1_query = _HASURA_T1_TMPL.format(post_id=post_id)
                             fw_config["queries"]["T1"] = (gql_url, t1_query)
                             print(f"  T1: resolved post UUID {post_id[:8]}... (GraphQL single query)", flush=True)
                         else:

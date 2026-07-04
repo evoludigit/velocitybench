@@ -1,12 +1,28 @@
-# Hasura table tracking configuration for VelocityBench benchmark schema
-# Tables: tb_user, tb_post, tb_comment (command side)
-# Views: tv_user, tv_post, tv_comment (query side - JSONB denormalized)
+# Hasura table tracking for the VelocityBench benchmark schema.
+#
+# Hasura benchmarks the classical normalized path: tb_user / tb_post /
+# tb_comment with JOIN-backed relationships. Root fields and column names are
+# customized to the cross-framework GraphQL shape (users/posts/comments,
+# camelCase fields) so the standard benchmark documents apply verbatim;
+# only filter arguments (where: {...}) and mutation shape stay Hasura-native.
+#
+# Applied non-interactively at container start by the cli-migrations image.
 
-# Command side tables (normalized)
 - table:
     schema: benchmark
     name: tb_user
-  object_relationships:
+  configuration:
+    custom_root_fields:
+      select: users
+      update: updateUser
+    column_config:
+      full_name:
+        custom_name: fullName
+      created_at:
+        custom_name: createdAt
+      updated_at:
+        custom_name: updatedAt
+  array_relationships:
     - name: posts
       using:
         foreign_key_constraint_on:
@@ -27,10 +43,26 @@
           - created_at
           - updated_at
         filter: {}
+  update_permissions:
+    # M1 / MC1 mutation scenario: updateUser(where: {id: ...}, _set: {bio: ...})
+    - role: public
+      permission:
+        columns:
+          - bio
+        filter: {}
+        check: {}
 
 - table:
     schema: benchmark
     name: tb_post
+  configuration:
+    custom_root_fields:
+      select: posts
+    column_config:
+      created_at:
+        custom_name: createdAt
+      updated_at:
+        custom_name: updatedAt
   object_relationships:
     - name: author
       using:
@@ -44,6 +76,8 @@
             schema: benchmark
             name: tb_comment
   select_permissions:
+    # No row filter: Q2 selects all posts like every other framework;
+    # F1/F2 apply published=true explicitly in the query document.
     - role: public
       permission:
         columns:
@@ -54,13 +88,19 @@
           - published
           - created_at
           - updated_at
-        filter:
-          published:
-            _eq: true
+        filter: {}
 
 - table:
     schema: benchmark
     name: tb_comment
+  configuration:
+    custom_root_fields:
+      select: comments
+    column_config:
+      created_at:
+        custom_name: createdAt
+      updated_at:
+        custom_name: updatedAt
   object_relationships:
     - name: author
       using:
@@ -76,45 +116,5 @@
           - identifier
           - content
           - created_at
-          - updated_at
-        filter: {}
-
-# Query side tables (denormalized JSONB)
-- table:
-    schema: benchmark
-    name: tv_user
-  select_permissions:
-    - role: public
-      permission:
-        columns:
-          - id
-          - identifier
-          - data
-          - updated_at
-        filter: {}
-
-- table:
-    schema: benchmark
-    name: tv_post
-  select_permissions:
-    - role: public
-      permission:
-        columns:
-          - id
-          - identifier
-          - data
-          - updated_at
-        filter: {}
-
-- table:
-    schema: benchmark
-    name: tv_comment
-  select_permissions:
-    - role: public
-      permission:
-        columns:
-          - id
-          - identifier
-          - data
           - updated_at
         filter: {}
