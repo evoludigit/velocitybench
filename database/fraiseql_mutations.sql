@@ -60,7 +60,7 @@ BEGIN
         WHERE pk_user = v_pk;
     END IF;
 
-    SELECT vu.data INTO v_data FROM benchmark.v_user vu WHERE vu._pk = v_pk;
+    SELECT vu.data INTO v_data FROM benchmark.fv_user vu WHERE vu._pk = v_pk;
 
     RETURN QUERY SELECT * FROM fraiseql.mutation_ok(
         v_data, v_uuid, 'User', v_changed,
@@ -122,7 +122,7 @@ BEGIN
     VALUES (v_post_id, v_slug, p_title, p_content, v_author_pk, p_published::BOOLEAN)
     RETURNING pk_post INTO v_post_pk;
 
-    SELECT vp.data INTO v_data FROM benchmark.v_post vp WHERE vp._pk = v_post_pk;
+    SELECT vp.data INTO v_data FROM benchmark.fv_post vp WHERE vp._pk = v_post_pk;
 
     RETURN QUERY SELECT * FROM fraiseql.mutation_ok(v_data, v_post_id, 'Post');
 END;

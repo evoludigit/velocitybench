@@ -5,7 +5,7 @@
 SET search_path TO benchmark, public;
 
 -- ============================================================================
--- fn_update_user_full: update bio, snapshot before/after, log, return v_user
+-- fn_update_user_full: update bio, snapshot before/after, log, return fv_user
 -- ============================================================================
 
 DROP FUNCTION IF EXISTS benchmark.fn_update_user_full(JSONB, JSONB);
@@ -49,7 +49,7 @@ BEGIN
         RETURN;
     END IF;
 
-    SELECT vu.data INTO v_payload_before FROM benchmark.v_user vu WHERE vu._pk = v_pk;
+    SELECT vu.data INTO v_payload_before FROM benchmark.fv_user vu WHERE vu._pk = v_pk;
 
     v_changed := (SELECT bio FROM benchmark.tb_user WHERE pk_user = v_pk)
                  IS DISTINCT FROM p_bio;
@@ -60,7 +60,7 @@ BEGIN
         WHERE pk_user = v_pk;
     END IF;
 
-    SELECT vu.data INTO v_payload_after FROM benchmark.v_user vu WHERE vu._pk = v_pk;
+    SELECT vu.data INTO v_payload_after FROM benchmark.fv_user vu WHERE vu._pk = v_pk;
 
     PERFORM benchmark.log_mutation_event(
         'User', v_user_id, 'UPDATE',
@@ -136,7 +136,7 @@ BEGIN
     VALUES (v_post_id, v_slug, p_title, p_content, v_author_pk, p_published::BOOLEAN)
     RETURNING pk_post INTO v_post_pk;
 
-    SELECT vp.data INTO v_payload_after FROM benchmark.v_post vp WHERE vp._pk = v_post_pk;
+    SELECT vp.data INTO v_payload_after FROM benchmark.fv_post vp WHERE vp._pk = v_post_pk;
 
     v_cascade_data := jsonb_build_object(
         'invalidate', jsonb_build_array(

@@ -21,10 +21,10 @@ SET search_path TO benchmark, public;
 -- VARIANT A: On-the-fly JSONB Views (v_*)
 -- ============================================================================
 
--- v_user: User entity as JSONB
-DROP VIEW IF EXISTS v_user CASCADE;
+-- fv_user: User entity as JSONB
+DROP VIEW IF EXISTS fv_user CASCADE;
 
-CREATE VIEW v_user AS
+CREATE VIEW fv_user AS
 SELECT
     id,
     jsonb_build_object(
@@ -40,11 +40,11 @@ SELECT
     pk_user AS _pk
 FROM benchmark.tb_user;
 
--- v_post: Post entity with nested author as JSONB
+-- fv_post: Post entity with nested author as JSONB
 -- Author pre-computed to eliminate N+1 queries
-DROP VIEW IF EXISTS v_post CASCADE;
+DROP VIEW IF EXISTS fv_post CASCADE;
 
-CREATE VIEW v_post AS
+CREATE VIEW fv_post AS
 SELECT
     p.id,
     jsonb_build_object(
@@ -72,11 +72,11 @@ SELECT
 FROM benchmark.tb_post p
 LEFT JOIN benchmark.tb_user u ON u.pk_user = p.fk_author;
 
--- v_comment: Comment entity with nested author and post as JSONB
+-- fv_comment: Comment entity with nested author and post as JSONB
 -- Both relationships pre-computed to eliminate N+1 queries
-DROP VIEW IF EXISTS v_comment CASCADE;
+DROP VIEW IF EXISTS fv_comment CASCADE;
 
-CREATE VIEW v_comment AS
+CREATE VIEW fv_comment AS
 SELECT
     c.id,
     jsonb_build_object(
@@ -437,6 +437,6 @@ GRANT SELECT ON benchmark.v_comment_slim TO PUBLIC;
 -- Permissions
 -- ============================================================================
 
-GRANT SELECT ON v_user    TO PUBLIC;
-GRANT SELECT ON v_post    TO PUBLIC;
-GRANT SELECT ON v_comment TO PUBLIC;
+GRANT SELECT ON fv_user    TO PUBLIC;
+GRANT SELECT ON fv_post    TO PUBLIC;
+GRANT SELECT ON fv_comment TO PUBLIC;

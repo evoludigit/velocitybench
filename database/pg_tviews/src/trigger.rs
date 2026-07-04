@@ -120,7 +120,10 @@ fn pg_tview_trigger_handler<'a>(
                 };
                 enqueue_refresh(entity, pk_value);
             }
-            return Ok(None);
+            // No early return: a direct TVIEW source can simultaneously be a
+            // dependency of other TVIEWs (tb_user feeds tv_user directly AND
+            // tv_post/tv_comment via the embedded author object). Fall through
+            // so cascade paths are followed as well.
         }
         Ok(None) => { /* fall through to indirect lookup */ }
         Err(e) => {
