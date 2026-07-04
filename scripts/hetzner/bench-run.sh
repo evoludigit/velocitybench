@@ -203,10 +203,13 @@ ssh_loadgen "chmod 600 /root/.ssh/id_ed25519 && printf 'Host ${NETWORK_RANGE%%.0
 # First boot seeds 10k users / 500k comments + tv build — wait for it.
 ssh_sut "docker network inspect velocitybench-benchmark >/dev/null 2>&1 || docker network create velocitybench-benchmark"
 ssh_sut "cd ${REMOTE_DIR} && TVIEW_PERSISTENCE=logged docker compose up -d postgres"
-ssh_sut "cd ${REMOTE_DIR} && for i in \$(seq 1 180); do \
-docker compose exec -T postgres psql -U benchmark -d velocitybench_benchmark -tAc \
-'SELECT count(*) FROM benchmark.tb_user' 2>/dev/null | grep -qx 10005 && exit 0; sleep 10; done; \
-echo 'DB seed did not complete within 30 min' >&2; exit 1"
+# -h 127.0.0.1 forces TCP: during docker-entrypoint init postgres only serves
+# the unix socket, so a socket check releases while the 500k-comment seed and
+# tview build are still running. Full readiness = TCP up + tv_comment complete.
+ssh_sut "cd ${REMOTE_DIR} && for i in \$(seq 1 360); do \
+docker compose exec -T postgres psql -h 127.0.0.1 -U benchmark -d velocitybench_benchmark -tAc \
+'SELECT count(*) FROM benchmark.tv_comment' 2>/dev/null | grep -qx 500005 && exit 0; sleep 10; done; \
+echo 'DB seed did not complete within 60 min' >&2; exit 1"
 # loadgen: k6 + python only — the SUT stays dumb (Docker + repo)
 ssh_loadgen "command -v k6 >/dev/null || (gpg -k >/dev/null; curl -fsSL https://dl.k6.io/key.gpg | gpg --dearmor -o /usr/share/keyrings/k6.gpg && echo 'deb [signed-by=/usr/share/keyrings/k6.gpg] https://dl.k6.io/deb stable main' > /etc/apt/sources.list.d/k6.list && apt-get update -qq && apt-get install -y -qq k6)"
 
@@ -234,12 +237,15 @@ for n in $(seq 1 "$SWEEPS"); do
     # call (framework start/stop, RSS sampling, cold-start restarts) at the SUT.
     # Detached (nohup + pidfile) so a dropped operator connection cannot kill a
     # paid multi-hour sweep; we poll the pid and tail the log for liveness.
-    ssh_loadgen "cd ${REMOTE_DIR} && mkdir -p reports && \
+    # Braces keep the & scoped to nohup: without them the WHOLE cd&&mkdir&&nohup
+    # chain backgrounds and echo \$! races ahead of mkdir (first live run bug).
+    ssh_loadgen "cd ${REMOTE_DIR} && mkdir -p reports && { \
 nohup env DOCKER_HOST=ssh://root@${SUT_PRIVATE_IP} \
 python3 tests/benchmark/bench_sequential.py \
 --target-host ${SUT_PRIVATE_IP} --frameworks ${FRAMEWORKS} ${SWEEP_ARGS} \
 --output ${REMOTE_DIR}/reports/bench-hetzner-\$(date +%F)-sweep${n}.md \
-> ${REMOTE_DIR}/reports/sweep${n}.log 2>&1 < /dev/null & echo \$! > ${REMOTE_DIR}/reports/sweep${n}.pid"
+> ${REMOTE_DIR}/reports/sweep${n}.log 2>&1 < /dev/null & \
+echo \$! > ${REMOTE_DIR}/reports/sweep${n}.pid; }"
     if (( ! PLAN )); then
         sleep 20
         while ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=accept-new "root@${LOADGEN_IP}" \
