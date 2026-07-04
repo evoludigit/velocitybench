@@ -236,8 +236,8 @@ _FRAISEQL_T1_SINGLE_QUERY = (
 # composed view overhead. ~26% faster than postFull in benchmarks.
 _FRAISEQL_T1_MULTI_ROOT = (
     "query GetPostAndComments($id: ID!) { "
-    "post(id: $id) { id title content author { id username fullName } } "
-    "comments(postId: $id, limit: 10) { id content author { id username fullName } } "
+    "post(id: $id) { id title content author { username fullName bio } } "
+    "comments(postId: $id, limit: 10) { id content author { username } } "
     "}"
 )
 
@@ -2351,6 +2351,42 @@ def collect_run_environment(args: argparse.Namespace, tview_mode: str | None) ->
     }
 
 
+def run_parity_gate(audited: list[str], *, no_isolation: bool) -> None:
+    """Mandatory pre-sweep gate: audited schema-to-API engines must return the
+    same entity count and field set as the FraiseQL reference, or the sweep
+    aborts — a config regression can never silently produce incomparable
+    numbers. Starts the required services (unless --no-isolation), audits,
+    and stops them again."""
+    import scenario_parity
+
+    to_run = [scenario_parity.REFERENCE, *audited]
+    print(f"Scenario parity gate: {', '.join(audited)} vs {scenario_parity.REFERENCE}")
+    started: list[str] = []
+    try:
+        if not no_isolation:
+            for fw_name in to_run:
+                cfg = FRAMEWORKS[fw_name]
+                start_service(
+                    cfg["compose_service"],
+                    cfg["health_url"],
+                    cfg.get("start_timeout", 60),
+                    no_build=cfg.get("no_build", False),
+                )
+                started.append(cfg["compose_service"])
+        failures = scenario_parity.run_audit(
+            tuple(audited), bench_module=sys.modules[__name__]
+        )
+    finally:
+        for service in started:
+            stop_service(service)
+    if failures:
+        print("PARITY GATE FAILED — aborting sweep:", file=sys.stderr)
+        for failure in failures:
+            print(f"  ✗ {failure}", file=sys.stderr)
+        sys.exit(1)
+    print("  parity ✓ — all audited scenarios match the reference\n")
+
+
 def start_service(service: str, health_url: str, timeout_secs: int = 60, *, no_build: bool = False) -> None:
     print(f"  starting {service}...", end=" ", flush=True)
     if no_build:
@@ -3339,6 +3375,12 @@ def main() -> None:
              "fastest frameworks — and is kept only for debugging (--loadgen python).",
     )
     parser.add_argument(
+        "--skip-parity-gate",
+        action="store_true",
+        help="Skip the pre-sweep scenario parity audit for schema-to-API engines "
+             "(debugging only — a published sweep must run the gate).",
+    )
+    parser.add_argument(
         "--tview-mode",
         choices=["logged", "unlogged"],
         default="logged",
@@ -3437,6 +3479,17 @@ def main() -> None:
     else:
         print(f"{live_tview_mode} ✓", flush=True)
     print()
+
+    # Scenario parity gate — mandatory whenever an audited schema-to-API engine
+    # is part of the sweep (see tests/benchmark/scenario_parity.py).
+    import scenario_parity as _parity
+
+    audited_in_run = [fw for fw in args.frameworks if fw in _parity.AUDITED]
+    if audited_in_run and not args.skip_parity_gate:
+        run_parity_gate(audited_in_run, no_isolation=args.no_isolation)
+    elif audited_in_run:
+        print("WARNING: --skip-parity-gate set — numbers for "
+              f"{', '.join(audited_in_run)} are unaudited\n")
 
     # Build flat run schedule: pass 1 preserves canonical order; subsequent passes are
     # randomly shuffled so run-order bias averages out across the reported median ± σ.
