@@ -77,6 +77,10 @@ _PG_F2 = (
     "{ allTbPosts(first: 10, condition: {published: true})"
     " { nodes { id: rowId title tbUserByFkAuthor { username fullName } } } }"
 )
+_PG_M1_TMPL = (
+    'mutation {{ updateTbUserByRowId(input: {{rowId: "{user_id}", tbUserPatch: {{bio: "bench"}}}})'
+    " {{ tbUser {{ id: rowId bio }} }} }}"
+)
 
 # Hasura: metadata renames root fields and columns to the cross-framework shape
 # (users/posts/comments, camelCase), so the standard _GQL_* documents apply
@@ -812,9 +816,12 @@ FRAMEWORKS: dict[str, dict] = {
             "Q3": ("http://localhost:4014/graphql", _PG_Q3),
             "F1": ("http://localhost:4014/graphql", _PG_F1),
             "F2": ("http://localhost:4014/graphql", _PG_F2),
+            "M1": "M1",
             "T1": "T1",
+            "MC1": "MC1",
         },
         "health_url": "http://localhost:4014/health",
+        "m1_template": _PG_M1_TMPL,
         "t1_template": "postgraphile",
     },
     # ------------------------------------------------------------------
@@ -835,6 +842,7 @@ FRAMEWORKS: dict[str, dict] = {
             "F2": ("http://localhost:4000/v1/graphql", _HASURA_F2),
             "M1": "M1",
             "T1": "T1",
+            "MC1": "MC1",
         },
         # strict=true fails while metadata is inconsistent — the warmup window
         # must not open before the config is fully applied. /healthz is plain
@@ -1428,6 +1436,22 @@ def _worker_rest(url: str, end_time: float) -> _WorkerResult:
 # ---------------------------------------------------------------------------
 
 
+def _extract_users(body: dict) -> list:
+    """Unwrap the user list from a Q1 GraphQL response.
+
+    Handles the standard shape ({"data": {"users": [...]}}) and Relay
+    connection shapes under a renamed root field
+    ({"data": {"allTbUsers": {"nodes": [...]}}} — PostGraphile).
+    """
+    data = body.get("data") or {}
+    users = data.get("users")
+    if users is None and len(data) == 1:
+        users = next(iter(data.values()))
+    if isinstance(users, dict):
+        users = users.get("nodes")
+    return users if isinstance(users, list) else []
+
+
 def _discover_user_uuid(fw_config: dict) -> str | None:
     """Fetch Q1 (or graphql_url fallback) and extract the first user's id."""
     q1_entry = fw_config["queries"].get("Q1")
@@ -1451,7 +1475,7 @@ def _discover_user_uuid(fw_config: dict) -> str | None:
             )
             with urllib.request.urlopen(req, timeout=10) as resp:
                 body = json.loads(resp.read())
-                users = body.get("data", {}).get("users", [])
+                users = _extract_users(body)
                 if users:
                     return str(users[0]["id"])
         else:
@@ -1497,7 +1521,7 @@ def _discover_user_uuids(fw_config: dict) -> list[str]:
             )
             with urllib.request.urlopen(req, timeout=10) as resp:
                 body = json.loads(resp.read())
-                users = body.get("data", {}).get("users", [])
+                users = _extract_users(body)
                 return [str(u["id"]) for u in users if u.get("id")]
     except (urllib.error.URLError, OSError, json.JSONDecodeError, KeyError, IndexError):
         pass
