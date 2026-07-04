@@ -1,0 +1,23 @@
+# Hetzner Cloud dedicated-vCPU (CCX) instance prices.
+#
+# Captured 2026-07-04 from the official price-adjustment notice (effective
+# 2026-06-15, when Hetzner raised CCX prices 122-173%):
+#   https://docs.hetzner.com/general/infrastructure-and-availability/price-adjustment/
+# Prices are EUR excl. VAT, Germany/Finland regions, excl. IPv4 add-on.
+#
+# This file is the single source for the report's cost composite
+# (bench_sequential.format_cost_section). A rerun on new pricing = update
+# this file (or add a newer dated file and point the loader at it).
+currency: EUR
+captured: 2026-07-04
+instances:
+  ccx23:
+    vcpu: 4
+    ram_gb: 16
+    price_month: 85.99
+    price_hour: 0.1378
+  ccx33:
+    vcpu: 8
+    ram_gb: 32
+    price_month: 138.49
+    price_hour: 0.2219

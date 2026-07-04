@@ -1137,6 +1137,13 @@ class BenchResult:
     ext_p50_ms: float | None = None
     ext_p95_ms: float | None = None
     ext_p99_ms: float | None = None
+    # Container RSS sampled every 2s strictly inside the measurement window
+    # (None when the SUT container is not locally visible, e.g. --target-host).
+    rss_steady_mb: float | None = None
+    rss_max_mb: float | None = None
+    # Median container-restart → first correct Q1 response (ms), measured once
+    # per framework after its scenarios and stamped on every row.
+    cold_start_ms: float | None = None
 
     @property
     def requests_sent(self) -> int:
@@ -2103,7 +2110,10 @@ def run_scenario(
         if query_name in ("M1", "M1d", "MC1", "M1_APQ"):
             _reset_postgres_state()
         print(f"    measuring {duration_secs}s...", end=" ", flush=True)
-        ok_cycles, errors, pct = _run_k6(steps, concurrency, duration_secs)
+        with RssSampler(fw_config["compose_service"]) as rss:
+            ok_cycles, errors, pct = _run_k6(steps, concurrency, duration_secs)
+        result.rss_steady_mb = rss.median_mb
+        result.rss_max_mb = rss.max_mb
         result.ext_requests = ok_cycles
         result.ext_p50_ms = pct["p50"]
         result.ext_p95_ms = pct["p95"]
@@ -2232,7 +2242,10 @@ def run_scenario(
 
     # Measurement
     print(f"    measuring {duration_secs}s...", end=" ", flush=True)
-    lats, errs, breakdown, samples = _run_workers(duration_secs)
+    with RssSampler(fw_config["compose_service"]) as rss:
+        lats, errs, breakdown, samples = _run_workers(duration_secs)
+    result.rss_steady_mb = rss.median_mb
+    result.rss_max_mb = rss.max_mb
     result.latencies_ms = lats
     result.errors = errs
     result.error_breakdown = breakdown
@@ -2349,6 +2362,64 @@ def collect_run_environment(args: argparse.Namespace, tview_mode: str | None) ->
         "passes": args.passes,
         "tview_mode": tview_mode,
     }
+
+
+def _q1_probe_ok(fw_config: dict) -> bool:
+    """One Q1 request; True only on a 200 with a correct body."""
+    entry = fw_config["queries"].get("Q1")
+    try:
+        if fw_config["type"] == "graphql":
+            if not isinstance(entry, tuple):
+                return False
+            url, query = entry[0], entry[1]
+            payload = json.dumps({"query": query}).encode()
+            req = urllib.request.Request(
+                url, data=payload,
+                headers={"Content-Type": "application/json"}, method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                body = resp.read()
+                return resp.status == 200 and b'"data"' in body and b'"errors"' not in body
+        if not isinstance(entry, str):
+            return False
+        with urllib.request.urlopen(entry, timeout=2) as resp:
+            return resp.status == 200
+    except (urllib.error.URLError, OSError, ValueError):
+        return False
+
+
+def measure_cold_start(fw_config: dict, repeats: int = 5) -> float | None:
+    """Cold start: container restart → first correct Q1 response, median ms.
+
+    Measured window (per repeat): `docker compose start` on the existing
+    container (image already built/pulled, DB already up and seeded) until the
+    first Q1 request that returns 200 with a correct body, polling at 50ms.
+    IN the window: container start, app boot, connection-pool setup, first
+    query execution, and the docker CLI dispatch itself (the operator-visible
+    restart cost). OUT by construction: image pull/build and DB seeding.
+
+    Returns None (absent, not zero) when Q1 isn't a plain document for this
+    framework or a repeat times out.
+    """
+    service = fw_config["compose_service"]
+    timeout_secs = fw_config.get("start_timeout", 60)
+    if not fw_config["queries"].get("Q1"):
+        return None
+    samples_ms: list[float] = []
+    for _ in range(repeats):
+        _compose("stop", service)
+        t0 = time.monotonic()
+        _compose("start", service)
+        deadline = t0 + timeout_secs
+        while time.monotonic() < deadline:
+            if _q1_probe_ok(fw_config):
+                samples_ms.append((time.monotonic() - t0) * 1000)
+                break
+            time.sleep(0.05)
+        else:
+            print(f"  cold-start: {service} timed out after {timeout_secs}s — skipping metric", flush=True)
+            return None
+    return round(statistics.median(samples_ms), 1)
 
 
 def run_parity_gate(audited: list[str], *, no_isolation: bool) -> None:
@@ -2829,6 +2900,59 @@ class ResourceMonitor:
             self._cpu_samples.append(cpu_pct)
 
 
+class RssSampler:
+    """Samples container RSS strictly inside a scenario's measurement window.
+
+    Context manager so sampling cannot start outside the window or outlive it.
+    One capture path for every framework (docker stats on the SUT container —
+    same cgroup source, same cadence). When the container is not locally
+    visible (e.g. remote SUT via --target-host, or a stopped service) the
+    medians are None rather than zero: absent, not wrong.
+
+    JVM caveat (documented for the report): JVM RSS reflects the heap ceiling
+    the GC has claimed, not live demand — spring-boot* rows are measured with
+    default flags and must be labeled as such.
+    """
+
+    def __init__(self, service: str, interval_secs: float = 2.0) -> None:
+        self._container = f"velocitybench-{service}-1"
+        self._interval = interval_secs
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._samples_mb: list[float] = []
+
+    def __enter__(self) -> "RssSampler":
+        self._stop.clear()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+        return self
+
+    def __exit__(self, *_exc) -> None:
+        self._stop.set()
+        if self._thread:
+            self._thread.join(timeout=5)
+
+    @property
+    def median_mb(self) -> float | None:
+        return round(statistics.median(self._samples_mb), 1) if self._samples_mb else None
+
+    @property
+    def max_mb(self) -> float | None:
+        return round(max(self._samples_mb), 1) if self._samples_mb else None
+
+    def _run(self) -> None:
+        while not self._stop.is_set():
+            result = subprocess.run(
+                ["docker", "stats", "--no-stream", "--format", "{{.MemUsage}}", self._container],
+                capture_output=True, text=True, check=False,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                ram_mb = _parse_mem_mb(result.stdout.strip().split("\n")[0])
+                if ram_mb > 0:
+                    self._samples_mb.append(ram_mb)
+            self._stop.wait(self._interval)
+
+
 # ---------------------------------------------------------------------------
 # Report formatting
 # ---------------------------------------------------------------------------
@@ -2975,6 +3099,72 @@ def _agg_row(agg: AggResult, multi_pass: bool, detailed_errors: bool = False) ->
         f"| {r.requests_sent:,} "
         f"| {err_col} |"
     )
+
+
+_INSTANCE_PRICES_FILE = (
+    Path(__file__).parent.parent.parent / "costs" / "instance-prices-2026-07.yaml"
+)
+_SECONDS_PER_MONTH = 730 * 3600  # Hetzner bills 730h/month
+
+
+def _load_instance_prices() -> dict | None:
+    try:
+        import yaml
+
+        return yaml.safe_load(_INSTANCE_PRICES_FILE.read_text())
+    except (OSError, ImportError, ValueError):
+        return None
+
+
+def format_cost_section(results: list[BenchResult]) -> str:
+    """Cost composite: measured Q1 RPS priced on dedicated-vCPU instances.
+
+    The entire cost model is this one function plus the dated price YAML —
+    the capacity-projection app under costs/ is superseded for report
+    purposes (it models assumed RPS-per-core, not measured throughput).
+
+    € / 1M requests = price_month / (RPS × seconds_per_month) × 10⁶,
+    i.e. the instance cost attributable to one million requests when the
+    framework serves its measured Q1 throughput continuously.
+    """
+    prices = _load_instance_prices()
+    if not prices:
+        return ""
+    q1_rps: dict[str, float] = {}
+    for r in results:
+        if r.query_name == "Q1" and not r.skipped and r.rps > 0:
+            q1_rps.setdefault(r.framework, r.rps)
+    if not q1_rps:
+        return ""
+
+    instances = prices["instances"]
+    names = list(instances)
+    lines = [
+        "## Cost Composite",
+        "",
+        f"> Measured Q1 throughput priced on Hetzner dedicated-vCPU instances "
+        f"(prices captured {prices['captured']}, {prices['currency']} excl. VAT — "
+        f"`costs/{_INSTANCE_PRICES_FILE.name}`).  ",
+        "> **€ / 1M requests** = price/month ÷ (RPS × 2 628 000 s) × 10⁶ — the instance cost "
+        "attributable to one million requests at sustained measured throughput.  ",
+        "> Only meaningful for sweeps run **on** the priced instance class; on other hardware "
+        "it is a projection.",
+        "",
+        "| Framework | Q1 RPS | "
+        + " | ".join(f"{n} RPS/€mo | {n} € / 1M requests" for n in names)
+        + " |",
+        "|-----------|-------:|"
+        + "".join("---------:|---------:|" for _ in names),
+    ]
+    for fw, rps in sorted(q1_rps.items(), key=lambda kv: -kv[1]):
+        cells = []
+        for name in names:
+            price = instances[name]["price_month"]
+            per_million = price / (rps * _SECONDS_PER_MONTH) * 1_000_000
+            cells.append(f"{rps / price:.0f}")
+            cells.append(f"{per_million:.4f}")
+        lines.append(f"| {fw} | {rps:.0f} | " + " | ".join(cells) + " |")
+    return "\n".join(lines)
 
 
 def format_report(
@@ -3137,6 +3327,10 @@ def format_report(
             f"| {a.framework} | {lang} | {cat} "
             f"| {rps_col} | {a.representative.p50_ms:.1f} | {a.representative.p99_ms:.1f} |"
         )
+
+    cost_section = format_cost_section(results)
+    if cost_section:
+        lines += ["", "---", "", cost_section]
 
     # Resource metrics section (only if collected via --resource-metrics)
     if resource_metrics:
@@ -3373,6 +3567,12 @@ def main() -> None:
         help="Load generator for the measurement path (default: k6). The Python "
              "ThreadPool generator saturates at ~6.5k RPS under the GIL — below the "
              "fastest frameworks — and is kept only for debugging (--loadgen python).",
+    )
+    parser.add_argument(
+        "--skip-cold-start",
+        action="store_true",
+        help="Skip the per-framework cold-start measurement (5× restart → "
+             "first Q1; adds minutes for slow-boot frameworks).",
     )
     parser.add_argument(
         "--skip-parity-gate",
@@ -4013,6 +4213,18 @@ def main() -> None:
             all_resource_metrics[fw_name].peak_ram_mb = peak_ram
             all_resource_metrics[fw_name].avg_cpu_pct = avg_cpu
 
+        # Cold start: measured after the scenarios (the service is about to be
+        # stopped anyway) and only in isolation mode — restarting a shared
+        # container under --no-isolation would disturb concurrent services.
+        if not args.no_isolation and not args.skip_cold_start:
+            print("  cold-start: 5× restart → first Q1...", end=" ", flush=True)
+            cold_ms = measure_cold_start(fw_config)
+            if cold_ms is not None:
+                print(f"median {cold_ms:.0f}ms", flush=True)
+                for r in all_results:
+                    if r.framework == fw_name and r.pass_num == pass_num:
+                        r.cold_start_ms = cold_ms
+
         if not args.no_isolation:
             stop_service(fw_config["compose_service"])
             if args.prune_images:
@@ -4053,6 +4265,9 @@ def main() -> None:
             "requests": r.requests_sent,
             "errors": r.errors,
             "error_breakdown": r.error_breakdown,
+            "rss_steady_mb": r.rss_steady_mb,
+            "rss_max_mb": r.rss_max_mb,
+            "cold_start_ms": r.cold_start_ms,
             "skipped": r.skipped,
             "skip_reason": r.skip_reason,
         }
