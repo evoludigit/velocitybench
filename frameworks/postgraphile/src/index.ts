@@ -1,57 +1,66 @@
+import { createServer } from 'node:http';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import express from 'express';
-import cors from 'cors';
-import { connectDatabase, closeDatabase, getPool } from './db';
-import { setupGraphQL } from './middleware';
+import { Pool } from 'pg';
+import { postgraphile } from 'postgraphile';
+import { grafserv } from 'postgraphile/grafserv/express/v4';
+import preset, { connectionString } from './graphile.config';
 
 const PORT = parseInt(process.env.PORT || '4000', 10);
+
+// PostGraphile version reported by /health so benchmark runs record it.
+// The package doesn't export ./package.json, so read it from disk
+// (resolve lands on dist/index.js; the manifest is two levels up).
+const POSTGRAPHILE_VERSION: string = JSON.parse(
+  readFileSync(
+    join(require.resolve('postgraphile'), '..', '..', 'package.json'),
+    'utf8'
+  )
+).version;
+
+// Small dedicated pool for liveness checks — keeps the GraphQL pool
+// (managed by makePgService) free of health traffic.
+const healthPool = new Pool({ connectionString, max: 2 });
 
 async function startServer() {
   const app = express();
 
-  // Middleware
-  app.use(cors());
-  app.use(express.json());
-
-  // Connect to database
-  const connected = await connectDatabase();
-  if (!connected) {
-    if (require.main === module) {
-      process.exit(1);
-    }
-    throw new Error('Failed to connect to database');
-  }
-
-  // Setup GraphQL
-  setupGraphQL(app);
-
-  // Health check endpoint
-  app.get('/health', async (req, res) => {
+  app.get('/health', async (_req, res) => {
     try {
-      const pool = getPool();
-      const client = await pool.connect();
+      const client = await healthPool.connect();
       await client.query('SELECT 1');
       client.release();
-      res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+      res.json({
+        status: 'healthy',
+        version: POSTGRAPHILE_VERSION,
+        timestamp: new Date().toISOString(),
+      });
     } catch (err) {
       res.status(503).json({ status: 'unhealthy', error: String(err) });
     }
   });
 
-  // Readiness check
-  app.get('/ready', async (req, res) => {
+  app.get('/ready', (_req, res) => {
     res.json({ status: 'ready' });
   });
 
-  // Start server
-  const server = app.listen(PORT, () => {
-    console.log(`🚀 PostGraphile server listening on port ${PORT}`);
+  const server = createServer(app);
+  const pgl = postgraphile(preset);
+  const serv = pgl.createServ(grafserv);
+  await serv.addTo(app, server);
+
+  server.listen(PORT, () => {
+    console.log(
+      `🚀 PostGraphile v${POSTGRAPHILE_VERSION} listening on port ${PORT}`
+    );
   });
 
-  // Graceful shutdown
-  process.on('SIGTERM', async () => {
+  process.on('SIGTERM', () => {
     console.log('Shutting down gracefully...');
     server.close(async () => {
-      await closeDatabase();
+      await serv.release();
+      await healthPool.end();
       process.exit(0);
     });
   });

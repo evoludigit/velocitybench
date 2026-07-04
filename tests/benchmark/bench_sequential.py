@@ -62,10 +62,21 @@ _GQL_Q1 = "{ users(limit: 20) { id username fullName } }"
 _GQL_Q2 = "{ posts(limit: 10) { id title } }"
 _GQL_Q2b = "{ posts(limit: 10) { id title author { username fullName } } }"
 
-# PostGraphile uses Relay-style schema with different field names
-_PG_Q1 = "{ allTbUsers(first: 20) { nodes { id username fullName } } }"
-_PG_Q2 = "{ allTbPosts(first: 10) { nodes { id title } } }"
-_PG_Q2b = "{ allTbPosts(first: 10) { nodes { id title tbUserByFkAuthor { username fullName } } } }"
+# PostGraphile (v5, amber preset) uses Relay-style schema with different field
+# names. The uuid `id` column surfaces as `rowId` (`id` is the Relay node ID),
+# so documents alias `id: rowId` to return the uuid like every other framework.
+_PG_Q1 = "{ allTbUsers(first: 20) { nodes { id: rowId username fullName } } }"
+_PG_Q2 = "{ allTbPosts(first: 10) { nodes { id: rowId title } } }"
+_PG_Q2b = "{ allTbPosts(first: 10) { nodes { id: rowId title tbUserByFkAuthor { username fullName } } } }"
+_PG_Q3 = (
+    "{ allTbComments(first: 20) { nodes { id: rowId content "
+    "tbUserByFkAuthor { username } tbPostByFkPost { title } } } }"
+)
+_PG_F1 = "{ allTbPosts(first: 10, condition: {published: true}) { nodes { id: rowId title } } }"
+_PG_F2 = (
+    "{ allTbPosts(first: 10, condition: {published: true})"
+    " { nodes { id: rowId title tbUserByFkAuthor { username fullName } } } }"
+)
 
 # Hasura: metadata renames root fields and columns to the cross-framework shape
 # (users/posts/comments, camelCase), so the standard _GQL_* documents apply
@@ -186,11 +197,11 @@ _GQL_T1_TMPL = (
     "comments(limit: 10) {{ id content author {{ username }} }} "
     "}} }}"
 )
-# PostGraphile Relay-style T1
+# PostGraphile Relay-style T1 (v5: single-row lookup by uuid is *ByRowId)
 _PG_T1_TMPL = (
-    '{{ tbPostById(id: "{post_id}") {{ id title content '
-    "tbUserByFkAuthor {{ username fullName }} "
-    "tbCommentsByFkPost(first: 10) {{ nodes {{ id content tbUserByFkAuthor {{ username }} }} }} "
+    '{{ tbPostByRowId(rowId: "{post_id}") {{ id: rowId title content '
+    "tbUserByFkAuthor {{ username fullName bio }} "
+    "tbCommentsByFkPost(first: 10) {{ nodes {{ id: rowId content tbUserByFkAuthor {{ username }} }} }} "
     "}} }}"
 )
 # Hasura T1: single-post lookup via where (tb_post's pk is the serial pk_post;
@@ -798,6 +809,9 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": ("http://localhost:4014/graphql", _PG_Q1),
             "Q2": ("http://localhost:4014/graphql", _PG_Q2),
             "Q2b": ("http://localhost:4014/graphql", _PG_Q2b),
+            "Q3": ("http://localhost:4014/graphql", _PG_Q3),
+            "F1": ("http://localhost:4014/graphql", _PG_F1),
+            "F2": ("http://localhost:4014/graphql", _PG_F2),
             "T1": "T1",
         },
         "health_url": "http://localhost:4014/health",
@@ -1510,7 +1524,7 @@ def _discover_post_uuid(fw_config: dict) -> tuple[str, str] | None:
                 return None
             # PostGraphile uses auto-generated names (allTbPosts, tbUserByFkAuthor)
             if fw_config.get("t1_template") == "postgraphile":
-                pg_query = '{ allTbPosts(first: 1) { nodes { id tbUserByFkAuthor { id } } } }'
+                pg_query = '{ allTbPosts(first: 1) { nodes { id: rowId tbUserByFkAuthor { id: rowId } } } }'
                 pg_payload = json.dumps({"query": pg_query}).encode()
                 pg_req = urllib.request.Request(
                     gql_url,

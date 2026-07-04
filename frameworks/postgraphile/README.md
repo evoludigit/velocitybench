@@ -1,195 +1,59 @@
-# Postgraphile
+# PostGraphile
 
-GRAPHQL API implementation for VelocityBench framework benchmarking.
+PostGraphile is a schema-to-API engine: it generates a GraphQL API directly
+from the PostgreSQL schema. In VelocityBench it represents the Node.js entry
+in the "compiled/generated GraphQL" category alongside Hasura and FraiseQL.
 
-## 📋 Overview
+## Version
 
-This GRAPHQL implementation provides a standardized API endpoint for the VelocityBench performance testing suite. It enables direct performance comparison across different frameworks and languages.
+**PostGraphile v5** (Grafast executor), pinned in `package.json` /
+`package-lock.json` and gated by `tests/benchmark/test_postgraphile_version.py`.
+Runs the stock **amber preset** — no custom plugins or inflection
+(`src/graphile.config.ts`).
 
-## 🏗️ Technology Stack
+## Ports & endpoints
 
-- **Language**: Typescript
-- **API Type**: GRAPHQL
-- **Framework**: Postgraphile
-- **Database**: PostgreSQL
-- **Port**: 8031
+| What | URL |
+|------|-----|
+| GraphQL | `POST http://localhost:4014/graphql` (compose maps 4014 → container 4000) |
+| Health (reports `version` for the run JSON) | `GET http://localhost:4014/health` |
 
-## 🚀 Quick Start
+## Benchmark documents
 
-### Setup Dependencies
-```bash
-cd frameworks/postgraphile
-npm install
-# or
-yarn install
+v5 amber naming: collections are `allTbUsers` / `allTbPosts` / `allTbComments`,
+relations `tbUserByFkAuthor` / `tbCommentsByFkPost`, single-row lookup
+`tbPostByRowId`. The uuid `id` column surfaces as `rowId` (the `id` field is
+the Relay node ID), so benchmark documents alias `id: rowId` to return the
+uuid like every other framework:
+
+```graphql
+# Q1
+{ allTbUsers(first: 20) { nodes { id: rowId username fullName } } }
+
+# F1 — published filter
+{ allTbPosts(first: 10, condition: {published: true}) { nodes { id: rowId title } } }
 ```
 
-### Run the Server
-```bash
-npm run dev
-# or
-npm start
-```
+The canonical documents live in `tests/benchmark/bench_sequential.py`
+(`_PG_*` constants).
 
-### Verify the Server
-
-```bash
-# Health check
-curl http://localhost:8031/health
-
-# API endpoint
-curl http://localhost:8031/graphql
-```
-
-## 🧪 Testing
-
-### Run Tests
+## Running
 
 ```bash
-npm test -- --coverage
+# Benchmark (canonical path — k6, full scenario row set)
+make bench-one FRAMEWORK=postgraphile
+
+# Local development (postgres via root docker-compose exposes host port 5434)
+npm install && npm run build
+DB_HOST=localhost DB_PORT=5434 DB_PASSWORD=benchmark123 npm start
+
+# Smoke tests (same env)
+DB_HOST=localhost DB_PORT=5434 DB_PASSWORD=benchmark123 npm test
 ```
 
-### Test Coverage
+## Notes
 
-The test suite validates:
-- ✅ Health check endpoint
-- ✅ API schema correctness
-- ✅ GraphQL/REST endpoint functionality
-- ✅ Database connectivity
-- ✅ Error handling
-- ✅ Performance baseline
-
-### Development Commands
-
-```bash
-# Run tests with coverage
-npm test -- --coverage
-
-# Format code
-npm run format
-
-# Lint code
-npm run lint
-
-# Type check
-npm run type-check
-```
-
-## 📡 API Endpoints
-
-### Health Check
-```http
-GET /health
-```
-**Response**: {"status": "ok"}
-
-### Main API Endpoint
-```http
-GRAPHQL /graphql
-```
-
-For GraphQL frameworks, use GraphQL queries.
-For REST frameworks, refer to the implementation's endpoint documentation.
-
-## 🐳 Docker
-
-### Build
-```bash
-cd frameworks/postgraphile
-docker build -t velocitybench-postgraphile .
-```
-
-### Run with Docker Compose
-```bash
-docker-compose --profile postgraphile up -d
-```
-
-The framework will be available at: http://localhost:8031
-
-## 🔗 Configuration
-
-### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DATABASE_URL` | postgres://velocitybench:password@localhost:5432/velocitybench_test | Database connection string |
-| `PORT` | 8031 | Server port |
-| `LOG_LEVEL` | info | Logging level (debug, info, warn, error) |
-
-### Database Schema
-
-The framework expects these tables:
-- `benchmark.tb_user` - User data
-- `benchmark.tb_post` - Post data
-- `benchmark.tb_comment` - Comment data
-
-## 🧩 Project Structure
-
-```
-frameworks/postgraphile/
-├── src/ or app/          # Source code
-├── tests/                # Test files
-├── Dockerfile            # Container definition
-├── .dockerignore         # Docker exclusions
-├── requirements.txt or equivalents
-└── README.md             # This file
-```
-
-## 🐛 Troubleshooting
-
-### Database Connection Failed
-- Ensure PostgreSQL is running
-- Check DATABASE_URL environment variable
-- Verify database credentials
-- Run: `psql $DATABASE_URL -c "SELECT 1"`
-
-### Port Already in Use
-```bash
-# Find process using port 8031
-lsof -i :8031
-# or kill it
-kill -9 <PID>
-```
-
-### Build or Dependency Issues
-```bash
-# Clean and rebuild
-# Python: rm -rf .venv && python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
-# Node.js: rm -rf node_modules package-lock.json && npm install
-# Go: go clean -cache && go mod tidy
-# Rust: cargo clean && cargo build
-# Java: mvn clean install
-# PHP: rm -rf vendor composer.lock && composer install
-# Ruby: bundle clean --force && bundle install
-```
-
-## 📚 Further Reading
-
-- **VelocityBench**: See main [README.md](../../README.md)
-- **Framework Official Docs**: Check framework's official documentation
-- **Testing Guide**: See [TESTING_STANDARDS.md](../../docs/testing/TESTING_STANDARDS.md)
-- **CI/CD Setup**: See [.github/workflows](../../.github/workflows)
-
-## 📝 Version History
-
-- **1.0.0** (2026-01-31) - Initial implementation
-
-## 🤝 Contributing
-
-When making changes:
-1. Ensure tests pass: `npm test -- --coverage`
-2. Format code according to language standards
-3. Update this README if adding new features
-4. Submit PR with description of changes
-
-## 📄 License
-
-MIT License - see main project LICENSE file
-
----
-
-**Framework**: Postgraphile
-**Language**: Typescript
-**API Type**: GRAPHQL
-**Port**: 8031
-**Status**: Active in CI/CD Pipeline ✅
+- Configuration lives entirely in `src/graphile.config.ts` — the server never
+  writes smart-tag `COMMENT`s or any other DDL into the shared database.
+- Type checking runs in `npm run build` (tsc, node16 resolution); jest runs
+  transpile-only because ts-jest mis-resolves grafserv's exports-map subpaths.

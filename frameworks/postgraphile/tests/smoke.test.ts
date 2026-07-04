@@ -1,59 +1,56 @@
+import { createServer, Server } from 'node:http';
 import request from 'supertest';
-import { Pool } from 'pg';
+
+/**
+ * Smoke test against the real v5 server wired to the benchmark database.
+ *
+ * Uses the same env defaults as src/graphile.config.ts (set DB_PORT=5434 when
+ * postgres runs via the root docker-compose port mapping).
+ */
 import { startServer } from '../src/index';
-import { TestFactory } from './test-factory';
 
-describe('Smoke Test', () => {
-  let server: any;
-  let pool: Pool;
-  let factory: TestFactory;
+let server: Server;
 
-  beforeAll(async () => {
-    server = await startServer();
-    pool = new Pool({
-      user: process.env.DB_USER || 'velocitybench',
-      password: process.env.DB_PASSWORD || 'password',
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '5432'),
-      database: process.env.DB_NAME || 'velocitybench_test',
+beforeAll(async () => {
+  server = (await startServer()) as Server;
+});
+
+afterAll(() => {
+  server.close();
+});
+
+test('health endpoint reports healthy and the postgraphile version', async () => {
+  const response = await request(server).get('/health');
+  expect(response.status).toBe(200);
+  expect(response.body.status).toBe('healthy');
+  expect(response.body.version).toMatch(/^5\./);
+});
+
+test('Q1 benchmark document returns users with uuid ids', async () => {
+  const response = await request(server)
+    .post('/graphql')
+    .send({
+      query: '{ allTbUsers(first: 20) { nodes { id: rowId username fullName } } }',
     });
-    factory = new TestFactory(pool);
-  });
+  expect(response.status).toBe(200);
+  expect(response.body.errors).toBeUndefined();
+  const nodes = response.body.data.allTbUsers.nodes;
+  expect(nodes).toHaveLength(20);
+  expect(nodes[0].id).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+  );
+});
 
-  afterAll(async () => {
-    await pool.end();
-    server.close();
-  }, 15000);
-
-  afterEach(async () => {
-    await factory.cleanup();
-  });
-
-  test('health endpoint should return healthy', async () => {
-    const response = await request(server)
-      .get('/health');
-
-    expect(response.status).toBe(200);
-    expect(response.body.status).toBe('healthy');
-    expect(response.body.timestamp).toBeDefined();
-  });
-
-  test('ready endpoint should return ready', async () => {
-    const response = await request(server)
-      .get('/ready');
-
-    expect(response.status).toBe(200);
-    expect(response.body.status).toBe('ready');
-  });
-
-  test('graphql introspection should work', async () => {
-    const response = await request(server)
-      .post('/graphql')
-      .send({
-        query: '{ __typename }',
-      });
-
-    expect(response.status).toBe(200);
-    expect(response.body.data.__typename).toBe('Query');
-  });
+test('Q2b nesting resolves the author relation', async () => {
+  const response = await request(server)
+    .post('/graphql')
+    .send({
+      query:
+        '{ allTbPosts(first: 10) { nodes { id: rowId title tbUserByFkAuthor { username fullName } } } }',
+    });
+  expect(response.status).toBe(200);
+  expect(response.body.errors).toBeUndefined();
+  const nodes = response.body.data.allTbPosts.nodes;
+  expect(nodes.length).toBeGreaterThan(0);
+  expect(nodes[0].tbUserByFkAuthor.username).toBeTruthy();
 });

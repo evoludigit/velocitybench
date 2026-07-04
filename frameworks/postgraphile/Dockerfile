@@ -1,10 +1,10 @@
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
 # Install dependencies first for better caching
 COPY package*.json ./
-RUN npm ci --only=production=false
+RUN npm ci
 
 # Copy source and build
 COPY tsconfig.json ./
@@ -12,7 +12,7 @@ COPY src ./src
 RUN npm run build
 
 # Remove dev dependencies after build
-RUN npm prune --production
+RUN npm prune --omit=dev
 
 # Health check
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
