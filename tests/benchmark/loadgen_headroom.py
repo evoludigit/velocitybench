@@ -16,7 +16,6 @@ Exit code 0 iff the measured RPS meets the threshold.
 import argparse
 import subprocess
 import sys
-import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -38,16 +37,25 @@ server {
 """
 
 
-def start_null_target() -> None:
+def start_null_target(bind_host: str = "127.0.0.1") -> None:
+    """Start the canned-response nginx.
+
+    The config travels as an env var written inside the container (not a bind
+    mount) so this also works against a remote docker daemon
+    (DOCKER_HOST=ssh://… on the Hetzner SUT). Loopback measurement binds
+    127.0.0.1 only; a remote target host requires binding all interfaces.
+    """
     subprocess.run(["docker", "rm", "-f", CONTAINER], capture_output=True, check=False)
-    conf = Path(tempfile.mkdtemp(prefix="loadgen-nulltarget-")) / "default.conf"
-    conf.write_text(NGINX_CONF)
+    publish = f"127.0.0.1:{PORT}:80" if bind_host == "127.0.0.1" else f"{PORT}:80"
     subprocess.run(
         [
             "docker", "run", "--rm", "-d", "--name", CONTAINER,
-            "-p", f"127.0.0.1:{PORT}:80",
-            "-v", f"{conf}:/etc/nginx/conf.d/default.conf:ro",
+            "-p", publish,
+            "-e", f"NULL_TARGET_CONF={NGINX_CONF}",
             "nginx:alpine",
+            "sh", "-c",
+            'printf %s "$NULL_TARGET_CONF" > /etc/nginx/conf.d/default.conf '
+            '&& exec nginx -g "daemon off;"',
         ],
         check=True,
         capture_output=True,
@@ -62,8 +70,8 @@ def stop_null_target() -> None:
 QUERY = "{ users(limit: 20) { id username fullName bio } }"
 
 
-def measure_python(duration: int, concurrency: int) -> float:
-    url = f"http://127.0.0.1:{PORT}/graphql"
+def measure_python(duration: int, concurrency: int, host: str = "127.0.0.1") -> float:
+    url = f"http://{host}:{PORT}/graphql"
     end_time = time.monotonic() + duration
     total_requests = 0
     total_errors = 0
@@ -81,8 +89,8 @@ def measure_python(duration: int, concurrency: int) -> float:
     return total_requests / duration
 
 
-def measure_k6(duration: int, concurrency: int) -> float:
-    entry = (f"http://127.0.0.1:{PORT}/graphql", QUERY)
+def measure_k6(duration: int, concurrency: int, host: str = "127.0.0.1") -> float:
+    entry = (f"http://{host}:{PORT}/graphql", QUERY)
     steps = _entry_to_k6_steps(entry, "graphql", "Q1")
     ok_cycles, errors, _pct = _run_k6(steps, concurrency, duration)
     if errors:
@@ -97,12 +105,18 @@ def main() -> int:
     parser.add_argument("--duration", type=int, default=5)
     parser.add_argument("--concurrency", type=int, default=40)
     parser.add_argument("--min-rps", type=int, default=30_000)
+    parser.add_argument(
+        "--host", default="127.0.0.1",
+        help="Host the null target is reachable on (default: 127.0.0.1). On the "
+             "two-instance topology: SUT private IP, with DOCKER_HOST=ssh://… "
+             "pointing docker at the SUT daemon.",
+    )
     args = parser.parse_args()
 
     measure = measure_k6 if args.tool == "k6" else measure_python
-    start_null_target()
+    start_null_target(bind_host=args.host)
     try:
-        rps = measure(args.duration, args.concurrency)
+        rps = measure(args.duration, args.concurrency, host=args.host)
     finally:
         stop_null_target()
 

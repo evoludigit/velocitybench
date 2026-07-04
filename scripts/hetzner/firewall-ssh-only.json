@@ -1,0 +1,15 @@
+[
+  {
+    "direction": "in",
+    "protocol": "tcp",
+    "port": "22",
+    "source_ips": ["0.0.0.0/0", "::/0"],
+    "description": "SSH only — framework ports stay on the private network"
+  },
+  {
+    "direction": "in",
+    "protocol": "icmp",
+    "source_ips": ["0.0.0.0/0", "::/0"],
+    "description": "ping"
+  }
+]

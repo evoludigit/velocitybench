@@ -1,0 +1,13 @@
+#cloud-config
+# VelocityBench campaign instances (SUT + loadgen). Docker via the official
+# convenience script; python3 + rsync for the harness. Nothing framework-
+# specific — the repo is rsynced in by bench-run.sh after boot.
+package_update: true
+packages:
+  - rsync
+  - python3
+  - curl
+  - gnupg
+runcmd:
+  - curl -fsSL https://get.docker.com | sh
+  - systemctl enable --now docker
