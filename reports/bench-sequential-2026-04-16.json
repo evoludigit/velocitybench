@@ -1,0 +1,584 @@
+{
+  "results": [
+    {
+      "framework": "fraiseql-tv",
+      "query": "Q1",
+      "pass": 1,
+      "rps": 10528.7,
+      "p50_ms": 3.31,
+      "p95_ms": 7.98,
+      "p99_ms": 10.97,
+      "requests": 315861,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "Q2",
+      "pass": 1,
+      "rps": 10577.7,
+      "p50_ms": 3.26,
+      "p95_ms": 8.16,
+      "p99_ms": 11.26,
+      "requests": 317330,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "Q2b",
+      "pass": 1,
+      "rps": 9473.6,
+      "p50_ms": 3.69,
+      "p95_ms": 8.85,
+      "p99_ms": 11.97,
+      "requests": 284209,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "Q3",
+      "pass": 1,
+      "rps": 4665.8,
+      "p50_ms": 7.73,
+      "p95_ms": 16.72,
+      "p99_ms": 22.12,
+      "requests": 139973,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "C3",
+      "pass": 1,
+      "rps": 10666.7,
+      "p50_ms": 3.21,
+      "p95_ms": 8.2,
+      "p99_ms": 11.42,
+      "requests": 320001,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "HC3",
+      "pass": 1,
+      "rps": 10733.7,
+      "p50_ms": 3.18,
+      "p95_ms": 8.16,
+      "p99_ms": 11.35,
+      "requests": 322012,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "M1",
+      "pass": 1,
+      "rps": 4075.6,
+      "p50_ms": 7.29,
+      "p95_ms": 23.92,
+      "p99_ms": 44.37,
+      "requests": 122269,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "M1d",
+      "pass": 1,
+      "rps": 8713.4,
+      "p50_ms": 4.21,
+      "p95_ms": 8.16,
+      "p99_ms": 10.64,
+      "requests": 261401,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "F1",
+      "pass": 1,
+      "rps": 10409.5,
+      "p50_ms": 3.33,
+      "p95_ms": 8.19,
+      "p99_ms": 11.23,
+      "requests": 312286,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "F2",
+      "pass": 1,
+      "rps": 8963.2,
+      "p50_ms": 3.9,
+      "p95_ms": 9.31,
+      "p99_ms": 12.83,
+      "requests": 268896,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "F3",
+      "pass": 1,
+      "rps": 10491.6,
+      "p50_ms": 3.32,
+      "p95_ms": 8.0,
+      "p99_ms": 11.02,
+      "requests": 314748,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "T1",
+      "pass": 1,
+      "rps": 6261.4,
+      "p50_ms": 5.87,
+      "p95_ms": 11.42,
+      "p99_ms": 15.46,
+      "requests": 187843,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "MC1",
+      "pass": 1,
+      "rps": 8603.5,
+      "p50_ms": 4.26,
+      "p95_ms": 8.34,
+      "p99_ms": 10.87,
+      "requests": 258104,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "Q1_APQ",
+      "pass": 1,
+      "rps": 10391.6,
+      "p50_ms": 3.36,
+      "p95_ms": 8.07,
+      "p99_ms": 11.06,
+      "requests": 311747,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "Q2b_APQ",
+      "pass": 1,
+      "rps": 9675.0,
+      "p50_ms": 3.63,
+      "p95_ms": 8.56,
+      "p99_ms": 11.59,
+      "requests": 290250,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "M1_APQ",
+      "pass": 1,
+      "rps": 9068.0,
+      "p50_ms": 4.06,
+      "p95_ms": 7.77,
+      "p99_ms": 10.12,
+      "requests": 272041,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "Q1",
+      "pass": 1,
+      "rps": 10647.1,
+      "p50_ms": 3.27,
+      "p95_ms": 7.91,
+      "p99_ms": 10.81,
+      "requests": 319412,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "Q2",
+      "pass": 1,
+      "rps": 10992.2,
+      "p50_ms": 3.14,
+      "p95_ms": 7.83,
+      "p99_ms": 10.78,
+      "requests": 329765,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "Q2b",
+      "pass": 1,
+      "rps": 9811.7,
+      "p50_ms": 3.55,
+      "p95_ms": 8.45,
+      "p99_ms": 11.49,
+      "requests": 294352,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "Q3",
+      "pass": 1,
+      "rps": 4800.6,
+      "p50_ms": 7.57,
+      "p95_ms": 16.04,
+      "p99_ms": 21.09,
+      "requests": 144017,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "C3",
+      "pass": 1,
+      "rps": 10661.5,
+      "p50_ms": 3.2,
+      "p95_ms": 8.22,
+      "p99_ms": 11.44,
+      "requests": 319845,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "HC3",
+      "pass": 1,
+      "rps": 10169.8,
+      "p50_ms": 3.21,
+      "p95_ms": 8.28,
+      "p99_ms": 11.57,
+      "requests": 305094,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "M1",
+      "pass": 1,
+      "rps": 8675.2,
+      "p50_ms": 4.22,
+      "p95_ms": 8.26,
+      "p99_ms": 10.88,
+      "requests": 260255,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "F1",
+      "pass": 1,
+      "rps": 10409.3,
+      "p50_ms": 3.32,
+      "p95_ms": 8.22,
+      "p99_ms": 11.33,
+      "requests": 312278,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "F2",
+      "pass": 1,
+      "rps": 9364.7,
+      "p50_ms": 3.76,
+      "p95_ms": 8.8,
+      "p99_ms": 11.89,
+      "requests": 280942,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "F3",
+      "pass": 1,
+      "rps": 10466.9,
+      "p50_ms": 3.33,
+      "p95_ms": 8.07,
+      "p99_ms": 11.08,
+      "requests": 314007,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "T1",
+      "pass": 1,
+      "rps": 6470.5,
+      "p50_ms": 5.77,
+      "p95_ms": 10.57,
+      "p99_ms": 14.57,
+      "requests": 194115,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "MC1",
+      "pass": 1,
+      "rps": 8699.9,
+      "p50_ms": 4.23,
+      "p95_ms": 8.23,
+      "p99_ms": 10.68,
+      "requests": 260997,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "Q1_APQ",
+      "pass": 1,
+      "rps": 10511.7,
+      "p50_ms": 3.32,
+      "p95_ms": 7.96,
+      "p99_ms": 10.95,
+      "requests": 315352,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "Q2b_APQ",
+      "pass": 1,
+      "rps": 9711.0,
+      "p50_ms": 3.63,
+      "p95_ms": 8.51,
+      "p99_ms": 11.55,
+      "requests": 291330,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "query": "M1_APQ",
+      "pass": 1,
+      "rps": 9150.2,
+      "p50_ms": 4.02,
+      "p95_ms": 7.68,
+      "p99_ms": 10.03,
+      "requests": 274505,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    }
+  ],
+  "resource_metrics": [
+    {
+      "framework": "fraiseql-tv",
+      "loc": 251,
+      "complexity_per_100_loc": 2.0,
+      "image_mb": 44.1,
+      "peak_ram_mb": 15.5,
+      "avg_cpu_pct": 102.4
+    },
+    {
+      "framework": "fraiseql-tv-cache",
+      "loc": 251,
+      "complexity_per_100_loc": 2.0,
+      "image_mb": 44.1,
+      "peak_ram_mb": 18.3,
+      "avg_cpu_pct": 109.1
+    }
+  ],
+  "db_footprint": [
+    {
+      "table": "tv_comment",
+      "total_bytes": 1739137024,
+      "heap_bytes": 730087424,
+      "indexes_bytes": 337731584
+    },
+    {
+      "table": "tb_comment",
+      "total_bytes": 395485184,
+      "heap_bytes": 309075968,
+      "indexes_bytes": 86286336
+    },
+    {
+      "table": "tv_post",
+      "total_bytes": 337559552,
+      "heap_bytes": 209281024,
+      "indexes_bytes": 75685888
+    },
+    {
+      "table": "tb_post",
+      "total_bytes": 161161216,
+      "heap_bytes": 140083200,
+      "indexes_bytes": 21004288
+    },
+    {
+      "table": "tb_mutation_log",
+      "total_bytes": 77864960,
+      "heap_bytes": 71639040,
+      "indexes_bytes": 6168576
+    },
+    {
+      "table": "tb_post_like",
+      "total_bytes": 15138816,
+      "heap_bytes": 5218304,
+      "indexes_bytes": 9887744
+    },
+    {
+      "table": "tv_user",
+      "total_bytes": 14450688,
+      "heap_bytes": 8364032,
+      "indexes_bytes": 6078464
+    },
+    {
+      "table": "tb_user",
+      "total_bytes": 8224768,
+      "heap_bytes": 4915200,
+      "indexes_bytes": 3276800
+    },
+    {
+      "table": "tb_user_follows",
+      "total_bytes": 6995968,
+      "heap_bytes": 2220032,
+      "indexes_bytes": 4743168
+    },
+    {
+      "table": "tvd_comment",
+      "total_bytes": 253952,
+      "heap_bytes": 155648,
+      "indexes_bytes": 65536
+    },
+    {
+      "table": "tvd_post",
+      "total_bytes": 98304,
+      "heap_bytes": 16384,
+      "indexes_bytes": 49152
+    },
+    {
+      "table": "tvd_user",
+      "total_bytes": 49152,
+      "heap_bytes": 8192,
+      "indexes_bytes": 32768
+    },
+    {
+      "table": "sessions",
+      "total_bytes": 32768,
+      "heap_bytes": 0,
+      "indexes_bytes": 24576
+    },
+    {
+      "table": "failed_jobs",
+      "total_bytes": 24576,
+      "heap_bytes": 0,
+      "indexes_bytes": 16384
+    },
+    {
+      "table": "jobs",
+      "total_bytes": 24576,
+      "heap_bytes": 0,
+      "indexes_bytes": 16384
+    },
+    {
+      "table": "users",
+      "total_bytes": 24576,
+      "heap_bytes": 0,
+      "indexes_bytes": 16384
+    },
+    {
+      "table": "migrations",
+      "total_bytes": 24576,
+      "heap_bytes": 8192,
+      "indexes_bytes": 16384
+    },
+    {
+      "table": "password_reset_tokens",
+      "total_bytes": 16384,
+      "heap_bytes": 0,
+      "indexes_bytes": 8192
+    },
+    {
+      "table": "job_batches",
+      "total_bytes": 16384,
+      "heap_bytes": 0,
+      "indexes_bytes": 8192
+    },
+    {
+      "table": "cache",
+      "total_bytes": 16384,
+      "heap_bytes": 0,
+      "indexes_bytes": 8192
+    },
+    {
+      "table": "cache_locks",
+      "total_bytes": 16384,
+      "heap_bytes": 0,
+      "indexes_bytes": 8192
+    }
+  ]
+}

@@ -1,0 +1,366 @@
+{
+  "results": [
+    {
+      "framework": "fraiseql-tv",
+      "query": "Q1",
+      "pass": 1,
+      "rps": 9547.1,
+      "p50_ms": 3.64,
+      "p95_ms": 8.86,
+      "p99_ms": 12.22,
+      "requests": 286413,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "Q2",
+      "pass": 1,
+      "rps": 9886.8,
+      "p50_ms": 3.48,
+      "p95_ms": 8.75,
+      "p99_ms": 12.09,
+      "requests": 296603,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "Q2b",
+      "pass": 1,
+      "rps": 8987.7,
+      "p50_ms": 3.89,
+      "p95_ms": 9.27,
+      "p99_ms": 12.71,
+      "requests": 269630,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "Q3",
+      "pass": 1,
+      "rps": 4488.5,
+      "p50_ms": 7.89,
+      "p95_ms": 17.99,
+      "p99_ms": 24.26,
+      "requests": 134656,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "C3",
+      "pass": 1,
+      "rps": 7709.5,
+      "p50_ms": 4.18,
+      "p95_ms": 12.16,
+      "p99_ms": 19.64,
+      "requests": 231285,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "HC3",
+      "pass": 1,
+      "rps": 7809.9,
+      "p50_ms": 3.95,
+      "p95_ms": 11.05,
+      "p99_ms": 17.77,
+      "requests": 234298,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "M1",
+      "pass": 1,
+      "rps": 9121.5,
+      "p50_ms": 3.75,
+      "p95_ms": 9.52,
+      "p99_ms": 13.24,
+      "requests": 273644,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "M1d",
+      "pass": 1,
+      "rps": 1995.1,
+      "p50_ms": 12.34,
+      "p95_ms": 65.06,
+      "p99_ms": 118.49,
+      "requests": 59854,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "F1",
+      "pass": 1,
+      "rps": 8599.5,
+      "p50_ms": 3.66,
+      "p95_ms": 9.21,
+      "p99_ms": 12.89,
+      "requests": 257984,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "F2",
+      "pass": 1,
+      "rps": 6221.0,
+      "p50_ms": 4.48,
+      "p95_ms": 11.34,
+      "p99_ms": 16.69,
+      "requests": 186631,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "F3",
+      "pass": 1,
+      "rps": 8230.7,
+      "p50_ms": 3.68,
+      "p95_ms": 9.05,
+      "p99_ms": 12.65,
+      "requests": 246921,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "T1",
+      "pass": 1,
+      "rps": 6241.2,
+      "p50_ms": 5.89,
+      "p95_ms": 11.64,
+      "p99_ms": 15.66,
+      "requests": 187237,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "MC1",
+      "pass": 1,
+      "rps": 8914.6,
+      "p50_ms": 3.81,
+      "p95_ms": 9.8,
+      "p99_ms": 13.9,
+      "requests": 267438,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "Q1_APQ",
+      "pass": 1,
+      "rps": 9167.0,
+      "p50_ms": 3.68,
+      "p95_ms": 9.08,
+      "p99_ms": 12.59,
+      "requests": 275010,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "Q2b_APQ",
+      "pass": 1,
+      "rps": 8995.5,
+      "p50_ms": 3.88,
+      "p95_ms": 9.31,
+      "p99_ms": 12.7,
+      "requests": 269865,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    },
+    {
+      "framework": "fraiseql-tv",
+      "query": "M1_APQ",
+      "pass": 1,
+      "rps": 8319.5,
+      "p50_ms": 3.57,
+      "p95_ms": 9.11,
+      "p99_ms": 12.81,
+      "requests": 249584,
+      "errors": 0,
+      "error_breakdown": {},
+      "skipped": false,
+      "skip_reason": ""
+    }
+  ],
+  "resource_metrics": [
+    {
+      "framework": "fraiseql-tv",
+      "loc": 243,
+      "complexity_per_100_loc": 2.1,
+      "image_mb": 44.7,
+      "peak_ram_mb": 27.3,
+      "avg_cpu_pct": 93.7
+    }
+  ],
+  "db_footprint": [
+    {
+      "table": "tv_comment",
+      "total_bytes": 1741578240,
+      "heap_bytes": 726695936,
+      "indexes_bytes": 337862656
+    },
+    {
+      "table": "tvd_comment",
+      "total_bytes": 1225023488,
+      "heap_bytes": 507011072,
+      "indexes_bytes": 52674560
+    },
+    {
+      "table": "tb_comment",
+      "total_bytes": 394862592,
+      "heap_bytes": 308994048,
+      "indexes_bytes": 85745664
+    },
+    {
+      "table": "tv_post",
+      "total_bytes": 337477632,
+      "heap_bytes": 209657856,
+      "indexes_bytes": 75735040
+    },
+    {
+      "table": "tvd_post",
+      "total_bytes": 202506240,
+      "heap_bytes": 141983744,
+      "indexes_bytes": 8790016
+    },
+    {
+      "table": "tb_post",
+      "total_bytes": 161071104,
+      "heap_bytes": 140386304,
+      "indexes_bytes": 20611072
+    },
+    {
+      "table": "tb_mutation_log",
+      "total_bytes": 102252544,
+      "heap_bytes": 94150656,
+      "indexes_bytes": 8044544
+    },
+    {
+      "table": "tb_post_like",
+      "total_bytes": 15147008,
+      "heap_bytes": 5218304,
+      "indexes_bytes": 9895936
+    },
+    {
+      "table": "tv_user",
+      "total_bytes": 14532608,
+      "heap_bytes": 8413184,
+      "indexes_bytes": 6103040
+    },
+    {
+      "table": "tb_user",
+      "total_bytes": 8151040,
+      "heap_bytes": 4866048,
+      "indexes_bytes": 3276800
+    },
+    {
+      "table": "tb_user_follows",
+      "total_bytes": 6987776,
+      "heap_bytes": 2220032,
+      "indexes_bytes": 4734976
+    },
+    {
+      "table": "tvd_user",
+      "total_bytes": 6905856,
+      "heap_bytes": 6184960,
+      "indexes_bytes": 679936
+    },
+    {
+      "table": "sessions",
+      "total_bytes": 32768,
+      "heap_bytes": 0,
+      "indexes_bytes": 24576
+    },
+    {
+      "table": "migrations",
+      "total_bytes": 24576,
+      "heap_bytes": 8192,
+      "indexes_bytes": 16384
+    },
+    {
+      "table": "users",
+      "total_bytes": 24576,
+      "heap_bytes": 0,
+      "indexes_bytes": 16384
+    },
+    {
+      "table": "failed_jobs",
+      "total_bytes": 24576,
+      "heap_bytes": 0,
+      "indexes_bytes": 16384
+    },
+    {
+      "table": "jobs",
+      "total_bytes": 24576,
+      "heap_bytes": 0,
+      "indexes_bytes": 16384
+    },
+    {
+      "table": "password_reset_tokens",
+      "total_bytes": 16384,
+      "heap_bytes": 0,
+      "indexes_bytes": 8192
+    },
+    {
+      "table": "cache",
+      "total_bytes": 16384,
+      "heap_bytes": 0,
+      "indexes_bytes": 8192
+    },
+    {
+      "table": "cache_locks",
+      "total_bytes": 16384,
+      "heap_bytes": 0,
+      "indexes_bytes": 8192
+    },
+    {
+      "table": "job_batches",
+      "total_bytes": 16384,
+      "heap_bytes": 0,
+      "indexes_bytes": 8192
+    }
+  ]
+}
