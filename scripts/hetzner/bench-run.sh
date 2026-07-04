@@ -139,17 +139,22 @@ if (( ! PLAN )); then
     [[ -f "$SSH_KEY_FILE" ]] || run ssh-keygen -t ed25519 -N "" -f "$SSH_KEY_FILE"
 fi
 
-# ── 1. Create network, firewall, SSH key, instances ────────────────────────
+# ── 1. Create network, firewall, SSH key, instances (idempotent) ───────────
 say "── 1. Provision network + instances ─────────────────────────"
-run hcloud network create --name "$NETWORK_NAME" --ip-range "$NETWORK_RANGE" --label "$CAMPAIGN_LABEL"
-run hcloud network add-subnet "$NETWORK_NAME" --network-zone eu-central --type cloud --ip-range "$NETWORK_RANGE"
-run hcloud firewall create --name "$FIREWALL_NAME" --label "$CAMPAIGN_LABEL" \
-    --rules-file "${REPO_ROOT}/scripts/hetzner/firewall-ssh-only.json"
-run hcloud ssh-key create --name "$SSH_KEY_NAME" --public-key-from-file "${SSH_KEY_FILE}.pub" --label "$CAMPAIGN_LABEL"
+exists() { (( PLAN )) && return 1; hcloud "$1" describe "$2" >/dev/null 2>&1; }
+
+exists network "$NETWORK_NAME" || {
+    run hcloud network create --name "$NETWORK_NAME" --ip-range "$NETWORK_RANGE" --label "$CAMPAIGN_LABEL"
+    run hcloud network add-subnet "$NETWORK_NAME" --network-zone eu-central --type cloud --ip-range "$NETWORK_RANGE"
+}
+exists firewall "$FIREWALL_NAME" || run hcloud firewall create --name "$FIREWALL_NAME" \
+    --label "$CAMPAIGN_LABEL" --rules-file "${REPO_ROOT}/scripts/hetzner/firewall-ssh-only.json"
+exists ssh-key "$SSH_KEY_NAME" || run hcloud ssh-key create --name "$SSH_KEY_NAME" \
+    --public-key-from-file "${SSH_KEY_FILE}.pub" --label "$CAMPAIGN_LABEL"
 
 for spec in "${SUT_NAME}:${SUT_TYPE}" "${LOADGEN_NAME}:${LOADGEN_TYPE}"; do
     name="${spec%%:*}" type="${spec##*:}"
-    run hcloud server create --name "$name" --type "$type" --image "$IMAGE" \
+    exists server "$name" || run hcloud server create --name "$name" --type "$type" --image "$IMAGE" \
         --location "$LOCATION" --network "$NETWORK_NAME" \
         --firewall "$FIREWALL_NAME" --ssh-key "$SSH_KEY_NAME" \
         --label "$CAMPAIGN_LABEL" \
@@ -179,11 +184,24 @@ for ip_desc in "SUT:${SUT_IP}" "loadgen:${LOADGEN_IP}"; do
     run rsync -az --delete \
         --exclude .git --exclude '.venv' --exclude venv --exclude node_modules \
         --exclude reports --exclude '.phases*' \
+        --exclude tests/perf --exclude target --exclude '.gradle' \
+        --exclude __pycache__ --exclude '*.pyc' --exclude '.pytest_cache' \
+        --exclude '.ruff_cache' --exclude costs/test_venv \
         -e "ssh -i ${SSH_KEY_FILE} -o StrictHostKeyChecking=accept-new" \
         "${REPO_ROOT}/" "root@${ip}:${REMOTE_DIR}/"
 done
-# SUT: postgres up + seeded (logged tviews — the publishable profile)
-ssh_sut "cd ${REMOTE_DIR} && TVIEW_PERSISTENCE=logged docker compose up -d postgres && docker compose logs --tail 5 postgres"
+# loadgen → SUT ssh identity: DOCKER_HOST=ssh://root@SUT needs a key on the
+# loadgen. The campaign key only opens these two instances and dies with them.
+run rsync -az -e "ssh -i ${SSH_KEY_FILE} -o StrictHostKeyChecking=accept-new" \
+    "$SSH_KEY_FILE" "root@${LOADGEN_IP}:/root/.ssh/id_ed25519"
+ssh_loadgen "chmod 600 /root/.ssh/id_ed25519 && printf 'Host ${NETWORK_RANGE%%.0/*}.*\n  User root\n  StrictHostKeyChecking accept-new\n  ControlMaster auto\n  ControlPath /root/.ssh/cm-%%r@%%h\n  ControlPersist 10m\n' > /root/.ssh/config"
+# SUT: postgres up + seeded (logged tviews — the publishable profile).
+# First boot seeds 10k users / 500k comments + tv build — wait for it.
+ssh_sut "cd ${REMOTE_DIR} && TVIEW_PERSISTENCE=logged docker compose up -d postgres"
+ssh_sut "cd ${REMOTE_DIR} && for i in \$(seq 1 180); do \
+docker compose exec -T postgres psql -U benchmark -d velocitybench_benchmark -tAc \
+'SELECT count(*) FROM benchmark.tb_user' 2>/dev/null | grep -qx 10005 && exit 0; sleep 10; done; \
+echo 'DB seed did not complete within 30 min' >&2; exit 1"
 # loadgen: k6 + python only — the SUT stays dumb (Docker + repo)
 ssh_loadgen "command -v k6 >/dev/null || (gpg -k >/dev/null; curl -fsSL https://dl.k6.io/key.gpg | gpg --dearmor -o /usr/share/keyrings/k6.gpg && echo 'deb [signed-by=/usr/share/keyrings/k6.gpg] https://dl.k6.io/deb stable main' > /etc/apt/sources.list.d/k6.list && apt-get update -qq && apt-get install -y -qq k6)"
 
@@ -209,10 +227,31 @@ for n in $(seq 1 "$SWEEPS"); do
     say "── 4.${n} Sweep ${n}/${SWEEPS} ──────────────────────────────────────"
     # Orchestration runs on the loadgen; DOCKER_HOST points every docker/compose
     # call (framework start/stop, RSS sampling, cold-start restarts) at the SUT.
-    ssh_loadgen "cd ${REMOTE_DIR} && DOCKER_HOST=ssh://root@${SUT_PRIVATE_IP} \
+    # Detached (nohup + pidfile) so a dropped operator connection cannot kill a
+    # paid multi-hour sweep; we poll the pid and tail the log for liveness.
+    ssh_loadgen "cd ${REMOTE_DIR} && mkdir -p reports && \
+nohup env DOCKER_HOST=ssh://root@${SUT_PRIVATE_IP} \
 python3 tests/benchmark/bench_sequential.py \
 --target-host ${SUT_PRIVATE_IP} --frameworks ${FRAMEWORKS} ${SWEEP_ARGS} \
---output ${REMOTE_DIR}/reports/bench-hetzner-\$(date +%F)-sweep${n}.md"
+--output ${REMOTE_DIR}/reports/bench-hetzner-\$(date +%F)-sweep${n}.md \
+> ${REMOTE_DIR}/reports/sweep${n}.log 2>&1 < /dev/null & echo \$! > ${REMOTE_DIR}/reports/sweep${n}.pid"
+    if (( ! PLAN )); then
+        sleep 20
+        while ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=accept-new "root@${LOADGEN_IP}" \
+              "kill -0 \$(cat ${REMOTE_DIR}/reports/sweep${n}.pid) 2>/dev/null"; do
+            ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=accept-new "root@${LOADGEN_IP}" \
+                "tail -1 ${REMOTE_DIR}/reports/sweep${n}.log" 2>/dev/null || true
+            sleep 60
+        done
+        if ! ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=accept-new "root@${LOADGEN_IP}" \
+             "grep -q 'Report written to' ${REMOTE_DIR}/reports/sweep${n}.log"; then
+            say "sweep ${n} FAILED — last log lines:"
+            ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=accept-new "root@${LOADGEN_IP}" \
+                "tail -30 ${REMOTE_DIR}/reports/sweep${n}.log" || true
+            exit 1
+        fi
+        say "sweep ${n} complete ✓"
+    fi
 done
 
 collect_results
