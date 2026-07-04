@@ -78,7 +78,7 @@ _PG_F2 = (
     " { nodes { id: rowId title tbUserByFkAuthor { username fullName } } } }"
 )
 _PG_M1_TMPL = (
-    'mutation {{ updateTbUserByRowId(input: {{rowId: "{user_id}", tbUserPatch: {{bio: "bench"}}}})'
+    'mutation {{ updateTbUserByRowId(input: {{rowId: "{user_id}", tbUserPatch: {{bio: "{bio}"}}}})'
     " {{ tbUser {{ id: rowId bio }} }} }}"
 )
 
@@ -92,18 +92,18 @@ _HASURA_F2 = (
     " { id title author { username fullName } } }"
 )
 _HASURA_M1_TMPL = (
-    'mutation {{ updateUser(where: {{id: {{_eq: "{user_id}"}}}}, _set: {{bio: "bench"}})'
+    'mutation {{ updateUser(where: {{id: {{_eq: "{user_id}"}}}}, _set: {{bio: "{bio}"}})'
     " {{ returning {{ id bio }} }} }}"
 )
 _GQL_Q3 = "{ comments(limit: 20) { id content author { username } post { title } } }"
 _GQL_M1_TMPL = (
-    'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "bench" }}) {{ id bio }} }}'
+    'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "{bio}" }}) {{ id bio }} }}'
 )
 
 # Flat-args mutation template — no input wrapper. Most GraphQL frameworks (gqlgen, graphene,
 # strawberry, apollo, yoga, mercurius, go-graphql-go, graphql-go) use flat args directly.
 _GQL_M1_FLAT_TMPL = (
-    'mutation {{ updateUser(id: "{user_id}", bio: "bench") {{ id bio }} }}'
+    'mutation {{ updateUser(id: "{user_id}", bio: "{bio}") {{ id bio }} }}'
 )
 
 # FraiseQL-specific templates — flat args (no input wrapper), schema compiled differently.
@@ -118,6 +118,29 @@ _FRAISEQL_M1D_QUERY = (
     "mutation UpdateUserDelta($id: ID!, $bio: String) { updateUserDelta(id: $id, bio: $bio)"
     " { id identifier email username fullName bio createdAt updatedAt } }"
 )
+
+# Bio values rotated through every mutation scenario. Every request must be a
+# REAL write: constant values hit no-op short circuits (fn_update_user skips
+# unchanged bios) and turn "mutation" throughput into read throughput — see
+# the 2026-07-04 M1-design finding.
+_M1_BIOS = [f"bio-{i}" for i in range(10)]
+
+
+def _rotating_writes(user_ids: list[str], bios: list[str]) -> list[tuple[str, str]]:
+    """Cycle-based (user_id, bio) pairing for mutation scenarios.
+
+    Each full pass over the user pool advances the bio, so consecutive visits
+    to the same user always write a different value — regardless of pool
+    sizes. (Index-parallel pairing like ``bios[i % len(bios)]`` over
+    ``user_ids * len(bios)`` silently gives every user a CONSTANT bio when
+    len(user_ids) is a multiple of len(bios): 20 users × 10 bios → user k
+    always gets bio k%10 → no-ops after the first cycle.)
+    """
+    return [
+        (uid, bios[cycle % len(bios)])
+        for cycle in range(len(bios))
+        for uid in user_ids
+    ]
 
 # ---------------------------------------------------------------------------
 # APQ (Automatic Persisted Queries) — pre-computed SHA-256 hashes.
@@ -307,7 +330,7 @@ FRAMEWORKS: dict[str, dict] = {
             "MC1": "MC1",
         },
         "health_url": "http://localhost:8016/health",
-        "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "bench" }}) {{ id bio }} }}',
+        "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "{bio}" }}) {{ id bio }} }}',
     },
     "juniper": {
         "compose_service": "juniper",
@@ -327,7 +350,7 @@ FRAMEWORKS: dict[str, dict] = {
             "T1": "T1",
         },
         # Juniper wraps mutation args in input object: updateUser(id, input: {bio})
-        "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "bench" }}) {{ id username fullName bio }} }}',
+        "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "{bio}" }}) {{ id username fullName bio }} }}',
         "health_url": "http://localhost:4000/health",
     },
     # ------------------------------------------------------------------
@@ -692,7 +715,7 @@ FRAMEWORKS: dict[str, dict] = {
         },
         "health_url": "http://localhost:4000/health",
         # Micronaut wraps mutation args in input object: updateUser(id, input: {bio})
-        "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "bench" }}) {{ id username fullName bio createdAt }} }}',
+        "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "{bio}" }}) {{ id username fullName bio createdAt }} }}',
     },
     "quarkus-graphql": {
         "compose_service": "quarkus-graphql",
@@ -711,7 +734,7 @@ FRAMEWORKS: dict[str, dict] = {
         },
         "health_url": "http://localhost:4000/health",
         # Quarkus wraps mutation args in input object: updateUser(id, input: {bio})
-        "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "bench" }}) {{ id username fullName bio createdAt updatedAt }} }}',
+        "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "{bio}" }}) {{ id username fullName bio createdAt updatedAt }} }}',
     },
     # ------------------------------------------------------------------
     # Scala frameworks
@@ -798,7 +821,7 @@ FRAMEWORKS: dict[str, dict] = {
             "T1": "T1",
         },
         # webonyx uses input object wrapper: updateUser(id, input: {bio})
-        "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "bench" }}) {{ id username fullName bio createdAt }} }}',
+        "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "{bio}" }}) {{ id username fullName bio createdAt }} }}',
         "health_url": "http://localhost:4000/health",
     },
     # ------------------------------------------------------------------
@@ -880,6 +903,7 @@ FRAMEWORKS: dict[str, dict] = {
     # ------------------------------------------------------------------
     # fraiseql-tv: TV tables, no cache — best TV read throughput (pre-computed JSONB baseline)
     "fraiseql-tv": {
+        "tview_triggers": True,  # FraiseQL deploys pg_tviews; its mutations keep the cascade cost
         "compose_service": "fraiseql-tv-nocache",
         "type": "graphql",
         "language": "Rust",
@@ -924,6 +948,7 @@ FRAMEWORKS: dict[str, dict] = {
     },
     # fraiseql-tv-cache: TV tables, cache enabled — post-cascade fragmentation M1 condition
     "fraiseql-tv-cache": {
+        "tview_triggers": True,  # FraiseQL deploys pg_tviews; its mutations keep the cascade cost
         "compose_service": "fraiseql-tv",
         "type": "graphql",
         "language": "Rust",
@@ -958,6 +983,7 @@ FRAMEWORKS: dict[str, dict] = {
     },
     # fraiseql-v-nocache: v_* on-the-fly JSONB views, cache disabled — raw JOIN cost baseline
     "fraiseql-v-nocache": {
+        "tview_triggers": True,  # FraiseQL deploys pg_tviews; its mutations keep the cascade cost
         "compose_service": "fraiseql-v-nocache",
         "type": "graphql",
         "language": "Rust",
@@ -994,6 +1020,7 @@ FRAMEWORKS: dict[str, dict] = {
     },
     # fraiseql-v-cache: v_* on-the-fly JSONB views, cache enabled — where cache earns its keep
     "fraiseql-v-cache": {
+        "tview_triggers": True,  # FraiseQL deploys pg_tviews; its mutations keep the cascade cost
         "compose_service": "fraiseql",
         "type": "graphql",
         "language": "Rust",
@@ -1030,6 +1057,7 @@ FRAMEWORKS: dict[str, dict] = {
     },
     # Phase 5: Observer overhead — fraiseql-tv with audit logging enabled
     "fraiseql-tv-audit": {
+        "tview_triggers": True,  # FraiseQL deploys pg_tviews; its mutations keep the cascade cost
         "compose_service": "fraiseql-tv-audit",
         "type": "graphql",
         "language": "Rust",
@@ -1289,7 +1317,7 @@ class _PersistentConn:
                     return False, elapsed, "connection_error", "reconnect failed"
         return False, 0.0, "connection_error", "unreachable"
 
-    def put(self, payload: bytes) -> tuple[bool, float, str, str]:
+    def put(self, payload: bytes, path: str | None = None) -> tuple[bool, float, str, str]:
         for attempt in range(2):
             t0 = time.monotonic()
             try:
@@ -1297,7 +1325,7 @@ class _PersistentConn:
                 assert self._conn is not None
                 self._conn.request(
                     "PUT",
-                    self._path,
+                    path if path is not None else self._path,
                     body=payload,
                     headers={"Content-Type": "application/json"},
                 )
@@ -1819,6 +1847,32 @@ def _worker_mutation_rest(url: str, payload: bytes, end_time: float) -> _WorkerR
     return latencies, errors, breakdown, samples
 
 
+def _worker_mutation_rest_rotating(
+    urls: list[str], bodies: list[bytes], end_time: float
+) -> _WorkerResult:
+    """REST PUT mutations with paired url/body rotation (write spreading)."""
+    import random
+
+    latencies: list[float] = []
+    errors = 0
+    breakdown: dict[str, int] = {}
+    samples: list[tuple[str, str]] = []
+    conn = _PersistentConn(urls[0])
+    paths = [urlparse(u).path for u in urls]
+    n = len(urls)
+    while time.monotonic() < end_time:
+        i = random.randrange(n)  # noqa: S311
+        ok, lat, cat, detail = conn.put(bodies[i], path=paths[i])
+        if ok:
+            latencies.append(lat)
+        else:
+            errors += 1
+            breakdown[cat] = breakdown.get(cat, 0) + 1
+            if len(samples) < _MAX_ERROR_SAMPLES:
+                samples.append((cat, detail))
+    return latencies, errors, breakdown, samples
+
+
 def _worker_graphql_composite(url: str, payloads: list[bytes], end_time: float) -> _WorkerResult:
     """Worker for T1 total scenario with multiple sequential GraphQL POSTs.
 
@@ -1878,14 +1932,17 @@ def _worker_rest_composite(urls: list[str], end_time: float) -> _WorkerResult:
 
 
 def _worker_mc1_classical(
-    url: str, m1_payload: bytes, q1_payload: bytes, end_time: float
+    url: str, m1_payloads: list[bytes], q1_payload: bytes, end_time: float
 ) -> _WorkerResult:
     """Worker for MC1 classical cycle: M1 mutation + Q1 re-fetch (2 serial requests).
 
     Each cycle represents the minimum client work to reach consistent state after a
     mutation on a classical GraphQL framework. Latency = total wall-clock for the pair.
-    RPS = mutation-to-consistent-state cycles per second.
+    RPS = mutation-to-consistent-state cycles per second. The mutation payload
+    rotates (write spreading — same reason as M1).
     """
+    import random
+
     latencies: list[float] = []
     errors = 0
     breakdown: dict[str, int] = {}
@@ -1894,7 +1951,7 @@ def _worker_mc1_classical(
     while time.monotonic() < end_time:
         t0 = time.monotonic()
         failed = False
-        for payload in (m1_payload, q1_payload):
+        for payload in (random.choice(m1_payloads), q1_payload):  # noqa: S311
             ok, _lat, cat, detail = conn.post_graphql(payload)
             if not ok:
                 failed = True
@@ -1986,6 +2043,21 @@ def _entry_to_k6_steps(entry, fw_type: str, query_name: str) -> list[dict]:
                 "bodies": [p.decode() for p in entry["payloads"]],
                 "validate": "graphql",
             }]
+        if mode == "graphql_rotating":
+            # Pre-rendered query bodies rotated per iteration (mutation write-spreading)
+            return [{
+                "method": "POST", "url": entry["url"],
+                "bodies": [p.decode() for p in entry["payloads"]],
+                "validate": "graphql",
+            }]
+        if mode == "rest_rotating":
+            # REST mutation with paired url/body rotation (same modulo index)
+            return [{
+                "method": entry.get("method", "PUT"),
+                "urls": entry["urls"],
+                "bodies": entry["bodies"],
+                "validate": "rest",
+            }]
         if mode == "graphql_composite":
             return [gql(entry["url"], p.decode()) for p in entry["payloads"]]
         if mode == "composite":
@@ -2000,10 +2072,16 @@ def _entry_to_k6_steps(entry, fw_type: str, query_name: str) -> list[dict]:
                 "validate": "graphql",
             }]
         if mode == "mc1_classical":
-            return [
-                gql(entry["url"], entry["m1_payload"].decode()),
-                gql(entry["url"], entry["q1_payload"].decode()),
-            ]
+            m1_step = (
+                {
+                    "method": "POST", "url": entry["url"],
+                    "bodies": [p.decode() for p in entry["m1_payloads"]],
+                    "validate": "graphql",
+                }
+                if "m1_payloads" in entry
+                else gql(entry["url"], entry["m1_payload"].decode())
+            )
+            return [m1_step, gql(entry["url"], entry["q1_payload"].decode())]
         raise ValueError(f"unknown scenario mode for k6: {mode!r}")
     if fw_type == "graphql":
         if len(entry) == 3:
@@ -2156,6 +2234,22 @@ def run_scenario(
                     pool.submit(_worker_graphql_apq_vars, url, payloads, end_time)
                     for _ in range(concurrency)
                 ]
+            elif isinstance(entry, dict) and entry.get("mode") == "graphql_rotating":
+                # Pre-rendered rotating query bodies (mutation write-spreading);
+                # same rotating-payload machinery as APQ-with-variables.
+                url = entry["url"]
+                payloads = entry["payloads"]
+                futures = [
+                    pool.submit(_worker_graphql_apq_vars, url, payloads, end_time)
+                    for _ in range(concurrency)
+                ]
+            elif isinstance(entry, dict) and entry.get("mode") == "rest_rotating":
+                urls = entry["urls"]
+                bodies = [b.encode() if isinstance(b, str) else b for b in entry["bodies"]]
+                futures = [
+                    pool.submit(_worker_mutation_rest_rotating, urls, bodies, end_time)
+                    for _ in range(concurrency)
+                ]
             elif isinstance(entry, dict) and entry.get("mode") == "graphql_composite":
                 # FraiseQL T1: chain multiple GraphQL POSTs per iteration
                 url = entry["url"]
@@ -2183,10 +2277,10 @@ def run_scenario(
             elif isinstance(entry, dict) and entry.get("mode") == "mc1_classical":
                 # Classical MC1: M1 mutation + Q1 re-fetch — 2 requests per cycle
                 url = entry["url"]
-                m1_p = entry["m1_payload"]
+                m1_ps = entry.get("m1_payloads") or [entry["m1_payload"]]
                 q1_p = entry["q1_payload"]
                 futures = [
-                    pool.submit(_worker_mc1_classical, url, m1_p, q1_p, end_time)
+                    pool.submit(_worker_mc1_classical, url, m1_ps, q1_p, end_time)
                     for _ in range(concurrency)
                 ]
             elif fw_type == "graphql":
@@ -2362,6 +2456,9 @@ def collect_run_environment(args: argparse.Namespace, tview_mode: str | None) ->
         "cooldown_secs": args.cooldown,
         "passes": args.passes,
         "tview_mode": tview_mode,
+        # pg_tviews triggers fire only for frameworks that deploy pg_tviews
+        # (fraiseql-*); classical stacks mutate a vanilla tb_user.
+        "tview_trigger_scope": "fraiseql-only",
     }
 
 
@@ -2570,6 +2667,136 @@ def _query_dead_tuples() -> int:
         return -1
 
 
+def _psql(sql: str) -> list[list[str]]:
+    """Run SQL in the postgres container, returning rows as text-field lists."""
+    result = _compose(
+        "exec", "-T", "postgres",
+        "psql", "-U", "benchmark", "-d", "velocitybench_benchmark",
+        "-At", "-F", "\t", "-c", sql,
+        check=True,
+    )
+    return [line.split("\t") for line in result.stdout.splitlines()]
+
+
+def set_tview_triggers(enable: bool) -> None:
+    """Enable/disable the pg_tviews triggers on benchmark.tb_user.
+
+    Parity scoping: classical stacks never deploy pg_tviews, so their
+    mutations must not pay its cascade. Triggers stay enabled for the
+    FraiseQL frameworks (``tview_triggers: True``), whose numbers include
+    their consistency infrastructure's maintenance cost. Scoped to tb_user —
+    the only table the mutation scenarios write.
+    """
+    rows = _psql(
+        "SELECT tgname FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid "
+        "JOIN pg_namespace n ON n.oid = c.relnamespace "
+        "WHERE n.nspname = 'benchmark' AND c.relname = 'tb_user' "
+        "AND NOT t.tgisinternal AND t.tgname LIKE 'trg_tview_%'"
+    )
+    action = "ENABLE" if enable else "DISABLE"
+    stmts = "; ".join(
+        f"ALTER TABLE benchmark.tb_user {action} TRIGGER {r[0]}" for r in rows if r[0]
+    )
+    if stmts:
+        _psql(stmts)
+
+
+def resync_tview_user() -> int:
+    """Recompute tv rows that drifted while triggers were disabled.
+
+    An identity update (bio = bio) on exactly the drifted rows re-fires the
+    tview cascade, restoring tb/tv sync without a full-table refresh.
+    Returns the number of rows resynced.
+    """
+    rows = _psql(
+        "WITH fixed AS ("
+        "  UPDATE benchmark.tb_user tb SET bio = tb.bio"
+        "  FROM benchmark.tv_user tv"
+        "  WHERE tv.pk_user = tb.pk_user"
+        "  AND tv.data->>'bio' IS DISTINCT FROM tb.bio"
+        "  RETURNING 1"
+        ") SELECT count(*) FROM fixed"
+    )
+    return int(rows[0][0]) if rows and rows[0][0] else 0
+
+
+def snapshot_user_bios() -> None:
+    """Snapshot every user's bio at sweep start (UNLOGGED scratch table).
+
+    Mutation scenarios overwrite the 20 discovered users' bios with short
+    rotating values — exactly the rows Q1 reads. Without restoration the
+    seeded (TOAST-sized) bios shrink as the sweep progresses and later
+    frameworks measure a faster Q1 than earlier ones.
+    """
+    _psql(
+        "DROP TABLE IF EXISTS benchmark.bench_bio_snapshot; "
+        "CREATE UNLOGGED TABLE benchmark.bench_bio_snapshot AS "
+        "SELECT pk_user, bio FROM benchmark.tb_user"
+    )
+
+
+def restore_user_bios() -> int:
+    """Restore all drifted bios from the sweep-start snapshot.
+
+    Fires the tview cascade for restored rows when triggers are enabled;
+    under per-stack scoping the follow-up resync_tview_user() covers tv.
+    Returns the number of rows restored (0 when no snapshot exists).
+    """
+    rows = _psql(
+        "SELECT 1 FROM pg_tables WHERE schemaname='benchmark' "
+        "AND tablename='bench_bio_snapshot'"
+    )
+    if not rows:
+        return 0
+    rows = _psql(
+        "WITH fixed AS ("
+        "  UPDATE benchmark.tb_user tb SET bio = s.bio"
+        "  FROM benchmark.bench_bio_snapshot s"
+        "  WHERE s.pk_user = tb.pk_user AND tb.bio IS DISTINCT FROM s.bio"
+        "  RETURNING 1"
+        ") SELECT count(*) FROM fixed"
+    )
+    return int(rows[0][0]) if rows and rows[0][0] else 0
+
+
+def verify_m1_write_effect(fw_name: str, fw_config: dict) -> bool:
+    """Live probe: two M1 requests for one user with distinct bios must leave
+    the SECOND bio in tb_user. Catches no-op mutation paths (constant values,
+    short-circuiting resolvers) that turn mutation benchmarks into read
+    benchmarks — per framework, at sweep time.
+    """
+    probe = fw_config.get("m1_probe")
+    if not probe:
+        return True
+    try:
+        for request in probe["requests"]:
+            req = urllib.request.Request(
+                request["url"],
+                data=request["body"],
+                headers={"Content-Type": "application/json"},
+                method=request.get("method", "POST"),
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                if resp.status != 200:
+                    print(f"probe request returned {resp.status}", end=" ", flush=True)
+                    return False
+        rows = _psql(
+            "SELECT bio FROM benchmark.tb_user "
+            f"WHERE id = '{probe['user_id']}'"
+        )
+        live_bio = rows[0][0] if rows and rows[0] else None
+        if live_bio != probe["expect_bio"]:
+            print(
+                f"bio is {live_bio!r}, expected {probe['expect_bio']!r}",
+                end=" ", flush=True,
+            )
+            return False
+        return True
+    except Exception as exc:  # noqa: BLE001 — any probe failure must surface, not crash
+        print(f"probe failed: {exc}", end=" ", flush=True)
+        return False
+
+
 def _reset_postgres_state() -> None:
     """CHECKPOINT + VACUUM FULL ANALYZE + pg_prewarm between framework runs.
 
@@ -2585,6 +2812,13 @@ def _reset_postgres_state() -> None:
     Best-effort: failures are printed but do not abort the benchmark.
     """
     print("  resetting PostgreSQL state (CHECKPOINT + VACUUM FULL + pg_prewarm)...", end=" ", flush=True)
+    # Canonical dataset first: warmup mutations shrank the discovered users'
+    # TOAST-sized bios — restore them so every measurement reads/writes the
+    # seeded content (best-effort like the rest of this reset).
+    try:
+        restore_user_bios()
+    except subprocess.CalledProcessError:
+        pass
     # UPDATE tb_user triggers a 3-table pg_tviews cascade: tv_user, tv_post, tv_comment.
     # All four tables are compacted so cascade write paths start from equal page density.
     result = _compose(
@@ -2990,7 +3224,7 @@ _QUERY_LABELS = {
     "Q2": "`posts(limit: 10) { id title }`",
     "Q2b": "`posts(limit: 10) { id title author { username fullName } }`",
     "Q3": "`comments(limit: 20) { id content author { username } post { title } }`",
-    "M1": "`mutation { updateUser(...) { id bio } }`",
+    "M1": "`mutation { updateUser(...) { id bio } }` — 20 user UUIDs × 10 bio values, rotating: every request is a real write",
     "M1d": "`mutation { updateUserDelta(...) { id bio } }` — jsonb_delta surgical patch on tvd_* (rotating bios)",
     # Feature benchmark labels (published filter cross-framework, FraiseQL-specific extras)
     "C3": "`user(id: UUID) { id username fullName }` — single entity, rotating UUIDs",
@@ -3226,6 +3460,14 @@ def format_report(
             f"| Load generator | {environment.get('load_generator', 'unknown')} |",
             f"| Target host | {environment.get('target_host', 'localhost')} |",
             f"| `tv_*` persistence | {tview_stamp} |",
+            *(
+                [
+                    "| `tv_*` trigger scope | FraiseQL frameworks only — classical "
+                    "stacks mutate a vanilla tb_user (they never deploy pg_tviews) |"
+                ]
+                if environment.get("tview_trigger_scope") == "fraiseql-only"
+                else []
+            ),
             "| Dataset | MEDIUM — 10 000 users · 50 000 posts · 200 000 comments |",
             f"| Concurrency | {environment.get('concurrency', args.concurrency)} workers |",
             f"| Measurement / warmup / cooldown | {environment.get('duration_secs', args.duration)}s"
@@ -3732,6 +3974,12 @@ def main() -> None:
              "(debugging only — a published sweep must run the gate).",
     )
     parser.add_argument(
+        "--skip-write-check",
+        action="store_true",
+        help="Skip the per-framework M1 write-effect probe (debugging only — "
+             "a published sweep must prove its mutations actually write).",
+    )
+    parser.add_argument(
         "--from-json",
         type=Path,
         default=None,
@@ -3850,6 +4098,20 @@ def main() -> None:
         print(f"{live_tview_mode} ✓", flush=True)
     print()
 
+    # Defensive: a crashed prior run may have left the tb_user tview triggers
+    # disabled (per-stack scoping below). Re-enable and resync before anything
+    # is measured, then snapshot the seeded bios — mutation scenarios rotate
+    # them and every framework must start from the canonical dataset.
+    if live_tview_mode is not None:
+        try:
+            set_tview_triggers(True)
+            _stale = resync_tview_user()
+            if _stale:
+                print(f"Recovered {_stale} stale tv_user rows from a prior run\n", flush=True)
+            snapshot_user_bios()
+        except subprocess.CalledProcessError:
+            pass  # postgres reachable but query failed — per-framework paths will surface it
+
     # Scenario parity gate — mandatory whenever an audited schema-to-API engine
     # is part of the sweep (see tests/benchmark/scenario_parity.py).
     import scenario_parity as _parity
@@ -3940,6 +4202,17 @@ def main() -> None:
                 _monitor = ResourceMonitor(fw_config["compose_service"])
                 _monitor.start()
 
+        # Parity scoping: stacks that don't deploy pg_tviews must not pay its
+        # mutation cascade (their tv reads never happen either). FraiseQL
+        # frameworks keep the triggers — the maintenance cost is part of their
+        # architecture. Re-enabled + resynced after this framework's scenarios.
+        _tview_scoped = (
+            not fw_config.get("tview_triggers", False) and not args.no_isolation
+        )
+        if _tview_scoped:
+            set_tview_triggers(False)
+            print("  tview triggers: disabled (stack does not deploy pg_tviews)", flush=True)
+
         # Resolve M1, C3, and MC1 sentinel queries at runtime (need a real user UUID)
         needs_user_id = (
             fw_config["queries"].get("M1") == "M1"
@@ -3952,6 +4225,13 @@ def main() -> None:
 
             if fw_config["queries"].get("M1") == "M1":
                 if user_id:
+                    # Rotating writes for EVERY framework: constant values hit
+                    # no-op short circuits and a single UUID serializes all
+                    # workers on one row — both turn M1 into a non-mutation
+                    # benchmark (2026-07-04 finding).
+                    user_ids = _discover_user_uuids(fw_config) or [user_id]
+                    pairs = _rotating_writes(user_ids, _M1_BIOS)
+                    probe_uid = user_ids[0]
                     if fw_config["type"] == "graphql":
                         q1_entry = fw_config["queries"].get("Q1")
                         gql_url = (
@@ -3960,31 +4240,74 @@ def main() -> None:
                             else fw_config.get("graphql_url", "")
                         )
                         m1_tmpl = fw_config.get("m1_template")
-                        if m1_tmpl is None:
-                            # standard GraphQL: inline literal
-                            mutation = _GQL_M1_TMPL.format(user_id=user_id)
-                            fw_config["queries"]["M1"] = (gql_url, mutation)
-                        elif m1_tmpl == "fraiseql":
-                            # FraiseQL: must use variables (executor ignores inline args).
-                            # Use all discovered UUIDs as a rotating list so 40 workers
-                            # don't all hammer the same row (row-lock contention).
-                            user_ids = _discover_user_uuids(fw_config)
-                            if not user_ids:
-                                user_ids = [user_id]
-                            variables_list = [{"id": uid, "bio": "bench"} for uid in user_ids]
+                        if m1_tmpl == "fraiseql":
+                            # FraiseQL: must use variables (executor ignores inline args)
+                            variables_list = [
+                                {"id": uid, "bio": bio} for uid, bio in pairs
+                            ]
                             fw_config["queries"]["M1"] = (
                                 gql_url,
                                 _FRAISEQL_M1_QUERY,
                                 variables_list,
                             )
+                            probe_requests = [
+                                {
+                                    "url": gql_url,
+                                    "body": json.dumps({
+                                        "query": _FRAISEQL_M1_QUERY,
+                                        "variables": {"id": probe_uid, "bio": bio},
+                                    }).encode(),
+                                }
+                                for bio in ("probe-a", "probe-b")
+                            ]
                         else:
-                            mutation = m1_tmpl.format(user_id=user_id)
-                            fw_config["queries"]["M1"] = (gql_url, mutation)
+                            tmpl = m1_tmpl if isinstance(m1_tmpl, str) else _GQL_M1_TMPL
+                            fw_config["queries"]["M1"] = {
+                                "mode": "graphql_rotating",
+                                "url": gql_url,
+                                "payloads": [
+                                    json.dumps(
+                                        {"query": tmpl.format(user_id=uid, bio=bio)}
+                                    ).encode()
+                                    for uid, bio in pairs
+                                ],
+                            }
+                            probe_requests = [
+                                {
+                                    "url": gql_url,
+                                    "body": json.dumps({
+                                        "query": tmpl.format(user_id=probe_uid, bio=bio)
+                                    }).encode(),
+                                }
+                                for bio in ("probe-a", "probe-b")
+                            ]
                     else:
                         q1_url = fw_config["queries"]["Q1"]
                         base = q1_url.rsplit("/users", 1)[0]
-                        fw_config["queries"]["M1"] = f"{base}/users/{user_id}"
-                    print(f"  M1: resolved user UUID {user_id[:8]}...", flush=True)
+                        fw_config["queries"]["M1"] = {
+                            "mode": "rest_rotating",
+                            "method": "PUT",
+                            "urls": [f"{base}/users/{uid}" for uid, _ in pairs],
+                            "bodies": [json.dumps({"bio": bio}) for _, bio in pairs],
+                        }
+                        probe_requests = [
+                            {
+                                "url": f"{base}/users/{probe_uid}",
+                                "body": json.dumps({"bio": bio}).encode(),
+                                "method": "PUT",
+                            }
+                            for bio in ("probe-a", "probe-b")
+                        ]
+                    fw_config["m1_probe"] = {
+                        "user_id": probe_uid,
+                        "expect_bio": "probe-b",
+                        "requests": probe_requests,
+                    }
+                    print(
+                        f"  M1: {len(user_ids)} user UUIDs × {len(_M1_BIOS)} bio values "
+                        f"(rotating writes)",
+                        flush=True,
+                    )
                 else:
                     fw_config["queries"]["M1"] = None
                     print("  M1: could not discover user UUID — skipping", flush=True)
@@ -4003,11 +4326,13 @@ def main() -> None:
                     user_ids = _discover_user_uuids(fw_config)
                     if not user_ids:
                         user_ids = [user_id]
-                    # Rotate bios so every call writes different data (no no-change skip)
-                    bios = [f"bio-{i}" for i in range(10)]
+                    # Cycle-based rotation so every call writes different data.
+                    # (The old bios[i % 10] pairing over user_ids * 10 gave each
+                    # user a CONSTANT bio with a 20-user pool — no-ops after the
+                    # first cycle.)
                     variables_list = [
-                        {"id": uid, "bio": bios[i % len(bios)]}
-                        for i, uid in enumerate(user_ids * len(bios))
+                        {"id": uid, "bio": bio}
+                        for uid, bio in _rotating_writes(user_ids, _M1_BIOS)
                     ]
                     fw_config["queries"]["M1d"] = (
                         gql_url,
@@ -4015,8 +4340,8 @@ def main() -> None:
                         variables_list,
                     )
                     print(
-                        f"  M1d: resolved {len(user_ids)} user UUIDs × {len(bios)} bio values "
-                        f"(rotating, jsonb_delta variant)",
+                        f"  M1d: resolved {len(user_ids)} user UUIDs × {len(_M1_BIOS)} bio "
+                        f"values (rotating, jsonb_delta variant)",
                         flush=True,
                     )
                 else:
@@ -4107,7 +4432,13 @@ def main() -> None:
                     if not user_ids_mc1 and user_id:
                         user_ids_mc1 = [user_id]
                     if user_ids_mc1:
-                        variables_list = [{"id": uid, "bio": "bench"} for uid in user_ids_mc1]
+                        # Rotating bios: a constant value would no-op after the
+                        # first cycle and return an EMPTY cascade — measuring
+                        # nothing (2026-07-04 finding).
+                        variables_list = [
+                            {"id": uid, "bio": bio}
+                            for uid, bio in _rotating_writes(user_ids_mc1, _M1_BIOS)
+                        ]
                         fw_config["queries"]["MC1"] = {
                             "mode": "mc1_cascade",
                             "url": gql_url,
@@ -4115,7 +4446,8 @@ def main() -> None:
                             "variables": variables_list,
                         }
                         print(
-                            f"  MC1: cascade (1 req/cycle), {len(user_ids_mc1)} user UUIDs",
+                            f"  MC1: cascade (1 req/cycle), {len(user_ids_mc1)} user UUIDs "
+                            f"× {len(_M1_BIOS)} bio values (rotating writes)",
                             flush=True,
                         )
                     else:
@@ -4124,21 +4456,22 @@ def main() -> None:
                 else:
                     # Classical: M1 mutation + Q1 re-fetch (2 serial requests per cycle).
                     if user_id and gql_url:
-                        mutation_query = (
-                            m1_tmpl.format(user_id=user_id)
-                            if isinstance(m1_tmpl, str)
-                            else _GQL_M1_TMPL.format(user_id=user_id)
-                        )
-                        m1_payload = json.dumps({"query": mutation_query}).encode()
+                        user_ids_mc1 = _discover_user_uuids(fw_config) or [user_id]
+                        tmpl = m1_tmpl if isinstance(m1_tmpl, str) else _GQL_M1_TMPL
+                        m1_payloads = [
+                            json.dumps({"query": tmpl.format(user_id=uid, bio=bio)}).encode()
+                            for uid, bio in _rotating_writes(user_ids_mc1, _M1_BIOS)
+                        ]
                         q1_payload = json.dumps({"query": q1_query}).encode()
                         fw_config["queries"]["MC1"] = {
                             "mode": "mc1_classical",
                             "url": gql_url,
-                            "m1_payload": m1_payload,
+                            "m1_payloads": m1_payloads,
                             "q1_payload": q1_payload,
                         }
                         print(
-                            f"  MC1: classical (2 req/cycle), user {user_id[:8]}...",
+                            f"  MC1: classical (2 req/cycle), {len(user_ids_mc1)} user UUIDs "
+                            f"× {len(_M1_BIOS)} bio values (rotating writes)",
                             flush=True,
                         )
                     else:
@@ -4308,7 +4641,11 @@ def main() -> None:
                         # Fall back to the single UUID discovered for M1
                         single = fw_config["queries"].get("M1")
                         if isinstance(single, tuple) and len(single) == 3:
-                            user_ids_apq = [v["id"] for v in single[2]] if single[2] else []
+                            # Rotation duplicates uids across bio cycles — dedupe.
+                            user_ids_apq = (
+                                list(dict.fromkeys(v["id"] for v in single[2]))
+                                if single[2] else []
+                            )
                     if user_ids_apq:
                         sha256 = _apq_hash(_FRAISEQL_M1_QUERY)
                         # Register with a sample variable set — mutations require variables
@@ -4316,9 +4653,10 @@ def main() -> None:
                         reg_vars = {"id": user_ids_apq[0], "bio": "bench"}
                         ok = _apq_register_with_vars(apq_url, _FRAISEQL_M1_QUERY, sha256, reg_vars)
                         if ok:
+                            # Rotating bios: same real-write requirement as M1.
                             apq_payloads = [
-                                _apq_payload_with_vars(sha256, {"id": uid, "bio": "bench"})
-                                for uid in user_ids_apq
+                                _apq_payload_with_vars(sha256, {"id": uid, "bio": bio})
+                                for uid, bio in _rotating_writes(user_ids_apq, _M1_BIOS)
                             ]
                             fw_config["queries"]["M1_APQ"] = {
                                 "mode": "apq_vars",
@@ -4327,7 +4665,7 @@ def main() -> None:
                             }
                             print(
                                 f"  M1_APQ: registered hash {sha256[:12]}... "
-                                f"({len(user_ids_apq)} UUID payloads)",
+                                f"({len(user_ids_apq)} UUIDs × {len(_M1_BIOS)} bios)",
                                 flush=True,
                             )
                         else:
@@ -4337,19 +4675,38 @@ def main() -> None:
                         fw_config["queries"]["M1_APQ"] = None
                         print("  M1_APQ: could not discover user UUIDs — skipping", flush=True)
                 else:
-                    # Classical inline mutation: bake UUID into query string, register once
+                    # Classical inline mutations: one hash per rendered rotating
+                    # query. Every variant is registered up front; measurement
+                    # sends hash-only payloads (rotated like M1).
                     m1_entry = fw_config["queries"].get("M1")
-                    inline_query = m1_entry[1] if isinstance(m1_entry, tuple) else None
-                    if inline_query:
-                        sha256 = _apq_hash(inline_query)
-                        ok = _apq_register(apq_url, inline_query, sha256)
-                        if ok:
-                            fw_config["queries"]["M1_APQ"] = {
-                                "mode": "apq",
-                                "url": apq_url,
-                                "payload": _apq_payload_static(sha256),
-                            }
-                            print(f"  M1_APQ: registered hash {sha256[:12]}...", flush=True)
+                    inline_queries: list[str] = []
+                    if isinstance(m1_entry, dict) and m1_entry.get("mode") == "graphql_rotating":
+                        inline_queries = [
+                            json.loads(p.decode())["query"] for p in m1_entry["payloads"]
+                        ]
+                    elif isinstance(m1_entry, tuple):
+                        inline_queries = [m1_entry[1]]
+                    if inline_queries:
+                        hashes = [_apq_hash(q) for q in inline_queries]
+                        if _apq_register(apq_url, inline_queries[0], hashes[0]):
+                            registered_all = all(
+                                _apq_register(apq_url, q, h)
+                                for q, h in zip(inline_queries[1:], hashes[1:])
+                            )
+                            if registered_all:
+                                fw_config["queries"]["M1_APQ"] = {
+                                    "mode": "apq_vars",
+                                    "url": apq_url,
+                                    "payloads": [_apq_payload_static(h) for h in hashes],
+                                }
+                                print(
+                                    f"  M1_APQ: registered {len(hashes)} rotating hashes "
+                                    f"({hashes[0][:12]}...)",
+                                    flush=True,
+                                )
+                            else:
+                                fw_config["queries"]["M1_APQ"] = None
+                                print("  M1_APQ: bulk hash registration failed — skipping", flush=True)
                         else:
                             fw_config["queries"]["M1_APQ"] = None
                             print("  M1_APQ: server does not support APQ — skipping", flush=True)
@@ -4359,6 +4716,22 @@ def main() -> None:
             else:
                 fw_config["queries"]["M1_APQ"] = None
                 print("  M1_APQ: no GraphQL URL — skipping", flush=True)
+
+        # Write-effect probe: a framework whose M1 doesn't actually write would
+        # produce meaningless mutation numbers — abort rather than measure.
+        if fw_config.get("m1_probe") and not args.skip_write_check:
+            print("  write-effect probe:", end=" ", flush=True)
+            if verify_m1_write_effect(fw_name, fw_config):
+                print("real write confirmed ✓", flush=True)
+            else:
+                print("FAILED ✗", flush=True)
+                print(
+                    f"{fw_name} M1 does not actually write (no-op path or broken "
+                    "mutation) — mutation numbers would be meaningless. "
+                    "Aborting sweep (--skip-write-check to bypass while debugging).",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
 
         for query_name in query_names:
             print(f"  {query_name}:")
@@ -4377,6 +4750,18 @@ def main() -> None:
                 print("    error samples:", file=sys.stderr, flush=True)
                 for cat, detail in r.error_samples:
                     print(f"      [{cat}] {detail}", file=sys.stderr, flush=True)
+
+        # Leave the canonical dataset for the next framework: restore rotated
+        # bios (fires the cascade when triggers are on), then re-enable scoped
+        # triggers and resync any tv rows that drifted while they were off.
+        try:
+            restore_user_bios()
+        except subprocess.CalledProcessError:
+            pass
+        if _tview_scoped:
+            set_tview_triggers(True)
+            _resynced = resync_tview_user()
+            print(f"  tview triggers: re-enabled ({_resynced} rows resynced)", flush=True)
 
         if _monitor is not None and fw_name in all_resource_metrics:
             peak_ram, avg_cpu = _monitor.stop()

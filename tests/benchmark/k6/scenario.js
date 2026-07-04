@@ -40,6 +40,15 @@ function stepBody(step) {
   return step.body || null;
 }
 
+function stepUrl(step) {
+  // urls rotate on the same iteration index as bodies, so paired lists
+  // (REST mutation: url picks the row, body picks the new value) stay in sync.
+  if (step.urls) {
+    return step.urls[exec.scenario.iterationInTest % step.urls.length];
+  }
+  return step.url;
+}
+
 const validators = {
   graphql: (r) =>
     r.status === 200 &&
@@ -51,10 +60,11 @@ const validators = {
 
 export default function () {
   for (const step of cfg.steps) {
+    const url = stepUrl(step);
     const res =
       step.method === 'GET'
-        ? http.get(step.url)
-        : http.request(step.method, step.url, stepBody(step), { headers: JSON_HEADERS });
+        ? http.get(url)
+        : http.request(step.method, url, stepBody(step), { headers: JSON_HEADERS });
     check(res, { ok: validators[step.validate || 'rest'] });
   }
 }

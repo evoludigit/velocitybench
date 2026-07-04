@@ -101,20 +101,41 @@ that post.
 
 ## Mutation scenarios (excluded from the shape audit — workflow-defined)
 
-### M1 — single-field update
+### M1 — single-field update (rotating real writes)
+
+Every M1 request is a **real write**: the load rotates 20 user UUIDs × 10 bio
+values, cycle-paired so consecutive visits to the same user always send a
+different value. Two failure modes this design prevents (both found live on
+2026-07-04):
+
+- a **constant value** hits no-op short circuits (e.g. FraiseQL's
+  `fn_update_user` skips unchanged bios) and silently measures reads;
+- a **single UUID** serializes all workers on one row's lock and measures the
+  database, not the framework.
+
+A per-framework **write-effect probe** runs before measurement (two writes,
+then a direct DB check); a framework whose mutation doesn't actually write
+aborts the sweep.
 
 ```graphql
 # FraiseQL — variables-driven (executor reads args from the variables map)
 mutation UpdateUser($id: ID!, $bio: String) { updateUser(id: $id, bio: $bio) { … } }
 
-# Hasura
-mutation { updateUser(where: {id: {_eq: "<uuid>"}}, _set: {bio: "bench"})
+# Hasura (one of 200 rotating rendered documents)
+mutation { updateUser(where: {id: {_eq: "<uuid>"}}, _set: {bio: "bio-3"})
   { returning { id bio } } }
 
-# PostGraphile v5
-mutation { updateTbUserByRowId(input: {rowId: "<uuid>", tbUserPatch: {bio: "bench"}})
+# PostGraphile v5 (rotating likewise)
+mutation { updateTbUserByRowId(input: {rowId: "<uuid>", tbUserPatch: {bio: "bio-3"}})
   { tbUser { id: rowId bio } } }
 ```
+
+**pg_tviews trigger scoping.** The `tb_user` tview triggers fire only while a
+FraiseQL framework is under test: FraiseQL deploys pg_tviews, so its mutation
+numbers include that maintenance cost. Classical stacks never deploy pg_tviews
+— during their runs the triggers are disabled (their M1 hits a vanilla table),
+then re-enabled with drifted `tv_user` rows resynced before the next FraiseQL
+framework. The run JSON records `tview_trigger_scope: fraiseql-only`.
 
 ### MC1 — mutation-to-consistent-state cycle (deliberately asymmetric)
 
