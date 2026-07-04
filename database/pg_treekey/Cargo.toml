@@ -1,0 +1,53 @@
+[package]
+name = "pg_treekey"
+version = "0.1.0"
+edition = "2021"
+description = "PostgreSQL extension for hierarchical tree key management"
+license = "MIT"
+repository = "https://github.com/users/lionel/repos"
+readme = "README.md"
+keywords = ["postgresql", "extension", "tree", "hierarchy"]
+categories = ["database"]
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+[[bin]]
+name = "pgrx_embed_pg_treekey"
+path = "src/bin/pgrx_embed.rs"
+
+[dependencies]
+pgrx = "0.17.0"
+unicode-normalization = "0.1"
+
+[features]
+default = ["pg18"]
+pg14 = ["pgrx/pg14"]
+pg15 = ["pgrx/pg15"]
+pg16 = ["pgrx/pg16"]
+pg17 = ["pgrx/pg17"]
+pg18 = ["pgrx/pg18"]
+pg_test = []
+
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+opt-level = 3
+lto = true
+
+[lints.rust]
+# Relaxed from "forbid" to "warn": pgrx trigger functions (Phase 10) require unsafe
+# blocks for raw heap tuple manipulation. Unsafe is suppressed per-module with
+# explicit justification comments; the overall crate remains unsafe-minimal.
+unsafe_code = "warn"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+multiple_crate_versions = "allow"
+
+[package.metadata.pgrx]
+extension_name = "pg_treekey"

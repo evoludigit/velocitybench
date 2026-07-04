@@ -1,0 +1,129 @@
+name: Filesystem Security Scan
+
+# Dedicated workflow for filesystem security scanning
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run weekly security scans (every Monday at 3 AM UTC)
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: container-security-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  security-events: write  # Required for uploading SARIF to Code Scanning
+  actions: read
+
+jobs:
+  filesystem-security-scan:
+    name: Filesystem Security Scan
+    runs-on: ubuntu-latest
+    # Fast timeout for filesystem scanning
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-security-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install cargo-audit for Rust dependency scanning
+        run: cargo install cargo-audit
+
+      - name: Scan Rust dependencies for vulnerabilities
+        run: |
+          echo "🔍 Scanning Rust dependencies for security vulnerabilities..."
+          cargo audit --json > rust-security-audit.json || true
+
+          # Check for critical vulnerabilities
+          CRITICAL=$(jq '.vulnerabilities.list | map(select(.advisory.severity == "critical")) | length' rust-security-audit.json 2>/dev/null || echo "0")
+          HIGH=$(jq '.vulnerabilities.list | map(select(.advisory.severity == "high")) | length' rust-security-audit.json 2>/dev/null || echo "0")
+
+          echo "🔍 Rust Dependency Security Summary:"
+          echo "   CRITICAL: $CRITICAL"
+          echo "   HIGH: $HIGH"
+
+          if [ "$CRITICAL" -gt 0 ]; then
+            echo "❌ CRITICAL Rust dependency vulnerabilities found!"
+            jq '.vulnerabilities.list[] | select(.advisory.severity == "critical") | {package: .package.name, vulnerability: .advisory.id, severity: .advisory.severity, title: .advisory.title}' rust-security-audit.json
+            exit 1
+          elif [ "$HIGH" -gt 0 ]; then
+            echo "⚠️  HIGH Rust dependency vulnerabilities found"
+            jq '.vulnerabilities.list[] | select(.advisory.severity == "high") | {package: .package.name, vulnerability: .advisory.id, severity: .advisory.severity, title: .advisory.title}' rust-security-audit.json
+          else
+            echo "✅ No CRITICAL or HIGH Rust dependency vulnerabilities"
+          fi
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'filesystem-scan.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: 0
+
+      - name: Upload Trivy SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: 'filesystem-scan.sarif'
+
+      - name: Run detailed Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'json'
+          output: 'filesystem-scan.json'
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW'
+
+      - name: Analyze filesystem vulnerabilities
+        run: |
+          CRITICAL=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' filesystem-scan.json 2>/dev/null || echo "0")
+          HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' filesystem-scan.json 2>/dev/null || echo "0")
+          MEDIUM=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' filesystem-scan.json 2>/dev/null || echo "0")
+          LOW=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="LOW")] | length' filesystem-scan.json 2>/dev/null || echo "0")
+
+          echo "🔍 Filesystem Vulnerability Summary:"
+          echo "   CRITICAL: $CRITICAL"
+          echo "   HIGH: $HIGH"
+          echo "   MEDIUM: $MEDIUM"
+          echo "   LOW: $LOW"
+
+          if [ "$CRITICAL" -gt 0 ]; then
+            echo "❌ CRITICAL filesystem vulnerabilities found!"
+            jq '.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL") | {FilePath, PackageName, VulnerabilityID, Severity, Title}' filesystem-scan.json
+            exit 1
+          elif [ "$HIGH" -gt 0 ]; then
+            echo "⚠️  HIGH filesystem vulnerabilities found"
+            jq '.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH") | {FilePath, PackageName, VulnerabilityID, Severity, Title}' filesystem-scan.json
+            # Allow HIGH vulnerabilities to pass (review .trivyignore)
+          else
+            echo "✅ No CRITICAL filesystem vulnerabilities"
+          fi
+
+      - name: Upload security scan results
+        uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: filesystem-security-scan-results
+          path: |
+            rust-security-audit.json
+            filesystem-scan.json
+            filesystem-scan.sarif

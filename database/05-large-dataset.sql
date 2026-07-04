@@ -4,6 +4,13 @@
 
 SET search_path TO benchmark, public;
 
+-- Disable pg_tviews triggers for bulk loading.
+-- pg_tviews beta.10 fires triggers eagerly per row; accumulating 10K users +
+-- 100K posts + 500K comments in single transactions overflows the internal
+-- PK-tracking array. fraiseql_tv_bulk_sync.sql (runs next) will reconcile
+-- tv_user / tv_post / tv_comment with a single bulk INSERT ... ON CONFLICT.
+SET session_replication_role = replica;
+
 -- ============================================================================
 -- HELPER FUNCTIONS FOR DATA GENERATION
 -- ============================================================================

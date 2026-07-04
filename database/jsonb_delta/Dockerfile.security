@@ -1,0 +1,31 @@
+# Dockerfile.security - Minimal container for security scanning
+# Uses pre-built Rust base image for fast scanning
+
+FROM rust:1.85-slim-bookworm
+
+# Minimal metadata for scanning
+LABEL org.opencontainers.image.title="jsonb_delta"
+LABEL org.opencontainers.image.description="Efficient JSONB delta and patch operations for PostgreSQL"
+LABEL org.opencontainers.image.version="0.1.0"
+LABEL org.opencontainers.image.vendor="Evolution Digitale"
+LABEL org.opencontainers.image.licenses="PostgreSQL"
+LABEL org.opencontainers.image.source="https://github.com/evoludigit/jsonb_delta"
+
+# Copy source files for dependency analysis
+WORKDIR /scan
+COPY Cargo.toml Cargo.lock ./
+COPY src/ ./src/
+
+# Ready for security scanning (no build needed)
+CMD ["echo", "Container ready for Trivy security scanning"]
+
+# Labels for security scanning
+LABEL org.opencontainers.image.title="jsonb_delta"
+LABEL org.opencontainers.image.description="Efficient JSONB delta and patch operations for PostgreSQL"
+LABEL org.opencontainers.image.version="0.1.0"
+LABEL org.opencontainers.image.vendor="Evolution Digitale"
+LABEL org.opencontainers.image.licenses="PostgreSQL"
+LABEL org.opencontainers.image.source="https://github.com/evoludigit/jsonb_delta"
+
+# Ready for security scanning
+CMD ["echo", "Container built for security vulnerability analysis"]

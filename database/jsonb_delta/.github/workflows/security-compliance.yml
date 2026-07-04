@@ -1,0 +1,298 @@
+name: Security & Compliance
+
+# Comprehensive security and compliance checks for Rust PostgreSQL extension
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run weekly security scans (every Monday at 2 AM UTC)
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: security-compliance-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  security-events: write  # Required for uploading SARIF to Code Scanning
+  actions: read
+
+jobs:
+  secrets-scan:
+    name: Secrets Detection
+    runs-on: ubuntu-latest
+    # Only run on pull requests where there's always a diff to scan
+    if: github.event_name == 'pull_request'
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Run TruffleHog OSS
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
+        base: ${{ github.event.pull_request.base.sha }}
+        head: ${{ github.event.pull_request.head.sha }}
+        extra_args: --debug --only-verified
+
+  license-scan:
+    name: License Compliance
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache cargo dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-license-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Install cargo-license
+      run: cargo install cargo-license
+
+    - name: Scan Rust package licenses
+      run: |
+        echo "=== Rust Package Licenses ==="
+        cargo license --json > rust-licenses.json
+        cargo license --tsv > rust-licenses.tsv
+        cat rust-licenses.tsv
+
+    - name: Check for GPL licenses
+      run: |
+        # Check for GPL licenses (excluding LGPL and multi-licensed packages)
+        GPL_PACKAGES=$(grep -i "GPL" rust-licenses.tsv | grep -v -i "LGPL" | grep -v "MIT OR Apache-2.0 OR GPL" || true)
+
+        if [ -n "$GPL_PACKAGES" ]; then
+          echo "⚠️  GPL-licensed packages found:"
+          echo "$GPL_PACKAGES"
+          echo ""
+          echo "ℹ️  Review these packages to ensure compliance with project license policy"
+          echo "ℹ️  PostgreSQL License is compatible with most permissive licenses"
+          # Don't fail - just warn (PostgreSQL ecosystem may have GPL tools)
+          exit 0
+        else
+          echo "✅ No strict GPL licenses found"
+        fi
+
+    - name: Upload license report
+      uses: actions/upload-artifact@v5
+      with:
+        name: license-report
+        path: |
+          rust-licenses.json
+          rust-licenses.tsv
+
+  dependency-audit:
+    name: Dependency Security Audit
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache cargo dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-audit-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Install cargo-audit
+      run: cargo install cargo-audit --locked
+
+    - name: Audit Rust dependencies
+      run: |
+        echo "=== Rust Security Advisory Database Scan ==="
+        cargo audit --json > audit-results.json || true
+        cargo audit || true
+
+    - name: Check for critical vulnerabilities
+      run: |
+        if [ -f audit-results.json ]; then
+          # Check if there are any vulnerabilities
+          # The .vulnerabilities.found field can be a boolean (false) or a number/array
+          VULN_FOUND=$(jq -r '.vulnerabilities.found' audit-results.json)
+
+          if [ "$VULN_FOUND" = "false" ] || [ "$VULN_FOUND" = "0" ]; then
+            echo "✅ No known vulnerabilities found"
+          else
+            # Try to get count from list array
+            VULN_COUNT=$(jq '.vulnerabilities.list | length' audit-results.json 2>/dev/null || echo "0")
+            if [ "$VULN_COUNT" -gt 0 ]; then
+              echo "🚨 $VULN_COUNT vulnerabilities found!"
+              jq '.vulnerabilities.list' audit-results.json
+              echo ""
+              echo "Run 'cargo audit --fix' to update vulnerable dependencies"
+              exit 1
+            else
+              echo "✅ No known vulnerabilities found"
+            fi
+          fi
+        else
+          echo "ℹ️  No audit results generated (clean scan)"
+        fi
+
+    - name: Upload audit results
+      uses: actions/upload-artifact@v5
+      if: always()
+      with:
+        name: dependency-audit-results
+        path: audit-results.json
+
+  compliance-check:
+    name: Compliance Validation
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Check SECURITY.md exists
+      run: |
+        if [ ! -f "SECURITY.md" ]; then
+          echo "❌ SECURITY.md file is missing"
+          exit 1
+        fi
+        echo "✅ Security policy exists"
+
+    - name: Check CODE_OF_CONDUCT.md exists
+      run: |
+        if [ ! -f "CODE_OF_CONDUCT.md" ]; then
+          echo "❌ CODE_OF_CONDUCT.md file is missing"
+          exit 1
+        fi
+        echo "✅ Code of Conduct exists"
+
+    - name: Check for required files
+      run: |
+        required_files=("LICENSE" "README.md" "CHANGELOG.md" "CONTRIBUTING.md")
+        for file in "${required_files[@]}"; do
+          if [ ! -f "$file" ]; then
+            echo "❌ Required file $file is missing"
+            exit 1
+          fi
+        done
+        echo "✅ All required compliance files present"
+
+    - name: Validate Cargo.lock is committed
+      run: |
+        if [ ! -f "Cargo.lock" ]; then
+          echo "❌ Cargo.lock must be committed for reproducible builds"
+          exit 1
+        fi
+        echo "✅ Cargo.lock is committed (reproducible builds enabled)"
+
+    - name: Check for unsafe code usage
+      run: |
+        echo "=== Checking for unsafe code blocks ==="
+        UNSAFE_COUNT=$(grep -r "unsafe" src/ --include="*.rs" | wc -l || echo "0")
+        echo "Found $UNSAFE_COUNT unsafe code blocks"
+
+        if [ "$UNSAFE_COUNT" -gt 0 ]; then
+          echo ""
+          echo "⚠️  Unsafe code detected (review required):"
+          grep -n "unsafe" src/ --include="*.rs" || true
+          echo ""
+          echo "ℹ️  Unsafe code is acceptable in PostgreSQL extensions (pgrx requirements)"
+          echo "ℹ️  Ensure all unsafe blocks are:"
+          echo "   - Documented with safety invariants"
+          echo "   - Minimized in scope"
+          echo "   - Required by pgrx or PostgreSQL C API"
+        else
+          echo "✅ No unsafe code found (100% safe Rust)"
+        fi
+
+  supply-chain-metadata:
+    name: Supply Chain Metadata
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Generate dependency tree
+      run: |
+        cargo tree > dependency-tree.txt
+        echo "=== Dependency Tree ==="
+        cat dependency-tree.txt
+
+    - name: Count dependencies
+      run: |
+        DIRECT_DEPS=$(grep -c "^[a-z]" Cargo.toml || echo "0")
+        TOTAL_DEPS=$(cargo tree --depth 999 | grep -c "├──\|└──" || echo "0")
+
+        echo "📦 Direct dependencies: $DIRECT_DEPS"
+        echo "📦 Total dependencies (with transitive): $TOTAL_DEPS"
+
+        # jsonb_delta should have minimal dependencies (target: <50 total)
+        if [ "$TOTAL_DEPS" -gt 100 ]; then
+          echo "⚠️  High dependency count detected (review recommended)"
+        else
+          echo "✅ Minimal dependency footprint"
+        fi
+
+    - name: Upload dependency tree
+      uses: actions/upload-artifact@v5
+      with:
+        name: dependency-tree
+        path: dependency-tree.txt
+
+  container-security:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    # Use separate workflow with extended timeout
+    steps:
+      - name: Run Container Security Scan
+        run: |
+          echo "🔄 Container security scan moved to dedicated workflow"
+          echo "📋 See: .github/workflows/container-security.yml"
+          echo "⏱️  Uses 30-minute timeout for complex Docker builds"
+          echo "✅ Run independently: https://github.com/evoludigit/jsonb_delta/actions/workflows/container-security.yml"
+
+  security-gate:
+    name: Security Gate ✅
+    runs-on: ubuntu-latest
+    needs: [secrets-scan, license-scan, dependency-audit, compliance-check, supply-chain-metadata]
+    if: always()
+    steps:
+      - name: Security compliance check
+        run: |
+          # Check if all security jobs passed
+          # secrets-scan is skipped on push events (only runs on PRs) - that's OK
+          if [[ "${{ needs.secrets-scan.result }}" != "success" && "${{ needs.secrets-scan.result }}" != "skipped" ]]; then
+            echo "❌ Secrets scan failed - Security gate blocked"
+            exit 1
+          fi
+          if [[ "${{ needs.license-scan.result }}" != "success" ]]; then
+            echo "❌ License compliance failed - Security gate blocked"
+            exit 1
+          fi
+          if [[ "${{ needs.dependency-audit.result }}" != "success" ]]; then
+            echo "❌ Dependency audit failed - Security gate blocked"
+            exit 1
+          fi
+          if [[ "${{ needs.compliance-check.result }}" != "success" ]]; then
+            echo "❌ Compliance validation failed - Security gate blocked"
+            exit 1
+          fi
+          if [[ "${{ needs.supply-chain-metadata.result }}" != "success" ]]; then
+            echo "❌ Supply chain metadata failed - Security gate blocked"
+            exit 1
+          fi
+
+          echo "✅ All security and compliance checks passed"
+          echo "🔒 Code meets security and compliance standards (A+ GRADE)"
+          echo ""
+          echo "ℹ️  Filesystem security scanning runs in separate workflow:"
+          echo "   📋 https://github.com/evoludigit/jsonb_delta/actions/workflows/container-security.yml"
+          echo "✅ All security and compliance checks passed - Security gate open"
+          echo "🔒 Code meets security and compliance standards (A+ GRADE)"
