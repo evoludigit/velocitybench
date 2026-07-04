@@ -40,6 +40,8 @@ static mut HOOK_IN_PROGRESS: bool = false;
 /// Install the `ProcessUtility` hook to intercept CREATE/DROP TABLE `tv_*`
 /// Install the `ProcessUtility` hook to intercept CREATE TABLE `tv_*` commands
 pub unsafe fn install_hook() {
+    // SAFETY: install_hook is called during extension load, modifying global PostgreSQL
+    // hook pointers. The hook is a valid function pointer matching the C signature.
     unsafe {
         PREV_PROCESS_UTILITY_HOOK = pg_sys::ProcessUtility_hook;
         pg_sys::ProcessUtility_hook = Some(tview_process_utility_hook);
@@ -49,6 +51,8 @@ pub unsafe fn install_hook() {
 /// Check if hook is installed, install it if not
 /// This is called lazily to avoid issues during postmaster startup
 pub unsafe fn ensure_hook_installed() {
+    // SAFETY: Called lazily from PostgreSQL backend context. Modifies static to track
+    // initialization state.
     unsafe {
         static mut HOOK_INSTALLED: bool = false;
 
@@ -191,6 +195,17 @@ unsafe extern "C-unwind" fn tview_process_utility_hook(
             }
         }
 
+        // Check for ALTER TABLE
+        if node_tag == pg_sys::NodeTag::T_AlterTableStmt {
+            #[allow(clippy::cast_ptr_alignment)] // Reason: PostgreSQL Node* → AlterTableStmt* cast
+            let alter_stmt = utility_stmt.cast::<pg_sys::AlterTableStmt>();
+            match unsafe { handle_alter_table(alter_stmt, query_string) } {
+                Ok(true) => return Ok(true),
+                Ok(false) => {}
+                Err(e) => return Err(e),
+            }
+        }
+
         // Not a tv_* statement - pass through
         Ok(false)
     });
@@ -241,6 +256,11 @@ unsafe extern "C-unwind" fn tview_process_utility_hook(
                 qc,
             );
         }
+
+        // After the event trigger returns, populate any TVIEWs created via CTAS.
+        // The INSERT runs via SPI (DML, not utility), so it does not re-enter
+        // ProcessUtility and there is no reentrancy issue with HOOK_IN_PROGRESS.
+        drain_pending_populates();
     }
 
     // Release the reentrancy guard
@@ -252,11 +272,14 @@ unsafe extern "C-unwind" fn tview_process_utility_hook(
 /// Returns `Ok(true)` if the hook handled the statement, `Ok(false)` if it should
 /// pass through. Returns `Err` on failures that should abort with `error!()` —
 /// the caller is responsible for resetting `HOOK_IN_PROGRESS` before raising.
+///
+/// SAFETY: This function operates on raw PostgreSQL C pointers from the ProcessUtility hook.
+/// All pointers are validated with null checks before dereferencing.
 unsafe fn handle_create_table_as(
     ctas: *mut pg_sys::CreateTableAsStmt,
     query_string: *const ::std::os::raw::c_char,
 ) -> Result<bool, TViewError> {
-    // Safety: all pointer dereferences are guarded by null checks above each use.
+    // SAFETY: All pointer dereferences are guarded by null checks above each use.
     unsafe {
         if ctas.is_null() {
             return Ok(false);
@@ -383,6 +406,14 @@ fn validate_tview_select(select_sql: &str) -> Result<(), String> {
 
     let sql_lower = select_sql.to_lowercase();
 
+    // Early return for SELECT * - defer validation to event trigger
+    if let Some(pos) = sql_lower.find("select") {
+        let after = &sql_lower[pos + 6..].trim_start();
+        if after.starts_with('*') {
+            return Ok(());
+        }
+    }
+
     // Check for id column (required) — handle both bare `id,` and qualified `alias.id,`
     let has_id = sql_lower.contains(" as id")
         || sql_lower.contains(" id,")
@@ -450,6 +481,106 @@ pub fn take_pending_tview_select(table_name: &str) -> Option<(String, String)> {
     PENDING_TVIEW_SELECTS.lock().ok()?.remove(table_name)
 }
 
+/// Pending initial-data population requests deferred from the event trigger.
+///
+/// When `create_tview` is called from the `ddl_command_end` event trigger (CTAS path),
+/// the INSERT that populates the materialized table silently loses its effects due to
+/// sub-transaction depth corruption.  Instead, `create_tview` enqueues the populate
+/// request here and the `ProcessUtility` hook drains the queue **after** the event
+/// trigger returns, in a clean SPI context.
+static PENDING_POPULATES: LazyLock<Mutex<Vec<PendingPopulate>>> =
+    LazyLock::new(|| Mutex::new(Vec::new()));
+
+struct PendingPopulate {
+    tv_table_name: String,
+    view_name: String,
+    schema_name: String,
+}
+
+/// Enqueue a deferred initial-data population for a TVIEW created via CTAS.
+///
+/// Called by `create_tview` when `defer_populate` is `true`.
+pub fn enqueue_pending_populate(tv_table_name: &str, view_name: &str, schema_name: &str) {
+    if let Ok(mut queue) = PENDING_POPULATES.lock() {
+        queue.push(PendingPopulate {
+            tv_table_name: tv_table_name.to_string(),
+            view_name: view_name.to_string(),
+            schema_name: schema_name.to_string(),
+        });
+    }
+}
+
+/// Drain and execute all pending TVIEW population requests.
+///
+/// Called by the `ProcessUtility` hook after `call_prev_hook_or_standard` returns
+/// (the event trigger has completed).  Runs the INSERT via SPI in a clean context
+/// outside the event trigger's sub-transaction scope.
+fn drain_pending_populates() {
+    let entries: Vec<PendingPopulate> = PENDING_POPULATES
+        .lock()
+        .map(|mut q| q.drain(..).collect())
+        .unwrap_or_default();
+
+    for entry in entries {
+        let view_oid = match Spi::get_one::<pg_sys::Oid>(&format!(
+            "SELECT c.oid FROM pg_class c JOIN pg_namespace n ON c.relnamespace = n.oid \
+             WHERE c.relname::text = '{}' AND n.nspname::text = '{}'  AND c.relkind = 'v'",
+            entry.view_name, entry.schema_name
+        )) {
+            Ok(Some(oid)) => oid,
+            Ok(None) => {
+                error!(
+                    "pg_tviews: deferred populate failed — view {}.{} not found",
+                    entry.schema_name, entry.view_name
+                );
+            }
+            Err(e) => {
+                error!(
+                    "pg_tviews: deferred populate failed — cannot resolve view {}.{}: {e}",
+                    entry.schema_name, entry.view_name
+                );
+            }
+        };
+
+        let view_columns = match crate::utils::get_view_columns_by_oid(view_oid) {
+            Ok(cols) if !cols.is_empty() => cols,
+            Ok(_) => {
+                error!(
+                    "pg_tviews: deferred populate failed — view {}.{} has no columns",
+                    entry.schema_name, entry.view_name
+                );
+            }
+            Err(e) => {
+                error!(
+                    "pg_tviews: deferred populate failed — cannot get columns for {}.{}: {e}",
+                    entry.schema_name, entry.view_name
+                );
+            }
+        };
+
+        let qi_schema = crate::utils::quote_identifier(&entry.schema_name);
+        let qi_tview = crate::utils::quote_identifier(&entry.tv_table_name);
+        let qi_view = crate::utils::quote_identifier(&entry.view_name);
+        let col_list = view_columns
+            .iter()
+            .map(|c| crate::utils::quote_identifier(c))
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let insert_sql = format!(
+            "INSERT INTO {qi_schema}.{qi_tview} ({col_list}) \
+             SELECT {col_list} FROM {qi_schema}.{qi_view}"
+        );
+
+        if let Err(e) = Spi::run(&insert_sql) {
+            error!(
+                "pg_tviews: deferred populate failed for {}: {e}",
+                entry.tv_table_name
+            );
+        }
+    }
+}
+
 /// Handle DROP TABLE tv_*
 ///
 /// Iterates over the parsed `DropStmt.objects` list to correctly handle
@@ -462,11 +593,14 @@ pub fn take_pending_tview_select(table_name: &str) -> Option<(String, String)> {
 /// `Ok(false)` to let the standard handler process the remaining tables.
 ///
 /// Returns `Err` on failures — caller resets `HOOK_IN_PROGRESS` before raising.
+///
+/// SAFETY: This function operates on raw PostgreSQL C pointers from the ProcessUtility hook.
+/// All pointers are validated with null checks before dereferencing.
 unsafe fn handle_drop_table(
     drop_stmt: *mut pg_sys::DropStmt,
     _query_string: *const ::std::os::raw::c_char,
 ) -> Result<bool, TViewError> {
-    // Safety: all pointer dereferences are guarded by null checks.
+    // SAFETY: All pointer dereferences are guarded by null checks.
     unsafe {
         if drop_stmt.is_null() {
             return Ok(false);
@@ -564,7 +698,80 @@ unsafe fn handle_drop_table(
     } // unsafe
 }
 
+/// Handle ALTER TABLE statements on TVIEW tables
+///
+/// SAFETY: This function operates on raw PostgreSQL C pointers from the ProcessUtility hook.
+/// All pointers are validated with null checks before dereferencing.
+unsafe fn handle_alter_table(
+    alter_stmt: *mut pg_sys::AlterTableStmt,
+    _query_string: *const ::std::os::raw::c_char,
+) -> Result<bool, TViewError> {
+    // SAFETY: All pointer dereferences are guarded by null checks.
+    unsafe {
+        if alter_stmt.is_null() {
+            return Ok(false);
+        }
+
+        let alter_ref = &*alter_stmt;
+
+        // Get the table name
+        let relation = alter_ref.relation;
+        if relation.is_null() {
+            return Ok(false);
+        }
+
+        let rel_ref = &*relation;
+        let table_name_cstr = rel_ref.relname;
+        if table_name_cstr.is_null() {
+            return Ok(false);
+        }
+
+        let table_name = CStr::from_ptr(table_name_cstr).to_str().unwrap_or("");
+
+        // Check if it's a TVIEW table (starts with tv_)
+        if !table_name.starts_with("tv_") {
+            return Ok(false);
+        }
+
+        // Check the ALTER TABLE commands for SET UNLOGGED/LOGGED
+        let cmds = alter_ref.cmds;
+        if cmds.is_null() {
+            return Ok(false);
+        }
+
+        let num_cmds = pg_sys::list_length(cmds);
+        for i in 0..num_cmds {
+            let cmd_node = pg_sys::list_nth(cmds, i);
+            if cmd_node.is_null() {
+                continue;
+            }
+
+            let cmd = cmd_node as *mut pg_sys::AlterTableCmd;
+            if cmd.is_null() {
+                continue;
+            }
+
+            let cmd_ref = &*cmd;
+
+            // Check for SET UNLOGGED or SET LOGGED
+            if cmd_ref.subtype == pg_sys::AlterTableType::AT_SetUnLogged {
+                // SET UNLOGGED - data is preserved, no special handling needed
+                return Ok(false); // Let PostgreSQL handle it normally
+            } else if cmd_ref.subtype == pg_sys::AlterTableType::AT_SetLogged {
+                // SET LOGGED preserves data — no special handling needed
+                return Ok(false); // Let PostgreSQL handle it normally
+            }
+        }
+
+        // Not a SET UNLOGGED/LOGGED command we care about
+        Ok(false)
+    }
+}
+
 /// Call the previous hook if it exists, otherwise call `standard_ProcessUtility`
+///
+/// SAFETY: This calls into either a previous PostgreSQL hook or standard_ProcessUtility.
+/// The parameters are raw C pointers from the calling ProcessUtility hook.
 #[allow(clippy::too_many_arguments)] // Reason: PostgreSQL ProcessUtility_hook C callback signature
 unsafe fn call_prev_hook_or_standard(
     pstmt: *mut pg_sys::PlannedStmt,
@@ -576,6 +783,7 @@ unsafe fn call_prev_hook_or_standard(
     dest: *mut pg_sys::DestReceiver,
     qc: *mut pg_sys::QueryCompletion,
 ) {
+    // SAFETY: Delegates to PostgreSQL internal hook or standard utility handler.
     unsafe {
         match PREV_PROCESS_UTILITY_HOOK {
             Some(prev_hook) => {

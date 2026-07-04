@@ -1,6 +1,6 @@
 [package]
 name = "pg_tviews"
-version = "0.1.0-beta.10"
+version = "0.1.0-beta.11"
 edition = "2024"
 authors = ["Lionel Hamayon <lionel.hamayon@evolution-digitale.fr>"]
 description = "Transactional materialized views with incremental refresh for PostgreSQL"
@@ -26,6 +26,7 @@ regex = "1.0"
 bincode = "1.3"
 flate2 = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
+sqlparser = "0.50"
 
 [dev-dependencies]
 pgrx-tests = "=0.17.0"

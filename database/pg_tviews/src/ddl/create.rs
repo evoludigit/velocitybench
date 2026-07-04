@@ -1,7 +1,9 @@
+use crate::cascade_path;
 use crate::error::{TViewError, TViewResult};
 use crate::schema::{TViewSchema, analyzer::analyze_dependencies, inference::infer_schema};
 use crate::utils::quote_identifier;
 use pgrx::datum::DatumWithOid;
+use pgrx::pg_sys::Oid;
 use pgrx::prelude::*;
 
 /// Resolve the target schema for creating TVIEW objects.
@@ -84,6 +86,9 @@ fn expand_select_star_if_needed(select_sql: &str) -> TViewResult<String> {
 
     // Query information_schema.columns for the column names in order
     let columns: Vec<String> = if let Some(ref schema) = schema_name {
+        // SAFETY: DatumWithOid::new wraps PostgreSQL datum pointers for SPI parameter passing.
+        // The OID parameter ensures correct type handling in PostgreSQL. Validated strings
+        // from table/schema names are passed as text OID parameters.
         let args = vec![
             unsafe {
                 pgrx::datum::DatumWithOid::new(
@@ -109,12 +114,13 @@ fn expand_select_star_if_needed(select_sql: &str) -> TViewResult<String> {
             )?;
             let mut result = Vec::new();
             for row in rows {
-                if let Some(col) = row[1]
-                    .value::<String>()
-                    .map_err(|e| TViewError::CatalogError {
-                        operation: "expand_select_star: read column_name".to_string(),
-                        pg_error: format!("{e:?}"),
-                    })?
+                if let Some(col) =
+                    row[1]
+                        .value::<String>()
+                        .map_err(|e| TViewError::CatalogError {
+                            operation: "expand_select_star: read column_name".to_string(),
+                            pg_error: format!("{e:?}"),
+                        })?
                 {
                     result.push(col);
                 }
@@ -143,12 +149,13 @@ fn expand_select_star_if_needed(select_sql: &str) -> TViewResult<String> {
             )?;
             let mut result = Vec::new();
             for row in rows {
-                if let Some(col) = row[1]
-                    .value::<String>()
-                    .map_err(|e| TViewError::CatalogError {
-                        operation: "expand_select_star: read column_name".to_string(),
-                        pg_error: format!("{e:?}"),
-                    })?
+                if let Some(col) =
+                    row[1]
+                        .value::<String>()
+                        .map_err(|e| TViewError::CatalogError {
+                            operation: "expand_select_star: read column_name".to_string(),
+                            pg_error: format!("{e:?}"),
+                        })?
                 {
                     result.push(col);
                 }
@@ -199,6 +206,7 @@ pub fn create_tview(
     tview_name: &str,
     select_sql: &str,
     schema_override: Option<&str>,
+    defer_populate: bool,
 ) -> TViewResult<()> {
     // Step 1: Check if TVIEW already exists
     let exists = tview_exists(tview_name)?;
@@ -285,21 +293,37 @@ pub fn create_tview(
     )?;
 
     // Step 5: Populate initial data
-    populate_initial_data(&tv_table_name, &view_name, &final_schema, &schema_name)?;
+    // When called from the ddl_command_end event trigger (CTAS path), the DDL
+    // sub-transactions corrupt savepoint depth tracking and the INSERT's effects
+    // are lost.  Defer the populate to after the event trigger returns, where
+    // the ProcessUtility hook drains the queue in a clean SPI context.
+    if defer_populate {
+        crate::hooks::enqueue_pending_populate(&tv_table_name, &view_name, &schema_name);
+    } else {
+        populate_initial_data(&tv_table_name, &view_name, &final_schema, &schema_name)?;
+    }
 
     // Step 6: Find base table dependencies.
     // Pass schema_name so the view OID lookup searches in the correct schema even when
     // current_schema() resolves to a different schema due to the database search_path.
     let dep_graph = crate::dependency::find_base_tables(&view_name, Some(&schema_name))?;
 
-    // Step 7: Register metadata (with dependencies)
+    // Step 6.5: Extract cascade paths from the SELECT SQL
+    let cascade_paths = extract_and_resolve_cascade_paths(
+        &final_select_sql,
+        entity_name,
+        &final_schema,
+        &dep_graph.base_tables,
+    )?;
+
+    // Step 7: Register metadata (with cascade paths)
     register_metadata(
         entity_name,
         &view_name,
         &tv_table_name,
         &final_select_sql,
         &final_schema,
-        &dep_graph.base_tables,
+        &cascade_paths,
         &schema_name,
         &distinct_on_keys,
     )?;
@@ -321,6 +345,152 @@ pub fn create_tview(
     }
 
     Ok(())
+}
+
+/// Extract cascade paths from the view's SELECT SQL and resolve table names to OIDs.
+///
+/// Parses the JOIN tree to find all non-root tables, computes the hop chain
+/// from each back to the root (= the TVIEW's own base table), then resolves
+/// table names to OIDs and validates that all referenced columns exist.
+fn extract_and_resolve_cascade_paths(
+    select_sql: &str,
+    entity_name: &str,
+    _schema: &TViewSchema,
+    base_table_oids: &[pg_sys::Oid],
+) -> TViewResult<Vec<cascade_path::CascadePath>> {
+    let root_table = format!("tb_{entity_name}");
+
+    // Step 1: Parse JOIN tree to extract unresolved paths
+    let join_paths = match crate::sql_parser::extract_join_paths(select_sql, &root_table) {
+        Ok(paths) => paths,
+        Err(e) => {
+            notice!("Could not parse JOIN tree for cascade paths: {e}");
+            return Ok(vec![]);
+        }
+    };
+
+    if join_paths.is_empty() {
+        return Ok(vec![]);
+    }
+
+    // Step 2: Build OID lookup map for base tables: relname → OID
+    let oid_map = build_oid_name_map(base_table_oids)?;
+
+    // Step 3: Resolve each join path to a CascadePath with OIDs
+    let mut cascade_paths = Vec::new();
+    for jp in &join_paths {
+        match resolve_join_path(jp, entity_name, &oid_map) {
+            Ok(cp) => cascade_paths.push(cp),
+            Err(e) => {
+                notice!(
+                    "Cascade path from '{}' unresolvable: {e} — changes to this table will not trigger incremental refresh of '{entity_name}'",
+                    jp.source_table
+                );
+            }
+        }
+    }
+
+    Ok(cascade_paths)
+}
+
+/// Build a map from table name → OID for a set of base table OIDs.
+fn build_oid_name_map(
+    oids: &[pg_sys::Oid],
+) -> TViewResult<std::collections::HashMap<String, pg_sys::Oid>> {
+    use std::collections::HashMap;
+
+    if oids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let oid_list = oids
+        .iter()
+        .map(|o| o.to_u32().to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+
+    let query = format!("SELECT oid, relname::text FROM pg_class WHERE oid IN ({oid_list})");
+
+    let mut map = HashMap::new();
+    Spi::connect(|client| {
+        let rows = client.select(&query, None, &[])?;
+        for row in rows {
+            let oid: pg_sys::Oid = row["oid"].value()?.unwrap_or(pg_sys::Oid::INVALID);
+            let name: String = row["relname"].value()?.unwrap_or_default();
+            map.insert(name, oid);
+        }
+        Ok::<_, spi::Error>(())
+    })?;
+
+    Ok(map)
+}
+
+/// Resolve a `JoinPath` (table names only) to a `CascadePath` (with OIDs).
+fn resolve_join_path(
+    jp: &crate::sql_parser::JoinPath,
+    entity_name: &str,
+    oid_map: &std::collections::HashMap<String, pg_sys::Oid>,
+) -> TViewResult<cascade_path::CascadePath> {
+    let source_oid = *oid_map
+        .get(&jp.source_table)
+        .ok_or_else(|| TViewError::CatalogError {
+            operation: "resolve cascade path".to_string(),
+            pg_error: format!(
+                "Table '{}' not found in base table dependencies",
+                jp.source_table
+            ),
+        })?;
+
+    let mut hops = Vec::with_capacity(jp.steps.len());
+    for step in &jp.steps {
+        let table_oid = *oid_map
+            .get(&step.table_name)
+            .ok_or_else(|| TViewError::CatalogError {
+                operation: "resolve cascade path hop".to_string(),
+                pg_error: format!(
+                    "Intermediate table '{}' not found in base table dependencies",
+                    step.table_name
+                ),
+            })?;
+
+        hops.push(cascade_path::CascadeHop {
+            table_oid,
+            table_name: step.table_name.clone(),
+            lookup_col: step.lookup_col.clone(),
+            carry_col: step.carry_col.clone(),
+        });
+    }
+
+    // Check if the path terminates at the entity PK. If root_join_col is
+    // NOT pk_{entity}, the incoming IDs are foreign keys on the root table
+    // (not entity PKs), so we need a reverse-lookup hop through the root.
+    let pk_col = format!("pk_{entity_name}");
+    if jp.root_join_col != pk_col {
+        let root_table = format!("tb_{entity_name}");
+        let root_oid = *oid_map
+            .get(&root_table)
+            .ok_or_else(|| TViewError::CatalogError {
+                operation: "resolve cascade path reverse-lookup hop".to_string(),
+                pg_error: format!(
+                    "Root table '{root_table}' not found in base table dependencies"
+                ),
+            })?;
+        hops.push(cascade_path::CascadeHop {
+            table_oid: root_oid,
+            table_name: root_table,
+            lookup_col: jp.root_join_col.clone(),
+            carry_col: pk_col,
+        });
+    }
+
+    Ok(cascade_path::CascadePath {
+        source_oid,
+        source_table: jp.source_table.clone(),
+        entity_name: entity_name.to_string(),
+        initial_col: jp.initial_col.clone(),
+        hops,
+        unresolvable: false,
+    })
 }
 
 /// Check if a TVIEW already exists
@@ -539,6 +709,8 @@ fn create_materialized_table(
     let entity = tview_name.strip_prefix("tv_").unwrap_or(tview_name);
     let view_name_for_types = format!("v_{entity}");
     let actual_col_types: std::collections::HashMap<String, String> = {
+        // SAFETY: DatumWithOid::new wraps PostgreSQL datum pointers for SPI parameter passing.
+        // The view/schema names are validated before this point.
         let args = vec![
             unsafe {
                 DatumWithOid::new(
@@ -547,10 +719,7 @@ fn create_materialized_table(
                 )
             },
             unsafe {
-                DatumWithOid::new(
-                    schema_name,
-                    PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value(),
-                )
+                DatumWithOid::new(schema_name, PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value())
             },
         ];
         Spi::connect(|client| {
@@ -614,7 +783,13 @@ fn create_materialized_table(
 
     let columns_sql = columns.join(",\n    ");
 
-    let create_table_sql = format!("CREATE TABLE {qi_schema}.{qi_tview} (\n    {columns_sql}\n)");
+    let unlogged_keyword = if crate::config::unlogged_by_default() {
+        "UNLOGGED "
+    } else {
+        ""
+    };
+    let create_table_sql =
+        format!("CREATE {unlogged_keyword}TABLE {qi_schema}.{qi_tview} (\n    {columns_sql}\n)");
 
     crate::utils::spi_run_ddl(&create_table_sql).map_err(|e| TViewError::SpiError {
         query: create_table_sql,
@@ -685,56 +860,45 @@ fn create_tview_indexes(
 fn populate_initial_data(
     tview_name: &str,
     view_name: &str,
-    schema: &TViewSchema,
+    _schema: &TViewSchema,
     schema_name: &str,
 ) -> TViewResult<()> {
-    // Build column list from schema (excluding created_at/updated_at which have defaults)
-    let mut select_columns = Vec::new();
-    let mut insert_columns = Vec::new();
+    // Get actual column names from the backing view (like pg_tviews_refresh does)
+    // This ensures consistency and handles any discrepancies between inferred schema and actual view
+    let view_oid = Spi::get_one::<Oid>(&format!(
+        "SELECT c.oid FROM pg_class c JOIN pg_namespace n ON c.relnamespace = n.oid \
+         WHERE c.relname::text = '{}' AND n.nspname::text = '{}' AND c.relkind = 'v'",
+        view_name, schema_name
+    ))?
+    .ok_or_else(|| TViewError::CatalogError {
+        operation: format!("Find view {view_name} in schema {schema_name}"),
+        pg_error: "View not found".to_string(),
+    })?;
 
-    if let Some(pk) = &schema.pk_column {
-        insert_columns.push(pk.clone());
-        select_columns.push(pk.clone());
+    let view_columns = crate::utils::get_view_columns_by_oid(view_oid)?;
+
+    if view_columns.is_empty() {
+        return Err(TViewError::CatalogError {
+            operation: format!("Get columns for view {view_name}"),
+            pg_error: "View has no selectable columns".to_string(),
+        });
     }
-    if let Some(id) = &schema.id_column {
-        insert_columns.push(id.clone());
-        // Cast id to UUID to ensure compatibility
-        select_columns.push(format!("{id}::uuid"));
-    }
-    if let Some(identifier) = &schema.identifier_column {
-        insert_columns.push(identifier.clone());
-        select_columns.push(identifier.clone());
-    }
-    if let Some(data) = &schema.data_column {
-        insert_columns.push(data.clone());
-        select_columns.push(data.clone());
-    }
-    for fk in &schema.fk_columns {
-        insert_columns.push(fk.clone());
-        select_columns.push(fk.clone());
-    }
-    for uuid_fk in &schema.uuid_fk_columns {
-        insert_columns.push(uuid_fk.clone());
-        select_columns.push(uuid_fk.clone());
-    }
-    for col in &schema.additional_columns {
-        insert_columns.push(col.clone());
-        select_columns.push(col.clone());
-    }
+
+    // Use the actual view columns for both insert and select
+    let insert_columns = view_columns;
 
     let qi_schema = quote_identifier(schema_name);
     let qi_tview = quote_identifier(tview_name);
     let qi_view = quote_identifier(view_name);
-    let insert_column_list = insert_columns
+    let col_list = insert_columns
         .iter()
         .map(|c| quote_identifier(c))
         .collect::<Vec<_>>()
         .join(", ");
-    let select_column_list = select_columns.join(", ");
 
     let insert_sql = format!(
-        "INSERT INTO {qi_schema}.{qi_tview} ({insert_column_list}) \
-         SELECT {select_column_list} FROM {qi_schema}.{qi_view}"
+        "INSERT INTO {qi_schema}.{qi_tview} ({col_list}) \
+         SELECT {col_list} FROM {qi_schema}.{qi_view}"
     );
 
     Spi::run(&insert_sql).map_err(|e| TViewError::SpiError {
@@ -765,7 +929,7 @@ fn register_metadata(
     tview_name: &str,
     definition_sql: &str,
     schema: &TViewSchema,
-    dependencies: &[pg_sys::Oid],
+    cascade_paths: &[cascade_path::CascadePath],
     schema_name: &str,
     distinct_on_keys: &[String],
 ) -> TViewResult<()> {
@@ -820,12 +984,16 @@ fn register_metadata(
         .collect::<Vec<_>>()
         .join(",");
 
-    // Serialize dependencies as OID array
-    let deps_str = dependencies
+    // Serialize cascade paths as a TEXT[] array of JSON strings
+    let cascade_paths_str = cascade_paths
         .iter()
-        .map(|oid| oid.to_u32().to_string())
+        .map(|path| {
+            let json = serde_json::to_string(path).expect("Failed to serialize cascade path");
+            pg_array_elem(&json)
+        })
         .collect::<Vec<_>>()
         .join(",");
+    let cascade_paths_literal = format!("'{{{cascade_paths_str}}}'");
 
     // Get OIDs for the created objects (schema-qualified, parameterized to prevent injection)
     let view_oid_args = vec![
@@ -882,7 +1050,7 @@ fn register_metadata(
             view_oid,
             table_oid,
             definition,
-            dependencies,
+            cascade_paths,
             fk_columns,
             uuid_fk_columns,
             dependency_types,
@@ -890,11 +1058,11 @@ fn register_metadata(
             array_match_keys,
             distinct_on_keys,
             is_union
-        ) VALUES ($1, {}, {}, $2, '{{{}}}', '{{{}}}', '{{{}}}', '{{{}}}', '{{{}}}', '{{{}}}', '{{{}}}', {})
+        ) VALUES ($1, {}, {}, $2, {}, '{{{}}}', '{{{}}}', '{{{}}}', '{{{}}}', '{{{}}}', '{{{}}}', {})
         ON CONFLICT (entity) DO NOTHING",
         view_oid.to_u32(),
         table_oid.to_u32(),
-        deps_str,
+        cascade_paths_literal,
         fk_columns,
         uuid_fk_columns,
         dep_types,
@@ -1069,7 +1237,10 @@ mod tests {
     fn test_scalar_pg_type_floating_point() {
         assert_eq!(super::scalar_pg_type_to_sql("real"), "REAL");
         assert_eq!(super::scalar_pg_type_to_sql("float4"), "REAL");
-        assert_eq!(super::scalar_pg_type_to_sql("double precision"), "DOUBLE PRECISION");
+        assert_eq!(
+            super::scalar_pg_type_to_sql("double precision"),
+            "DOUBLE PRECISION"
+        );
         assert_eq!(super::scalar_pg_type_to_sql("float8"), "DOUBLE PRECISION");
     }
 
@@ -1111,10 +1282,7 @@ mod tests {
 
     #[test]
     fn test_resolve_pg_column_type_builtin_scalar() {
-        assert_eq!(
-            super::resolve_pg_column_type("boolean", None),
-            "BOOLEAN"
-        );
+        assert_eq!(super::resolve_pg_column_type("boolean", None), "BOOLEAN");
         assert_eq!(super::resolve_pg_column_type("uuid", None), "UUID");
         assert_eq!(super::resolve_pg_column_type("bigint", None), "BIGINT");
         assert_eq!(super::resolve_pg_column_type("text", None), "TEXT");
@@ -1148,10 +1316,7 @@ mod tests {
     #[test]
     fn test_resolve_pg_column_type_user_defined_missing_udt_name() {
         // USER-DEFINED without udt_name falls back to TEXT
-        assert_eq!(
-            super::resolve_pg_column_type("USER-DEFINED", None),
-            "TEXT"
-        );
+        assert_eq!(super::resolve_pg_column_type("USER-DEFINED", None), "TEXT");
     }
 
     #[test]
@@ -1190,10 +1355,7 @@ mod tests {
     #[test]
     fn test_resolve_pg_column_type_array_missing_udt_name() {
         // ARRAY without udt_name falls back to TEXT[]
-        assert_eq!(
-            super::resolve_pg_column_type("ARRAY", None),
-            "TEXT[]"
-        );
+        assert_eq!(super::resolve_pg_column_type("ARRAY", None), "TEXT[]");
     }
 
     #[test]
@@ -1285,6 +1447,356 @@ mod tests {
         assert!(
             in_public,
             "tv_gadget should be in public with default search_path"
+        );
+    }
+
+    /// Test CTAS (CREATE TABLE AS SELECT) with preexisting data.
+    /// This reproduces the bug where initial population fails.
+    #[pg_test]
+    fn test_ctas_with_preexisting_data() {
+        Spi::run("SET search_path TO public").unwrap();
+
+        // Create base table with data
+        Spi::run("CREATE TABLE tb_ctas_test (pk_test BIGSERIAL PRIMARY KEY, name TEXT)").unwrap();
+        Spi::run("INSERT INTO tb_ctas_test VALUES (1, 'Alice'), (2, 'Bob')").unwrap();
+
+        // Do CTAS - this should create a TVIEW with the existing data
+        Spi::run(
+            "CREATE TABLE tv_ctas_test AS
+            SELECT pk_test, jsonb_build_object('name', name) AS data
+            FROM tb_ctas_test",
+        )
+        .unwrap();
+
+        // Check that TVIEW was created
+        let tview_exists = Spi::get_one::<bool>(
+            "SELECT COUNT(*) > 0 FROM pg_class c \
+             JOIN pg_namespace n ON c.relnamespace = n.oid \
+             WHERE c.relname = 'tv_ctas_test' AND n.nspname = 'public'",
+        )
+        .unwrap()
+        .unwrap_or(false);
+        assert!(tview_exists, "tv_ctas_test should exist");
+
+        // Check that it has the initial data (this is where the bug manifests)
+        let row_count = Spi::get_one::<i64>("SELECT COUNT(*) FROM tv_ctas_test")
+            .unwrap()
+            .unwrap_or(0);
+        assert_eq!(
+            row_count, 2,
+            "tv_ctas_test should have 2 rows from initial population"
+        );
+
+        // Check specific data
+        let alice_exists = Spi::get_one::<bool>(
+            "SELECT COUNT(*) > 0 FROM tv_ctas_test WHERE data->>'name' = 'Alice'",
+        )
+        .unwrap()
+        .unwrap_or(false);
+        assert!(alice_exists, "Alice should be in the TVIEW");
+    }
+
+    /// Test that TVIEW tables respect the unlogged_by_default GUC.
+    #[pg_test]
+    fn test_tview_unlogged_guc_control() {
+        Spi::run("SET search_path TO public").unwrap();
+
+        // Test with GUC set to true (default)
+        Spi::run("SET pg_tviews.unlogged_by_default TO true").unwrap();
+
+        // Create base table
+        Spi::run("CREATE TABLE tb_guc_test1 (pk_test BIGSERIAL PRIMARY KEY, name TEXT)").unwrap();
+
+        // Create TVIEW
+        Spi::run(
+            "SELECT pg_tviews_create('guc_test1', $$
+            SELECT pk_test, jsonb_build_object('name', name) AS data
+            FROM tb_guc_test1
+        $$)",
+        )
+        .unwrap();
+
+        // Check that the TVIEW table is UNLOGGED
+        let is_unlogged = Spi::get_one::<bool>(
+            "SELECT c.relpersistence = 'u' FROM pg_class c \
+             JOIN pg_namespace n ON c.relnamespace = n.oid \
+             WHERE c.relname = 'tv_guc_test1' AND n.nspname = 'public'",
+        )
+        .unwrap()
+        .unwrap_or(false);
+        assert!(
+            is_unlogged,
+            "tv_guc_test1 should be UNLOGGED when GUC is true"
+        );
+
+        // Test with GUC set to false
+        Spi::run("SET pg_tviews.unlogged_by_default TO false").unwrap();
+
+        // Create another base table
+        Spi::run("CREATE TABLE tb_guc_test2 (pk_test BIGSERIAL PRIMARY KEY, name TEXT)").unwrap();
+
+        // Create another TVIEW
+        Spi::run(
+            "SELECT pg_tviews_create('guc_test2', $$
+            SELECT pk_test, jsonb_build_object('name', name) AS data
+            FROM tb_guc_test2
+        $$)",
+        )
+        .unwrap();
+
+        // Check that this TVIEW table is LOGGED
+        let is_logged = Spi::get_one::<bool>(
+            "SELECT c.relpersistence = 'p' FROM pg_class c \
+             JOIN pg_namespace n ON c.relnamespace = n.oid \
+             WHERE c.relname = 'tv_guc_test2' AND n.nspname = 'public'",
+        )
+        .unwrap()
+        .unwrap_or(false);
+        assert!(is_logged, "tv_guc_test2 should be LOGGED when GUC is false");
+
+        // Reset GUC to default
+        Spi::run("RESET pg_tviews.unlogged_by_default").unwrap();
+    }
+
+    /// Test ALTER TABLE SET UNLOGGED/LOGGED on TVIEWs.
+    #[pg_test]
+    fn test_alter_tview_unlogged_logged() {
+        Spi::run("SET search_path TO public").unwrap();
+
+        // Create base table with data
+        Spi::run("CREATE TABLE tb_alter_test (pk_test BIGSERIAL PRIMARY KEY, name TEXT)").unwrap();
+        Spi::run("INSERT INTO tb_alter_test VALUES (1, 'Alice'), (2, 'Bob')").unwrap();
+
+        // Create TVIEW as LOGGED first
+        Spi::run("SET pg_tviews.unlogged_by_default TO false").unwrap();
+        Spi::run(
+            "SELECT pg_tviews_create('alter_test', $$
+            SELECT pk_test, jsonb_build_object('name', name) AS data
+            FROM tb_alter_test
+        $$)",
+        )
+        .unwrap();
+
+        // Verify TVIEW is initially LOGGED
+        let is_logged = Spi::get_one::<bool>(
+            "SELECT c.relpersistence = 'p' FROM pg_class c \
+             JOIN pg_namespace n ON c.relnamespace = n.oid \
+             WHERE c.relname = 'tv_alter_test' AND n.nspname = 'public'",
+        )
+        .unwrap()
+        .unwrap_or(false);
+        assert!(is_logged, "tv_alter_test should initially be LOGGED");
+
+        // ALTER TABLE to UNLOGGED
+        Spi::run("ALTER TABLE tv_alter_test SET UNLOGGED").unwrap();
+
+        // Verify it's now UNLOGGED
+        let is_unlogged = Spi::get_one::<bool>(
+            "SELECT c.relpersistence = 'u' FROM pg_class c \
+             JOIN pg_namespace n ON c.relnamespace = n.oid \
+             WHERE c.relname = 'tv_alter_test' AND n.nspname = 'public'",
+        )
+        .unwrap()
+        .unwrap_or(false);
+        assert!(
+            is_unlogged,
+            "tv_alter_test should be UNLOGGED after ALTER TABLE"
+        );
+
+        // ALTER TABLE back to LOGGED
+        Spi::run("ALTER TABLE tv_alter_test SET LOGGED").unwrap();
+
+        // Verify it's now LOGGED again
+        let is_logged_again = Spi::get_one::<bool>(
+            "SELECT c.relpersistence = 'p' FROM pg_class c \
+             JOIN pg_namespace n ON c.relnamespace = n.oid \
+             WHERE c.relname = 'tv_alter_test' AND n.nspname = 'public'",
+        )
+        .unwrap()
+        .unwrap_or(false);
+        assert!(
+            is_logged_again,
+            "tv_alter_test should be LOGGED again after ALTER TABLE"
+        );
+
+        // Reset GUC
+        Spi::run("RESET pg_tviews.unlogged_by_default").unwrap();
+    }
+
+    /// Test data integrity during ALTER TABLE UNLOGGED/LOGGED operations.
+    #[pg_test]
+    fn test_alter_tview_data_integrity() {
+        Spi::run("SET search_path TO public").unwrap();
+
+        // Create base table with data
+        Spi::run("CREATE TABLE tb_integrity_test (pk_test BIGSERIAL PRIMARY KEY, name TEXT)")
+            .unwrap();
+        Spi::run("INSERT INTO tb_integrity_test VALUES (1, 'Alice'), (2, 'Bob'), (3, 'Charlie')")
+            .unwrap();
+
+        // Create TVIEW as LOGGED
+        Spi::run("SET pg_tviews.unlogged_by_default TO false").unwrap();
+        Spi::run(
+            "SELECT pg_tviews_create('integrity_test', $$
+            SELECT pk_test, jsonb_build_object('name', name) AS data
+            FROM tb_integrity_test
+        $$)",
+        )
+        .unwrap();
+
+        // Verify data is present
+        let initial_count = Spi::get_one::<i64>("SELECT COUNT(*) FROM tv_integrity_test")
+            .unwrap()
+            .unwrap_or(0);
+        assert_eq!(initial_count, 3, "TVIEW should have 3 rows initially");
+
+        // ALTER TABLE from LOGGED to UNLOGGED - data should be preserved
+        Spi::run("ALTER TABLE tv_integrity_test SET UNLOGGED").unwrap();
+
+        let after_unlogged_count = Spi::get_one::<i64>("SELECT COUNT(*) FROM tv_integrity_test")
+            .unwrap()
+            .unwrap_or(0);
+        assert_eq!(
+            after_unlogged_count, 3,
+            "Data should be preserved when converting LOGGED to UNLOGGED"
+        );
+
+        // ALTER TABLE from UNLOGGED to LOGGED - data is preserved (PostgreSQL behavior)
+        Spi::run("ALTER TABLE tv_integrity_test SET LOGGED").unwrap();
+
+        let after_logged_count = Spi::get_one::<i64>("SELECT COUNT(*) FROM tv_integrity_test")
+            .unwrap()
+            .unwrap_or(0);
+        assert_eq!(
+            after_logged_count, 3,
+            "Data should be preserved when converting UNLOGGED to LOGGED"
+        );
+
+        // Reset GUC
+        Spi::run("RESET pg_tviews.unlogged_by_default").unwrap();
+    }
+
+    /// Test detection of post-crash empty UNLOGGED table.
+    #[pg_test]
+    fn test_detect_post_crash_empty_tview() {
+        Spi::run("SET search_path TO public").unwrap();
+
+        // Create base table with data
+        Spi::run("CREATE TABLE tb_crash_test (pk_test BIGSERIAL PRIMARY KEY, name TEXT)").unwrap();
+        Spi::run("INSERT INTO tb_crash_test VALUES (1, 'Alice'), (2, 'Bob')").unwrap();
+
+        // Create TVIEW
+        Spi::run(
+            "SELECT pg_tviews_create('crash_test', $$
+            SELECT pk_test, jsonb_build_object('name', name) AS data
+            FROM tb_crash_test
+        $$)",
+        )
+        .unwrap();
+
+        // Verify TVIEW has data
+        let initial_count = Spi::get_one::<i64>("SELECT COUNT(*) FROM tv_crash_test")
+            .unwrap()
+            .unwrap_or(0);
+        assert_eq!(initial_count, 2, "TVIEW should have 2 rows initially");
+
+        // Before truncation, should not detect crash
+        let crash_before = crate::lifecycle::detect_post_crash_truncation("crash_test").unwrap();
+        assert!(!crash_before, "Should not detect crash when table has data");
+
+        // Simulate post-crash truncation (UNLOGGED table behavior)
+        Spi::run("TRUNCATE TABLE tv_crash_test").unwrap();
+
+        // Verify table is now empty
+        let after_truncate_count = Spi::get_one::<i64>("SELECT COUNT(*) FROM tv_crash_test")
+            .unwrap()
+            .unwrap_or(0);
+        assert_eq!(
+            after_truncate_count, 0,
+            "TVIEW should be empty after truncate"
+        );
+
+        // Should now detect crash (table empty but view has data)
+        let crash_detected = crate::lifecycle::detect_post_crash_truncation("crash_test").unwrap();
+        assert!(
+            crash_detected,
+            "Should detect crash when UNLOGGED table is empty but view has data"
+        );
+
+        // Verify backing view still has data
+        let view_count = Spi::get_one::<i64>("SELECT COUNT(*) FROM v_crash_test")
+            .unwrap()
+            .unwrap_or(0);
+        assert_eq!(
+            view_count, 2,
+            "Backing view should still have data after table truncate"
+        );
+    }
+
+    /// Test automatic recovery after crash detection.
+    #[pg_test]
+    fn test_auto_recover_after_crash() {
+        Spi::run("SET search_path TO public").unwrap();
+
+        // Create base table with data
+        Spi::run("CREATE TABLE tb_recover_test (pk_test BIGSERIAL PRIMARY KEY, name TEXT)")
+            .unwrap();
+        Spi::run("INSERT INTO tb_recover_test VALUES (1, 'Alice'), (2, 'Bob')").unwrap();
+
+        // Create TVIEW
+        Spi::run(
+            "SELECT pg_tviews_create('recover_test', $$
+            SELECT pk_test, jsonb_build_object('name', name) AS data
+            FROM tb_recover_test
+        $$)",
+        )
+        .unwrap();
+
+        // Verify TVIEW has data initially
+        let initial_count = Spi::get_one::<i64>("SELECT COUNT(*) FROM tv_recover_test")
+            .unwrap()
+            .unwrap_or(0);
+        assert_eq!(initial_count, 2, "TVIEW should have 2 rows initially");
+
+        // Simulate post-crash truncation
+        Spi::run("TRUNCATE TABLE tv_recover_test").unwrap();
+
+        // Verify table is now empty
+        let after_truncate_count = Spi::get_one::<i64>("SELECT COUNT(*) FROM tv_recover_test")
+            .unwrap()
+            .unwrap_or(0);
+        assert_eq!(
+            after_truncate_count, 0,
+            "TVIEW should be empty after truncate"
+        );
+
+        // Call auto-recovery function
+        let recovery_performed =
+            Spi::get_one::<bool>("SELECT pg_tviews_recover_after_crash('recover_test')")
+                .unwrap()
+                .unwrap_or(false);
+        assert!(
+            recovery_performed,
+            "Recovery should be performed when crash is detected"
+        );
+
+        // Verify TVIEW has data again after recovery
+        let after_recovery_count = Spi::get_one::<i64>("SELECT COUNT(*) FROM tv_recover_test")
+            .unwrap()
+            .unwrap_or(0);
+        assert_eq!(
+            after_recovery_count, 2,
+            "TVIEW should have 2 rows after recovery"
+        );
+
+        // Call recovery again - should return false (no recovery needed)
+        let second_recovery =
+            Spi::get_one::<bool>("SELECT pg_tviews_recover_after_crash('recover_test')")
+                .unwrap()
+                .unwrap_or(true);
+        assert!(
+            !second_recovery,
+            "Second recovery call should return false when no crash detected"
         );
     }
 }

@@ -1,5 +1,5 @@
 use super::key::RefreshKey;
-use super::state::TX_REFRESH_QUEUE;
+use super::state::{TX_CRASH_RECOVERY_CHECKED, TX_REFRESH_QUEUE};
 use std::collections::HashSet;
 
 /// Check queue size against a limit and raise ERROR if exceeded.
@@ -92,6 +92,86 @@ pub fn clear_queue() {
     TX_REFRESH_QUEUE.with(|q| {
         q.borrow_mut().clear();
     });
+}
+
+/// Check if crash recovery has already been checked for this entity in this transaction
+pub fn is_crash_recovery_checked(entity: &str) -> bool {
+    TX_CRASH_RECOVERY_CHECKED.with(|checked| checked.borrow().contains(entity))
+}
+
+/// Mark that crash recovery has been checked for this entity in this transaction
+pub fn mark_crash_recovery_checked(entity: &str) {
+    TX_CRASH_RECOVERY_CHECKED.with(|checked| {
+        checked.borrow_mut().insert(entity.to_string());
+    });
+}
+
+/// Clear the crash recovery check cache (used on transaction abort)
+pub fn clear_crash_recovery_cache() {
+    TX_CRASH_RECOVERY_CHECKED.with(|checked| {
+        checked.borrow_mut().clear();
+    });
+}
+
+/// Batch lookup of carry column values via SPI.
+///
+/// Executes: `SELECT {carry_col} FROM "schema"."table" WHERE {lookup_col} = ANY($1)`
+///
+/// Resolves the table OID to a schema-qualified, properly-quoted name via
+/// `pg_class + pg_namespace` so that tables in any schema are referenced
+/// correctly regardless of `search_path`.
+///
+/// Used for cascade path traversal to find parent IDs that need refreshing.
+/// Table OID and column names come from `CascadePath` data validated at registration time.
+pub fn spi_batch_lookup(
+    table_oid: pgrx::pg_sys::Oid,
+    lookup_col: &str,
+    carry_col: &str,
+    ids: &[i64],
+) -> crate::TViewResult<Vec<i64>> {
+    use crate::utils::{qualified_relname_from_oid, quote_identifier};
+    use pgrx::prelude::*;
+
+    if ids.is_empty() {
+        return Ok(vec![]);
+    }
+
+    // Resolve OID → "schema"."table" so the FROM clause is valid SQL regardless
+    // of search_path.  Cast expressions like `(52276294::regclass)` are not valid
+    // FROM-clause table references in PostgreSQL.
+    let qualified_name = qualified_relname_from_oid(table_oid).map_err(|e| {
+        crate::TViewError::SpiError {
+            query: "qualified_relname_from_oid".to_string(),
+            error: format!("failed to resolve table OID {table_oid:?}: {e}"),
+        }
+    })?;
+    let qi_lookup = quote_identifier(lookup_col);
+    let qi_carry = quote_identifier(carry_col);
+
+    let query = format!("SELECT {qi_carry} FROM {qualified_name} WHERE {qi_lookup} = ANY($1)");
+
+    let pks_array = ids.to_vec();
+    let args = vec![unsafe {
+        pgrx::datum::DatumWithOid::new(
+            pks_array,
+            PgOid::BuiltIn(PgBuiltInOids::INT8ARRAYOID).value(),
+        )
+    }];
+
+    Spi::connect(|client| {
+        let rows = client.select(&query, None, &args)?;
+        let mut result = Vec::new();
+        for row in rows {
+            if let Some(value) = row[1].value::<i64>()? {
+                result.push(value);
+            }
+        }
+        Ok(result)
+    })
+    .map_err(|e: pgrx::spi::Error| crate::TViewError::SpiError {
+        query,
+        error: format!("SPI batch lookup failed: {e}"),
+    })
 }
 
 #[cfg(test)]

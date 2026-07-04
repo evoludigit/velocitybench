@@ -87,7 +87,7 @@ pub fn drop_tview(tview_name: &str, if_exists: bool) -> TViewResult<()> {
 /// so drops work regardless of which schema the TVIEW was created in.
 fn drop_by_oid(oid: pg_sys::Oid, kind: &str) -> TViewResult<()> {
     let qualified = crate::utils::spi_get_string(&format!(
-        "SELECT quote_ident(n.nspname) || '.' || quote_ident(c.relname) \
+        "SELECT quote_ident(n.nspname::text) || '.' || quote_ident(c.relname::text) \
          FROM pg_class c \
          JOIN pg_namespace n ON c.relnamespace = n.oid \
          WHERE c.oid = {}",
@@ -127,6 +127,8 @@ fn tview_exists_in_metadata(entity_name: &str) -> TViewResult<bool> {
 
 /// Drop metadata record from `pg_tview_meta`
 fn drop_metadata(entity_name: &str) -> TViewResult<()> {
+    // SAFETY: DatumWithOid::new wraps PostgreSQL datum pointers for SPI parameter passing.
+    // The entity name is validated before this call.
     let args =
         [
             unsafe {

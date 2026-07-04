@@ -1,5 +1,8 @@
-use super::ops::{clear_queue, take_queue_snapshot};
+use super::ops::{
+    clear_queue, is_crash_recovery_checked, mark_crash_recovery_checked, take_queue_snapshot,
+};
 use crate::TViewResult;
+use pgrx::datum::DatumWithOid;
 use pgrx::pg_sys;
 use pgrx::prelude::*;
 use std::collections::HashSet;
@@ -30,9 +33,8 @@ enum XactEvent {
 /// This uses `PostgreSQL`'s `RegisterXactCallback` FFI to install our handler.
 /// The callback will be invoked at transaction commit/abort.
 pub unsafe fn register_xact_callback() {
-    // Safety: We're calling into PostgreSQL FFI
-    // The callback function must be extern "C" and #[no_mangle]
-
+    // SAFETY: Called from PostgreSQL backend context. RegisterXactCallback
+    // registers a valid extern "C" callback function pointer.
     unsafe {
         pg_sys::RegisterXactCallback(Some(tview_xact_callback), std::ptr::null_mut());
     }
@@ -43,12 +45,26 @@ pub unsafe fn register_xact_callback() {
 /// This uses `PostgreSQL`'s `RegisterSubXactCallback` FFI to handle savepoints.
 /// The callback will be invoked when savepoints are created/released/rolled back.
 pub unsafe fn register_subxact_callback() {
-    // Safety: We're calling into PostgreSQL FFI
-    // The callback function must be extern "C" and #[no_mangle]
-
+    // SAFETY: Called from PostgreSQL backend context. RegisterSubXactCallback
+    // registers a valid extern "C" callback function pointer.
     unsafe {
         pg_sys::RegisterSubXactCallback(Some(tview_subxact_callback), std::ptr::null_mut());
     }
+
+    // Initialize SAVEPOINT_DEPTH from current transaction nest level
+    // When loaded inside a DO block, subtransactions may already be open
+    let nest_level = unsafe { pg_sys::GetCurrentTransactionNestLevel() };
+    SAVEPOINT_DEPTH.with(|d| {
+        *d.borrow_mut() = (nest_level as usize).saturating_sub(1);
+    });
+
+    // Push placeholder queue snapshots for existing subtransactions
+    QUEUE_SNAPSHOTS.with(|s| {
+        let mut snapshots = s.borrow_mut();
+        for _ in 0..(nest_level as usize).saturating_sub(1) {
+            snapshots.push(HashSet::new());
+        }
+    });
 }
 
 /// Transaction callback handler (invoked by `PostgreSQL`)
@@ -89,6 +105,7 @@ unsafe extern "C-unwind" fn tview_xact_callback(event: u32, _arg: *mut c_void) {
             // Queue flush + audit flush happen in ProcessUtility hook before COMMIT.
             // Clear audit buffer as safety net (should already be empty after flush).
             crate::audit::clear_audit_buffer();
+            super::ops::clear_crash_recovery_cache();
             crate::metrics::metrics_api::reset_metrics();
         }
         XactEvent::Prepare => {
@@ -98,6 +115,8 @@ unsafe extern "C-unwind" fn tview_xact_callback(event: u32, _arg: *mut c_void) {
         }
         XactEvent::Abort => {
             clear_queue();
+            super::ops::clear_crash_recovery_cache();
+            super::cache::cascade_cache::clear_cache();
             crate::audit::clear_audit_buffer();
             crate::metrics::metrics_api::reset_metrics();
         }
@@ -251,6 +270,23 @@ pub fn flush_refresh_queue() -> TViewResult<()> {
 
             // Process each entity group
             for (entity, entity_keys) in keys_by_entity {
+                // Check for post-crash truncation and auto-refresh if needed
+                if !is_crash_recovery_checked(&entity) {
+                    mark_crash_recovery_checked(&entity);
+                    if crate::lifecycle::detect_post_crash_truncation(&entity)? {
+                        // TVIEW is empty but backing view has data - perform full refresh first
+                        Spi::run_with_args(
+                            "SELECT pg_tviews_refresh($1)",
+                            &[unsafe {
+                                DatumWithOid::new(
+                                    &entity,
+                                    PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value(),
+                                )
+                            }],
+                        )?;
+                    }
+                }
+
                 if entity_keys.len() == 1 {
                     // Single key: use existing individual refresh
                     let key = &entity_keys[0];

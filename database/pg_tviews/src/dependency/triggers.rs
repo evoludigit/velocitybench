@@ -128,7 +128,11 @@ pub fn migrate_all_triggers_to_rust_handler() -> TViewResult<()> {
     // Collect (entity, table_oid) pairs from pg_tview_meta
     let pairs: Vec<(String, pg_sys::Oid)> = Spi::connect(|client| {
         let rows = client.select(
-            "SELECT entity, unnest(dependencies) AS table_oid FROM pg_tview_meta",
+            "SELECT m.entity, d.refobjid::oid AS table_oid \
+             FROM pg_tview_meta m \
+             JOIN pg_depend d ON d.objid = m.view_oid \
+             JOIN pg_class c ON c.oid = d.refobjid AND c.relkind = 'r' \
+             WHERE d.deptype = 'n'",
             None,
             &[],
         )?;
@@ -218,7 +222,7 @@ pub fn migrate_all_triggers_to_rust_handler() -> TViewResult<()> {
 /// PostgreSQL trigger names).
 fn get_table_name(oid: pg_sys::Oid) -> TViewResult<(String, String)> {
     let row = crate::utils::spi_get_string(&format!(
-        "SELECT n.nspname || ':' || c.relname \
+        "SELECT n.nspname::text || ':' || c.relname::text \
          FROM pg_class c \
          JOIN pg_namespace n ON n.oid = c.relnamespace \
          WHERE c.oid = {oid:?}"

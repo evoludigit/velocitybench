@@ -39,7 +39,7 @@ extension_sql!(
         view_oid OID NOT NULL,
         table_oid OID NOT NULL,
         definition TEXT NOT NULL,
-        dependencies OID[] NOT NULL DEFAULT '{}',
+        cascade_paths TEXT[] NOT NULL DEFAULT '{}',
         fk_columns TEXT[] NOT NULL DEFAULT '{}',
         uuid_fk_columns TEXT[] NOT NULL DEFAULT '{}',
         dependency_types TEXT[] NOT NULL DEFAULT '{}',
@@ -91,7 +91,7 @@ BEGIN
         -- Only process table-creation commands
         IF obj.command_tag IN ('CREATE TABLE', 'CREATE TABLE AS', 'SELECT INTO') THEN
             -- Only intercept tv_* tables
-            IF obj.object_identity LIKE 'public.tv_%' OR obj.object_identity LIKE 'tv_%' THEN
+            IF obj.object_identity LIKE '%.tv_%' OR obj.object_identity LIKE 'tv_%' THEN
                 DECLARE
                     table_name_only TEXT;
                 BEGIN
@@ -208,7 +208,7 @@ pub fn create_metadata_tables() -> TViewResult<()> {
             view_oid OID NOT NULL,
             table_oid OID NOT NULL,
             definition TEXT NOT NULL,
-            dependencies OID[] NOT NULL DEFAULT '{}',
+            cascade_paths TEXT[] NOT NULL DEFAULT '{}',
             fk_columns TEXT[] NOT NULL DEFAULT '{}',
             uuid_fk_columns TEXT[] NOT NULL DEFAULT '{}',
             dependency_types TEXT[] NOT NULL DEFAULT '{}',
@@ -360,7 +360,7 @@ mod tests {
             ("view_oid", "oid", "NO"),
             ("table_oid", "oid", "NO"),
             ("definition", "text", "NO"),
-            ("dependencies", "ARRAY", "NO"),
+            ("cascade_paths", "ARRAY", "NO"),
             ("fk_columns", "ARRAY", "NO"),
             ("uuid_fk_columns", "ARRAY", "NO"),
             ("dependency_types", "ARRAY", "NO"),

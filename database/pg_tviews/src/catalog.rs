@@ -1,3 +1,4 @@
+use crate::cascade_path::CascadePath;
 use pgrx::datum::DatumWithOid;
 use pgrx::pg_sys::Oid;
 use pgrx::prelude::*;
@@ -81,6 +82,12 @@ pub struct TviewMeta {
     /// for the same PK during refresh (which can occur with non-mutually-exclusive
     /// UNION ALL branches).
     pub is_union: bool,
+
+    /// Cascade paths defining how changes propagate to this TVIEW.
+    ///
+    /// Each path represents a sequence of hops from a source table to this TVIEW,
+    /// enabling indirect dependency tracking for multi-level cascades.
+    pub cascade_paths: Vec<CascadePath>,
 }
 
 impl TviewMeta {
@@ -109,6 +116,8 @@ impl TviewMeta {
 
     /// Look up metadata by source table OID or view OID.
     pub fn load_for_source(source_oid: Oid) -> spi::Result<Option<Self>> {
+        // SAFETY: DatumWithOid::new wraps PostgreSQL datum pointers for SPI parameter passing.
+        // The OID is a validated PostgreSQL object identifier.
         Spi::connect(|client| {
             let args = vec![unsafe {
                 DatumWithOid::new(source_oid, PgOid::BuiltIn(PgBuiltInOids::OIDOID).value())
@@ -117,7 +126,7 @@ impl TviewMeta {
                 "SELECT table_oid AS tview_oid, view_oid, entity, \
                         fk_columns, uuid_fk_columns, \
                         dependency_types, dependency_paths, array_match_keys, \
-                        distinct_on_keys, is_union \
+                        distinct_on_keys, is_union, cascade_paths \
                  FROM pg_tview_meta \
                  WHERE view_oid = $1 OR table_oid = $1",
                 None,
@@ -133,6 +142,8 @@ impl TviewMeta {
 
     /// Look up metadata by entity name
     pub fn load_by_entity(entity_name: &str) -> spi::Result<Option<Self>> {
+        // SAFETY: DatumWithOid::new wraps PostgreSQL datum pointers for SPI parameter passing.
+        // The entity name is validated before this call.
         Spi::connect(|client| {
             let args = vec![unsafe {
                 DatumWithOid::new(entity_name, PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value())
@@ -141,7 +152,7 @@ impl TviewMeta {
                 "SELECT table_oid AS tview_oid, view_oid, entity, \
                         fk_columns, uuid_fk_columns, \
                         dependency_types, dependency_paths, array_match_keys, \
-                        distinct_on_keys, is_union \
+                        distinct_on_keys, is_union, cascade_paths \
                  FROM pg_tview_meta \
                  WHERE entity = $1",
                 None,
@@ -152,6 +163,28 @@ impl TviewMeta {
                 Some(row) => Ok(Some(Self::from_spi_row(&row)?)),
                 None => Ok(None),
             }
+        })
+    }
+
+    /// Load all TVIEW metadata
+    pub fn load_all() -> spi::Result<Vec<Self>> {
+        Spi::connect(|client| {
+            let rows = client.select(
+                "SELECT table_oid AS tview_oid, view_oid, entity, \
+                        fk_columns, uuid_fk_columns, \
+                        dependency_types, dependency_paths, array_match_keys, \
+                        distinct_on_keys, is_union, cascade_paths \
+                 FROM pg_tview_meta \
+                 ORDER BY entity",
+                None,
+                &[],
+            )?;
+
+            let mut result = Vec::new();
+            for row in rows {
+                result.push(Self::from_spi_row(&row)?);
+            }
+            Ok(result)
         })
     }
 
@@ -182,6 +215,8 @@ impl TviewMeta {
     /// ```
     #[allow(dead_code)] // Reason: May be useful in future optimization phases or external code
     pub fn load_for_tview(tview_oid: Oid) -> spi::Result<Option<Self>> {
+        // SAFETY: DatumWithOid::new wraps PostgreSQL datum pointers for SPI parameter passing.
+        // The OID is a validated PostgreSQL object identifier.
         Spi::connect(|client| {
             let args = vec![unsafe {
                 DatumWithOid::new(tview_oid, PgOid::BuiltIn(PgBuiltInOids::OIDOID).value())
@@ -190,7 +225,7 @@ impl TviewMeta {
                 "SELECT table_oid AS tview_oid, view_oid, entity, \
                         fk_columns, uuid_fk_columns, \
                         dependency_types, dependency_paths, array_match_keys, \
-                        distinct_on_keys, is_union \
+                        distinct_on_keys, is_union, cascade_paths \
                  FROM pg_tview_meta \
                  WHERE table_oid = $1",
                 None,
@@ -233,6 +268,18 @@ impl TviewMeta {
         // is_union (BOOLEAN) — true when backing view is a UNION ALL / UNION query
         let is_union: bool = row["is_union"].value::<bool>()?.unwrap_or(false);
 
+        // cascade_paths (TEXT[]) — array of JSON-serialized cascade path objects
+        let cascade_paths_raw: Option<Vec<String>> = row["cascade_paths"].value()?;
+        let cascade_paths = if let Some(json_strings) = cascade_paths_raw {
+            json_strings
+                .into_iter()
+                .map(|json| serde_json::from_str(&json))
+                .collect::<Result<Vec<CascadePath>, _>>()
+                .map_err(|_e| spi::Error::InvalidPosition)? // Use appropriate error type
+        } else {
+            Vec::new()
+        };
+
         Ok(Self {
             tview_oid: row["tview_oid"].value()?.ok_or_else(|| {
                 spi::Error::from(crate::TViewError::SpiError {
@@ -260,6 +307,7 @@ impl TviewMeta {
             array_match_keys: array_keys.unwrap_or_default(),
             distinct_on_keys,
             is_union,
+            cascade_paths,
         })
     }
 
@@ -347,39 +395,9 @@ impl Default for TviewMeta {
             array_match_keys: vec![],
             distinct_on_keys: vec![],
             is_union: false,
+            cascade_paths: vec![],
         }
     }
-}
-
-/// Find all TVIEW entities whose dependency list includes the given base table OID.
-///
-/// This is the reverse lookup for indirect dependencies: when `tb_comment` changes,
-/// this function finds that entity `"post"` depends on it (because `tb_comment`'s OID
-/// is in `tv_post`'s `dependencies` array).
-///
-/// Returns entity names (e.g. `["post"]`) for all TVIEWs that depend on this table.
-pub fn parent_entities_for_base_table(table_oid: Oid) -> crate::TViewResult<Vec<String>> {
-    let result: Result<Vec<String>, spi::Error> = Spi::connect(|client| {
-        let args = vec![unsafe {
-            DatumWithOid::new(table_oid, PgOid::BuiltIn(PgBuiltInOids::OIDOID).value())
-        }];
-        let rows = client.select(
-            "SELECT entity FROM pg_tview_meta WHERE $1 = ANY(dependencies)",
-            None,
-            &args,
-        )?;
-        let mut entities = Vec::new();
-        for row in rows {
-            if let Some(entity) = row["entity"].value::<String>()? {
-                entities.push(entity);
-            }
-        }
-        Ok(entities)
-    });
-    result.map_err(|e| crate::TViewError::CatalogError {
-        operation: "parent_entities_for_base_table".to_string(),
-        pg_error: format!("{e:?}"),
-    })
 }
 
 /// Map a base table OID to its entity name
@@ -407,34 +425,52 @@ pub fn entity_for_table(table_oid: Oid) -> crate::TViewResult<Option<String>> {
 /// This is the slow path that queries `pg_class` every time.
 /// Used by the cache when there's a cache miss.
 pub fn entity_for_table_uncached(table_oid: Oid) -> crate::TViewResult<Option<String>> {
-    // Query pg_class to get table name from OID
-    let args = vec![unsafe {
-        DatumWithOid::new(table_oid, PgOid::BuiltIn(PgBuiltInOids::OIDOID).value())
-    }];
-    let table_name = Spi::get_one_with_args::<String>(
-        "SELECT relname::text FROM pg_class WHERE oid = $1",
-        &args,
-    )?
-    .ok_or_else(|| crate::TViewError::SpiError {
-        query: "SELECT relname FROM pg_class WHERE oid = $1".to_string(),
-        error: "Table OID not found".to_string(),
-    })?;
+    // Use Spi::connect + client.select instead of Spi::get_one_with_args because
+    // pgrx 0.17's get_one_with_args returns Err(InvalidPosition) when the query
+    // returns 0 rows — it calls .first().get_one() which goes through
+    // get_datum_by_ordinal's bounds check (current >= size) instead of the
+    // get_heap_tuple path that properly returns Ok(None) for empty results.
+    Spi::connect(|client| {
+        // Step 1: resolve OID → table name
+        let args = vec![unsafe {
+            DatumWithOid::new(table_oid, PgOid::BuiltIn(PgBuiltInOids::OIDOID).value())
+        }];
+        let mut rows = client.select(
+            "SELECT relname::text FROM pg_class WHERE oid = $1",
+            Some(1),
+            &args,
+        )?;
+        let table_name: String = match rows.next() {
+            Some(row) => match row[1].value::<String>()? {
+                Some(name) => name,
+                None => return Ok(None),
+            },
+            None => return Ok(None),
+        };
 
-    // Check if table name matches "tb_<entity>" pattern
-    let Some(entity) = table_name.strip_prefix("tb_") else {
-        return Ok(None);
-    };
+        // Step 2: check for "tb_<entity>" prefix
+        let Some(entity) = table_name.strip_prefix("tb_") else {
+            return Ok(None);
+        };
 
-    // Verify this entity actually exists in pg_tview_meta.
-    // Without this check, tb_comment would return Some("comment") even though
-    // there's no TVIEW for "comment" — causing the trigger handler to take the
-    // direct path instead of the indirect (array dependency) path.
-    let args =
-        vec![unsafe { DatumWithOid::new(entity, PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value()) }];
-    let exists: Option<String> =
-        Spi::get_one_with_args("SELECT entity FROM pg_tview_meta WHERE entity = $1", &args)?;
-
-    Ok(exists)
+        // Step 3: verify entity exists in pg_tview_meta
+        let args = vec![unsafe {
+            DatumWithOid::new(entity, PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value())
+        }];
+        let mut meta_rows = client.select(
+            "SELECT entity FROM pg_tview_meta WHERE entity = $1",
+            Some(1),
+            &args,
+        )?;
+        match meta_rows.next() {
+            Some(row) => Ok(row[1].value::<String>()?),
+            None => Ok(None),
+        }
+    })
+    .map_err(|e: spi::Error| crate::TViewError::SpiError {
+        query: "entity_for_table_uncached".to_string(),
+        error: format!("{e:?}"),
+    })
 }
 
 #[cfg(test)]
@@ -474,6 +510,7 @@ mod tests {
             array_match_keys: vec![None],
             distinct_on_keys: vec![],
             is_union: false,
+            cascade_paths: vec![],
         };
 
         assert_eq!(meta.dependency_types.len(), 1);

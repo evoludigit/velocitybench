@@ -1,6 +1,6 @@
 use crate::catalog::entity_for_table;
 use crate::queue::{enqueue_refresh, enqueue_refresh_bulk, enqueue_refresh_dedup};
-use crate::utils::{quote_identifier, tuple_get_i64};
+use crate::utils::{IntExtraction, quote_identifier, tuple_get_i64};
 use pgrx::prelude::*;
 /// Trigger Handler: Change Detection and Queue Management
 ///
@@ -25,6 +25,43 @@ use pgrx::prelude::*;
 /// - Minimal database queries during trigger execution
 /// - Queue processing deferred to commit time
 use pgrx::spi;
+
+/// Result of attempting to extract a DISTINCT ON key from a tuple
+enum KeyExtraction {
+    /// Successfully extracted and converted to String
+    Value(String),
+    /// Column exists but value is NULL
+    Null,
+    /// All typed extraction attempts failed (unsupported column type)
+    TypeMismatch,
+}
+
+/// Extract DISTINCT ON key value from tuple, trying multiple types
+/// Returns the extraction result: Value on success, Null if column is NULL, TypeMismatch if unsupported type
+fn extract_distinct_on_key<'a>(
+    tuple: &PgHeapTuple<'a, AllocatedByPostgres>,
+    key_col: &str,
+) -> KeyExtraction {
+    // Try String (TEXT, UUID, VARCHAR)
+    match tuple.get_by_name::<String>(key_col) {
+        Ok(Some(val)) => return KeyExtraction::Value(val),
+        Ok(None) => return KeyExtraction::Null,
+        Err(_) => {} // type mismatch, try next
+    }
+    // Try i64 (BIGINT)
+    match tuple.get_by_name::<i64>(key_col) {
+        Ok(Some(val)) => return KeyExtraction::Value(val.to_string()),
+        Ok(None) => return KeyExtraction::Null,
+        Err(_) => {}
+    }
+    // Try i32 (INTEGER)
+    match tuple.get_by_name::<i32>(key_col) {
+        Ok(Some(val)) => return KeyExtraction::Value(val.to_string()),
+        Ok(None) => return KeyExtraction::Null,
+        Err(_) => {}
+    }
+    KeyExtraction::TypeMismatch
+}
 
 /// Trigger handler function for TVIEW cascades
 /// This is called by triggers installed on base tables when rows change
@@ -56,16 +93,19 @@ fn pg_tview_trigger_handler<'a>(
                         return Ok(None);
                     }
                 };
-                match tuple.get_by_name::<String>(key_col) {
-                    Ok(Some(key_val)) => {
+                match extract_distinct_on_key(&tuple, key_col) {
+                    KeyExtraction::Value(key_val) => {
                         enqueue_refresh_dedup(entity, &key_val);
                     }
-                    Ok(None) => {
-                        warning!("DISTINCT ON key '{key_col}' is NULL for entity '{entity}'");
-                    }
-                    Err(e) => {
+                    KeyExtraction::Null => {
                         warning!(
-                            "Failed to extract DISTINCT ON key '{key_col}' for '{entity}': {e:?}"
+                            "DISTINCT ON key '{key_col}' is NULL for entity '{entity}' — skipping refresh"
+                        );
+                    }
+                    KeyExtraction::TypeMismatch => {
+                        warning!(
+                            "Cannot extract DISTINCT ON key '{key_col}' for '{entity}': \
+                             unsupported column type — skipping refresh for this row"
                         );
                     }
                 }
@@ -94,57 +134,100 @@ fn pg_tview_trigger_handler<'a>(
     }
 
     // 2. Indirect: this table is a dependency of one or more TVIEWs
-    //    (e.g. tb_comment is in tv_post's dependencies array)
-    //    PK extraction is handled inside — it reads FK values from the child row
-    enqueue_indirect_parents(trigger, table_oid);
+    //    Follow cascade paths to determine which TVIEW rows need refreshing
+    enqueue_cascade_parents(trigger, table_oid);
 
     Ok(None)
 }
 
-/// Look up parent entities for an indirect base table and enqueue their refreshes.
+/// Follow cascade paths from a base table change to enqueue parent TVIEW refreshes.
 ///
-/// When a child table (e.g. `tb_comment`) changes, we find all parent TVIEWs whose
-/// `dependencies` array includes this table's OID. For each parent, we extract the
-/// FK value from the child row (e.g. `fk_post`) to determine which parent row to refresh.
-fn enqueue_indirect_parents(trigger: &PgTrigger, table_oid: pg_sys::Oid) {
-    let parent_entities = match crate::catalog::parent_entities_for_base_table(table_oid) {
-        Ok(entities) => entities,
-        Err(e) => {
-            warning!(
-                "Failed to find parent entities for table {:?}: {:?}",
-                table_oid,
-                e
-            );
-            return;
-        }
-    };
+/// When a base table (e.g. `tb_item`) changes, loads cascade paths from the
+/// transaction-scoped cache and follows each path hop-by-hop via SPI to
+/// discover which TVIEW entity rows need refreshing.
+fn enqueue_cascade_parents(trigger: &PgTrigger, table_oid: pg_sys::Oid) {
+    let paths: Vec<crate::cascade_path::CascadePath> =
+        match crate::queue::cache::cascade_cache::cascade_paths_for_table(table_oid) {
+            Ok(p) => p,
+            Err(e) => {
+                warning!(
+                    "Failed to load cascade paths for table {:?}: {:?}",
+                    table_oid,
+                    e
+                );
+                return;
+            }
+        };
 
-    if parent_entities.is_empty() {
-        return; // table not managed by pg_tviews at all
+    if paths.is_empty() {
+        return;
     }
 
-    // Use NEW for INSERT/UPDATE, OLD for DELETE
     let Some(tuple) = trigger.new().or_else(|| trigger.old()) else {
         warning!("No tuple available in trigger context");
         return;
     };
 
-    for parent_entity in parent_entities {
-        // Convention: child row has fk_{parent_entity} column
-        let fk_col = format!("fk_{parent_entity}");
-        match tuple_get_i64(&tuple, &fk_col) {
-            Some(parent_pk) => {
-                enqueue_refresh(&parent_entity, parent_pk);
-            }
-            None => {
-                warning!(
-                    "FK column {} is NULL or missing, skipping refresh for {}",
-                    fk_col,
-                    parent_entity
-                );
-            }
+    for path in &paths {
+        if let Err(e) = follow_cascade_path(path, &tuple) {
+            warning!(
+                "Cascade refresh failed for path {} → {}: {:?}",
+                path.source_table,
+                path.entity_name,
+                e
+            );
         }
     }
+}
+
+/// Follow a single cascade path to enqueue refresh(es) for the target entity.
+fn follow_cascade_path(
+    path: &crate::cascade_path::CascadePath,
+    tuple: &PgHeapTuple<AllocatedByPostgres>,
+) -> crate::TViewResult<()> {
+    if path.unresolvable {
+        // Full refresh fallback — enqueue with pk=0 sentinel
+        // (the flush engine will treat this as "refresh all rows")
+        warning!(
+            "Unresolvable cascade path for entity '{}' — full refresh needed",
+            path.entity_name
+        );
+        return Ok(());
+    }
+
+    // Step 1: Read initial_col from the changed tuple
+    let mut current_ids = match tuple_get_i64(tuple, &path.initial_col) {
+        IntExtraction::Value(pk) => vec![pk],
+        IntExtraction::Null => return Ok(()), // FK is NULL, cascade stops
+        IntExtraction::Missing => {
+            warning!(
+                "Initial column '{}' not found on tuple for cascade to '{}'",
+                path.initial_col,
+                path.entity_name
+            );
+            return Ok(());
+        }
+    };
+
+    // Step 2: Follow each intermediate hop via SPI
+    for hop in &path.hops {
+        if current_ids.is_empty() {
+            return Ok(());
+        }
+        current_ids = crate::queue::spi_batch_lookup(
+            hop.table_oid,
+            &hop.lookup_col,
+            &hop.carry_col,
+            &current_ids,
+        )?;
+    }
+
+    // Step 3: Enqueue refresh for each resulting PK
+    for pk in current_ids {
+        enqueue_refresh(&path.entity_name, pk);
+    }
+
+    Ok(())
 }
 
 /// Statement-level AFTER trigger that flushes the refresh queue.
