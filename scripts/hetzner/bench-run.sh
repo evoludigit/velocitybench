@@ -199,7 +199,9 @@ run rsync -az -e "ssh -i ${SSH_KEY_FILE} -o StrictHostKeyChecking=accept-new" \
     "$SSH_KEY_FILE" "root@${LOADGEN_IP}:/root/.ssh/id_ed25519"
 ssh_loadgen "chmod 600 /root/.ssh/id_ed25519 && printf 'Host ${NETWORK_RANGE%%.0/*}.*\n  User root\n  StrictHostKeyChecking accept-new\n  ControlMaster auto\n  ControlPath /root/.ssh/cm-%%r@%%h\n  ControlPersist 10m\n' > /root/.ssh/config"
 # SUT: postgres up + seeded (logged tviews — the publishable profile).
+# The compose file declares the docker network as external — create it first.
 # First boot seeds 10k users / 500k comments + tv build — wait for it.
+ssh_sut "docker network inspect velocitybench-benchmark >/dev/null 2>&1 || docker network create velocitybench-benchmark"
 ssh_sut "cd ${REMOTE_DIR} && TVIEW_PERSISTENCE=logged docker compose up -d postgres"
 ssh_sut "cd ${REMOTE_DIR} && for i in \$(seq 1 180); do \
 docker compose exec -T postgres psql -U benchmark -d velocitybench_benchmark -tAc \
