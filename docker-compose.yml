@@ -20,9 +20,10 @@ services:
       - ./database/05-large-dataset.sql:/docker-entrypoint-initdb.d/04-seed.sql
       - ./frameworks/fraiseql/database/extensions.sql:/docker-entrypoint-initdb.d/05-fraiseql-views.sql
       - ./database/fraiseql_tv_bulk_sync.sql:/docker-entrypoint-initdb.d/06-fraiseql-tv-sync.sql
-      - ./database/fraiseql_mutations.sql:/docker-entrypoint-initdb.d/07-fraiseql-mutations.sql
-      - ./database/fraiseql_audit_helpers.sql:/docker-entrypoint-initdb.d/08-fraiseql-audit-helpers.sql
-      - ./database/fraiseql_mutations_full.sql:/docker-entrypoint-initdb.d/09-fraiseql-mutations-full.sql
+      - ./database/fraiseql_mutation_helpers.sql:/docker-entrypoint-initdb.d/07-fraiseql-mutation-helpers.sql
+      - ./database/fraiseql_mutations.sql:/docker-entrypoint-initdb.d/08-fraiseql-mutations.sql
+      - ./database/fraiseql_audit_helpers.sql:/docker-entrypoint-initdb.d/09-fraiseql-audit-helpers.sql
+      - ./database/fraiseql_mutations_full.sql:/docker-entrypoint-initdb.d/10-fraiseql-mutations-full.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U benchmark -d velocitybench_benchmark"]
       interval: 10s
@@ -156,6 +157,10 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     deploy:
       resources:
         limits:

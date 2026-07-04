@@ -1,4 +1,4 @@
-# FraiseQL v2.1.2 Dockerfile for VelocityBench
+# FraiseQL v2.2.0 Dockerfile for VelocityBench
 # Multi-stage build: Python schema gen -> CLI compile -> Debian runtime
 
 # Build argument: which schema variant to compile.
@@ -36,13 +36,13 @@ RUN python schema_source.py && \
      mv schema_tv_audit.json schema.json 2>/dev/null || true)
 
 # ============================================================================
-# Stage 2: Compile schema with fraiseql-cli v2.1.0
+# Stage 2: Compile schema with fraiseql-cli v2.2.0
 # The build directory intentionally has NO fraiseql.toml (server config)
 # to avoid auto-discovery conflicts with the CLI's TOML parser.
 # ============================================================================
 FROM debian:trixie-slim AS builder
 
-# Install fraiseql-cli (v2.1.2 release binary)
+# Install fraiseql-cli (v2.2.0 release binary)
 COPY fraiseql-cli /usr/local/bin/fraiseql-cli
 RUN chmod +x /usr/local/bin/fraiseql-cli
 
@@ -53,10 +53,10 @@ ARG BUILD_TOML
 COPY --from=schema-builder /app/schema.json .
 COPY ${BUILD_TOML} ./fraiseql.toml
 
-# Compile schema: TOML-only workflow (types, queries, mutations defined in build TOML + schema.json)
-RUN fraiseql-cli compile schema.json -o schema.compiled.json
+# Compile schema: legacy JSON workflow (types/queries/mutations in schema.json)
+RUN fraiseql-cli compile schema.json --output schema.compiled.json
 
-# Copy fraiseql-server binary (v2.1.2 release)
+# Copy fraiseql-server binary (v2.2.0 release)
 COPY fraiseql-server /usr/local/bin/fraiseql-server
 RUN chmod +x /usr/local/bin/fraiseql-server
 

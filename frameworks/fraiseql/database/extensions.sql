@@ -319,50 +319,58 @@ GRANT SELECT ON benchmark.v_post_full_delta TO PUBLIC;
 --      not seq scan (the missing index that made the naive delta ~200× slower than pg_tviews)
 -- ============================================================================
 
-CREATE OR REPLACE FUNCTION benchmark.fn_update_user_delta(
-    p_id  JSONB,
-    p_bio JSONB DEFAULT NULL
+DROP FUNCTION IF EXISTS benchmark.fn_update_user_delta(JSONB, JSONB);
+DROP FUNCTION IF EXISTS benchmark.fn_update_user_delta(TEXT, TEXT);
+
+CREATE FUNCTION benchmark.fn_update_user_delta(
+    p_id  TEXT,
+    p_bio TEXT DEFAULT NULL
 ) RETURNS TABLE(
-    status      TEXT,
-    message     TEXT,
-    entity      JSONB,
-    entity_type TEXT,
-    cascade     JSONB,
-    metadata    JSONB,
-    entity_id   TEXT
+    succeeded      BOOLEAN,
+    state_changed  BOOLEAN,
+    error_class    TEXT,
+    status_detail  TEXT,
+    http_status    SMALLINT,
+    message        TEXT,
+    entity_id      UUID,
+    entity_type    TEXT,
+    entity         JSONB,
+    updated_fields TEXT[],
+    cascade        JSONB,
+    error_detail   JSONB,
+    metadata       JSONB
 ) AS $$
 DECLARE
     v_pk          BIGINT;
-    v_bio         TEXT := COALESCE(p_bio #>> '{}', '');
+    v_user_uuid   UUID;
     v_data        JSONB;
     v_patch       JSONB;
     v_post_pks    BIGINT[];
     v_current_bio TEXT;
+    v_changed     BOOLEAN;
 BEGIN
     -- Serialize concurrent updates per user via the same row lock pg_tviews uses
-    SELECT pk_user INTO v_pk
+    SELECT pk_user, id INTO v_pk, v_user_uuid
     FROM benchmark.tb_user
-    WHERE id = (p_id #>> '{}')::UUID
+    WHERE id = p_id::UUID
     FOR UPDATE;
 
     IF v_pk IS NULL THEN
-        RETURN QUERY SELECT
-            'failed:not_found'::TEXT, 'User not found'::TEXT,
-            NULL::JSONB, 'User'::TEXT, NULL::JSONB, NULL::JSONB, NULL::TEXT;
+        RETURN QUERY SELECT * FROM fraiseql.mutation_err('not_found', 'User not found');
         RETURN;
     END IF;
 
     -- No-change detection — mirrors pg_tviews_check_jsonb_delta skip behaviour
     SELECT data->>'bio' INTO v_current_bio FROM benchmark.tvd_user WHERE pk_user = v_pk;
-    IF v_current_bio IS NOT DISTINCT FROM v_bio THEN
+    v_changed := (v_current_bio IS DISTINCT FROM p_bio);
+
+    IF NOT v_changed THEN
         SELECT data INTO v_data FROM benchmark.tvd_user WHERE pk_user = v_pk;
-        RETURN QUERY SELECT
-            'updated'::TEXT, NULL::TEXT, v_data, 'User'::TEXT,
-            NULL::JSONB, NULL::JSONB, (p_id #>> '{}')::TEXT;
+        RETURN QUERY SELECT * FROM fraiseql.mutation_ok(v_data, v_user_uuid, 'User', FALSE);
         RETURN;
     END IF;
 
-    v_patch := jsonb_build_object('bio', v_bio);
+    v_patch := jsonb_build_object('bio', p_bio);
 
     -- Surgical patches — idx_tvd_*_fk_author ensures index scan, not seq scan
     UPDATE benchmark.tvd_user
@@ -389,13 +397,13 @@ BEGIN
 
     SELECT data INTO v_data FROM benchmark.tvd_user WHERE pk_user = v_pk;
 
-    RETURN QUERY SELECT
-        'updated'::TEXT, NULL::TEXT, v_data, 'User'::TEXT,
-        NULL::JSONB, NULL::JSONB, (p_id #>> '{}')::TEXT;
+    RETURN QUERY SELECT * FROM fraiseql.mutation_ok(
+        v_data, v_user_uuid, 'User', TRUE, ARRAY['bio']::TEXT[]
+    );
 END;
 $$ LANGUAGE plpgsql;
 
-GRANT EXECUTE ON FUNCTION benchmark.fn_update_user_delta(JSONB, JSONB) TO PUBLIC;
+GRANT EXECUTE ON FUNCTION benchmark.fn_update_user_delta(TEXT, TEXT) TO PUBLIC;
 
 -- ============================================================================
 -- v_comment_slim — Q3 optimized view: strips heavy post fields from tv_comment

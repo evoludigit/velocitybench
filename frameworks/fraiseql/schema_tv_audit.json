@@ -37,12 +37,14 @@
         {
           "name": "createdAt",
           "type": "DateTime",
-          "nullable": false
+          "nullable": false,
+          "computed": true
         },
         {
           "name": "updatedAt",
           "type": "DateTime",
-          "nullable": false
+          "nullable": false,
+          "computed": true
         }
       ],
       "description": "User type representing a platform user."
@@ -84,12 +86,14 @@
         {
           "name": "createdAt",
           "type": "DateTime",
-          "nullable": false
+          "nullable": false,
+          "computed": true
         },
         {
           "name": "updatedAt",
           "type": "DateTime",
-          "nullable": false
+          "nullable": false,
+          "computed": true
         }
       ],
       "description": "Post type representing a blog post."
@@ -126,12 +130,14 @@
         {
           "name": "createdAt",
           "type": "DateTime",
-          "nullable": false
+          "nullable": false,
+          "computed": true
         },
         {
           "name": "updatedAt",
           "type": "DateTime",
-          "nullable": false
+          "nullable": false,
+          "computed": true
         }
       ],
       "description": "Comment type representing a comment on a post."
