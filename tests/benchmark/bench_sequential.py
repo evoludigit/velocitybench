@@ -96,6 +96,19 @@ _HASURA_M1_TMPL = (
     " {{ returning {{ id bio }} }} }}"
 )
 _GQL_Q3 = "{ comments(limit: 20) { id content author { username } post { title } } }"
+
+# C3 single-entity lookup templates (rotating UUIDs rendered per document).
+# Hasura: no *_by_pk root is addressable by the benchmark uuid (pk is the
+# serial pk_user), so the single-row lookup goes through `where` — same
+# unique-index work. PostGraphile v5 amber: single-row lookup by uuid is
+# tbUserByRowId; aliased to the cross-framework shape.
+_HASURA_C3_TMPL = (
+    '{{ users(where: {{id: {{_eq: "{user_id}"}}}}) {{ id username fullName }} }}'
+)
+_PG_C3_TMPL = (
+    '{{ user: tbUserByRowId(rowId: "{user_id}") {{ id: rowId username fullName }} }}'
+)
+
 _GQL_M1_TMPL = (
     'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "{bio}" }}) {{ id bio }} }}'
 )
@@ -307,10 +320,13 @@ FRAMEWORKS: dict[str, dict] = {
             "Q2": "http://localhost:8015/posts?limit=10",
             "Q2b": "http://localhost:8015/posts?limit=10&include=author",  # includes author JOIN
             "Q3": "http://localhost:8015/comments?limit=20",  # embedded author + post
+            "C3": "C3",
+            "HC3": "HC3",
             "M1": "M1",
             "F1": "http://localhost:8015/posts?published=true&limit=10",
             "F2": "http://localhost:8015/posts?published=true&limit=10&include=author",
-            "T1": "T1",  # no /posts/{id}/comments endpoint — skipped at runtime if missing
+            "T1": "T1",
+            "MC1": "MC1",  # REST workflow cycle: PUT /users/{id} + GET /users re-fetch
         },
         "health_url": "http://localhost:8015/health",
     },
@@ -324,6 +340,8 @@ FRAMEWORKS: dict[str, dict] = {
             "Q2": ("http://localhost:8016/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:8016/graphql", _GQL_Q2b),
             "Q3": ("http://localhost:8016/graphql", _GQL_Q3),
+            "C3": "C3",
+            "HC3": "HC3",
             "M1": "M1",
             "F1": ("http://localhost:8016/graphql", _GQL_F1),
             "F2": ("http://localhost:8016/graphql", _GQL_F2),
@@ -439,10 +457,13 @@ FRAMEWORKS: dict[str, dict] = {
             "Q2": ("http://localhost:4002/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:4002/graphql", _GQL_Q2b),
             "Q3": ("http://localhost:4002/graphql", _GQL_Q3),
+            "C3": "C3",
+            "HC3": "HC3",
             "M1": "M1",
             "F1": ("http://localhost:4002/graphql", _GQL_F1),
             "F2": ("http://localhost:4002/graphql", _GQL_F2),
             "T1": "T1",
+            "MC1": "MC1",
         },
         "health_url": "http://localhost:4002/health",
         "m1_template": _GQL_M1_FLAT_TMPL,
@@ -537,6 +558,8 @@ FRAMEWORKS: dict[str, dict] = {
             "Q2": ("http://localhost:4008/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:4008/graphql", _GQL_Q2b),
             "Q3": ("http://localhost:4008/graphql", _GQL_Q3),
+            "C3": "C3",
+            "HC3": "HC3",
             "M1": "M1",
             "F1": ("http://localhost:4008/graphql", _GQL_F1),
             "F2": ("http://localhost:4008/graphql", _GQL_F2),
@@ -559,10 +582,13 @@ FRAMEWORKS: dict[str, dict] = {
             "Q2": ("http://localhost:8011/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:8011/graphql", _GQL_Q2b),
             "Q3": ("http://localhost:8011/graphql", _GQL_Q3),
+            "C3": "C3",
+            "HC3": "HC3",
             "M1": "M1",
             "F1": ("http://localhost:8011/graphql", _GQL_F1),
             "F2": ("http://localhost:8011/graphql", _GQL_F2),
             "T1": "T1",
+            "MC1": "MC1",
         },
         "health_url": "http://localhost:8011/health",
         "m1_template": _GQL_M1_FLAT_TMPL,
@@ -841,6 +867,8 @@ FRAMEWORKS: dict[str, dict] = {
             "Q2": ("http://localhost:4014/graphql", _PG_Q2),
             "Q2b": ("http://localhost:4014/graphql", _PG_Q2b),
             "Q3": ("http://localhost:4014/graphql", _PG_Q3),
+            "C3": "C3",
+            "HC3": "HC3",
             "F1": ("http://localhost:4014/graphql", _PG_F1),
             "F2": ("http://localhost:4014/graphql", _PG_F2),
             "M1": "M1",
@@ -850,6 +878,7 @@ FRAMEWORKS: dict[str, dict] = {
         "health_url": "http://localhost:4014/health",
         "m1_template": _PG_M1_TMPL,
         "t1_template": "postgraphile",
+        "c3_template": _PG_C3_TMPL,
     },
     # ------------------------------------------------------------------
     # Schema-to-API engines (no resolver code — API generated from the DB)
@@ -865,6 +894,8 @@ FRAMEWORKS: dict[str, dict] = {
             "Q2": ("http://localhost:4000/v1/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:4000/v1/graphql", _GQL_Q2b),
             "Q3": ("http://localhost:4000/v1/graphql", _GQL_Q3),
+            "C3": "C3",
+            "HC3": "HC3",
             "F1": ("http://localhost:4000/v1/graphql", _HASURA_F1),
             "F2": ("http://localhost:4000/v1/graphql", _HASURA_F2),
             "M1": "M1",
@@ -881,6 +912,7 @@ FRAMEWORKS: dict[str, dict] = {
         "start_timeout": 120,
         "m1_template": _HASURA_M1_TMPL,
         "t1_template": "hasura",
+        "c3_template": _HASURA_C3_TMPL,
     },
     # ------------------------------------------------------------------
     # C# / .NET frameworks
@@ -1249,13 +1281,13 @@ class _PersistentConn:
                 pass
             self._conn = None
 
-    def get(self) -> tuple[bool, float, str, str]:
+    def get(self, path: str | None = None) -> tuple[bool, float, str, str]:
         for attempt in range(2):
             t0 = time.monotonic()
             try:
                 self._connect()
                 assert self._conn is not None
-                self._conn.request("GET", self._path)
+                self._conn.request("GET", path if path is not None else self._path)
                 resp = self._conn.getresponse()
                 raw = resp.read()
                 elapsed = (time.monotonic() - t0) * 1000
@@ -1877,6 +1909,69 @@ def _worker_mutation_rest_rotating(
     return latencies, errors, breakdown, samples
 
 
+def _worker_rest_get_rotating(urls: list[str], end_time: float) -> _WorkerResult:
+    """Single-entity REST GETs with URL rotation (C3/HC3 lookup traffic)."""
+    import random
+
+    latencies: list[float] = []
+    errors = 0
+    breakdown: dict[str, int] = {}
+    samples: list[tuple[str, str]] = []
+    conn = _PersistentConn(urls[0])
+    paths = [
+        urlparse(u).path + ("?" + urlparse(u).query if urlparse(u).query else "")
+        for u in urls
+    ]
+    n = len(paths)
+    while time.monotonic() < end_time:
+        ok, lat, cat, detail = conn.get(path=paths[random.randrange(n)])  # noqa: S311
+        if ok:
+            latencies.append(lat)
+        else:
+            errors += 1
+            breakdown[cat] = breakdown.get(cat, 0) + 1
+            if len(samples) < _MAX_ERROR_SAMPLES:
+                samples.append((cat, detail))
+    return latencies, errors, breakdown, samples
+
+
+def _worker_mc1_rest(
+    put_urls: list[str], put_bodies: list[bytes], q1_url: str, end_time: float
+) -> _WorkerResult:
+    """MC1 REST cycle: PUT mutation + GET Q1 re-fetch (2 serial requests).
+
+    REST twin of _worker_mc1_classical — the minimum client work to reach
+    consistent state after a write on a classical REST API. Latency = total
+    wall-clock for the pair; RPS = cycles/second. The mutation url/body pair
+    rotates (write spreading — same reason as M1).
+    """
+    import random
+
+    latencies: list[float] = []
+    errors = 0
+    breakdown: dict[str, int] = {}
+    samples: list[tuple[str, str]] = []
+    conn = _PersistentConn(q1_url)
+    put_paths = [urlparse(u).path for u in put_urls]
+    parsed_q1 = urlparse(q1_url)
+    q1_path = parsed_q1.path + ("?" + parsed_q1.query if parsed_q1.query else "")
+    n = len(put_paths)
+    while time.monotonic() < end_time:
+        t0 = time.monotonic()
+        i = random.randrange(n)  # noqa: S311
+        ok, _lat, cat, detail = conn.put(put_bodies[i], path=put_paths[i])
+        if ok:
+            ok, _lat, cat, detail = conn.get(path=q1_path)
+        if ok:
+            latencies.append((time.monotonic() - t0) * 1000)
+        else:
+            errors += 1
+            breakdown[cat] = breakdown.get(cat, 0) + 1
+            if len(samples) < _MAX_ERROR_SAMPLES:
+                samples.append((cat, detail))
+    return latencies, errors, breakdown, samples
+
+
 def _worker_graphql_composite(url: str, payloads: list[bytes], end_time: float) -> _WorkerResult:
     """Worker for T1 total scenario with multiple sequential GraphQL POSTs.
 
@@ -2062,6 +2157,20 @@ def _entry_to_k6_steps(entry, fw_type: str, query_name: str) -> list[dict]:
                 "bodies": entry["bodies"],
                 "validate": "rest",
             }]
+        if mode == "rest_get_rotating":
+            # Single-entity REST lookups; urls rotate per iteration
+            return [{"method": "GET", "urls": entry["urls"], "validate": "rest"}]
+        if mode == "mc1_rest":
+            # REST MC1 cycle: rotating PUT + fixed GET re-fetch (2 steps/iteration)
+            return [
+                {
+                    "method": "PUT",
+                    "urls": entry["put_urls"],
+                    "bodies": entry["put_bodies"],
+                    "validate": "rest",
+                },
+                {"method": "GET", "url": entry["q1_url"], "validate": "rest"},
+            ]
         if mode == "graphql_composite":
             return [gql(entry["url"], p.decode()) for p in entry["payloads"]]
         if mode == "composite":
@@ -2252,6 +2361,24 @@ def run_scenario(
                 bodies = [b.encode() if isinstance(b, str) else b for b in entry["bodies"]]
                 futures = [
                     pool.submit(_worker_mutation_rest_rotating, urls, bodies, end_time)
+                    for _ in range(concurrency)
+                ]
+            elif isinstance(entry, dict) and entry.get("mode") == "rest_get_rotating":
+                # C3/HC3 REST: single-entity GETs rotated across the UUID pool
+                urls = entry["urls"]
+                futures = [
+                    pool.submit(_worker_rest_get_rotating, urls, end_time)
+                    for _ in range(concurrency)
+                ]
+            elif isinstance(entry, dict) and entry.get("mode") == "mc1_rest":
+                # REST MC1: PUT mutation + GET Q1 re-fetch — 2 requests per cycle
+                put_urls = entry["put_urls"]
+                put_bodies = [
+                    b.encode() if isinstance(b, str) else b for b in entry["put_bodies"]
+                ]
+                q1_url = entry["q1_url"]
+                futures = [
+                    pool.submit(_worker_mc1_rest, put_urls, put_bodies, q1_url, end_time)
                     for _ in range(concurrency)
                 ]
             elif isinstance(entry, dict) and entry.get("mode") == "graphql_composite":
@@ -3237,7 +3364,7 @@ _QUERY_LABELS = {
     "F2": "`posts(published: true, limit: 10) { id title author { ... } }` — published filter + nesting",
     "F3": "`users(limit: 20) { id username fullName }` — baseline for ORDER BY comparison",
     "T1": "Full blog page load — `post(id) { title content author { ... } comments(limit:10) { content author { ... } } }`",
-    "MC1": "Mutation-to-consistent-state cycle — FraiseQL: 1 request (M1 + cascade data). Classical: 2 serial requests (M1 + Q1 re-fetch). RPS = cycles/second.",
+    "MC1": "Mutation-to-consistent-state cycle — FraiseQL: 1 request (M1 + cascade data). Classical GraphQL: 2 serial requests (M1 + Q1 re-fetch). REST: 2 serial requests (PUT + GET re-fetch). RPS = cycles/second.",
     "Q1_APQ": "APQ hash-only Q1 — no query string sent, server resolves by SHA-256 hash. Compare to Q1.",
     "Q2b_APQ": "APQ hash-only Q2b — nested posts+author query via hash lookup. Compare to Q2b.",
     "M1_APQ": "APQ mutation — hash + variables only (FraiseQL) or hash-only (classical). Compare to M1.",
@@ -4352,75 +4479,86 @@ def main() -> None:
                     fw_config["queries"]["M1d"] = None
                     print("  M1d: could not discover user UUID — skipping", flush=True)
 
-            if fw_config["queries"].get("C3") == "C3":
-                if user_id:
-                    q1_entry = fw_config["queries"].get("Q1")
-                    gql_url = (
-                        q1_entry[0]
-                        if q1_entry is not None
-                        else fw_config.get("graphql_url", "")
+            # C3 / HC3: single-entity lookup. C3 rotates the full discovered UUID
+            # pool (cache-miss traffic); HC3 restricts to a 5-UUID hot pool
+            # (cache saturation test). Same resolution for both — only the pool
+            # size differs.
+            for _c3_key, _c3_pool_size in (("C3", None), ("HC3", 5)):
+                if fw_config["queries"].get(_c3_key) != _c3_key:
+                    continue
+                if not user_id:
+                    fw_config["queries"][_c3_key] = None
+                    print(f"  {_c3_key}: could not discover user UUID — skipping", flush=True)
+                    continue
+                user_ids = _discover_user_uuids(fw_config) or [user_id]
+                pool = user_ids[:_c3_pool_size] if _c3_pool_size else user_ids
+                pool_desc = (
+                    f"{len(pool)} hot user UUIDs (fixed pool, cache saturation test)"
+                    if _c3_pool_size
+                    else f"{len(pool)} user UUIDs (rotating)"
+                )
+                if fw_config["type"] == "rest":
+                    # REST: GET /users/{id}, URL rotation across the pool.
+                    q1_url = fw_config["queries"]["Q1"]
+                    base = q1_url.rsplit("/users", 1)[0]
+                    fw_config["queries"][_c3_key] = {
+                        "mode": "rest_get_rotating",
+                        "urls": [f"{base}/users/{uid}" for uid in pool],
+                    }
+                    print(f"  {_c3_key}: {pool_desc} — REST GETs", flush=True)
+                    continue
+                q1_entry = fw_config["queries"].get("Q1")
+                gql_url = (
+                    q1_entry[0]
+                    if isinstance(q1_entry, tuple)
+                    else fw_config.get("graphql_url", "")
+                )
+                if fw_config.get("m1_template") == "fraiseql":
+                    # FraiseQL: executor reads args from the variables map.
+                    variables_list = [{"id": uid} for uid in pool]
+                    fw_config["queries"][_c3_key] = (
+                        gql_url,
+                        _FRAISEQL_C3_QUERY,
+                        variables_list,
                     )
-                    if fw_config.get("m1_template") == "fraiseql":
-                        # FraiseQL: use variables with rotating UUIDs so workers spread
-                        # across all discovered users — realistic single-entity lookup traffic.
-                        user_ids = _discover_user_uuids(fw_config)
-                        if not user_ids:
-                            user_ids = [user_id]
-                        variables_list = [{"id": uid} for uid in user_ids]
-                        fw_config["queries"]["C3"] = (
-                            gql_url,
-                            _FRAISEQL_C3_QUERY,
-                            variables_list,
-                        )
-                        print(
-                            f"  C3: resolved {len(user_ids)} user UUIDs "
-                            f"(rotating, fraiseql variables)",
-                            flush=True,
-                        )
-                    else:
-                        c3_tmpl = fw_config.get("c3_template", _FRAISEQL_C3_TMPL)
-                        c3_query = c3_tmpl.format(user_id=user_id)
-                        fw_config["queries"]["C3"] = (gql_url, c3_query)
-                        print(f"  C3: resolved user UUID {user_id[:8]}...", flush=True)
+                    print(f"  {_c3_key}: {pool_desc} — fraiseql variables", flush=True)
                 else:
-                    fw_config["queries"]["C3"] = None
-                    print("  C3: could not discover user UUID — skipping", flush=True)
+                    # Classical: one rendered document per UUID, rotated per
+                    # request (same write-spreading machinery as M1).
+                    c3_tmpl = fw_config.get("c3_template", _FRAISEQL_C3_TMPL)
+                    fw_config["queries"][_c3_key] = {
+                        "mode": "graphql_rotating",
+                        "url": gql_url,
+                        "payloads": [
+                            json.dumps({"query": c3_tmpl.format(user_id=uid)}).encode()
+                            for uid in pool
+                        ],
+                    }
+                    print(f"  {_c3_key}: {pool_desc} — rendered documents", flush=True)
 
-            if fw_config["queries"].get("HC3") == "HC3":
+            if fw_config["queries"].get("MC1") == "MC1" and fw_config["type"] == "rest":
+                # REST workflow cycle: PUT /users/{id} mutation + GET Q1 re-fetch
+                # (2 serial requests — same asymmetry as classical GraphQL MC1).
                 if user_id:
-                    q1_entry = fw_config["queries"].get("Q1")
-                    gql_url = (
-                        q1_entry[0]
-                        if q1_entry is not None
-                        else fw_config.get("graphql_url", "")
+                    user_ids_mc1 = _discover_user_uuids(fw_config) or [user_id]
+                    q1_url = fw_config["queries"]["Q1"]
+                    base = q1_url.rsplit("/users", 1)[0]
+                    pairs = _rotating_writes(user_ids_mc1, _M1_BIOS)
+                    fw_config["queries"]["MC1"] = {
+                        "mode": "mc1_rest",
+                        "put_urls": [f"{base}/users/{uid}" for uid, _ in pairs],
+                        "put_bodies": [json.dumps({"bio": bio}) for _, bio in pairs],
+                        "q1_url": q1_url,
+                    }
+                    print(
+                        f"  MC1: REST classical (2 req/cycle), {len(user_ids_mc1)} user "
+                        f"UUIDs × {len(_M1_BIOS)} bio values (rotating writes)",
+                        flush=True,
                     )
-                    if fw_config.get("m1_template") == "fraiseql":
-                        # HC3: hot-key variant of C3 — only 5 fixed UUIDs so cache fills after
-                        # 5 misses and all subsequent requests are hits. Measures sustained
-                        # cache-hit throughput vs raw DB round-trip (nocache).
-                        user_ids = _discover_user_uuids(fw_config)
-                        hot_ids = user_ids[:5] if user_ids else [user_id]
-                        variables_list = [{"id": uid} for uid in hot_ids]
-                        fw_config["queries"]["HC3"] = (
-                            gql_url,
-                            _FRAISEQL_C3_QUERY,
-                            variables_list,
-                        )
-                        print(
-                            f"  HC3: resolved {len(hot_ids)} hot user UUIDs "
-                            f"(fixed pool, cache saturation test)",
-                            flush=True,
-                        )
-                    else:
-                        c3_tmpl = fw_config.get("c3_template", _FRAISEQL_C3_TMPL)
-                        c3_query = c3_tmpl.format(user_id=user_id)
-                        fw_config["queries"]["HC3"] = (gql_url, c3_query)
-                        print(f"  HC3: resolved user UUID {user_id[:8]}...", flush=True)
                 else:
-                    fw_config["queries"]["HC3"] = None
-                    print("  HC3: could not discover user UUID — skipping", flush=True)
-
-            if fw_config["queries"].get("MC1") == "MC1":
+                    fw_config["queries"]["MC1"] = None
+                    print("  MC1: could not discover user UUID — skipping", flush=True)
+            elif fw_config["queries"].get("MC1") == "MC1":
                 q1_entry = fw_config["queries"].get("Q1")
                 gql_url = (
                     q1_entry[0]
