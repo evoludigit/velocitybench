@@ -130,3 +130,7 @@ frameworks/fraiseql/schema_tv.compiled.patched.json
 # FraiseQL server binary (copied from local build for Docker context)
 # Replace with crates.io install once fraiseql-server beta.3 is published
 frameworks/fraiseql/fraiseql-server
+
+# VelocityBench site — generated output (rebuilt from run JSON)
+site/dist/
+site/tests/junit.xml

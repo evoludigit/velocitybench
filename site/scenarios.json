@@ -1,0 +1,487 @@
+{
+  "_comment": "Hand-maintained metadata contract for the VelocityBench site. Changes only when the benchmark grid changes. Exclusion reasons are verbatim from docs/scenarios.md; framework/scenario orders are canonical (do not derive from dict order).",
+  "framework_order": [
+    "fraiseql-tv",
+    "fraiseql-tv-cache",
+    "fraiseql-v-nocache",
+    "fraiseql-v-cache",
+    "fraiseql-tv-audit",
+    "hasura",
+    "postgraphile",
+    "actix-web-rest",
+    "async-graphql",
+    "mercurius",
+    "apollo-server",
+    "strawberry"
+  ],
+  "scenario_order": [
+    "Q1",
+    "Q2",
+    "Q2b",
+    "Q3",
+    "F1",
+    "F2",
+    "F3",
+    "T1",
+    "C3",
+    "HC3",
+    "M1",
+    "M1d",
+    "MC1",
+    "Q1_APQ",
+    "Q2b_APQ",
+    "M1_APQ"
+  ],
+  "frameworks": {
+    "fraiseql-tv": {
+      "label": "FraiseQL · tv",
+      "family": "fraiseql",
+      "mechanism": "precompute",
+      "note": "precomputed tv_* tables, no result cache"
+    },
+    "fraiseql-tv-cache": {
+      "label": "FraiseQL · tv+cache",
+      "family": "fraiseql",
+      "mechanism": "precompute",
+      "note": "precomputed tv_* tables + result cache"
+    },
+    "fraiseql-v-nocache": {
+      "label": "FraiseQL · v",
+      "family": "fraiseql",
+      "mechanism": "compile",
+      "note": "on-the-fly JSONB JOIN views, no result cache"
+    },
+    "fraiseql-v-cache": {
+      "label": "FraiseQL · v+cache",
+      "family": "fraiseql",
+      "mechanism": "compile",
+      "note": "on-the-fly JSONB JOIN views + result cache"
+    },
+    "fraiseql-tv-audit": {
+      "label": "FraiseQL · tv+audit",
+      "family": "fraiseql",
+      "mechanism": "precompute",
+      "appendix": true,
+      "note": "M1-only audit-overhead appendix row"
+    },
+    "hasura": {
+      "label": "Hasura CE v2",
+      "family": "classical",
+      "mechanism": "compile",
+      "note": "compiles GraphQL to a single SQL query"
+    },
+    "postgraphile": {
+      "label": "PostGraphile v5",
+      "family": "classical",
+      "mechanism": "compile",
+      "note": "compiles GraphQL to a single SQL query"
+    },
+    "actix-web-rest": {
+      "label": "Actix (REST)",
+      "family": "classical",
+      "mechanism": "rest",
+      "note": "hand-written REST handlers over SQL"
+    },
+    "async-graphql": {
+      "label": "async-graphql",
+      "family": "classical",
+      "mechanism": "resolver",
+      "note": "Rust per-level resolvers with DataLoader batching"
+    },
+    "mercurius": {
+      "label": "Mercurius",
+      "family": "classical",
+      "mechanism": "resolver",
+      "note": "Fastify per-level resolvers with DataLoader batching"
+    },
+    "apollo-server": {
+      "label": "Apollo Server",
+      "family": "classical",
+      "mechanism": "resolver",
+      "note": "Node per-level resolvers with DataLoader batching"
+    },
+    "strawberry": {
+      "label": "Strawberry",
+      "family": "classical",
+      "mechanism": "resolver",
+      "note": "Python per-level resolvers with DataLoader batching"
+    }
+  },
+  "scenarios": {
+    "Q1": {
+      "label": "Flat user list (20 rows)",
+      "category": "read",
+      "ladder": "nesting",
+      "ladder_pos": 0,
+      "units": "RPS",
+      "doc_ref": "docs/scenarios.md#q1-flat-user-list"
+    },
+    "Q2": {
+      "label": "Flat post list (10 rows)",
+      "category": "read",
+      "ladder": "nesting",
+      "ladder_pos": 1,
+      "units": "RPS",
+      "doc_ref": "docs/scenarios.md#q2-flat-post-list"
+    },
+    "Q2b": {
+      "label": "Posts + author (1-level nest)",
+      "category": "read",
+      "ladder": "nesting",
+      "ladder_pos": 2,
+      "units": "RPS",
+      "doc_ref": "docs/scenarios.md#q2b-posts--author"
+    },
+    "Q3": {
+      "label": "Comments + author + post (2-level nest)",
+      "category": "read",
+      "ladder": "nesting",
+      "ladder_pos": 3,
+      "units": "RPS",
+      "doc_ref": "docs/scenarios.md#q3-comments--author--post"
+    },
+    "F1": {
+      "label": "Published filter (10 rows)",
+      "category": "read",
+      "units": "RPS",
+      "doc_ref": "docs/scenarios.md#f1-f2-published-filter"
+    },
+    "F2": {
+      "label": "Published filter + author (10 rows)",
+      "category": "read",
+      "units": "RPS",
+      "doc_ref": "docs/scenarios.md#f1-f2-published-filter"
+    },
+    "F3": {
+      "label": "ORDER BY baseline (20 rows)",
+      "category": "read",
+      "units": "RPS",
+      "note": "duplicates Q1 until the orderBy variant lands; the cell keeps the grid complete",
+      "doc_ref": "docs/scenarios.md#f3-order-by-baseline"
+    },
+    "T1": {
+      "label": "Full blog page (multi-root)",
+      "category": "read",
+      "ladder": "nesting",
+      "ladder_pos": 4,
+      "units": "RPS",
+      "note": "post + author + 10 comments-with-authors in one request; FraiseQL runs it multi-root",
+      "doc_ref": "docs/scenarios.md#t1-full-blog-page-load"
+    },
+    "C3": {
+      "label": "Single-row lookup, 20 rotating UUIDs (cache-miss)",
+      "category": "read",
+      "cache_regime": "miss",
+      "pair": "HC3",
+      "units": "RPS",
+      "doc_ref": "docs/scenarios.md#c3-hc3"
+    },
+    "HC3": {
+      "label": "Single-row lookup, 5-UUID hot pool (cache-hit)",
+      "category": "read",
+      "cache_regime": "hit",
+      "pair": "C3",
+      "units": "RPS",
+      "doc_ref": "docs/scenarios.md#c3-hc3"
+    },
+    "M1": {
+      "label": "Update user bio (full recompute)",
+      "category": "write",
+      "pair": "M1d",
+      "units": "RPS",
+      "doc_ref": "docs/scenarios.md#m1-single-field-update"
+    },
+    "M1d": {
+      "label": "Update user bio (delta patch)",
+      "category": "write",
+      "pair": "M1",
+      "units": "RPS",
+      "doc_ref": "docs/scenarios.md#m1-single-field-update"
+    },
+    "MC1": {
+      "label": "Mutation → consistent state (workflow)",
+      "category": "workflow",
+      "units": "cycles/s",
+      "doc_ref": "docs/scenarios.md#mc1-mutation-to-consistent-state"
+    },
+    "Q1_APQ": {
+      "label": "Q1 with APQ (persisted query)",
+      "category": "read",
+      "apq_base": "Q1",
+      "units": "RPS",
+      "doc_ref": "docs/scenarios.md#scenario-coverage--exclusions"
+    },
+    "Q2b_APQ": {
+      "label": "Q2b with APQ (persisted query)",
+      "category": "read",
+      "apq_base": "Q2b",
+      "units": "RPS",
+      "doc_ref": "docs/scenarios.md#scenario-coverage--exclusions"
+    },
+    "M1_APQ": {
+      "label": "M1 with APQ (persisted query)",
+      "category": "write",
+      "apq_base": "M1",
+      "units": "RPS",
+      "doc_ref": "docs/scenarios.md#scenario-coverage--exclusions"
+    }
+  },
+  "mutation_mechanisms": {
+    "M1": {
+      "fraiseql": "full-cascade",
+      "classical": "vanilla-update"
+    },
+    "M1d": {
+      "fraiseql": "jsonb-delta"
+    },
+    "M1_APQ": {
+      "fraiseql": "full-cascade",
+      "classical": "vanilla-update"
+    }
+  },
+  "exclusion_reasons": {
+    "1": "M1d on v-variants — updateUserDelta patches the tvd_* delta tables of the tv pipeline; the v-variants serve on-the-fly JSONB views and have no delta pipeline to contrast (structural, see frameworks/fraiseql/database/extensions.sql).",
+    "2": "fraiseql-tv-audit — audit-overhead appendix row: measures M1 only, to isolate the cost of audit logging on the mutation path. Deliberately not a full-grid framework; do not expand.",
+    "3": "M1d on non-FraiseQL engines — the jsonb_delta/tvd_* surgical-patch mutation is FraiseQL infrastructure; no equivalent operation exists to benchmark elsewhere.",
+    "4": "APQ on Hasura — Hasura CE v2 has no automatic-persisted-query handshake (its allow-lists and query caching are different mechanisms / Enterprise features). Hand-rolling APQ would benchmark custom code.",
+    "5": "APQ on PostGraphile — v5 first-party persisted operations are a build-time allowlist, not the register-on-first-use sha256 handshake the APQ scenarios measure.",
+    "6": "APQ on actix-web-rest — APQ is a GraphQL wire-protocol optimization (persisting a query document by hash); REST requests carry no document, so the scenario is not applicable.",
+    "7": "APQ on Strawberry — Strawberry GraphQL ships no first-party APQ extension (verified against the installed strawberry/extensions inventory); third-party or hand-rolled implementations would not benchmark the framework."
+  },
+  "exclusions": [
+    {
+      "framework": "fraiseql-v-nocache",
+      "scenario": "M1d",
+      "reason_id": 1
+    },
+    {
+      "framework": "fraiseql-v-cache",
+      "scenario": "M1d",
+      "reason_id": 1
+    },
+    {
+      "framework": "fraiseql-tv-audit",
+      "scenario": "Q1",
+      "reason_id": 2
+    },
+    {
+      "framework": "fraiseql-tv-audit",
+      "scenario": "Q2",
+      "reason_id": 2
+    },
+    {
+      "framework": "fraiseql-tv-audit",
+      "scenario": "Q2b",
+      "reason_id": 2
+    },
+    {
+      "framework": "fraiseql-tv-audit",
+      "scenario": "Q3",
+      "reason_id": 2
+    },
+    {
+      "framework": "fraiseql-tv-audit",
+      "scenario": "F1",
+      "reason_id": 2
+    },
+    {
+      "framework": "fraiseql-tv-audit",
+      "scenario": "F2",
+      "reason_id": 2
+    },
+    {
+      "framework": "fraiseql-tv-audit",
+      "scenario": "F3",
+      "reason_id": 2
+    },
+    {
+      "framework": "fraiseql-tv-audit",
+      "scenario": "T1",
+      "reason_id": 2
+    },
+    {
+      "framework": "fraiseql-tv-audit",
+      "scenario": "C3",
+      "reason_id": 2
+    },
+    {
+      "framework": "fraiseql-tv-audit",
+      "scenario": "HC3",
+      "reason_id": 2
+    },
+    {
+      "framework": "fraiseql-tv-audit",
+      "scenario": "M1d",
+      "reason_id": 2
+    },
+    {
+      "framework": "fraiseql-tv-audit",
+      "scenario": "MC1",
+      "reason_id": 2
+    },
+    {
+      "framework": "fraiseql-tv-audit",
+      "scenario": "Q1_APQ",
+      "reason_id": 2
+    },
+    {
+      "framework": "fraiseql-tv-audit",
+      "scenario": "Q2b_APQ",
+      "reason_id": 2
+    },
+    {
+      "framework": "fraiseql-tv-audit",
+      "scenario": "M1_APQ",
+      "reason_id": 2
+    },
+    {
+      "framework": "hasura",
+      "scenario": "M1d",
+      "reason_id": 3
+    },
+    {
+      "framework": "hasura",
+      "scenario": "Q1_APQ",
+      "reason_id": 4
+    },
+    {
+      "framework": "hasura",
+      "scenario": "Q2b_APQ",
+      "reason_id": 4
+    },
+    {
+      "framework": "hasura",
+      "scenario": "M1_APQ",
+      "reason_id": 4
+    },
+    {
+      "framework": "postgraphile",
+      "scenario": "M1d",
+      "reason_id": 3
+    },
+    {
+      "framework": "postgraphile",
+      "scenario": "Q1_APQ",
+      "reason_id": 5
+    },
+    {
+      "framework": "postgraphile",
+      "scenario": "Q2b_APQ",
+      "reason_id": 5
+    },
+    {
+      "framework": "postgraphile",
+      "scenario": "M1_APQ",
+      "reason_id": 5
+    },
+    {
+      "framework": "actix-web-rest",
+      "scenario": "M1d",
+      "reason_id": 3
+    },
+    {
+      "framework": "actix-web-rest",
+      "scenario": "Q1_APQ",
+      "reason_id": 6
+    },
+    {
+      "framework": "actix-web-rest",
+      "scenario": "Q2b_APQ",
+      "reason_id": 6
+    },
+    {
+      "framework": "actix-web-rest",
+      "scenario": "M1_APQ",
+      "reason_id": 6
+    },
+    {
+      "framework": "async-graphql",
+      "scenario": "M1d",
+      "reason_id": 3
+    },
+    {
+      "framework": "mercurius",
+      "scenario": "M1d",
+      "reason_id": 3
+    },
+    {
+      "framework": "apollo-server",
+      "scenario": "M1d",
+      "reason_id": 3
+    },
+    {
+      "framework": "strawberry",
+      "scenario": "M1d",
+      "reason_id": 3
+    },
+    {
+      "framework": "strawberry",
+      "scenario": "Q1_APQ",
+      "reason_id": 7
+    },
+    {
+      "framework": "strawberry",
+      "scenario": "Q2b_APQ",
+      "reason_id": 7
+    },
+    {
+      "framework": "strawberry",
+      "scenario": "M1_APQ",
+      "reason_id": 7
+    }
+  ],
+  "workload_shapes": {
+    "read-heavy": {
+      "label": "Read-heavy",
+      "scenarios": [
+        "Q1",
+        "Q2",
+        "Q2b",
+        "Q3",
+        "T1"
+      ],
+      "section": "s1-nesting-cliff",
+      "blurb": "FraiseQL's precomputed reads stay flat as nesting deepens while resolver engines decay — the win grows with query depth. The trade: shallow Q1 sits mid-pack because the precomputed document is detoasted on every read."
+    },
+    "nested": {
+      "label": "Deeply nested",
+      "scenarios": [
+        "Q2b",
+        "Q3",
+        "T1"
+      ],
+      "section": "s1-nesting-cliff",
+      "blurb": "The deeper the nesting, the wider FraiseQL's lead — no N+1 by construction. The cost of that flat read line is paid on writes, not reads (see the write trade)."
+    },
+    "write-heavy": {
+      "label": "Write-heavy",
+      "scenarios": [
+        "M1",
+        "M1d",
+        "MC1"
+      ],
+      "section": "s5-write-trade",
+      "blurb": "FraiseQL's delta path (M1d) competes with a classical single UPDATE; the full-cascade recompute (M1) is the price of always-consistent precomputed reads. MC1 needs one round-trip where classical needs two."
+    },
+    "hot-key": {
+      "label": "Hot-key lookups",
+      "scenarios": [
+        "C3",
+        "HC3"
+      ],
+      "section": null,
+      "blurb": "A hot 5-key pool (HC3) lets result caches shine; the 20-UUID miss regime (C3) shows what a cache does when it cannot help. The full cache-under-fire view (S4) lands in a later phase."
+    }
+  },
+  "notes": {
+    "same_run": "This page renders exactly one benchmark sweep. No cross-run or cross-hardware mixing — the generator refuses two JSON files.",
+    "q1_toast": "Q1 sits mid-pack, not on top. FraiseQL's tv_user row carries the full precomputed JSONB document; the extra bytes are TOAST-detoasted on every read — a deliberate trade that pays off as nesting deepens (Q2b → Q3 → T1).",
+    "tview_scope": "pg_tviews cascade triggers fire only while a FraiseQL framework is under test (tview_trigger_scope = fraiseql-only). Classical stacks run against a vanilla table with the triggers disabled, then tv_* rows are resynced before the next FraiseQL run.",
+    "mc1_workflow": "MC1 is a workflow benchmark, not raw server speed: it counts the client round-trips needed to reach a consistent state after a write. FraiseQL = 1 request/cycle (the mutation response carries the cascade); classical GraphQL and REST = 2 requests/cycle (mutation + serial re-fetch).",
+    "m1_full_cascade": "Under logged tviews, M1 triggers a full cascade recompute across the affected precomputed rows (61-row fan-out here) — the maintenance price of always-consistent precomputed reads.",
+    "m1_delta": "M1d patches the tvd_* delta tables surgically instead of recomputing — the fast write path available only on the tv pipeline.",
+    "m1_vanilla": "Classical M1 is a single UPDATE on a vanilla table with no derived state to maintain.",
+    "tv_audit": "fraiseql-tv-audit measures M1 only — an audit-overhead appendix row isolating the cost of audit logging on the mutation path. It is never a full-grid framework.",
+    "not_measured": "Cells marked “not measured in this run” are wired in the benchmark but were not executed in this prototype sweep. They are distinct from “excluded by design” and are neither slow nor missing on purpose — the Phase 06 median-of-three run fills them."
+  }
+}
