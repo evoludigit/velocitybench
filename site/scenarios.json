@@ -408,6 +408,38 @@
     ],
     "db_summary": "The trade the RAM-and-CPU win is paid with. FraiseQL's read speed comes from precomputed tv_* rows, and those rows cost disk: tv_comment is 4.4× the size of the tb_comment base table it derives from. The storage trade belongs to the same story as the footprint — cheaper memory and cores, more disk."
   },
+  "amortization": {
+    "default_read": "Q2b",
+    "default_write": "full",
+    "reads": ["Q1", "Q2b", "Q3"],
+    "writes": {
+      "full": {
+        "label": "Full write",
+        "scenario": {"fraiseql": "M1", "classical": "M1"},
+        "trips": {"fraiseql": null, "classical": 1},
+        "note": "FraiseQL pays its full logged cascade (M1); classical engines a single vanilla UPDATE. The cascade fan-out count is not measured in this run, so the structural-count layer marks FraiseQL's write ‘fan-out not measured’ — the cost layer still uses its measured M1 service time."
+      },
+      "delta": {
+        "label": "Delta / fast path",
+        "scenario": {"fraiseql": "M1d", "classical": "M1"},
+        "trips": {"fraiseql": 1, "classical": 1},
+        "note": "Each engine's fast write path: FraiseQL's surgical jsonb-delta (M1d, one patch), classical's single vanilla UPDATE. M1d is measured only for fraiseql-tv in this run."
+      }
+    },
+    "ratios": [1, 10, 100, 1000],
+    "ratio_axis": [1, 10000],
+    "series": [
+      {"framework": "fraiseql-tv", "architecture": "precompute"},
+      {"framework": "postgraphile", "architecture": "compile-to-sql"},
+      {"framework": "async-graphql", "architecture": "resolver-dataloader"},
+      {"framework": "actix-web-rest", "architecture": "rest"}
+    ],
+    "anchor_series": "fraiseql-tv",
+    "summary": "The one system-level view — every story above is one request at a time, but a real service runs a mix of reads and writes. This models total sustainable load as that read:write ratio changes, and finds the break-even. FraiseQL moves read cost to write time (the cascade builds the precomputed rows), so it needs enough reads per write to amortize that write. A derived MODEL, not a measured cell — every input traces to a grid cell above.",
+    "cost_layer": "Cost-weighted — the headline. Each engine's sustainable requests/second for a workload of 1 write + r reads, from measured throughput (1/read_rps per read, 1/write_rps per write, composed). At r→0 the curve is the measured write throughput; at r→∞ the measured read throughput. Higher is better; where FraiseQL's line crosses above a rival is the break-even for that pair.",
+    "count_layer": "Structural query count — secondary, and counts are not cost. SQL round-trips per workload-unit from the S0 hop model: a per-level resolver does 2–3 trips for a nested read, a compiler or precompute does one. This is why depth hurts resolvers — but a round-trip is not a fixed price, so this layer never decides the winner, and it never leads.",
+    "caveat": "Illustrative — single-pass prototype inputs. Aggregation multiplies per-request numbers, so it compounds this sweep's noisy tail; no crossover is stated as fact until the Phase 06 median-of-three rebind. The read:write ratio is your assumption, shown across the whole range rather than one flattering point."
+  },
   "exclusion_reasons": {
     "1": "M1d on v-variants — updateUserDelta patches the tvd_* delta tables of the tv pipeline; the v-variants serve on-the-fly JSONB views and have no delta pipeline to contrast (structural, see frameworks/fraiseql/database/extensions.sql).",
     "2": "fraiseql-tv-audit — audit-overhead appendix row: measures M1 only, to isolate the cost of audit logging on the mutation path. Deliberately not a full-grid framework; do not expand.",

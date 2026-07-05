@@ -725,6 +725,119 @@ def db_footprint_pairs(run: Run, meta: dict) -> list:
 
 
 # --------------------------------------------------------------------------
+# S7 amortization — total load vs read:write ratio (the break-even model)
+# --------------------------------------------------------------------------
+
+@dataclass
+class AmortSeries:
+    framework: str
+    architecture: str
+    read_rps: float | None
+    write_rps: float | None
+    write_scenario: str            # the write cell used (M1 / M1d)
+    read_trips: int | None         # SQL round-trips per read (S0 hop model)
+    write_trips: int | None        # per write; None = cascade fan-out unmeasured
+    status: str                    # "ok" | "no_read" | "no_write"
+
+    def sustainable_rps(self, r: float) -> float | None:
+        """Sustainable total (reads+writes) requests/second for a workload of
+        1 write + r reads: (r+1) / (r/read_rps + 1/write_rps). At r→0 it is the
+        measured write throughput, at r→∞ the measured read throughput."""
+        if self.read_rps is None or self.write_rps is None:
+            return None
+        work = r / self.read_rps + 1.0 / self.write_rps
+        return (r + 1.0) / work if work else None
+
+    def count(self, r: float) -> float | None:
+        """Structural SQL round-trips per workload-unit: r·read_trips +
+        write_trips. None when either is unknown (e.g. an unmeasured cascade
+        fan-out) — never silently zero."""
+        if self.read_trips is None or self.write_trips is None:
+            return None
+        return r * self.read_trips + self.write_trips
+
+
+@dataclass
+class Breakeven:
+    anchor: str                    # the precompute anchor framework
+    other: str
+    ratio: float | None            # crossover reads-per-write (None if none > 0)
+    anchor_wins_above: bool        # anchor sustains more as reads dominate
+
+
+@dataclass
+class Amortization:
+    read: str
+    write: str                     # write-mode key ("full" / "delta")
+    series: list                   # AmortSeries, ok first
+    breakevens: list               # Breakeven, anchor vs each other ok series
+
+
+def _amort_family(fw: str, meta: dict) -> str:
+    return ("fraiseql" if meta["frameworks"][fw].get("family") == "fraiseql"
+            else "classical")
+
+
+def _breakevens(series: list, anchor_fw: str) -> list:
+    """Crossover reads-per-write between the anchor (precompute) and each other
+    plottable series, from the cost curves: r* where the two sustainable-rps
+    curves meet. Equivalent to r·(1/read_a)+1/write_a = r·(1/read_b)+1/write_b,
+    solved for r. A non-positive r* (one engine dominates at every ratio) is
+    reported as None with the win-direction still set."""
+    anchor = next((s for s in series
+                   if s.framework == anchor_fw and s.status == "ok"), None)
+    if anchor is None:
+        return []
+    rca, wca = 1.0 / anchor.read_rps, 1.0 / anchor.write_rps
+    out = []
+    for s in series:
+        if s.framework == anchor_fw or s.status != "ok":
+            continue
+        rcb, wcb = 1.0 / s.read_rps, 1.0 / s.write_rps
+        denom = rca - rcb
+        r = (wcb - wca) / denom if denom else None
+        ratio = r if (r is not None and r > 0) else None
+        out.append(Breakeven(anchor_fw, s.framework, ratio,
+                             anchor.read_rps > s.read_rps))
+    return out
+
+
+def amortize(grid: Grid, meta: dict, read: str | None = None,
+             write: str | None = None) -> Amortization:
+    """The amortization model for one read rung and write mode. Each configured
+    architecture-representative series carries its measured read and write
+    throughput (cost layer) and its structural round-trip counts (secondary
+    layer); a series missing either cell degrades with a status, never a silent
+    zero. Break-evens are computed against the precompute anchor. A derived
+    model: every number here traces to a grid cell or the S0 hop counts."""
+    cfg = meta["amortization"]
+    read = read or cfg["default_read"]
+    write = write or cfg["default_write"]
+    wmode = cfg["writes"][write]
+    strat, qs = meta["framework_strategy"], meta["query_strategies"]
+    order = {s["framework"]: i for i, s in enumerate(cfg["series"])}
+    series = []
+    for s in cfg["series"]:
+        fw = s["framework"]
+        fam = _amort_family(fw, meta)
+        wscenario = wmode["scenario"][fam]
+        rcell, wcell = grid.cell(fw, read), grid.cell(fw, wscenario)
+        read_rps = rcell.rps if rcell.status == STATUS_RESULT else None
+        write_rps = wcell.rps if wcell.status == STATUS_RESULT else None
+        read_trips = qs.get(strat[fw], {}).get("sql_roundtrips", {}).get(read)
+        status = ("ok" if read_rps and write_rps
+                  else "no_read" if not read_rps else "no_write")
+        series.append(AmortSeries(
+            framework=fw, architecture=s["architecture"], read_rps=read_rps,
+            write_rps=write_rps, write_scenario=wscenario,
+            read_trips=read_trips, write_trips=wmode["trips"][fam],
+            status=status))
+    series.sort(key=lambda a: (a.status != "ok", order[a.framework]))
+    return Amortization(read=read, write=write, series=series,
+                        breakevens=_breakevens(series, cfg["anchor_series"]))
+
+
+# --------------------------------------------------------------------------
 # S0 request anatomy — the hop model (movement layer)
 # --------------------------------------------------------------------------
 
