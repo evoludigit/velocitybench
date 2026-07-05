@@ -707,7 +707,11 @@ def db_footprint_pairs(run: Run, meta: dict) -> list:
     """The storage trade: each precomputed tv_* table beside the base tb_* table
     it derives from, with the size ratio. Precompute buys read speed and cheap
     RAM; it costs disk, and this shows how much. Pairs come from scenarios.json;
-    a named table absent from the run's db_footprint raises (no invented rows)."""
+    a named table absent from the run's db_footprint raises (no invented rows).
+    A run that captured no db_footprint at all yields no pairs — the storage
+    trade is simply omitted, not faked."""
+    if not run.db_footprint:
+        return []
     sizes = {f["table"]: f["total_bytes"] for f in run.db_footprint}
     pairs = []
     for p in meta["footprint"]["db_pairs"]:
@@ -1957,6 +1961,167 @@ def _s5_section(grid: Grid, meta: dict) -> str:
         + '</section>')
 
 
+# --------------------------------------------------------------------------
+# S6 — footprint & cost (RSS / cold start, cost composite, storage trade)
+# --------------------------------------------------------------------------
+
+def _fam(fw: str, meta: dict) -> str:
+    """'fql' for a FraiseQL variant, 'other' otherwise — the figure/ground
+    colour key: FraiseQL is the focus hue, every other engine a recessive
+    neutral. Identity is never colour-alone; each bar carries its label."""
+    return "fql" if meta["frameworks"][fw].get("family") == "fraiseql" else "other"
+
+
+def _fmt_mb(v) -> str:
+    return "—" if v is None else (f"{v:,.1f} MB" if v < 100 else f"{v:,.0f} MB")
+
+
+def _fmt_cold(ms) -> str:
+    return "—" if ms is None else f"{ms / 1000:.1f} s cold"
+
+
+def _fmt_bytes(nbytes) -> str:
+    """Adaptive size label: GB at/above a gigabyte, MB below — so the small
+    tv_user/tb_user pair reads its true 14 MB vs 8 MB, not '0.01 GB' twice."""
+    gb = nbytes / 1e9
+    return f"{gb:.2f} GB" if gb >= 1 else f"{nbytes / 1e6:.0f} MB"
+
+
+def _s6_legend() -> str:
+    return (
+        '<div class="s6-legend">'
+        '<span><span class="s6-swatch s6-fill-fql"></span>FraiseQL</span>'
+        '<span><span class="s6-swatch s6-fill-other"></span>other engines'
+        '</span></div>')
+
+
+def _s6_ram_row(row: FootprintRow, axis_max: float, meta: dict) -> str:
+    fam = _fam(row.framework, meta)
+    label = meta["frameworks"][row.framework]["label"]
+    pct = _bar_pct(row.peak_ram_mb, axis_max)
+    meta_bits = _fmt_cold(row.cold_start_ms)
+    if row.image_mb:
+        meta_bits += f" · {row.image_mb:,.0f} MB img"
+    return (
+        f'<div class="s6-row" data-framework="{esc(row.framework)}" '
+        f'data-ram-mb="{esc(row.peak_ram_mb)}" '
+        f'data-cold-ms="{esc(row.cold_start_ms)}">'
+        f'<span class="s6-fw">{esc(label)}</span>'
+        f'<span class="s6-track"><span class="s6-bar s6-fill-{fam}" '
+        f'style="width:{svg.n(pct)}%"></span></span>'
+        f'<span class="s6-val">{esc(_fmt_mb(row.peak_ram_mb))}'
+        f'<span class="s6-sub">{esc(meta_bits)}</span></span></div>')
+
+
+def _s6_ram_chart(rows: list, meta: dict) -> str:
+    axis_max = svg.nice_axis(
+        max((r.peak_ram_mb or 0 for r in rows), default=1.0), 5)[0]
+    body = "".join(_s6_ram_row(r, axis_max, meta) for r in rows)
+    axis = (
+        '<div class="s6-axis" aria-hidden="true"><span>0</span>'
+        f'<span>{fmt_rps(axis_max / 2)}</span>'
+        f'<span>{fmt_rps(axis_max)} MB</span></div>')
+    return (
+        '<h3>Steady-state memory <span class="s6-unit">resident MB, '
+        'lighter is better</span></h3>'
+        + _s6_legend() + axis + f'<div class="s6-chart">{body}</div>')
+
+
+def _s6_cost_row(row: CostRow, inst: str, axis_max: float, meta: dict) -> str:
+    fam = _fam(row.framework, meta)
+    label = meta["frameworks"][row.framework]["label"]
+    per_m = row.per_million[inst]
+    pct = _bar_pct(per_m, axis_max)
+    sub = f"{row.rps_per_euro_month[inst]:,.0f} RPS/€mo · {fmt_rps(row.rps)} Q1"
+    return (
+        f'<div class="s6-row" data-framework="{esc(row.framework)}" '
+        f'data-eur-per-million="{esc(round(per_m, 6))}">'
+        f'<span class="s6-fw">{esc(label)}</span>'
+        f'<span class="s6-track"><span class="s6-bar s6-fill-{fam}" '
+        f'style="width:{svg.n(pct)}%"></span></span>'
+        f'<span class="s6-val">€{per_m:.4f}'
+        f'<span class="s6-sub">{esc(sub)}</span></span></div>')
+
+
+def _s6_cost_chart(rows: list, cfg: dict, meta: dict) -> str:
+    inst = cfg["headline_instance"]
+    axis_max = svg.nice_axis(
+        max((r.per_million[inst] for r in rows), default=1.0), 5)[0]
+    body = "".join(_s6_cost_row(r, inst, axis_max, meta) for r in rows)
+    axis = (
+        '<div class="s6-axis" aria-hidden="true"><span>€0</span>'
+        f'<span>€{axis_max / 2:.3f}</span>'
+        f'<span>€{axis_max:.3f} / 1M</span></div>')
+    return (
+        f'<h3>Cost per million requests <span class="s6-unit">on {esc(inst)}, '
+        'lower is better · derived</span></h3>'
+        f'<p class="lede">{esc_text(cfg["summary"])}</p>'
+        + _s6_legend() + axis + f'<div class="s6-chart">{body}</div>'
+        f'<p class="footnote s6-formula">{esc_text(cfg["formula"])}<br>'
+        f'{esc_text(cfg["price_note"])}</p>')
+
+
+def _s6_storage(pairs: list, meta: dict) -> str:
+    axis_max = svg.nice_axis(
+        max((p.precompute_bytes for p in pairs), default=1.0), 5)[0]
+    rows = ""
+    for p in pairs:
+        pc_pct = _bar_pct(p.precompute_bytes, axis_max)
+        b_pct = _bar_pct(p.base_bytes, axis_max)
+        rows += (
+            f'<div class="s6-store" data-pair="{esc(p.precompute)}" '
+            f'data-ratio="{esc(round(p.ratio, 3))}">'
+            f'<div class="s6-store-head"><span class="s6-store-name">'
+            f'{esc(p.precompute)} <span class="s6-store-vs">vs '
+            f'{esc(p.base)}</span></span>'
+            f'<span class="s6-ratio">{p.ratio:.1f}× the base table</span></div>'
+            f'<div class="s6-store-bar"><span class="s6-store-lbl">precompute'
+            f'</span><span class="s6-track"><span class="s6-bar s6-fill-fql" '
+            f'style="width:{svg.n(pc_pct)}%"></span></span>'
+            f'<span class="s6-val">{esc(_fmt_bytes(p.precompute_bytes))}</span>'
+            f'</div>'
+            f'<div class="s6-store-bar"><span class="s6-store-lbl">base</span>'
+            f'<span class="s6-track"><span class="s6-bar s6-fill-other" '
+            f'style="width:{svg.n(b_pct)}%"></span></span>'
+            f'<span class="s6-val">{esc(_fmt_bytes(p.base_bytes))}</span></div>'
+            '</div>')
+    axis = (
+        '<div class="s6-axis s6-axis-store" aria-hidden="true"><span>0</span>'
+        f'<span>{_fmt_bytes(axis_max / 2)}</span>'
+        f'<span>{_fmt_bytes(axis_max)}</span></div>')
+    return (
+        '<h3>The storage trade <span class="s6-unit">precomputed tv_* vs base '
+        'tb_*, total on-disk size</span></h3>'
+        f'<p class="lede">{esc_text(meta["footprint"]["db_summary"])}</p>'
+        + axis + f'<div class="s6-store-chart">{rows}</div>')
+
+
+def _s6_section(grid: Grid, run: Run, meta: dict, prices: dict) -> str:
+    cfg = meta["footprint"]
+    fp = footprint_rows(run, meta)
+    costs = cost_composite(grid, prices, cfg["cost"]["scenario"])
+    pairs = db_footprint_pairs(run, meta)
+    # Each sub-chart is omitted (not faked) when its measurement wasn't captured
+    # in this run, so a minimal sweep still renders a valid, honest section.
+    body = f'<p class="lede">{esc_text(cfg["rss"]["summary"])}</p>'
+    if any(r.peak_ram_mb is not None for r in fp):
+        body += _s6_ram_chart(fp, meta)
+    if costs:
+        body += _s6_cost_chart(costs, cfg["cost"], meta)
+    if pairs:
+        body += _s6_storage(pairs, meta)
+    return (
+        '<section id="s6-footprint" aria-labelledby="s6-h">'
+        '<h2 id="s6-h">S6 — Footprint &amp; cost</h2>'
+        + body
+        + '<p class="footnote">Memory, image size and cold start are measured; '
+        'the cost figures are <em>derived</em> from measured throughput and the '
+        'dated price file (formula above), not a separate measurement. Every '
+        'raw number is also in the run JSON linked below. Prototype single-pass '
+        'sweep; the Phase 06 median-of-three run refines the tail.</p>'
+        '</section>')
+
+
 def _workload_selector(grid: Grid, meta: dict) -> str:
     shapes = meta.get("workload_shapes", {})
     cards = []
@@ -2097,7 +2262,7 @@ function vbSwitcher(o) {
 </script>"""
 
 
-def _render_index(run: Run, meta: dict, grid: Grid) -> str:
+def _render_index(run: Run, meta: dict, grid: Grid, prices: dict) -> str:
     banner = ""
     if run.is_local:
         banner = (f'<div class="banner" role="alert">{esc(BANNER_TEXT)}</div>\n')
@@ -2122,6 +2287,7 @@ def _render_index(run: Run, meta: dict, grid: Grid) -> str:
         _s3_section(grid, meta),
         _s4_section(grid, meta),
         _s5_section(grid, meta),
+        _s6_section(grid, run, meta, prices),
         _workload_selector(grid, meta),
         _footnote(run),
     ])
@@ -2210,7 +2376,7 @@ def render(run: Run, meta: dict, prices: dict | None = None) -> dict[str, bytes]
         prices = load_prices()
     grid = build_grid(run, meta)
     return {
-        "index.html": _render_index(run, meta, grid).encode("utf-8"),
+        "index.html": _render_index(run, meta, grid, prices).encode("utf-8"),
         "data.json": _render_data_json(run, meta, prices).encode("utf-8"),
         "llms.txt": _render_llms_txt(run, meta).encode("utf-8"),
     }

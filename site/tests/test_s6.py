@@ -137,3 +137,94 @@ def test_data_json_embeds_costs(sweep3_run, meta, prices):
     data = build.render(sweep3_run, meta, prices)["data.json"].decode("utf-8")
     doc = json.loads(data)
     assert doc["costs"]["instances"]["ccx33"]["price_month"] == 138.49
+
+
+# --------------------------------------------------------------------------
+# Phase 07 Step 4 [design→pin] — S6 markup pins (written after the design
+# settled; they guard the honesty-critical invariants: bars proportional, the
+# derived cost carries its formula, the storage trade is present).
+# --------------------------------------------------------------------------
+
+import re  # noqa: E402
+
+
+@pytest.fixture()
+def page(sweep3_run, meta, prices):
+    return build.render(sweep3_run, meta, prices)["index.html"].decode("utf-8")
+
+
+def s6(page):
+    m = re.search(r'<section id="s6-footprint".*?</section>', page, re.DOTALL)
+    assert m, "S6 section missing"
+    return m.group(0)
+
+
+def test_s6_anchored_after_s5_before_selector(page):
+    assert (page.index('id="s5-write-trade"') < page.index('id="s6-footprint"')
+            < page.index('id="workload-selector"'))
+
+
+def test_s6_ram_bar_widths_proportional_to_value(page):
+    """A bar's length must be proportional to the number it encodes (linear
+    from zero). Two known rows: Strawberry (173.7 MB) vs Actix (5.1 MB)."""
+    sec = s6(page)
+
+    def width(fw):
+        m = re.search(rf'data-framework="{fw}"[^>]*data-ram-mb[^>]*>.*?'
+                      r'width:([\d.]+)%', sec, re.DOTALL)
+        return float(m.group(1))
+    ratio_w = width("strawberry") / width("actix-web-rest")
+    assert round(ratio_w, 2) == round(173.7 / 5.1, 2)   # proportional, no lie
+
+
+def test_s6_shows_every_framework_no_appendix(page):
+    sec = s6(page)
+    assert sec.count('class="s6-row"') == 22            # 11 RAM + 11 cost
+    assert "fraiseql-tv-audit" not in sec               # appendix never shown
+
+
+def test_s6_derived_cost_carries_its_formula(page, meta):
+    """Cost is derived, and the derivation is shown next to it — never a bare
+    number the reader can't reconstruct."""
+    sec = s6(page)
+    assert meta["footprint"]["cost"]["formula"] in sec
+    assert meta["footprint"]["cost"]["price_note"] in sec
+    assert "€0.0063" in sec                             # tv+cache headline cost
+    assert "derived" in sec.lower()
+
+
+def test_s6_storage_trade_present_with_ratio(page):
+    """The storage counterweight: precomputed tv_* beside base tb_*, ratio
+    shown — precompute buys speed and costs disk, in plain sight."""
+    sec = s6(page)
+    assert 'data-pair="tv_comment"' in sec
+    assert "4.4× the base table" in sec
+    assert sec.count('class="s6-store-bar"') == 6       # 3 pairs × (tv + tb)
+
+    def store_width(kind_re):
+        return float(re.search(kind_re, sec, re.DOTALL).group(1))
+    # the precompute (tv_comment) bar is wider than its base (tb_comment)
+    tv = store_width(r'data-pair="tv_comment".*?s6-fill-fql[^>]*width:([\d.]+)%')
+    tb = store_width(r'data-pair="tv_comment".*?s6-fill-other[^>]*width:([\d.]+)%')
+    assert tv > tb
+
+
+def test_s6_legend_gives_identity_beyond_colour(page):
+    """≥2 colour roles ⇒ a legend is present, and every bar also carries its
+    framework label — identity is never colour-alone."""
+    sec = s6(page)
+    assert sec.count("s6-legend") == 2                  # RAM + cost charts
+    assert "FraiseQL" in sec and "other engines" in sec
+    assert 'class="s6-fw">Strawberry' in sec            # direct label on the bar
+
+
+def test_s6_omits_uncaptured_charts_never_fakes_them(localhost_path, meta, prices):
+    """A minimal run with no resource_metrics/db_footprint still renders a valid
+    section — the RAM and storage charts are omitted (not faked with zeros)."""
+    run = build.load_run(localhost_path)
+    page = build.render(run, meta, prices)["index.html"].decode("utf-8")
+    sec = re.search(r'<section id="s6-footprint".*?</section>', page,
+                    re.DOTALL).group(0)
+    assert "Steady-state memory" not in sec             # no RAM chart
+    assert "The storage trade" not in sec               # no storage trade
+    assert "Cost per million requests" in sec           # cost still derivable

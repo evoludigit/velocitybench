@@ -622,6 +622,56 @@ h3 .wt-unit { font-weight: 400; font-size: 0.82rem; color: var(--muted); }
   background: repeating-linear-gradient(135deg,
     color-mix(in srgb, var(--muted) 10%, transparent) 0 3px, transparent 3px 8px); }
 
+/* ---- S6 footprint & cost (ranked bars + storage trade) ---- */
+.s6-legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 6px 0 8px;
+  font-size: 0.78rem; color: var(--text-2); }
+.s6-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.s6-swatch { width: 12px; height: 12px; border-radius: 3px; }
+.s6-fill-fql { background: var(--fql-tv); }
+.s6-fill-other { background: var(--muted); }
+h3 .s6-unit { font-weight: 400; font-size: 0.8rem; color: var(--muted); }
+
+.s6-axis { display: flex; justify-content: space-between; color: var(--muted);
+  font-size: 0.72rem; font-variant-numeric: tabular-nums; padding: 0 0 2px;
+  border-bottom: 1px solid var(--grid-line); margin: 4px 0 6px;
+  margin-left: 158px; }
+.s6-chart { display: flex; flex-direction: column; }
+.s6-row { display: grid; grid-template-columns: 148px 1fr 154px; gap: 10px;
+  align-items: center; padding: 5px 0; }
+.s6-row + .s6-row { border-top: 1px solid var(--grid-line); }
+.s6-fw { font-size: 0.84rem; font-weight: 600; color: var(--text); }
+.s6-track { position: relative; background: var(--surface-2);
+  border-radius: 4px; height: 16px; }
+.s6-bar { position: absolute; left: 0; top: 0; height: 100%; border-radius: 4px;
+  min-width: 2px; }
+.s6-val { text-align: right; font-size: 0.82rem; font-weight: 650;
+  color: var(--text); font-variant-numeric: tabular-nums; }
+.s6-sub { display: block; font-size: 0.68rem; font-weight: 400;
+  color: var(--muted); white-space: nowrap; }
+.s6-formula { margin-top: 8px; }
+
+.s6-store-chart { display: flex; flex-direction: column; gap: 10px;
+  margin-top: 4px; }
+.s6-axis-store { margin-left: 76px; }
+.s6-store { padding: 8px 0; }
+.s6-store + .s6-store { border-top: 1px solid var(--grid-line); }
+.s6-store-head { display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: 8px; margin-bottom: 4px; }
+.s6-store-name { font-weight: 650; color: var(--text); font-size: 0.86rem;
+  font-family: var(--mono, ui-monospace, monospace); }
+.s6-store-vs { font-weight: 400; color: var(--muted); font-size: 0.78rem; }
+.s6-ratio { margin-left: auto; font-size: 0.8rem; font-weight: 650;
+  color: var(--fql-tv); font-variant-numeric: tabular-nums; }
+.s6-store-bar { display: grid; grid-template-columns: 66px 1fr 76px; gap: 10px;
+  align-items: center; padding: 2px 0; }
+.s6-store-lbl { font-size: 0.74rem; color: var(--muted); }
+
+@media (max-width: 640px) {
+  .s6-axis, .s6-axis-store { margin-left: 0; }
+  .s6-row { grid-template-columns: 1fr auto; }
+  .s6-row .s6-track { grid-column: 1 / -1; order: 3; }
+}
+
 /* ---- workload selector ---- */
 .wl-grid { display: grid; gap: 12px;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); margin: 14px 0; }
