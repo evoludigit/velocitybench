@@ -25,6 +25,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from string import Template
 
+import svg
+
 BUILD_DIR = Path(__file__).resolve().parent
 SCENARIOS_PATH = BUILD_DIR / "scenarios.json"
 TEMPLATES_DIR = BUILD_DIR / "templates"
@@ -186,6 +188,70 @@ def build_grid(run: Run, meta: dict) -> Grid:
                 cells[key] = Cell(
                     framework=fw, scenario=sc, status=STATUS_NOT_MEASURED)
     return Grid(cells=cells, run=run, meta=meta)
+
+
+# --------------------------------------------------------------------------
+# Ladder extraction (S1 nesting cliff; reused by S2/S4/S5 ladders)
+# --------------------------------------------------------------------------
+
+@dataclass
+class LadderPoint:
+    scenario: str
+    pos: int
+    status: str                 # "result" | "excluded" | "not_measured"
+    rps: float | None = None
+    p50_ms: float | None = None
+    p99_ms: float | None = None
+
+
+@dataclass
+class LadderSeries:
+    framework: str
+    points: list                # one LadderPoint per rung, in ladder order
+
+    def segments(self) -> list:
+        """Runs of consecutive result points with no gap between them. A
+        missing rung breaks the run, so the chart never interpolates across an
+        excluded or not-measured cell."""
+        segs, cur = [], []
+        for p in self.points:
+            if p.status == "result":
+                cur.append(p)
+            elif cur:
+                segs.append(cur)
+                cur = []
+        if cur:
+            segs.append(cur)
+        return segs
+
+
+def ladder_rungs(meta: dict, ladder: str) -> list:
+    """The (scenario, pos) rungs of a named ladder, ordered by ladder_pos."""
+    rungs = [(sc, m["ladder_pos"]) for sc, m in meta["scenarios"].items()
+             if m.get("ladder") == ladder]
+    return sorted(rungs, key=lambda x: x[1])
+
+
+def ladder_series(grid: Grid, ladder: str = "nesting") -> list:
+    """Per-framework ordered ladder points. Frameworks with no result on any
+    rung (e.g. the M1-only audit row) are omitted; excluded/not-measured rungs
+    are kept as explicit gap points so the renderer can break lines, never
+    interpolate."""
+    meta = grid.meta
+    rungs = ladder_rungs(meta, ladder)
+    out = []
+    for fw in meta["framework_order"]:
+        points = []
+        for sc, pos in rungs:
+            cell = grid.cell(fw, sc)
+            if cell.status == STATUS_RESULT:
+                points.append(LadderPoint(
+                    sc, pos, "result", cell.rps, cell.p50_ms, cell.p99_ms))
+            else:
+                points.append(LadderPoint(sc, pos, cell.status))
+        if any(p.status == STATUS_RESULT for p in points):
+            out.append(LadderSeries(fw, points))
+    return out
 
 
 # --------------------------------------------------------------------------
@@ -483,6 +549,235 @@ def _footnote(run: Run) -> str:
         '</footer>')
 
 
+# --------------------------------------------------------------------------
+# S1 — the nesting cliff (inline SVG, generated at build time)
+# --------------------------------------------------------------------------
+
+S1_W, S1_H = 980, 520
+S1_MARGIN = {"l": 62, "r": 182, "t": 30, "b": 58}
+DASH_STYLES = ["solid", "dashed", "dotted", "dashdot"]
+RUNG_SUBLABEL = {"Q1": "flat", "Q2": "flat", "Q2b": "1-level nest",
+                 "Q3": "2-level nest", "T1": "multi-root"}
+
+
+def _arch_of(fw: str, meta: dict) -> str:
+    f = meta["frameworks"][fw]
+    if f.get("family") == "fraiseql":
+        return "fraiseql"
+    return {"compile": "compiler", "resolver": "resolver",
+            "rest": "rest"}.get(f.get("mechanism"), "resolver")
+
+
+def chart_styles(meta: dict) -> dict:
+    """Per-framework chart identity: architecture band (the hue) + a dash style
+    (the within-band separator). Colour encodes architecture, not identity, so
+    the palette stays CVD-safe; the dash + the direct end-label carry identity."""
+    out, seen = {}, {}
+    for fw in meta["framework_order"]:
+        arch = _arch_of(fw, meta)
+        i = seen.get(arch, 0)
+        seen[arch] = i + 1
+        out[fw] = {"arch": arch, "style": DASH_STYLES[i % 4],
+                   "hero": fw == "fraiseql-tv"}
+    return out
+
+
+def _metric_val(point, metric):
+    return point.rps if metric == "rps" else point.p99_ms
+
+
+def _metric_fmt(v, metric):
+    return fmt_rps(v) if metric == "rps" else fmt_ms(v)
+
+
+def s1_annotations(grid: Grid, meta: dict) -> dict:
+    """Data-driven callouts — recomputed from the grid, never typed in.
+    Deliberately extremes (argmax/argmin/steepest), so they cannot be read as
+    cherry-picking. See test_chart.py for the exact-string pins."""
+    series = ladder_series(grid, "nesting")
+    rungs = ladder_rungs(meta, "nesting")
+    labels = {fw: meta["frameworks"][fw]["label"] for fw in meta["frameworks"]}
+
+    # Spread at the deepest rung that has any result.
+    deepest = None
+    for sc, _ in reversed(rungs):
+        vals = [(s.framework, next(p.rps for p in s.points if p.scenario == sc))
+                for s in series
+                if any(p.scenario == sc and p.status == "result"
+                       for p in s.points)]
+        if vals:
+            deepest = (sc, vals)
+            break
+    spread = None
+    if deepest:
+        sc, vals = deepest
+        top_fw, top_v = max(vals, key=lambda kv: kv[1])
+        bot_fw, bot_v = min(vals, key=lambda kv: kv[1])
+        ratio = top_v / bot_v if bot_v else float("inf")
+        spread = (
+            f"{ratio:.0f}× spread at {sc}: {labels[top_fw]} "
+            f"{fmt_rps(top_v)} RPS vs {labels[bot_fw]} {fmt_rps(bot_v)} RPS")
+
+    # Steepest single-step fall within a drawn segment (adjacent rungs only).
+    worst = None  # (pct, framework, from_sc, to_sc)
+    for s in series:
+        for seg in s.segments():
+            for a, b in zip(seg, seg[1:]):
+                if a.rps:
+                    pct = (b.rps - a.rps) / a.rps
+                    if worst is None or pct < worst[0]:
+                        worst = (pct, s.framework, a.scenario, b.scenario)
+    steepest = None
+    if worst:
+        pct, fw, a, b = worst
+        steepest = (f"Steepest single-step fall: {labels[fw]} "
+                    f"{pct * 100:.0f}% {a}→{b}")
+
+    return {"spread": spread, "steepest": steepest}
+
+
+def _s1_chart(grid: Grid, meta: dict, metric: str) -> str:
+    series = ladder_series(grid, "nesting")
+    rungs = ladder_rungs(meta, "nesting")
+    styles = chart_styles(meta)
+    m = S1_MARGIN
+    plot_l, plot_r = m["l"], S1_W - m["r"]
+    plot_t, plot_b = m["t"], S1_H - m["b"]
+
+    result_vals = [_metric_val(p, metric) for s in series for p in s.points
+                   if p.status == STATUS_RESULT]
+    vmax = max(result_vals, default=1.0)
+    if metric == "rps":
+        top, _step, ticks = svg.nice_axis(vmax, 6)
+        yscale = svg.Scale(0, top, plot_b, plot_t)
+        ylabel = lambda v: f"{v:,.0f}"
+        ytitle = "Requests / second (y from 0)"
+    else:  # p99 spans orders of magnitude -> loudly-labelled log axis
+        vmin = min(result_vals, default=1.0)
+        lo, hi, ticks = svg.nice_log_axis(vmin, vmax)
+        yscale = svg.LogScale(lo, hi, plot_b, plot_t)
+        ylabel = lambda v: f"{v:g}"
+        ytitle = "p99 latency, ms — LOG scale · lower is better"
+    xs = {sc: plot_l + (i * (plot_r - plot_l) / (len(rungs) - 1))
+          for i, (sc, _) in enumerate(rungs)}
+
+    parts = []
+    # gridlines + y tick labels
+    for tk in ticks:
+        y = yscale(tk)
+        parts.append(
+            f'<line class="s1-grid" x1="{svg.n(plot_l)}" y1="{svg.n(y)}" '
+            f'x2="{svg.n(plot_r)}" y2="{svg.n(y)}"/>')
+        parts.append(
+            f'<text class="s1-ylabel" x="{svg.n(plot_l - 8)}" '
+            f'y="{svg.n(y + 3.5)}">{ylabel(tk)}</text>')
+    # x rung labels
+    for sc, _ in rungs:
+        x = xs[sc]
+        parts.append(
+            f'<text class="s1-xlabel" x="{svg.n(x)}" y="{svg.n(plot_b + 20)}">'
+            f'{esc(sc)}</text>')
+        parts.append(
+            f'<text class="s1-xsub" x="{svg.n(x)}" y="{svg.n(plot_b + 35)}">'
+            f'{esc(RUNG_SUBLABEL.get(sc, ""))}</text>')
+    # axis titles
+    parts.append(
+        f'<text class="s1-axis-title" x="{svg.n(plot_l - 44)}" '
+        f'y="{svg.n(plot_t - 14)}">{esc(ytitle)}</text>')
+    parts.append(
+        f'<text class="s1-axis-title xt" x="{svg.n((plot_l + plot_r) / 2)}" '
+        f'y="{svg.n(S1_H - 8)}">read ladder → deeper nesting →</text>')
+
+    # one group per framework; lines break across gaps
+    end_labels = []
+    for s in series:
+        st = styles[s.framework]
+        hero = " hero" if st["hero"] else ""
+        seg_svg, dots, last = [], [], None
+        for seg in s.segments():
+            pts = [(xs[p.scenario], yscale(_metric_val(p, metric)))
+                   for p in seg]
+            seg_svg.append(
+                f'<path class="s1-line style-{st["style"]}" '
+                f'd="{svg.path_d(pts)}"/>')
+            for p, (x, y) in zip(seg, pts):
+                tip = (f'{p.scenario} · {_metric_fmt(_metric_val(p, metric), metric)}'
+                       f' {"RPS" if metric == "rps" else "ms"}'
+                       f' · p99 {fmt_ms(p.p99_ms)} ms')
+                dots.append(
+                    f'<circle class="s1-dot" cx="{svg.n(x)}" cy="{svg.n(y)}" '
+                    f'r="3"><title>{esc(s.framework)} — {esc(tip)}</title>'
+                    f'</circle>')
+            last = (seg[-1], pts[-1])
+        parts.append(
+            f'<g class="s1-series arch-{st["arch"]}{hero}" '
+            f'data-framework="{esc(s.framework)}">'
+            + "".join(seg_svg) + "".join(dots) + "</g>")
+        if last:
+            p, (x, y) = last
+            end_labels.append({
+                "y0": y, "fw": s.framework, "arch": st["arch"],
+                "text": f'{meta["frameworks"][s.framework]["label"]}  '
+                        f'{_metric_fmt(_metric_val(p, metric), metric)}'})
+
+    # de-collide end labels: greedy min-gap from the top
+    gap = 14.5
+    for lab in sorted(end_labels, key=lambda d: d["y0"]):
+        lab["y"] = lab["y0"]
+    ordered = sorted(end_labels, key=lambda d: d["y0"])
+    prev = plot_t - gap
+    for lab in ordered:
+        lab["y"] = max(lab["y0"], prev + gap)
+        prev = lab["y"]
+    # if pushed past the bottom, compress upward
+    overflow = ordered[-1]["y"] - plot_b if ordered else 0
+    if overflow > 0:
+        for lab in ordered:
+            lab["y"] -= overflow
+    for lab in ordered:
+        parts.append(
+            f'<text class="s1-endlabel arch-{lab["arch"]}" '
+            f'x="{svg.n(plot_r + 10)}" y="{svg.n(lab["y"] + 3)}" '
+            f'data-framework="{esc(lab["fw"])}">{esc(lab["text"])}</text>')
+
+    hidden = "" if metric == "rps" else ' hidden'
+    return (
+        f'<svg class="s1 metric-{metric}"{hidden} viewBox="0 0 {S1_W} {S1_H}" '
+        f'preserveAspectRatio="xMinYMid meet" role="img" '
+        f'aria-label="Throughput across the read ladder, one line per '
+        f'framework, y-axis from zero">'
+        + "".join(parts) + "</svg>")
+
+
+def _s1_section(grid: Grid, meta: dict) -> str:
+    ann = s1_annotations(grid, meta)
+    callouts = "".join(
+        f'<li>{esc(v)}</li>' for v in (ann["spread"], ann["steepest"]) if v)
+    return (
+        '<section id="s1-nesting-cliff" aria-labelledby="s1-h">'
+        '<h2 id="s1-h">S1 — The nesting cliff</h2>'
+        '<p class="lede">Throughput across the read ladder Q1 → Q2 → Q2b → Q3 '
+        '→ T1, one line per framework. Colour marks the <em>architecture</em> '
+        '(FraiseQL · compile-to-SQL · resolver · REST); line style and the '
+        'end-label name the specific engine. The y-axis starts at zero; a '
+        'missing rung breaks its line rather than interpolating.</p>'
+        '<div class="s1-controls">'
+        '<button id="s1-metric-toggle" class="theme-toggle" type="button" '
+        'aria-pressed="false" data-metric="rps">Showing: throughput (RPS)'
+        '</button>'
+        '<span class="s1-hint">tap a point for its exact numbers</span></div>'
+        '<div class="s1-figure">'
+        + _s1_chart(grid, meta, "rps")
+        + _s1_chart(grid, meta, "p99")
+        + '</div>'
+        f'<ul class="s1-callouts">{callouts}</ul>'
+        '<p class="footnote" style="margin-top:10px">Prototype sweep — single '
+        'pass; tail rungs (Q3, T1) are noisy and the Phase 06 median-of-three '
+        'run replaces them. Every value here is also in the grid table above '
+        '(no chart-only numbers).</p>'
+        '</section>')
+
+
 THEME_SCRIPT = """<script>
 (function () {
   var root = document.documentElement;
@@ -510,6 +805,22 @@ THEME_SCRIPT = """<script>
                : localStorage.removeItem('vb-theme'); } catch (e) {}
   });
 })();
+(function () {
+  var btn = document.getElementById('s1-metric-toggle');
+  var fig = document.querySelector('.s1-figure');
+  if (!btn || !fig) return;
+  var rps = fig.querySelector('.metric-rps');
+  var p99 = fig.querySelector('.metric-p99');
+  btn.addEventListener('click', function () {
+    var showP99 = btn.getAttribute('data-metric') === 'rps';
+    btn.setAttribute('data-metric', showP99 ? 'p99' : 'rps');
+    btn.setAttribute('aria-pressed', showP99 ? 'true' : 'false');
+    btn.textContent = showP99 ? 'Showing: p99 latency (ms)'
+                              : 'Showing: throughput (RPS)';
+    if (rps) rps.hidden = showP99;
+    if (p99) p99.hidden = !showP99;
+  });
+})();
 </script>"""
 
 
@@ -532,10 +843,7 @@ def _render_index(run: Run, meta: dict, grid: Grid) -> str:
         _methodology(run),
         _reading_panel(meta),
         _grid_section(run, meta, grid),
-        _placeholder_section(
-            "s1-nesting-cliff", "S1 — The nesting cliff",
-            "The read-ladder slope chart (Q1 → Q2 → Q2b → Q3 → T1) lands in "
-            "Phase 03; until then the numbers live in the grid above."),
+        _s1_section(grid, meta),
         _placeholder_section(
             "s5-write-trade", "S5 — The write trade",
             "The M1 / M1d / MC1 write-trade view lands in Phase 04; until then "

@@ -238,6 +238,75 @@ td.excluded .reason, td.not-measured .reason { display: block; white-space: norm
   max-width: 320px; margin: 4px auto 0; color: var(--text-2); text-align: left; }
 .appendix-row th[scope="row"] { font-style: italic; color: var(--text-2); }
 
+/* ---- S1 nesting-cliff chart ---- */
+:root {
+  --arch-fraiseql: #2a78d6;
+  --arch-compiler: #eb6834;
+  --arch-resolver: #008300;
+  --arch-rest:     #e87ba4;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --arch-fraiseql: #3987e5;
+    --arch-compiler: #d95926;
+    --arch-resolver: #2ea043;
+    --arch-rest:     #d55181;
+  }
+}
+:root[data-theme="light"] {
+  --arch-fraiseql: #2a78d6; --arch-compiler: #eb6834;
+  --arch-resolver: #008300; --arch-rest: #e87ba4;
+}
+:root[data-theme="dark"] {
+  --arch-fraiseql: #3987e5; --arch-compiler: #d95926;
+  --arch-resolver: #2ea043; --arch-rest: #d55181;
+}
+
+.s1-controls { display: flex; flex-wrap: wrap; align-items: center;
+  gap: 8px 14px; margin: 8px 0 4px; }
+#s1-metric-toggle { float: none; }
+.s1-hint { color: var(--muted); font-size: 0.8rem; }
+.s1-figure { width: 100%; overflow-x: auto; }
+svg.s1 { display: block; width: 100%; min-width: 620px; height: auto;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); }
+svg.s1[hidden] { display: none; }
+
+.s1-grid { stroke: var(--grid-line); stroke-width: 1; }
+.s1-ylabel { fill: var(--muted); font-size: 11px; text-anchor: end;
+  font-variant-numeric: tabular-nums; }
+.s1-xlabel { fill: var(--text-2); font-size: 12px; text-anchor: middle;
+  font-weight: 600; }
+.s1-xsub { fill: var(--muted); font-size: 10px; text-anchor: middle; }
+.s1-axis-title { fill: var(--muted); font-size: 11px; }
+.s1-axis-title.xt { text-anchor: middle; }
+
+.s1-series { color: var(--muted); }
+.s1-series.arch-fraiseql { color: var(--arch-fraiseql); }
+.s1-series.arch-compiler { color: var(--arch-compiler); }
+.s1-series.arch-resolver { color: var(--arch-resolver); }
+.s1-series.arch-rest { color: var(--arch-rest); }
+.s1-line { fill: none; stroke: currentColor; stroke-width: 2;
+  stroke-linejoin: round; stroke-linecap: round; }
+.s1-series.hero .s1-line { stroke-width: 3; }
+.style-dashed { stroke-dasharray: 7 4; }
+.style-dotted { stroke-dasharray: 1.5 4; }
+.style-dashdot { stroke-dasharray: 8 3.5 1.5 3.5; }
+.s1-dot { fill: currentColor; stroke: var(--surface); stroke-width: 1.2; }
+
+.s1-endlabel { font-size: 11px; font-weight: 600; fill: currentColor;
+  color: var(--muted); font-variant-numeric: tabular-nums; }
+.s1-endlabel.arch-fraiseql { color: var(--arch-fraiseql); }
+.s1-endlabel.arch-compiler { color: var(--arch-compiler); }
+.s1-endlabel.arch-resolver { color: var(--arch-resolver); }
+.s1-endlabel.arch-rest { color: var(--arch-rest); }
+
+.s1-callouts { list-style: none; padding: 0; margin: 12px 0 0; display: flex;
+  flex-wrap: wrap; gap: 8px 12px; }
+.s1-callouts li { background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 999px; padding: 4px 12px; font-size: 0.85rem;
+  font-variant-numeric: tabular-nums; color: var(--text); }
+
 /* ---- sections placeholders (charts mount in later phases) ---- */
 section { scroll-margin-top: 60px; }
 .section-todo { color: var(--muted); font-size: 0.9rem; border: 1px dashed var(--baseline);
