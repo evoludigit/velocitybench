@@ -1,0 +1,74 @@
+VelocityBench — machine-readable guide
+======================================
+
+WHAT THIS IS
+  One benchmark sweep rendered as a single self-contained page. Exactly ONE
+  run on ONE hardware target. No cross-run or cross-hardware mixing, ever — the
+  generator refuses two JSON files.
+$local_warning
+RUN IDENTITY
+  timestamp:            $timestamp
+  target_host:          $target_host
+  cpu_model:            $cpu_model
+  postgres_version:     $postgres_version
+  load_generator:       $load_generator
+  concurrency:          $concurrency
+  duration_secs:        $duration_secs
+  tview_mode:           $tview_mode
+  tview_trigger_scope:  $tview_trigger_scope
+  fraiseql_version:     $fraiseql_version
+
+DATA
+  Machine copy of this run + metadata:  ./data.json
+    { "run": <raw run JSON>, "scenarios": <the scenarios.json contract> }
+  Committed source run JSON (provenance):  $source_path
+
+RESULT-ROW GLOSSARY  (run.results[])
+  framework   engine under test (see FRAMEWORKS below)
+  query       THE SCENARIO ID — the field is named "query", NOT "scenario"
+  rps         requests/second (for MC1: cycles/second, a workflow metric)
+  p50_ms / p95_ms / p99_ms   latency percentiles, milliseconds
+  requests    total requests issued in the measured window
+  errors      failed/non-2xx responses; 0 on every published cell
+  rss_steady_mb / rss_max_mb   resident memory
+  cold_start_ms   time to first served request
+
+THE GRID — three cell states, no silent gaps
+  RESULT              one row in results[]; carries rps + latency + errors.
+  EXCLUDED BY DESIGN  the (framework, scenario) pair is structurally N/A. It is
+                      ABSENT from results[] and listed in scenarios.exclusions
+                      with a reason_id into scenarios.exclusion_reasons.
+                      Excluded is NOT slow and NOT missing by accident.
+  NOT MEASURED IN THIS RUN
+                      wired in the benchmark but not executed in this sweep;
+                      absent from results[] AND absent from exclusions.
+                      Distinct from excluded-by-design; neither slow nor
+                      excluded on purpose. The Phase 06 median-of-3 run fills
+                      these.
+
+CITING A CELL
+  Every (framework, scenario) cell has a stable anchor:
+    #cell-<framework>-<scenario>      e.g.  #cell-fraiseql-tv-Q1
+  Each DOM cell carries data-framework and data-scenario, plus:
+    result       data-rps, data-p99-ms, data-errors
+    excluded     data-excluded="true", data-reason-id="<N>"
+    not measured data-not-measured="true"
+
+M1 vs M1d — READ THE MECHANISM, NOT JUST THE NUMBER
+  M1   full-cascade write. FraiseQL: a logged tview recompute (61-row fan-out
+       here) — the maintenance price of always-consistent precomputed reads.
+       Classical: a vanilla single UPDATE with no derived state.
+  M1d  jsonb-delta surgical patch — a FraiseQL-only fast write path, present on
+       the tv variants only.
+  They measure DIFFERENT mechanisms and are ALWAYS shown side by side. FraiseQL
+  losing on full-cascade M1 is a real, prominent result, not an artifact.
+  $mc1_workflow
+
+FRAMEWORKS ($n_frameworks)
+$framework_lines
+
+SCENARIOS ($n_scenarios)
+$scenario_lines
+
+WORKLOAD SHAPES → WHICH CELLS ANSWER THEM
+$workload_lines
