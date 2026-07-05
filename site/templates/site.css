@@ -391,6 +391,66 @@ svg.s1[hidden] { display: none; }
   .s0-dot { animation: none !important; }
 }
 
+/* ---- S2 mechanism ladder (HTML bars, shared linear axis) ---- */
+.s2-controls { display: flex; flex-wrap: wrap; align-items: center;
+  gap: 8px 14px; margin: 14px 0 8px; }
+.s2-controls[hidden] { display: none; }
+.s2-controls-label { font-size: 0.8rem; color: var(--muted); }
+.s2-scenario { display: inline-flex; gap: 3px; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 999px; padding: 3px; }
+.s2-scn { font: inherit; font-size: 0.82rem; cursor: pointer; color: var(--text-2);
+  background: transparent; border: 0; border-radius: 999px; padding: 3px 12px;
+  display: inline-flex; flex-direction: column; align-items: center;
+  line-height: 1.15; }
+.s2-scn-sub { font-size: 0.62rem; color: var(--muted); }
+.s2-scn[aria-pressed="true"] { background: var(--surface); color: var(--text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14); }
+.s2-scn[aria-pressed="true"] .s2-scn-sub { color: var(--text-2); }
+
+.s2-axis { display: flex; justify-content: space-between; color: var(--muted);
+  font-size: 0.72rem; font-variant-numeric: tabular-nums; padding: 0 0 2px;
+  border-bottom: 1px solid var(--grid-line); margin: 6px 0 2px; }
+.s2-stage { display: flex; flex-direction: column; }
+.s2-variant { display: flex; flex-direction: column; }
+.s2-variant[hidden] { display: none; }   /* class display: flex would else win */
+.s2-rung { padding: 9px 0; }
+.s2-rung + .s2-rung { border-top: 1px solid var(--grid-line); }
+.s2-rung-head { display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: 3px 10px; margin-bottom: 6px; }
+.s2-mech { font-weight: 650; color: var(--text); font-size: 0.9rem; }
+.s2-apq .s2-mech { color: var(--fql-tv-cache); }
+.s2-vname { font-size: 0.76rem; color: var(--muted);
+  font-variant-numeric: tabular-nums; }
+.s2-delta { margin-left: auto; font-size: 0.8rem; font-weight: 650;
+  font-variant-numeric: tabular-nums; white-space: nowrap; }
+.s2-delta.dir-up { color: var(--good-ink); }
+.s2-delta.dir-down { color: var(--critical); }
+.s2-delta.dir-flat, .s2-delta.dir-base { color: var(--muted); font-weight: 500; }
+
+.s2-barline { display: grid; grid-template-columns: 1fr 104px; gap: 10px;
+  align-items: center; }
+.s2-track { position: relative; background: var(--surface-2); border-radius: 4px;
+  height: 22px; }
+.s2-bar { position: absolute; left: 0; top: 0; height: 100%; border-radius: 4px;
+  min-width: 3px; }
+.s2-bar-v   { background: var(--fql-v); }
+.s2-bar-vc  { background: var(--fql-v-cache); }
+.s2-bar-tv  { background: var(--fql-tv); }
+.s2-bar-tvc { background: var(--fql-tv-cache); }
+.s2-bar-apq { background: var(--fql-tv-cache);
+  background-image: repeating-linear-gradient(135deg,
+    rgba(255, 255, 255, 0.32) 0 4px, transparent 4px 9px); }
+.s2-val { text-align: right; font-size: 0.82rem; font-weight: 600;
+  color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.s2-explain { margin: 6px 0 0; font-size: 0.8rem; color: var(--text-2);
+  max-width: 94ch; }
+.s2-rung-empty .s2-mech, .s2-rung-empty .s2-vname { opacity: 0.65; }
+.s2-empty-msg { margin: 2px 0 0; font-size: 0.8rem; font-style: italic;
+  color: var(--muted); padding: 4px 8px; border-radius: 4px;
+  background: repeating-linear-gradient(135deg,
+    color-mix(in srgb, var(--muted) 10%, transparent) 0 3px,
+    transparent 3px 8px); }
+
 /* ---- S5 write-trade (HTML bars) ---- */
 :root {
   --wt-c-M1:  #eb6834;   /* full/vanilla write */

@@ -1264,6 +1264,110 @@ def _s0_section(grid: Grid, meta: dict) -> str:
 
 
 # --------------------------------------------------------------------------
+# S2 — the mechanism ladder (where the read speed comes from)
+# --------------------------------------------------------------------------
+
+S2_BAR = {"fraiseql-v-nocache": "v", "fraiseql-v-cache": "vc",
+          "fraiseql-tv": "tv", "fraiseql-tv-cache": "tvc"}
+
+
+def _s2_axis(axis_max: float, unit: str = "RPS") -> str:
+    return (
+        '<div class="s2-axis" aria-hidden="true">'
+        '<span>0</span>'
+        f'<span>{fmt_rps(axis_max / 2)}</span>'
+        f'<span>{fmt_rps(axis_max)} {esc(unit)}</span></div>')
+
+
+def _s2_delta(rung: MechRung) -> str:
+    if rung.delta is None:
+        return '<span class="s2-delta dir-base">baseline</span>'
+    return (f'<span class="s2-delta dir-{rung.delta.direction}">'
+            f'{esc(fmt_delta(rung.delta, "RPS"))}</span>')
+
+
+def _s2_rung(rung: MechRung, axis_max: float, meta: dict) -> str:
+    fw_label = meta["frameworks"][rung.framework]["label"]
+    vname = f"persisted query on {fw_label}" if rung.is_apq else fw_label
+    apq = " s2-apq" if rung.is_apq else ""
+    delta = _s2_delta(rung) if rung.status == STATUS_RESULT else ""
+    head = (
+        '<div class="s2-rung-head">'
+        f'<span class="s2-mech">{esc(rung.mechanism)}</span>'
+        f'<span class="s2-vname">{esc(vname)}</span>{delta}</div>')
+    if rung.status == STATUS_RESULT:
+        pct = _bar_pct(rung.rps, axis_max)
+        barcls = "apq" if rung.is_apq else S2_BAR.get(rung.framework, "tv")
+        return (
+            f'<div class="s2-rung{apq}" data-framework="{esc(rung.framework)}" '
+            f'data-mechanism="{esc(rung.mechanism)}" data-rps="{esc(rung.rps)}">'
+            f'{head}'
+            '<div class="s2-barline">'
+            f'<div class="s2-track"><span class="s2-bar s2-bar-{barcls}" '
+            f'style="width:{svg.n(pct)}%"></span></div>'
+            f'<span class="s2-val">{fmt_rps(rung.rps)} RPS</span></div>'
+            f'<p class="s2-explain">{esc_text(rung.explain)}</p></div>')
+    # na (no _APQ twin) / not_measured / excluded — an honest empty rung
+    if rung.status == STATUS_EXCLUDED:
+        msg = rung.reason
+    elif rung.status == "na":
+        msg = rung.note
+    else:
+        msg = "not measured in this run"
+    return (
+        f'<div class="s2-rung s2-rung-empty{apq}" '
+        f'data-mechanism="{esc(rung.mechanism)}">'
+        f'{head}<p class="s2-empty-msg">{esc_text(msg)}</p>'
+        f'<p class="s2-explain">{esc_text(rung.explain)}</p></div>')
+
+
+def _s2_variant(grid: Grid, meta: dict, scenario: str, axis_max: float,
+                default_sc: str) -> str:
+    rungs = mechanism_ladder(grid, scenario)
+    hidden = "" if scenario == default_sc else " hidden"
+    body = "".join(_s2_rung(r, axis_max, meta) for r in rungs)
+    return (
+        f'<div class="s2-variant" data-scenario="{esc(scenario)}"{hidden}>'
+        f'{body}</div>')
+
+
+def _s2_section(grid: Grid, meta: dict) -> str:
+    cfg = meta["mechanism_ladder"]
+    default_sc = cfg["default_scenario"]
+    all_rps = [r.rps for sc in cfg["scenarios"]
+               for r in mechanism_ladder(grid, sc)
+               if r.status == STATUS_RESULT and r.rps]
+    axis_max = svg.nice_axis(max(all_rps, default=1.0), 5)[0]
+    btns = "".join(
+        f'<button class="s2-scn" type="button" data-scenario="{esc(sc)}" '
+        f'aria-pressed="{"true" if sc == default_sc else "false"}">{esc(sc)}'
+        f'<span class="s2-scn-sub">{esc(RUNG_SUBLABEL.get(sc, ""))}</span>'
+        '</button>'
+        for sc in cfg["scenarios"])
+    controls = (
+        '<div class="s2-controls" hidden>'
+        '<span class="s2-controls-label">Read scenario</span>'
+        '<div class="s2-scenario" role="group" aria-label="Read scenario">'
+        f'{btns}</div></div>')
+    variants = "".join(
+        _s2_variant(grid, meta, sc, axis_max, default_sc)
+        for sc in cfg["scenarios"])
+    return (
+        '<section id="s2-mechanism-ladder" aria-labelledby="s2-h">'
+        '<h2 id="s2-h">S2 — Where the speed comes from</h2>'
+        f'<p class="lede">{esc_text(cfg["summary"])}</p>'
+        + controls + _s2_axis(axis_max)
+        + f'<div class="s2-stage" data-scenario="{esc(default_sc)}">'
+        f'{variants}</div>'
+        '<p class="footnote">Bars are absolute throughput from zero, so a rung '
+        'that earns ~nothing reads flat — no visual inflation of small gains. '
+        'Every value here is also in the grid table above (no chart-only '
+        'numbers). Prototype single-pass sweep; the Phase 06 median-of-three '
+        'run refines the tail.</p>'
+        '</section>')
+
+
+# --------------------------------------------------------------------------
 # S5 — the write trade (mandatory honesty section) + workload selector
 # --------------------------------------------------------------------------
 
@@ -1423,6 +1527,29 @@ def _workload_selector(grid: Grid, meta: dict) -> str:
 
 
 THEME_SCRIPT = """<script>
+// Shared scenario switcher (S0 anatomy + S2 mechanism ladder). Progressive
+// enhancement only: it toggles [hidden] + aria-pressed on already-rendered
+// per-scenario panels, so without JS the pre-rendered default is the story.
+function vbSwitcher(o) {
+  var btns = o.btnScope.querySelectorAll(o.btnSel);
+  var panels = o.panelScope.querySelectorAll(o.panelSel);
+  function set(sc) {
+    if (o.stateEl) o.stateEl.setAttribute('data-scenario', sc);
+    btns.forEach(function (b) {
+      b.setAttribute('aria-pressed',
+        b.getAttribute('data-scenario') === sc ? 'true' : 'false');
+    });
+    panels.forEach(function (p) {
+      p.hidden = p.getAttribute('data-scenario') !== sc;
+    });
+  }
+  btns.forEach(function (b) {
+    b.addEventListener('click', function () {
+      set(b.getAttribute('data-scenario'));
+    });
+  });
+  return set;
+}
 (function () {
   var root = document.documentElement;
   var btn = document.getElementById('theme-toggle');
@@ -1474,23 +1601,9 @@ THEME_SCRIPT = """<script>
   var controls = document.querySelector('.s0-controls');
   if (!stage || !controls) return;
   controls.hidden = false;
+  vbSwitcher({ btnScope: controls, btnSel: '.s0-scn',
+               panelScope: stage, panelSel: '.s0-variant', stateEl: stage });
   var play = document.getElementById('s0-play');
-  var scns = controls.querySelectorAll('.s0-scn');
-  function setScenario(sc) {
-    stage.setAttribute('data-scenario', sc);
-    scns.forEach(function (b) {
-      b.setAttribute('aria-pressed',
-        b.getAttribute('data-scenario') === sc ? 'true' : 'false');
-    });
-    stage.querySelectorAll('.s0-variant').forEach(function (v) {
-      v.hidden = v.getAttribute('data-scenario') !== sc;
-    });
-  }
-  scns.forEach(function (b) {
-    b.addEventListener('click', function () {
-      setScenario(b.getAttribute('data-scenario'));
-    });
-  });
   if (play) {
     play.addEventListener('click', function () {
       if (!stage.classList.contains('playing')) {
@@ -1506,6 +1619,18 @@ THEME_SCRIPT = """<script>
         : paused ? '\\u25BA Resume' : '\\u2016 Pause';
     });
   }
+})();
+(function () {
+  // S2 mechanism ladder — the shared scenario switcher, enhancing the
+  // pre-rendered default. No motion, so no play button.
+  var s2 = document.getElementById('s2-mechanism-ladder');
+  if (!s2) return;
+  var stage = s2.querySelector('.s2-stage');
+  var controls = s2.querySelector('.s2-controls');
+  if (!stage || !controls) return;
+  controls.hidden = false;
+  vbSwitcher({ btnScope: s2, btnSel: '.s2-scn',
+               panelScope: stage, panelSel: '.s2-variant', stateEl: stage });
 })();
 </script>"""
 
@@ -1531,6 +1656,7 @@ def _render_index(run: Run, meta: dict, grid: Grid) -> str:
         _grid_section(run, meta, grid),
         _s1_section(grid, meta),
         _s0_section(grid, meta),
+        _s2_section(grid, meta),
         _s5_section(grid, meta),
         _workload_selector(grid, meta),
         _footnote(run),
