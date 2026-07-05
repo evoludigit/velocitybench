@@ -135,6 +135,10 @@ export const resolvers = {
     author: async (comment: any, _: any, { loaders }: Context) => {
       return loaders.userLoader.load(comment.author_id);
     },
+
+    post: async (comment: any, _: any, { loaders }: Context) => {
+      return loaders.postLoader.load(comment.post_id);
+    },
   },
 
   Mutation: {

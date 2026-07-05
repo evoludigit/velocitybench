@@ -23,11 +23,19 @@ pub struct Post {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PostRef {
+    pub id: String,
+    pub title: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Comment {
     pub id: String,
     pub content: String,
     pub post_id: String,
     pub author_id: String,
     pub author: User,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub post: Option<PostRef>,
     pub created_at: DateTime<Utc>,
 }

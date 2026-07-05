@@ -306,6 +306,7 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": "http://localhost:8015/users?limit=20",
             "Q2": "http://localhost:8015/posts?limit=10",
             "Q2b": "http://localhost:8015/posts?limit=10&include=author",  # includes author JOIN
+            "Q3": "http://localhost:8015/comments?limit=20",  # embedded author + post
             "M1": "M1",
             "F1": "http://localhost:8015/posts?published=true&limit=10",
             "F2": "http://localhost:8015/posts?published=true&limit=10&include=author",
@@ -437,6 +438,7 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": ("http://localhost:4002/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4002/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:4002/graphql", _GQL_Q2b),
+            "Q3": ("http://localhost:4002/graphql", _GQL_Q3),
             "M1": "M1",
             "F1": ("http://localhost:4002/graphql", _GQL_F1),
             "F2": ("http://localhost:4002/graphql", _GQL_F2),
@@ -534,6 +536,7 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": ("http://localhost:4008/graphql", _GQL_Q1),
             "Q2": ("http://localhost:4008/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:4008/graphql", _GQL_Q2b),
+            "Q3": ("http://localhost:4008/graphql", _GQL_Q3),
             "M1": "M1",
             "F1": ("http://localhost:4008/graphql", _GQL_F1),
             "F2": ("http://localhost:4008/graphql", _GQL_F2),
@@ -555,6 +558,7 @@ FRAMEWORKS: dict[str, dict] = {
             "Q1": ("http://localhost:8011/graphql", _GQL_Q1),
             "Q2": ("http://localhost:8011/graphql", _GQL_Q2),
             "Q2b": ("http://localhost:8011/graphql", _GQL_Q2b),
+            "Q3": ("http://localhost:8011/graphql", _GQL_Q3),
             "M1": "M1",
             "F1": ("http://localhost:8011/graphql", _GQL_F1),
             "F2": ("http://localhost:8011/graphql", _GQL_F2),

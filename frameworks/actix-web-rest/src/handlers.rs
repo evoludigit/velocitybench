@@ -114,6 +114,28 @@ pub async fn get_post_comments(
     Ok(HttpResponse::Ok().json(comments))
 }
 
+// List recent comments with eager-loaded author and post (Q3 shape)
+#[get("/comments")]
+pub async fn list_comments(
+    query: web::Query<std::collections::HashMap<String, String>>,
+    state: web::Data<AppState>,
+) -> Result<HttpResponse, ApiError> {
+    let limit: i64 = query
+        .get("limit")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(10)
+        .min(100);
+
+    let offset: i64 = query
+        .get("offset")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
+
+    let comments = state.comment_repository.find_recent(limit, offset).await?;
+
+    Ok(HttpResponse::Ok().json(comments))
+}
+
 // List posts with pagination, eager-loaded authors, and optional comments
 #[get("/posts")]
 pub async fn list_posts(

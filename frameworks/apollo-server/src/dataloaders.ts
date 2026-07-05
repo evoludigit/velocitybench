@@ -70,6 +70,18 @@ export function createDataLoaders() {
       return authorIds.map((id) => postMap.get(id) || []);
     }),
 
+    // Batch load posts by UUID (for Comment.post)
+    postLoader: new DataLoader<string, Post | null>(async (ids) => {
+      const posts = await query<any>(
+        `SELECT id, fk_author, title, content, published as status
+         FROM benchmark.tb_post
+         WHERE id = ANY($1)`,
+        [ids]
+      );
+      const postMap = new Map(posts.map((p: any) => [p.id, p]));
+      return ids.map((id) => postMap.get(id) || null);
+    }),
+
     // Batch load comments by post ID
     commentsByPostLoader: new DataLoader<string, Comment[]>(async (postIds) => {
       const comments = await query<Comment>(

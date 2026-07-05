@@ -1,6 +1,6 @@
 use crate::db::DbPool;
 use crate::error::ApiError;
-use crate::models::{Comment, Post, User};
+use crate::models::{Comment, Post, PostRef, User};
 use deadpool_postgres::Client;
 use uuid::Uuid;
 
@@ -428,6 +428,59 @@ impl CommentRepository {
                 author_id: row.get("user_id"),
                 author,
                 post: None,
+                created_at,
+            };
+
+            comments.push(comment);
+        }
+
+        Ok(comments)
+    }
+
+    pub async fn find_recent(&self, limit: i64, offset: i64) -> Result<Vec<Comment>, ApiError> {
+        let client = self.get_client().await?;
+
+        let rows = client
+            .query(
+                "SELECT c.id::text, c.content, c.created_at::text,
+                        u.id::text as user_id, u.username, u.full_name, u.bio,
+                        p.id::text as post_id, p.title
+                 FROM benchmark.tb_comment c
+                 JOIN benchmark.tb_user u ON c.fk_author = u.pk_user
+                 JOIN benchmark.tb_post p ON c.fk_post = p.pk_post
+                 ORDER BY c.created_at DESC
+                 LIMIT $1 OFFSET $2",
+                &[&limit, &offset],
+            )
+            .await
+            .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
+
+        let mut comments = Vec::new();
+        for row in rows {
+            let author = User {
+                id: row.get("user_id"),
+                username: row.get("username"),
+                full_name: row.get("full_name"),
+                bio: row.get("bio"),
+                posts: None,
+            };
+
+            let created_at_str: String = row.get("created_at");
+            let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
+                .map(|dt| dt.with_timezone(&chrono::Utc))
+                .unwrap_or_else(|_| chrono::Utc::now());
+
+            let post_id: String = row.get("post_id");
+            let comment = Comment {
+                id: row.get("id"),
+                content: row.get("content"),
+                post_id: post_id.clone(),
+                author_id: row.get("user_id"),
+                author,
+                post: Some(PostRef {
+                    id: post_id,
+                    title: row.get("title"),
+                }),
                 created_at,
             };
 

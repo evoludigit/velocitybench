@@ -12,6 +12,7 @@ const schema = /* GraphQL */ `
     post(id: ID!): Post
     posts(limit: Int = 10, published: Boolean): [Post!]!
     comment(id: ID!): Comment
+    comments(limit: Int = 10): [Comment!]!
   }
 
   type Mutation {
@@ -183,6 +184,25 @@ const resolvers = {
         authorId: row.author_id,
         postId: row.post_id,
       };
+    },
+
+    comments: async (_: unknown, { limit }: { limit: number }) => {
+      const safeLimit = Math.min(Math.max(limit, 1), 100);
+      const result = await pool.query(
+        `SELECT c.id, c.content, u.id as author_id, p.id as post_id
+         FROM benchmark.tb_comment c
+         JOIN benchmark.tb_user u ON c.fk_author = u.pk_user
+         JOIN benchmark.tb_post p ON c.fk_post = p.pk_post
+         ORDER BY c.created_at DESC
+         LIMIT $1`,
+        [safeLimit]
+      );
+      return result.rows.map((row: any) => ({
+        id: row.id,
+        content: row.content,
+        authorId: row.author_id,
+        postId: row.post_id,
+      }));
     },
   },
 

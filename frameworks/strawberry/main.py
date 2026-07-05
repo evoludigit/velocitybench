@@ -560,6 +560,48 @@ class Query:
             logger.exception(f"Error fetching comment {id}: {e}")
             raise
 
+    @strawberry.field(description="Fetch recent comments")
+    async def comments(
+        self,
+        info: Info,
+        limit: int = 10,
+    ) -> list[Comment]:
+        """Fetch the most recent comments (author/post nesting via dataloaders)."""
+        try:
+            safe_limit = min(max(limit, 1), 100)
+            db = info.context.db
+            result = await db.fetch(
+                """
+                SELECT c.id, c.content, u.id as author_id, p.id as post_id
+                FROM benchmark.tb_comment c
+                JOIN benchmark.tb_user u ON c.fk_author = u.pk_user
+                JOIN benchmark.tb_post p ON c.fk_post = p.pk_post
+                ORDER BY c.created_at DESC
+                LIMIT $1
+                """,
+                safe_limit,
+                timeout=10.0,
+            )
+            return [
+                Comment(
+                    id=strawberry.ID(row["id"]),
+                    content=row["content"],
+                    author_id=strawberry.ID(row.get("author_id"))
+                    if row.get("author_id")
+                    else None,
+                    post_id=strawberry.ID(row.get("post_id"))
+                    if row.get("post_id")
+                    else None,
+                )
+                for row in result
+            ]
+        except TimeoutError:
+            logger.error(f"Timeout fetching comments with limit {limit}")
+            raise
+        except (asyncpg.PostgresError, ConnectionError, OSError) as e:
+            logger.exception(f"Error fetching comments: {e}")
+            raise
+
 
 @strawberry.type
 class Mutation:
