@@ -8,6 +8,7 @@ changes.
 """
 import json
 import re
+import sys
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -15,7 +16,6 @@ import pytest
 
 TESTS_DIR = Path(__file__).resolve().parent
 SITE_DIR = TESTS_DIR.parent
-import sys
 sys.path.insert(0, str(SITE_DIR))
 import build  # noqa: E402
 
@@ -146,8 +146,6 @@ def test_error_cell_is_greyed_with_breakdown(tmp_path, meta):
     p = tmp_path / "err.json"
     p.write_text(json.dumps(doc))
     html = build.render(build.load_run(p), meta)["index.html"].decode()
-    m = re.search(r'id="cell-fraiseql-tv-Q1"[^>]*class="[^"]*"', html) \
-        or re.search(r'class="[^"]*"[^>]*id="cell-fraiseql-tv-Q1"', html)
     assert "has-err" in html
     assert "http_500" in html and "7 errors" in html
 

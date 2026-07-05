@@ -255,6 +255,58 @@ def ladder_series(grid: Grid, ladder: str = "nesting") -> list:
 
 
 # --------------------------------------------------------------------------
+# Write-trade extraction (S5)
+# --------------------------------------------------------------------------
+
+WRITE_SCENARIOS = ("M1", "M1d", "MC1")
+
+
+@dataclass
+class WriteRow:
+    scenario: str
+    status: str
+    rps: float | None = None
+    mechanism: str | None = None
+    reason_id: int | None = None
+    reason: str | None = None
+
+
+@dataclass
+class WriteTradeGroup:
+    framework: str
+    rows: dict            # scenario -> WriteRow
+    appendix: bool = False
+
+
+def write_mechanism(framework: str, scenario: str, meta: dict) -> str | None:
+    fam = ("fraiseql" if meta["frameworks"][framework].get("family") == "fraiseql"
+           else "classical")
+    return meta.get("mutation_mechanisms", {}).get(scenario, {}).get(fam)
+
+
+def write_trade(grid: Grid) -> list:
+    """Per-framework M1/M1d/MC1 cells (or their exclusion/not-measured records),
+    with mutation mechanisms resolved from scenarios.json. The load-bearing
+    honesty section: FraiseQL's full-cascade M1 and its delta M1d side by side
+    with classical vanilla writes."""
+    meta = grid.meta
+    out = []
+    for fw in meta["framework_order"]:
+        rows = {}
+        for sc in WRITE_SCENARIOS:
+            c = grid.cell(fw, sc)
+            rows[sc] = WriteRow(
+                scenario=sc, status=c.status, rps=c.rps,
+                mechanism=(write_mechanism(fw, sc, meta)
+                           if c.status == STATUS_RESULT else None),
+                reason_id=c.reason_id, reason=c.reason)
+        out.append(WriteTradeGroup(
+            framework=fw, rows=rows,
+            appendix=bool(meta["frameworks"][fw].get("appendix"))))
+    return out
+
+
+# --------------------------------------------------------------------------
 # Rendering helpers
 # --------------------------------------------------------------------------
 
@@ -529,13 +581,6 @@ def _exclusion_key(meta: dict) -> str:
         f'run</strong> — {esc_text(nm)}</p></div>')
 
 
-def _placeholder_section(sid: str, title: str, blurb: str) -> str:
-    return (
-        f'<section id="{sid}" aria-label="{esc(title)}">'
-        f'<h2>{esc(title)}</h2>'
-        f'<div class="section-todo">{esc(blurb)}</div></section>')
-
-
 def _footnote(run: Run) -> str:
     rel = repo_relative(run.source_path)
     return (
@@ -580,6 +625,14 @@ def chart_styles(meta: dict) -> dict:
         out[fw] = {"arch": arch, "style": DASH_STYLES[i % 4],
                    "hero": fw == "fraiseql-tv"}
     return out
+
+
+def _tick_int(v) -> str:
+    return f"{v:,.0f}"
+
+
+def _tick_compact(v) -> str:
+    return f"{v:g}"
 
 
 def _metric_val(point, metric):
@@ -650,13 +703,13 @@ def _s1_chart(grid: Grid, meta: dict, metric: str) -> str:
     if metric == "rps":
         top, _step, ticks = svg.nice_axis(vmax, 6)
         yscale = svg.Scale(0, top, plot_b, plot_t)
-        ylabel = lambda v: f"{v:,.0f}"
+        ylabel = _tick_int
         ytitle = "Requests / second (y from 0)"
     else:  # p99 spans orders of magnitude -> loudly-labelled log axis
         vmin = min(result_vals, default=1.0)
         lo, hi, ticks = svg.nice_log_axis(vmin, vmax)
         yscale = svg.LogScale(lo, hi, plot_b, plot_t)
-        ylabel = lambda v: f"{v:g}"
+        ylabel = _tick_compact
         ytitle = "p99 latency, ms — LOG scale · lower is better"
     xs = {sc: plot_l + (i * (plot_r - plot_l) / (len(rungs) - 1))
           for i, (sc, _) in enumerate(rungs)}
@@ -778,6 +831,165 @@ def _s1_section(grid: Grid, meta: dict) -> str:
         '</section>')
 
 
+# --------------------------------------------------------------------------
+# S5 — the write trade (mandatory honesty section) + workload selector
+# --------------------------------------------------------------------------
+
+def _bar_pct(v, axis_max) -> float:
+    if not v or axis_max <= 0:
+        return 0.0
+    return max(0.4, min(100.0, v / axis_max * 100.0))
+
+
+def _wt_row(row: WriteRow, axis_max: float, unit: str) -> str:
+    tag = row.scenario
+    if row.status == STATUS_RESULT:
+        mech = row.mechanism or "workflow"
+        pct = _bar_pct(row.rps, axis_max)
+        return (
+            f'<div class="wt-row" data-framework="" data-scenario="{esc(tag)}" '
+            f'data-rps="{esc(row.rps)}">'
+            f'<span class="wt-tag">{esc(tag)}</span>'
+            f'<span class="wt-mech">{esc(mech)}</span>'
+            f'<span class="wt-track"><span class="wt-bar wt-{esc(tag)}" '
+            f'style="width:{svg.n(pct)}%"></span></span>'
+            f'<span class="wt-val">{fmt_rps(row.rps)} {esc(unit)}</span></div>')
+    if row.status == STATUS_EXCLUDED:
+        short = (row.reason or "").split("—", 1)[0].strip() or "excluded"
+        return (
+            f'<div class="wt-row excluded" data-scenario="{esc(tag)}" '
+            f'data-excluded="true" data-reason-id="{esc(row.reason_id)}" '
+            f'title="{esc(row.reason)}">'
+            f'<span class="wt-tag">{esc(tag)}</span>'
+            f'<span class="wt-mech">excluded · #{esc(row.reason_id)}</span>'
+            f'<span class="wt-track"></span>'
+            f'<span class="wt-val excl">{esc(short)}</span></div>')
+    return (
+        f'<div class="wt-row not-measured" data-scenario="{esc(tag)}" '
+        f'data-not-measured="true">'
+        f'<span class="wt-tag">{esc(tag)}</span>'
+        f'<span class="wt-mech">—</span>'
+        f'<span class="wt-track"></span>'
+        f'<span class="wt-val">not measured in this run</span></div>')
+
+
+def _wt_group(group: WriteTradeGroup, meta: dict, scenarios: list,
+              axis_max: float, unit: str) -> str:
+    fw_label = meta["frameworks"][group.framework]["label"]
+    appendix = " appendix" if group.appendix else ""
+    tail = ('<span class="wt-appendix-tag">audit overhead appendix</span>'
+            if group.appendix else "")
+    rows = "".join(
+        _wt_row(group.rows[sc], axis_max, unit) for sc in scenarios)
+    return (
+        f'<div class="wt-group{appendix}" data-framework="{esc(group.framework)}">'
+        f'<div class="wt-fw">{esc(fw_label)}{tail}</div>'
+        f'<div class="wt-rows">{rows}</div></div>')
+
+
+def _wt_axis(axis_max: float, unit: str) -> str:
+    return (
+        '<div class="wt-axis" aria-hidden="true">'
+        '<span>0</span>'
+        f'<span>{fmt_rps(axis_max / 2)}</span>'
+        f'<span>{fmt_rps(axis_max)} {esc(unit)}</span></div>')
+
+
+def _s5_section(grid: Grid, meta: dict) -> str:
+    groups = write_trade(grid)
+    notes = meta.get("notes", {})
+    main = [g for g in groups if not g.appendix]
+    audit = [g for g in groups if g.appendix]
+
+    # M1 / M1d share one linear req/s axis (same unit, adjacency preserved)
+    mm_vals = [g.rows[sc].rps for g in groups for sc in ("M1", "M1d")
+               if g.rows[sc].status == STATUS_RESULT and g.rows[sc].rps]
+    mm_max = svg.nice_axis(max(mm_vals, default=1.0), 5)[0]
+    mc_vals = [g.rows["MC1"].rps for g in groups
+               if g.rows["MC1"].status == STATUS_RESULT and g.rows["MC1"].rps]
+    mc_max = svg.nice_axis(max(mc_vals, default=1.0), 5)[0]
+
+    explainer = "".join(
+        f'<div class="wt-exp wt-exp-{cls}"><strong>{esc(tag)}</strong> '
+        f'{esc_text(notes.get(key, ""))}</div>'
+        for tag, cls, key in [
+            ("M1 — FraiseQL", "M1", "m1_full_cascade"),
+            ("M1d — delta", "M1d", "m1_delta"),
+            ("M1 — classical", "M1", "m1_vanilla")])
+
+    mm_groups = "".join(
+        _wt_group(g, meta, ["M1", "M1d"], mm_max, "req/s") for g in main)
+    audit_html = "".join(
+        _wt_group(g, meta, ["M1"], mm_max, "req/s") for g in audit)
+    mc_groups = "".join(
+        _wt_group(g, meta, ["MC1"], mc_max, "cyc/s") for g in main
+        if g.rows["MC1"].status != STATUS_NOT_MEASURED or True)
+
+    legend = (
+        '<div class="state-legend">'
+        '<span><span class="swatch" style="background:var(--wt-c-M1)"></span>'
+        'M1 — full write</span>'
+        '<span><span class="swatch" style="background:var(--wt-c-M1d)"></span>'
+        'M1d — delta patch</span>'
+        '<span><span class="swatch" style="background:var(--wt-c-MC1)"></span>'
+        'MC1 — workflow</span></div>')
+
+    return (
+        '<section id="s5-write-trade" aria-labelledby="s5-h">'
+        '<h2 id="s5-h">S5 — The write trade</h2>'
+        '<p class="lede">The mandatory honesty section. FraiseQL’s precomputed '
+        'reads are paid for on writes: its full-cascade <strong>M1</strong> is '
+        'the slowest write here, shown at full linear prominence next to its '
+        'own delta path <strong>M1d</strong> and classical vanilla updates. '
+        'M1 and M1d sit adjacent, each labelled by mechanism.</p>'
+        f'<div class="wt-explainer">{explainer}</div>'
+        + legend +
+        '<h3>Raw write throughput — M1 vs M1d '
+        '<span class="wt-unit">requests / second, linear from 0</span></h3>'
+        + _wt_axis(mm_max, "req/s")
+        + f'<div class="wt-chart">{mm_groups}</div>'
+        + (f'<div class="wt-chart wt-audit">{audit_html}</div>' if audit_html
+           else "")
+        + '<h3>Mutation → consistent state — MC1 '
+        '<span class="wt-unit">a workflow benchmark, cycles / second</span>'
+        '</h3>'
+        f'<p class="lede">{esc_text(notes.get("mc1_workflow", ""))}</p>'
+        + _wt_axis(mc_max, "cyc/s")
+        + f'<div class="wt-chart">{mc_groups}</div>'
+        + '</section>')
+
+
+def _workload_selector(grid: Grid, meta: dict) -> str:
+    shapes = meta.get("workload_shapes", {})
+    cards = []
+    for key, shape in shapes.items():
+        # resolve a guaranteed-existing anchor: the section, else a real cell
+        section = shape.get("section")
+        if section:
+            primary = f'#{section}'
+        else:
+            sc = shape["scenarios"][0]
+            primary = f'#{cell_anchor(meta["framework_order"][0], sc)}'
+            # framework_order[0] is fraiseql-tv which has C3/HC3 results
+        chips = "".join(
+            f'<a class="wl-chip" href="#{cell_anchor("fraiseql-tv", sc)}">'
+            f'{esc(sc)}</a>' for sc in shape["scenarios"])
+        cards.append(
+            f'<article class="wl-card" data-shape="{esc(key)}">'
+            f'<h3><a href="{esc(primary)}">{esc(shape.get("label", key))}</a>'
+            f'</h3>'
+            f'<p>{esc_text(shape.get("blurb", ""))}</p>'
+            f'<div class="wl-chips">answers: {chips}</div></article>')
+    return (
+        '<section id="workload-selector" aria-labelledby="wl-h">'
+        '<h2 id="wl-h">Which workload shape is yours?</h2>'
+        '<p class="lede">Pick the shape that matches your workload; each names '
+        'the scenarios that answer it — a winner <em>and</em> the trade — and '
+        'links to the section and the exact grid cells. Stub for now: plain '
+        'anchor navigation, no scoring. The scored selector is future work.</p>'
+        f'<div class="wl-grid">{"".join(cards)}</div></section>')
+
+
 THEME_SCRIPT = """<script>
 (function () {
   var root = document.documentElement;
@@ -844,10 +1056,8 @@ def _render_index(run: Run, meta: dict, grid: Grid) -> str:
         _reading_panel(meta),
         _grid_section(run, meta, grid),
         _s1_section(grid, meta),
-        _placeholder_section(
-            "s5-write-trade", "S5 — The write trade",
-            "The M1 / M1d / MC1 write-trade view lands in Phase 04; until then "
-            "the numbers live in the grid above."),
+        _s5_section(grid, meta),
+        _workload_selector(grid, meta),
         _footnote(run),
     ])
     shell = Template(_load_template("base.html"))
