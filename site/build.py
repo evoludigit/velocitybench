@@ -488,6 +488,69 @@ def apq_pairs(grid: Grid) -> list:
 
 
 # --------------------------------------------------------------------------
+# S4 caching under fire — C3 (miss regime) vs HC3 (hit regime)
+# --------------------------------------------------------------------------
+
+@dataclass
+class CacheRow:
+    framework: str
+    cache_on: bool | None
+    status: str                  # "result" | "not_measured" | "excluded"
+    miss_rps: float | None = None    # C3 — 20 rotating keys, cache can't hit
+    hit_rps: float | None = None     # HC3 — 5-key hot pool, cache should hit
+    delta: Delta | None = None       # HC3 (hit) over C3 (miss)
+    reason_id: int | None = None
+    reason: str | None = None
+
+
+@dataclass
+class CacheUnderFire:
+    miss: str                    # scenario id for the miss regime (C3)
+    hit: str                     # scenario id for the hit regime (HC3)
+    variants: list               # CacheRow, the configured FraiseQL variants
+    coverage: list               # CacheRow, every other framework (with reason)
+
+
+def cache_pairs(grid: Grid) -> CacheUnderFire:
+    """C3 (20 rotating keys, a cache can never hit) vs HC3 (5-key hot pool, a
+    cache should hit almost every time) per configured FraiseQL variant. The
+    delta is HC3 over C3: a cache that earned its keep would push it up on the
+    cache-on rows while the cache-off rows stayed flat — so the flatness of the
+    no-cache rows is itself information, and a ~zero or negative delta renders
+    as-is. Every other non-appendix framework trails as a coverage row (not
+    measured in this run, or excluded by design with its verbatim reason);
+    variant order and cache state come from scenarios.json, never hardcoded."""
+    meta = grid.meta
+    cfg = meta["cache_under_fire"]
+    miss, hit = cfg["miss"], cfg["hit"]
+    flat = cfg.get("flat_threshold_pct", 1.5)
+
+    def row(fw: str, cache_on: bool | None) -> CacheRow:
+        mcell, hcell = grid.cell(fw, miss), grid.cell(fw, hit)
+        r = CacheRow(framework=fw, cache_on=cache_on, status=hcell.status)
+        if hcell.status == STATUS_EXCLUDED:
+            r.reason_id, r.reason = hcell.reason_id, hcell.reason
+        elif hcell.status == STATUS_RESULT and mcell.status == STATUS_RESULT:
+            r.status = STATUS_RESULT
+            r.miss_rps, r.hit_rps = mcell.rps, hcell.rps
+            r.delta = delta_of(mcell.rps, hcell.rps, flat)
+        else:
+            r.status = STATUS_NOT_MEASURED
+            r.miss_rps = mcell.rps if mcell.status == STATUS_RESULT else None
+        return r
+
+    variant_fw = {v["framework"] for v in cfg["variants"]}
+    variants = [row(v["framework"], v["cache"]) for v in cfg["variants"]]
+    order = {fw: i for i, fw in enumerate(meta["framework_order"])}
+    coverage = [
+        row(fw, None) for fw in meta["framework_order"]
+        if fw not in variant_fw and not meta["frameworks"][fw].get("appendix")]
+    coverage.sort(key=lambda c: (_APQ_RANK[c.status], order[c.framework]))
+    return CacheUnderFire(miss=miss, hit=hit, variants=variants,
+                          coverage=coverage)
+
+
+# --------------------------------------------------------------------------
 # S0 request anatomy — the hop model (movement layer)
 # --------------------------------------------------------------------------
 

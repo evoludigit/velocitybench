@@ -373,6 +373,23 @@
     "summary": "APQ isolated: the same query sent as a pre-registered SHA-256 hash instead of full text. It changes no SQL round-trip, so it only helps when uploading and parsing the document is the bottleneck. In this run the read and write documents are small, so the measured APQ delta is near zero — sometimes slightly negative — and the chart shows that as-is. Frameworks with no first-party APQ handshake are greyed with their reason, never dropped.",
     "not_measured_note": "APQ-capable, but its persisted-query twin was not measured in this prototype sweep — distinct from excluded, and neither slow nor missing on purpose."
   },
+  "cache_under_fire": {
+    "miss": "C3",
+    "hit": "HC3",
+    "flat_threshold_pct": 1.5,
+    "regimes": {
+      "miss": "C3 — 20 rotating UUIDs. Each request asks for a different row, so a result cache is cold on every request: the worst case a cache can face.",
+      "hit": "HC3 — a 5-UUID hot pool. The same handful of rows repeat, so a result cache should serve almost every request from memory: the case caching is built for."
+    },
+    "variants": [
+      {"framework": "fraiseql-v-nocache", "cache": false},
+      {"framework": "fraiseql-v-cache", "cache": true},
+      {"framework": "fraiseql-tv", "cache": false},
+      {"framework": "fraiseql-tv-cache", "cache": true}
+    ],
+    "summary": "Caching under fire: the same single-row lookup run two ways — against 20 rotating keys (C3, a cache can never hit) and against a 5-key hot pool (HC3, a cache should hit almost every time). The cache-off variants (v, tv) sit beside the cache-on ones (v+cache, tv+cache) on purpose: if the cache earned its keep, the cache-on rows would jump from C3 to HC3 while the cache-off rows stayed flat. In this run every row is flat — a single-row read is already so cheap (~4 ms) that caching the result saves almost nothing, hot pool or not, and tv+cache is a touch slower with the cache in the path. The chart shows that as-is.",
+    "not_measured_note": "Wired in the benchmark but not run against the hot-key scenarios in this prototype sweep — distinct from excluded, and neither slow nor missing on purpose. The Phase 06 median-of-three run fills them."
+  },
   "exclusion_reasons": {
     "1": "M1d on v-variants — updateUserDelta patches the tvd_* delta tables of the tv pipeline; the v-variants serve on-the-fly JSONB views and have no delta pipeline to contrast (structural, see frameworks/fraiseql/database/extensions.sql).",
     "2": "fraiseql-tv-audit — audit-overhead appendix row: measures M1 only, to isolate the cost of audit logging on the mutation path. Deliberately not a full-grid framework; do not expand.",
@@ -604,7 +621,7 @@
         "HC3"
       ],
       "section": null,
-      "blurb": "A hot 5-key pool (HC3) lets result caches shine; the 20-UUID miss regime (C3) shows what a cache does when it cannot help. The full cache-under-fire view (S4) lands in a later phase."
+      "blurb": "A hot 5-key pool (HC3) is where a result cache should shine; the 20-UUID miss regime (C3) shows what a cache does when it cannot help. In this run both regimes land flat — the single-row read is already too cheap for the cache to matter."
     }
   },
   "notes": {
