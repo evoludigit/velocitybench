@@ -307,6 +307,181 @@ def write_trade(grid: Grid) -> list:
 
 
 # --------------------------------------------------------------------------
+# Delta helper — shared by the S2 mechanism ladder and the S3 APQ pairs
+# --------------------------------------------------------------------------
+
+@dataclass
+class Delta:
+    prev: float
+    cur: float
+    abs: float            # cur - prev (raw, sign preserved)
+    pct: float            # (cur - prev) / prev * 100 (raw)
+    direction: str        # "up" | "down" | "flat"
+
+
+def delta_of(prev: float, cur: float, flat_pct: float = 1.5) -> Delta:
+    """The signed change from prev to cur. A change under +/-flat_pct reads as
+    'flat' so a rung/pair that earns ~nothing is not visually inflated — but the
+    raw magnitude and sign are always kept, so a negative delta stays negative
+    and honest. Byte-stability is the caller's job (format at render time)."""
+    d = cur - prev
+    pct = (d / prev * 100.0) if prev else 0.0
+    if abs(pct) < flat_pct:
+        direction = "flat"
+    elif d > 0:
+        direction = "up"
+    else:
+        direction = "down"
+    return Delta(prev=prev, cur=cur, abs=d, pct=pct, direction=direction)
+
+
+DELTA_GLYPH = {"up": "▲", "down": "▼", "flat": "▬"}
+
+
+def fmt_delta(delta: Delta, unit: str = "") -> str:
+    """'▲ +2,836 RPS (+56.0%)' — explicit sign, real percent (a flat rung shows
+    its true near-zero number, a negative one its minus). Deterministic."""
+    minus = "−"
+    asign = "+" if delta.abs >= 0 else minus
+    aval = abs(delta.abs)
+    afmt = f"{aval:,.0f}" if aval >= 100 else f"{aval:,.1f}"
+    unit_s = f" {unit}" if unit else ""
+    psign = "+" if delta.pct >= 0 else minus
+    return (f"{DELTA_GLYPH[delta.direction]} {asign}{afmt}{unit_s} "
+            f"({psign}{abs(delta.pct):.1f}%)")
+
+
+# --------------------------------------------------------------------------
+# S2 mechanism ladder — where the read speed comes from, one mechanism at a time
+# --------------------------------------------------------------------------
+
+@dataclass
+class MechRung:
+    framework: str
+    mechanism: str
+    explain: str
+    status: str                  # "result" | "not_measured" | "excluded" | "na"
+    rps: float | None = None
+    delta: Delta | None = None   # vs the previous *result* rung
+    is_apq: bool = False
+    reason_id: int | None = None
+    reason: str | None = None
+    note: str | None = None      # for the "na" +APQ rung (no twin measured)
+
+
+def apq_twin(scenario: str, meta: dict) -> str | None:
+    """The _APQ scenario whose apq_base is `scenario`, if one is defined."""
+    for sc, m in meta["scenarios"].items():
+        if m.get("apq_base") == scenario:
+            return sc
+    return None
+
+
+def mechanism_ladder(grid: Grid, scenario: str) -> list:
+    """Ordered FraiseQL-variant rungs for one read scenario (v-nocache → v-cache
+    → tv → tv-cache), each labelled by the mechanism it adds and carrying its
+    delta over the previous result rung. A final +APQ rung is appended: a real
+    delta where the scenario's _APQ twin was measured for the base variant, else
+    'na' with a reason. Absolute throughput per rung — a rung that earns ~nothing
+    reads flat; the delta chip still states the real, possibly negative, change.
+    Variant order, labels and explanations come from scenarios.json."""
+    cfg = grid.meta["mechanism_ladder"]
+    flat = cfg.get("flat_threshold_pct", 1.5)
+    rungs: list = []
+    last_rps = None
+    for v in cfg["variants"]:
+        cell = grid.cell(v["framework"], scenario)
+        rung = MechRung(framework=v["framework"], mechanism=v["mechanism"],
+                        explain=v["explain"], status=cell.status)
+        if cell.status == STATUS_RESULT:
+            rung.rps = cell.rps
+            if last_rps is not None:
+                rung.delta = delta_of(last_rps, cell.rps, flat)
+            last_rps = cell.rps
+        elif cell.status == STATUS_EXCLUDED:
+            rung.reason_id, rung.reason = cell.reason_id, cell.reason
+        rungs.append(rung)
+
+    ar = cfg["apq_rung"]
+    base_fw = ar["base_variant"]
+    apq = MechRung(framework=base_fw, mechanism=ar["mechanism"],
+                   explain=ar["explain"], status="na", is_apq=True)
+    twin = apq_twin(scenario, grid.meta)
+    if twin is None:
+        apq.note = ar["no_twin_note"]
+    else:
+        cell = grid.cell(base_fw, twin)
+        apq.status = cell.status
+        if cell.status == STATUS_RESULT:
+            apq.rps = cell.rps
+            if last_rps is not None:
+                apq.delta = delta_of(last_rps, cell.rps, flat)
+        elif cell.status == STATUS_EXCLUDED:
+            apq.reason_id, apq.reason = cell.reason_id, cell.reason
+    rungs.append(apq)
+    return rungs
+
+
+# --------------------------------------------------------------------------
+# S3 APQ isolated — before/after per framework, honest about not-measured
+# --------------------------------------------------------------------------
+
+_APQ_RANK = {STATUS_RESULT: 0, STATUS_NOT_MEASURED: 1, STATUS_EXCLUDED: 2}
+
+
+@dataclass
+class ApqPairCell:
+    framework: str
+    status: str                  # "result" | "not_measured" | "excluded"
+    base_rps: float | None = None
+    apq_rps: float | None = None
+    delta: Delta | None = None
+    reason_id: int | None = None
+    reason: str | None = None
+
+
+@dataclass
+class ApqPairGroup:
+    base: str
+    apq: str
+    cells: list                  # ApqPairCell, results first / excluded last
+
+
+def apq_pairs(grid: Grid) -> list:
+    """Per APQ pair (Q1→Q1_APQ, Q2b→Q2b_APQ, M1→M1_APQ), the before/after of
+    every non-appendix framework. Status is derived from the grid, never a
+    hand-kept capability list: a measured _APQ twin → a real (possibly negative
+    or ~zero) delta; a by-design exclusion → its verbatim reason; anything else →
+    APQ-capable-but-not-measured. Rows lead with results and trail with
+    exclusions (present with reason, never dropped)."""
+    meta = grid.meta
+    flat = meta["apq"].get("flat_threshold_pct", 1.5)
+    order = {fw: i for i, fw in enumerate(meta["framework_order"])}
+    groups = []
+    for pair in meta["apq"]["pairs"]:
+        base, apq = pair["base"], pair["apq"]
+        cells = []
+        for fw in meta["framework_order"]:
+            if meta["frameworks"][fw].get("appendix"):
+                continue
+            bcell, acell = grid.cell(fw, base), grid.cell(fw, apq)
+            c = ApqPairCell(framework=fw, status=acell.status)
+            if acell.status == STATUS_EXCLUDED:
+                c.reason_id, c.reason = acell.reason_id, acell.reason
+            elif acell.status == STATUS_RESULT and bcell.status == STATUS_RESULT:
+                c.status = STATUS_RESULT
+                c.base_rps, c.apq_rps = bcell.rps, acell.rps
+                c.delta = delta_of(bcell.rps, acell.rps, flat)
+            else:
+                c.status = STATUS_NOT_MEASURED
+                c.base_rps = bcell.rps if bcell.status == STATUS_RESULT else None
+            cells.append(c)
+        cells.sort(key=lambda c: (_APQ_RANK[c.status], order[c.framework]))
+        groups.append(ApqPairGroup(base=base, apq=apq, cells=cells))
+    return groups
+
+
+# --------------------------------------------------------------------------
 # S0 request anatomy — the hop model (movement layer)
 # --------------------------------------------------------------------------
 
