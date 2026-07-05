@@ -64,6 +64,17 @@ M1 vs M1d — READ THE MECHANISM, NOT JUST THE NUMBER
   losing on full-cascade M1 is a real, prominent result, not an artifact.
   $mc1_workflow
 
+REQUEST ANATOMY — QUERY STRATEGIES (S0)
+  Where a nested read's round-trips come from, by architecture. Round-trip
+  counts are STRUCTURAL truth (provenanced to the source files below), not
+  measured timings: resolver + DataLoader adds one BATCHED SQL trip per nesting
+  level (Q1/Q2b/Q3 = 1/2/3, WHERE key = ANY($1), so no N+1); compile-to-SQL and
+  precompute stay at one round-trip at any depth. The animation's dot pacing is
+  the ONLY measured overlay (each engine's p50 for the read).
+  DataLoader credit: $dataloader_credit
+$strategy_lines
+  APQ: $apq_note
+
 FRAMEWORKS ($n_frameworks)
 $framework_lines
 

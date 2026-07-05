@@ -894,6 +894,201 @@ def _s1_section(grid: Grid, meta: dict) -> str:
 
 
 # --------------------------------------------------------------------------
+# S0 — anatomy of a request (movement layer; the "why" behind S1)
+# --------------------------------------------------------------------------
+
+S0_W, S0_H = 560, 96
+S0_BX, S0_SX, S0_DX = 56, 288, 508      # browser / server / database columns
+S0_Y0, S0_ROWGAP, S0_LABELY = 40, 15, 14
+S0_ARCH = {"resolver-dataloader": "resolver", "compile-to-sql": "compiler",
+           "precompute": "fraiseql"}
+S0_SUBLABEL = {"Q1": "flat", "Q2b": "1-level nest", "Q3": "2-level nest"}
+
+
+def _s0_points(n_trips: int) -> list:
+    """Dot path: browser → server, then one server↔DB rung per SQL round-trip
+    (descending so N trips read as an N-rung ladder), then server → browser.
+    n_trips == 0 (a cache hit) never reaches the DB column."""
+    pts = [(S0_BX, S0_Y0), (S0_SX, S0_Y0)]
+    for i in range(n_trips):
+        yi = S0_Y0 + i * S0_ROWGAP
+        pts.append((S0_DX, yi))
+        ynext = S0_Y0 + (i + 1) * S0_ROWGAP if i < n_trips - 1 else yi
+        pts.append((S0_SX, ynext))
+    pts.append((S0_BX, S0_Y0))
+    return pts
+
+
+def _s0_svg(scenario: str, n_trips: int, dur: float | None, rep_label: str,
+            p50: float | None, is_cache: bool) -> str:
+    path = svg.path_d(_s0_points(n_trips))
+    plural = "s" if n_trips != 1 else ""
+    parts = []
+    for x, name, anchor in ((S0_BX, "Browser", "start"),
+                            (S0_SX, "Server", "middle"),
+                            (S0_DX, "Database", "end")):
+        parts.append(
+            f'<text class="s0-station" x="{svg.n(x)}" y="{S0_LABELY}" '
+            f'text-anchor="{anchor}">{name}</text>')
+    parts.append(f'<path class="s0-wire" d="{path}"/>')
+    parts.append(
+        f'<circle class="s0-node" cx="{svg.n(S0_BX)}" cy="{svg.n(S0_Y0)}" r="3"/>'
+        f'<circle class="s0-node" cx="{svg.n(S0_SX)}" cy="{svg.n(S0_Y0)}" r="3"/>')
+    for i in range(n_trips):
+        yi = S0_Y0 + i * S0_ROWGAP
+        parts.append(
+            f'<circle class="s0-db" cx="{svg.n(S0_DX)}" cy="{svg.n(yi)}" r="4">'
+            f'<title>SQL round-trip {i + 1}</title></circle>')
+    if is_cache:
+        gy = S0_Y0 - 12
+        ghost = svg.path_d([(S0_BX, gy), (S0_SX, gy), (S0_BX, gy)])
+        parts.append(f'<path class="s0-wire s0-cache-wire" d="{ghost}"/>')
+        parts.append(
+            f'<text class="s0-cache-label" x="{svg.n(S0_SX + 8)}" '
+            f'y="{svg.n(gy - 3)}" text-anchor="middle">tv+cache hit — no DB</text>')
+    # The paced dot is only drawn when this run measured the representative's
+    # p50 for the scenario — the hop STRUCTURE above is measurement-independent,
+    # but the motion must never encode an unmeasured pace.
+    if dur is not None:
+        tip = (f'{rep_label} · {scenario} · {n_trips} SQL round-trip{plural} · '
+               f'median {fmt_ms(p50)} ms')
+        # cx/cy stay at 0,0: offset-path translates the element origin along the
+        # path, so a circle centred at the origin rides the path exactly (a
+        # non-zero cx/cy would double the offset).
+        parts.append(
+            f'<circle class="s0-dot" cx="0" cy="0" r="6" '
+            f"style=\"offset-path:path('{path}');--s0-dur:{svg.n(dur)}s\">"
+            f'<title>{esc(tip)}</title></circle>')
+    return (
+        f'<svg class="s0-anim" viewBox="0 0 {S0_W} {S0_H}" '
+        f'preserveAspectRatio="xMidYMid meet" role="img" '
+        f'aria-label="{esc(rep_label)} {esc(scenario)}: request travels browser '
+        f'to server to database and back, {n_trips} database round-trip{plural}">'
+        + "".join(parts) + "</svg>")
+
+
+def _s0_hop_list(hops: list, is_cache: bool, cache_src: str) -> str:
+    lis = []
+    for h in hops:
+        rt = (' <span class="s0-rt">DB round-trip</span>'
+              if h.sql_roundtrips else "")
+        lis.append(
+            f'<li class="s0-hop kind-{esc(h.kind)}" data-hop="{h.n}" '
+            f'data-sql-roundtrips="{h.sql_roundtrips}" '
+            f'data-source="{esc(h.source)}">{esc_text(h.label)}{rt}</li>')
+    if is_cache:
+        lis.append(
+            '<li class="s0-hop kind-cache" data-hop="cache-hit" '
+            f'data-sql-roundtrips="0" data-source="{esc(cache_src)}">'
+            'tv+cache hit — served from the result cache, database not touched'
+            ' <span class="s0-rt s0-rt-0">0 DB round-trips</span></li>')
+    return f'<ol class="s0-hops">{"".join(lis)}</ol>'
+
+
+def _s0_variant(strategy: str, scenario: str, meta: dict, grid: Grid,
+                default_sc: str) -> str:
+    s = meta["query_strategies"][strategy]
+    hops = hop_diagram(strategy, scenario, meta)
+    n_trips = sum(h.sql_roundtrips for h in hops)
+    rep = s["representative"]
+    rep_label = meta["frameworks"][rep]["label"]
+    scale = meta["anatomy"]["p50_scale_s_per_ms"]
+    cell = grid.cell(rep, scenario)
+    measured = cell.status == STATUS_RESULT and cell.p50_ms is not None
+    p50 = cell.p50_ms if measured else None
+    dur = anatomy_duration(p50, scale) if measured else None
+    is_cache = strategy == "precompute"
+    hidden = "" if scenario == default_sc else " hidden"
+    plural = "s" if n_trips != 1 else ""
+    if measured:
+        pace = (f'median {fmt_ms(p50)} ms · {esc(rep_label)} → '
+                f'{svg.n(dur)} s playback')
+    else:
+        pace = f'{esc(rep_label)} — not measured in this run (pace not shown)'
+    cap = (
+        '<figcaption class="s0-cap">'
+        f'<span class="s0-trips">{n_trips} SQL round-trip{plural}</span>'
+        f'<span class="s0-p50">{pace}</span></figcaption>')
+    ol = _s0_hop_list(hops, is_cache, s["source"])
+    return (
+        f'<div class="s0-variant" data-scenario="{esc(scenario)}"{hidden}>'
+        f'<figure class="s0-fig">'
+        + _s0_svg(scenario, n_trips, dur, rep_label, p50, is_cache)
+        + cap + ol + '</figure></div>')
+
+
+def _s0_lane(strategy: str, meta: dict, grid: Grid, default_sc: str) -> str:
+    s = meta["query_strategies"][strategy]
+    arch = S0_ARCH[strategy]
+    members = " · ".join(meta["frameworks"][m]["label"] for m in s["members"])
+    srcs = ", ".join(dict.fromkeys([s["source"], *s.get("sources", [])]))
+    variants = "".join(
+        _s0_variant(strategy, sc, meta, grid, default_sc)
+        for sc in meta["anatomy"]["scenarios"])
+    return (
+        f'<div class="s0-lane arch-{arch}" data-strategy="{esc(strategy)}">'
+        '<div class="s0-lane-head">'
+        f'<span class="s0-lane-title">{esc(s["label"])}</span>'
+        f'<span class="s0-lane-members">{esc(members)}</span></div>'
+        + variants
+        + f'<p class="s0-prov">hops provenanced to <code>{esc(srcs)}</code></p>'
+        '</div>')
+
+
+def _s0_section(grid: Grid, meta: dict) -> str:
+    a = meta["anatomy"]
+    default_sc = a["default_scenario"]
+    scale = a["p50_scale_s_per_ms"]
+    slow = round(scale * 1000)
+    lanes = "".join(_s0_lane(k, meta, grid, default_sc) for k in a["lanes"])
+    paces = []
+    for k in a["lanes"]:
+        rep = meta["query_strategies"][k]["representative"]
+        cell = grid.cell(rep, default_sc)
+        if cell.status != STATUS_RESULT or cell.p50_ms is None:
+            continue
+        paces.append(
+            f'{meta["frameworks"][rep]["label"]} {fmt_ms(cell.p50_ms)} ms→'
+            f'{svg.n(anatomy_duration(cell.p50_ms, scale))} s')
+    pace_txt = (" · ".join(esc(p) for p in paces) if paces
+                else "representatives not measured in this run")
+    scenario_btns = "".join(
+        f'<button class="s0-scn" type="button" data-scenario="{esc(sc)}" '
+        f'aria-pressed="{"true" if sc == default_sc else "false"}">{esc(sc)}'
+        f'<span class="s0-scn-sub">{esc(S0_SUBLABEL.get(sc, ""))}</span></button>'
+        for sc in a["scenarios"])
+    controls = (
+        '<div class="s0-controls" hidden>'
+        '<button id="s0-play" class="s0-btn" type="button" aria-pressed="false">'
+        '► Play the three requests</button>'
+        '<div class="s0-scenario" role="group" aria-label="Read scenario">'
+        f'{scenario_btns}</div></div>')
+    scale_line = (
+        '<p class="s0-scale">Dots are paced by each engine’s <strong>measured '
+        f'p50</strong> for the selected read: playback = p50 × {svg.n(scale)} '
+        f's/ms (≈{slow}× slow-motion). At {esc(default_sc)}: {pace_txt}. '
+        'The pace is the only thing the motion encodes — nothing is '
+        'decorative.</p>')
+    return (
+        '<section id="s0-request-anatomy" aria-labelledby="s0-h">'
+        '<h2 id="s0-h">S0 — Anatomy of a request</h2>'
+        '<p class="lede">Why the nesting cliff happens. The same nested read, '
+        'three architectures, one lane each — watch where the round-trips come '
+        'from as depth grows: the resolver lane gains a batched SQL trip per '
+        'nesting level, while compile-to-SQL and precompute stay at one at any '
+        'depth.</p>'
+        f'<p class="lede s0-credit">{esc_text(a["dataloader_credit"])}</p>'
+        f'<p class="s0-lens">{esc_text(a["lens_note"])}</p>'
+        + controls + scale_line
+        + f'<div class="s0-stage" data-scenario="{esc(default_sc)}">{lanes}</div>'
+        '<p class="footnote s0-foot"><span class="s0-nojs">Interactive: press '
+        'Play to send the dots, and pick a read to switch depth. Without '
+        'JavaScript the numbered steps under each lane are the full, ordered '
+        f'story.</span> {esc_text(a["apq_note"])}</p>'
+        '</section>')
+
+
+# --------------------------------------------------------------------------
 # S5 — the write trade (mandatory honesty section) + workload selector
 # --------------------------------------------------------------------------
 
@@ -1118,6 +1313,7 @@ def _render_index(run: Run, meta: dict, grid: Grid) -> str:
         _reading_panel(meta),
         _grid_section(run, meta, grid),
         _s1_section(grid, meta),
+        _s0_section(grid, meta),
         _s5_section(grid, meta),
         _workload_selector(grid, meta),
         _footnote(run),
@@ -1158,6 +1354,16 @@ def _render_llms_txt(run: Run, meta: dict) -> str:
         scen = ", ".join(shape["scenarios"])
         wl_lines.append(f"  {shape.get('label', key)} → {scen}")
         wl_lines.append(f"      {shape.get('blurb', '')}")
+    st_lines = []
+    for key, s in meta.get("query_strategies", {}).items():
+        rt = s.get("sql_roundtrips", {})
+        trips = " ".join(f"{sc}={rt.get(sc, '—')}" for sc in ("Q1", "Q2b", "Q3"))
+        st_lines.append(f"  {s['label']} [{key}]")
+        st_lines.append(f"      members: {', '.join(s['members'])}")
+        st_lines.append(f"      SQL round-trips: {trips}")
+        st_lines.append(f"      source: {s['source']}")
+        st_lines.append(f"      {s['summary']}")
+    anatomy = meta.get("anatomy", {})
     local_warning = ""
     if run.is_local:
         local_warning = (
@@ -1182,7 +1388,10 @@ def _render_llms_txt(run: Run, meta: dict) -> str:
         n_scenarios=len(meta["scenario_order"]),
         framework_lines="\n".join(fr_lines),
         scenario_lines="\n".join(sc_lines),
-        workload_lines="\n".join(wl_lines))
+        workload_lines="\n".join(wl_lines),
+        strategy_lines="\n".join(st_lines),
+        dataloader_credit=anatomy.get("dataloader_credit", ""),
+        apq_note=anatomy.get("apq_note", ""))
 
 
 def render(run: Run, meta: dict) -> dict[str, bytes]:
