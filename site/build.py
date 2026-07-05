@@ -837,6 +837,33 @@ def amortize(grid: Grid, meta: dict, read: str | None = None,
                         breakevens=_breakevens(series, cfg["anchor_series"]))
 
 
+@dataclass
+class WorkloadVerdict:
+    framework: str
+    architecture: str
+    rps: float
+    ratio: int
+    read: str
+
+
+def workload_winner(grid: Grid, meta: dict, score: dict) -> WorkloadVerdict | None:
+    """Score a workload shape off the amortization cost model: the architecture
+    that sustains the most total throughput at the shape's read rung and
+    read:write ratio. Data-backed and honest — a write-heavy shape names the
+    resolver engine, not FraiseQL. None if no series has both cells for the
+    rung (never a made-up winner)."""
+    amort = amortize(grid, meta, score["read"], "full")
+    r = score["ratio"]
+    scored = [(s, s.sustainable_rps(r)) for s in amort.series
+              if s.status == "ok"]
+    scored = [(s, v) for s, v in scored if v is not None]
+    if not scored:
+        return None
+    winner, rps = max(scored, key=lambda sv: sv[1])
+    return WorkloadVerdict(winner.framework, winner.architecture, rps,
+                           r, score["read"])
+
+
 # --------------------------------------------------------------------------
 # S0 request anatomy — the hop model (movement layer)
 # --------------------------------------------------------------------------
@@ -2491,6 +2518,27 @@ def _s7_section(grid: Grid, meta: dict) -> str:
         '</section>')
 
 
+def _wl_verdict(grid: Grid, meta: dict, shape: dict) -> str:
+    """The data-backed winner line for a shape, scored on the S7 amortization
+    model. Links to S7 so a reader can see the curve the verdict came from."""
+    score = shape.get("score")
+    if not score:
+        return ""
+    v = workload_winner(grid, meta, score)
+    if v is None:
+        return ""
+    arch = _arch_of(v.framework, meta)
+    strat = meta["query_strategies"][v.architecture]["short"]
+    fw_label = meta["frameworks"][v.framework]["label"]
+    return (
+        f'<a class="wl-verdict arch-{arch}" href="#s7-amortization" '
+        f'data-winner="{esc(v.framework)}" data-ratio="{esc(v.ratio)}">'
+        f'<span class="wl-verdict-swatch"></span>'
+        f'<span>At ≈{v.ratio}:1 reads:writes, <strong>{esc(strat)}</strong> '
+        f'({esc(fw_label)}) sustains the most — ≈{fmt_rps(v.rps)} req/s</span>'
+        '</a>')
+
+
 def _workload_selector(grid: Grid, meta: dict) -> str:
     shapes = meta.get("workload_shapes", {})
     cards = []
@@ -2511,14 +2559,17 @@ def _workload_selector(grid: Grid, meta: dict) -> str:
             f'<h3><a href="{esc(primary)}">{esc(shape.get("label", key))}</a>'
             f'</h3>'
             f'<p>{esc_text(shape.get("blurb", ""))}</p>'
-            f'<div class="wl-chips">answers: {chips}</div></article>')
+            + _wl_verdict(grid, meta, shape)
+            + f'<div class="wl-chips">answers: {chips}</div></article>')
     return (
         '<section id="workload-selector" aria-labelledby="wl-h">'
         '<h2 id="wl-h">Which workload shape is yours?</h2>'
         '<p class="lede">Pick the shape that matches your workload; each names '
-        'the scenarios that answer it — a winner <em>and</em> the trade — and '
-        'links to the section and the exact grid cells. Stub for now: plain '
-        'anchor navigation, no scoring. The scored selector is future work.</p>'
+        'the scenarios that answer it — a winner <em>and</em> the trade — links '
+        'to the section and the exact grid cells, and carries the architecture '
+        'that sustains the most load at that read:write mix, scored on the S7 '
+        'amortization model. The write-heavy shape names a resolver engine, not '
+        'FraiseQL — the honesty rule holds in the scoring too.</p>'
         f'<div class="wl-grid">{"".join(cards)}</div></section>')
 
 
@@ -2717,7 +2768,7 @@ def _render_data_json(run: Run, meta: dict, prices: dict) -> str:
                       indent=2, ensure_ascii=False) + "\n"
 
 
-def _render_llms_txt(run: Run, meta: dict) -> str:
+def _render_llms_txt(run: Run, meta: dict, grid: Grid) -> str:
     env = run.environment
     fr_lines = []
     for fw in meta["framework_order"]:
@@ -2737,6 +2788,29 @@ def _render_llms_txt(run: Run, meta: dict) -> str:
         scen = ", ".join(shape["scenarios"])
         wl_lines.append(f"  {shape.get('label', key)} → {scen}")
         wl_lines.append(f"      {shape.get('blurb', '')}")
+        if shape.get("score"):
+            v = workload_winner(grid, meta, shape["score"])
+            if v:
+                short = meta["query_strategies"][v.architecture]["short"]
+                fw_label = meta["frameworks"][v.framework]["label"]
+                wl_lines.append(
+                    f"      winner @ ~{v.ratio}:1 reads:writes → {short} "
+                    f"({fw_label}), ~{v.rps:,.0f} req/s")
+    acfg = meta["amortization"]
+    amort = amortize(grid, meta, acfg["default_read"], acfg["default_write"])
+    anchor_label = meta["frameworks"][acfg["anchor_series"]]["label"]
+    am_lines = []
+    for be in amort.breakevens:
+        other = meta["frameworks"][be.other]["label"]
+        if be.ratio is not None:
+            am_lines.append(
+                f"  {anchor_label} overtakes {other} at ~{be.ratio:,.0f} "
+                "reads/write")
+        else:
+            verb = "leads" if be.anchor_wins_above else "trails"
+            am_lines.append(f"  {anchor_label} {verb} {other} at every ratio")
+    amort_default = (f"read {amort.read}, "
+                     f"{acfg['writes'][amort.write]['label'].lower()} mode")
     st_lines = []
     for key, s in meta.get("query_strategies", {}).items():
         rt = s.get("sql_roundtrips", {})
@@ -2772,6 +2846,8 @@ def _render_llms_txt(run: Run, meta: dict) -> str:
         framework_lines="\n".join(fr_lines),
         scenario_lines="\n".join(sc_lines),
         workload_lines="\n".join(wl_lines),
+        amortization_default=amort_default,
+        amortization_lines="\n".join(am_lines),
         strategy_lines="\n".join(st_lines),
         dataloader_credit=anatomy.get("dataloader_credit", ""),
         apq_note=anatomy.get("apq_note", ""))
@@ -2788,7 +2864,7 @@ def render(run: Run, meta: dict, prices: dict | None = None) -> dict[str, bytes]
     return {
         "index.html": _render_index(run, meta, grid, prices).encode("utf-8"),
         "data.json": _render_data_json(run, meta, prices).encode("utf-8"),
-        "llms.txt": _render_llms_txt(run, meta).encode("utf-8"),
+        "llms.txt": _render_llms_txt(run, meta, grid).encode("utf-8"),
     }
 
 

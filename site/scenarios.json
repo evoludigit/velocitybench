@@ -642,7 +642,8 @@
         "T1"
       ],
       "section": "s1-nesting-cliff",
-      "blurb": "FraiseQL's precomputed reads stay flat as nesting deepens while resolver engines decay — the win grows with query depth. The trade: shallow Q1 sits mid-pack because the precomputed document is detoasted on every read."
+      "blurb": "FraiseQL's precomputed reads stay flat as nesting deepens while resolver engines decay — the win grows with query depth. The trade: shallow Q1 sits mid-pack because the precomputed document is detoasted on every read.",
+      "score": {"read": "Q2b", "ratio": 1000}
     },
     "nested": {
       "label": "Deeply nested",
@@ -652,7 +653,8 @@
         "T1"
       ],
       "section": "s1-nesting-cliff",
-      "blurb": "The deeper the nesting, the wider FraiseQL's lead — no N+1 by construction. The cost of that flat read line is paid on writes, not reads (see the write trade)."
+      "blurb": "The deeper the nesting, the wider FraiseQL's lead — no N+1 by construction. The cost of that flat read line is paid on writes, not reads (see the write trade).",
+      "score": {"read": "Q3", "ratio": 100}
     },
     "write-heavy": {
       "label": "Write-heavy",
@@ -662,7 +664,8 @@
         "MC1"
       ],
       "section": "s5-write-trade",
-      "blurb": "FraiseQL's delta path (M1d) competes with a classical single UPDATE; the full-cascade recompute (M1) is the price of always-consistent precomputed reads. MC1 needs one round-trip where classical needs two."
+      "blurb": "FraiseQL's delta path (M1d) competes with a classical single UPDATE; the full-cascade recompute (M1) is the price of always-consistent precomputed reads. MC1 needs one round-trip where classical needs two.",
+      "score": {"read": "Q2b", "ratio": 1}
     },
     "hot-key": {
       "label": "Hot-key lookups",
@@ -671,7 +674,8 @@
         "HC3"
       ],
       "section": "s4-cache-under-fire",
-      "blurb": "A hot 5-key pool (HC3) is where a result cache should shine; the 20-UUID miss regime (C3) shows what a cache does when it cannot help. In this run both regimes land flat — the single-row read is already too cheap for the cache to matter."
+      "blurb": "A hot 5-key pool (HC3) is where a result cache should shine; the 20-UUID miss regime (C3) shows what a cache does when it cannot help. In this run both regimes land flat — the single-row read is already too cheap for the cache to matter.",
+      "score": {"read": "Q1", "ratio": 1000}
     }
   },
   "notes": {

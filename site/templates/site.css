@@ -764,6 +764,18 @@ svg.s7-svg { display: block; width: 100%; min-width: 560px; height: auto; }
   border-radius: 999px; text-decoration: none; color: var(--text-2);
   font-variant-numeric: tabular-nums; }
 .wl-chip:hover { border-color: var(--baseline); }
+.wl-verdict { display: flex; align-items: flex-start; gap: 8px;
+  margin: 0 0 10px; padding: 7px 10px; border-radius: 6px;
+  background: var(--surface-2); border-left: 3px solid var(--vc);
+  font-size: 0.8rem; color: var(--text-2); text-decoration: none; }
+.wl-verdict:hover { background: var(--grid-line); }
+.wl-verdict strong { color: var(--text); }
+.wl-verdict-swatch { width: 10px; height: 10px; border-radius: 3px; flex: none;
+  margin-top: 2px; background: var(--vc); }
+.wl-verdict.arch-fraiseql { --vc: var(--arch-fraiseql); }
+.wl-verdict.arch-compiler { --vc: var(--arch-compiler); }
+.wl-verdict.arch-resolver { --vc: var(--arch-resolver); }
+.wl-verdict.arch-rest { --vc: var(--arch-rest); }
 
 /* ---- sections ---- */
 section { scroll-margin-top: 60px; }

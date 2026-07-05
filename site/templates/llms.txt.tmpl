@@ -81,5 +81,16 @@ $framework_lines
 SCENARIOS ($n_scenarios)
 $scenario_lines
 
-WORKLOAD SHAPES → WHICH CELLS ANSWER THEM
+WORKLOAD SHAPES → WHICH CELLS ANSWER THEM (winner scored on the S7 model)
 $workload_lines
+
+AMORTIZATION MODEL (S7) — total load vs the read:write ratio
+  A DERIVED model, not a measured cell. Sustainable total requests/second for a
+  workload of 1 write + r reads = (r+1) / (r/read_rps + 1/write_rps), from
+  measured throughput (endpoints: the measured write rps at r->0, read rps at
+  r->infinity). FraiseQL moves read cost to write time (the logged cascade), so
+  it needs enough reads per write to amortize the write. The cost layer decides
+  the winner; SQL round-trip COUNT is structural context, never cost. Illustrative
+  on this single-pass sweep; crossovers firm up at the Phase 06 rebind.
+  Break-evens at the default read/write ($amortization_default):
+$amortization_lines

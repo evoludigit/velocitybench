@@ -239,3 +239,60 @@ def test_s7_six_panels_default_visible(page):
     assert sec.count('class="s7-panel"') == 6         # 3 reads × 2 writes
     # exactly one panel (the default) renders without the hidden attribute
     assert len(re.findall(r'<div class="s7-panel" hidden', sec)) == 5
+
+
+# --------------------------------------------------------------------------
+# Phase 07b Step 3 [design→pin] — scored workload selector + llms.txt
+# --------------------------------------------------------------------------
+
+def selector(page):
+    return re.search(r'<section id="workload-selector".*?</section>', page,
+                     re.DOTALL).group(0)
+
+
+def test_selector_every_shape_scored_and_links_to_s7(page, meta):
+    sel = selector(page)
+    scored = [k for k, s in meta["workload_shapes"].items() if s.get("score")]
+    for key in scored:
+        card = re.search(rf'data-shape="{key}".*?</article>', sel,
+                         re.DOTALL).group(0)
+        assert 'class="wl-verdict' in card
+        assert 'href="#s7-amortization"' in card       # scored on the S7 model
+
+
+def test_selector_write_heavy_winner_is_not_fraiseql(sweep3_run, meta, page):
+    """The honesty rule holds in the scoring: a write-heavy mix names a resolver
+    engine, not FraiseQL, which loses there."""
+    grid = build.build_grid(sweep3_run, meta)
+    v = build.workload_winner(grid, meta, meta["workload_shapes"]["write-heavy"]["score"])
+    assert "fraiseql" not in v.framework
+    card = re.search(r'data-shape="write-heavy".*?</article>', selector(page),
+                     re.DOTALL).group(0)
+    assert f'data-winner="{v.framework}"' in card
+    assert "fraiseql" not in re.search(r'wl-verdict[^>]*data-winner="([^"]+)"',
+                                       card).group(1)
+
+
+def test_selector_read_heavy_winner_is_precompute(sweep3_run, meta, page):
+    grid = build.build_grid(sweep3_run, meta)
+    v = build.workload_winner(grid, meta, meta["workload_shapes"]["read-heavy"]["score"])
+    assert v.framework == "fraiseql-tv" and v.architecture == "precompute"
+    card = re.search(r'data-shape="read-heavy".*?</article>', selector(page),
+                     re.DOTALL).group(0)
+    assert 'data-winner="fraiseql-tv"' in card
+
+
+def test_selector_verdict_rps_matches_model(sweep3_run, meta, page):
+    grid = build.build_grid(sweep3_run, meta)
+    v = build.workload_winner(grid, meta, meta["workload_shapes"]["read-heavy"]["score"])
+    card = re.search(r'data-shape="read-heavy".*?</article>', selector(page),
+                     re.DOTALL).group(0)
+    assert build.fmt_rps(v.rps) in card                # the on-page rps is the model's
+
+
+def test_llms_txt_carries_amortization_model_and_winners(sweep3_run, meta):
+    txt = build.render(sweep3_run, meta)["llms.txt"].decode("utf-8")
+    assert "AMORTIZATION MODEL (S7)" in txt
+    assert "overtakes" in txt and "reads/write" in txt   # a crossover statement
+    assert "winner @" in txt                             # scored workload winners
+    assert "resolver + DataLoader (async-graphql)" in txt  # honest write-heavy
