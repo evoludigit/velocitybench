@@ -2,6 +2,14 @@ use crate::db::DbPool;
 use crate::error::ApiError;
 use crate::models::{Comment, Post, User};
 use deadpool_postgres::Client;
+use uuid::Uuid;
+
+/// Parse a path-supplied id into a native uuid so queries bind `uuid = $1`.
+/// Comparing `id::text = $1` instead defeats the btree index on the uuid
+/// column (full index scan + per-row text cast — ~280ms on tb_post).
+fn parse_uuid(id: &str) -> Result<Uuid, ApiError> {
+    Uuid::parse_str(id).map_err(|_| ApiError::NotFound)
+}
 
 #[derive(Clone)]
 pub struct UserRepository {
@@ -21,13 +29,14 @@ impl UserRepository {
     }
 
     pub async fn find_by_id(&self, id: &str) -> Result<Option<User>, ApiError> {
+        let uid = parse_uuid(id)?;
         let client = self.get_client().await?;
 
         let row = client
             .query_one(
                 "SELECT id::text, username, full_name, bio
-                 FROM benchmark.tb_user WHERE id::text = $1",
-                &[&id],
+                 FROM benchmark.tb_user WHERE id = $1",
+                &[&uid],
             )
             .await
             .map_err(|_| ApiError::NotFound)?;
@@ -73,14 +82,15 @@ impl UserRepository {
     }
 
     pub async fn update_bio(&self, id: &str, bio: &str) -> Result<User, ApiError> {
+        let uid = parse_uuid(id)?;
         let client = self.get_client().await?;
 
         let row = client
             .query_one(
                 "UPDATE benchmark.tb_user SET bio = $1
-                 WHERE id::text = $2
+                 WHERE id = $2
                  RETURNING id::text, username, full_name, bio",
-                &[&bio, &id],
+                &[&bio, &uid],
             )
             .await
             .map_err(|_| ApiError::NotFound)?;
@@ -95,6 +105,7 @@ impl UserRepository {
     }
 
     pub async fn find_posts_by_user(&self, user_id: &str, limit: i64) -> Result<Vec<Post>, ApiError> {
+        let uid = parse_uuid(user_id)?;
         let client = self.get_client().await?;
 
         let rows = client
@@ -106,7 +117,7 @@ impl UserRepository {
                  WHERE u.id = $1 AND p.published = true
                  ORDER BY p.created_at DESC
                  LIMIT $2",
-                &[&user_id, &limit],
+                &[&uid, &limit],
             )
             .await
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
@@ -160,6 +171,7 @@ impl PostRepository {
     }
 
     pub async fn find_by_id(&self, id: &str) -> Result<Option<Post>, ApiError> {
+        let pid = parse_uuid(id)?;
         let client = self.get_client().await?;
 
         let row = client
@@ -168,8 +180,8 @@ impl PostRepository {
                         u.id::text as user_id, u.username, u.full_name, u.bio
                  FROM benchmark.tb_post p
                  JOIN benchmark.tb_user u ON p.fk_author = u.pk_user
-                 WHERE p.id::text = $1",
-                &[&id],
+                 WHERE p.id = $1",
+                &[&pid],
             )
             .await
             .map_err(|_| ApiError::NotFound)?;
@@ -311,6 +323,7 @@ impl PostRepository {
     }
 
     pub async fn find_by_author(&self, author_id: &str, limit: i64, offset: i64) -> Result<Vec<Post>, ApiError> {
+        let uid = parse_uuid(author_id)?;
         let client = self.get_client().await?;
 
         let rows = client
@@ -322,7 +335,7 @@ impl PostRepository {
                  WHERE u.id = $1 AND p.published = true
                  ORDER BY p.created_at DESC
                  LIMIT $2 OFFSET $3",
-                &[&author_id, &limit, &offset],
+                &[&uid, &limit, &offset],
             )
             .await
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
@@ -376,6 +389,7 @@ impl CommentRepository {
     }
 
     pub async fn find_by_post(&self, post_id: &str, limit: i64, offset: i64) -> Result<Vec<Comment>, ApiError> {
+        let pid = parse_uuid(post_id)?;
         let client = self.get_client().await?;
 
         let rows = client
@@ -384,10 +398,10 @@ impl CommentRepository {
                         u.id::text as user_id, u.username, u.full_name, u.bio
                  FROM benchmark.tb_comment c
                  JOIN benchmark.tb_user u ON c.fk_author = u.pk_user
-                 WHERE c.fk_post = (SELECT pk_post FROM benchmark.tb_post WHERE id::text = $1)
+                 WHERE c.fk_post = (SELECT pk_post FROM benchmark.tb_post WHERE id = $1)
                  ORDER BY c.created_at DESC
                  LIMIT $2 OFFSET $3",
-                &[&post_id, &limit, &offset],
+                &[&pid, &limit, &offset],
             )
             .await
             .map_err(|e| ApiError::DatabaseError(e.to_string()))?;
@@ -413,6 +427,7 @@ impl CommentRepository {
                 post_id: post_id.to_string(),
                 author_id: row.get("user_id"),
                 author,
+                post: None,
                 created_at,
             };
 
