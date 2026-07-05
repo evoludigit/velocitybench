@@ -1290,6 +1290,48 @@ THEME_SCRIPT = """<script>
     if (p99) p99.hidden = !showP99;
   });
 })();
+(function () {
+  // S0 request anatomy — progressive enhancement. Without this script the
+  // static ladders + numbered hop lists are the full story; the controls stay
+  // hidden and nothing animates. Motion is CSS (offset-path) gated behind
+  // .s0-stage.playing, so this only toggles classes — it never drives frames.
+  var stage = document.querySelector('.s0-stage');
+  var controls = document.querySelector('.s0-controls');
+  if (!stage || !controls) return;
+  controls.hidden = false;
+  var play = document.getElementById('s0-play');
+  var scns = controls.querySelectorAll('.s0-scn');
+  function setScenario(sc) {
+    stage.setAttribute('data-scenario', sc);
+    scns.forEach(function (b) {
+      b.setAttribute('aria-pressed',
+        b.getAttribute('data-scenario') === sc ? 'true' : 'false');
+    });
+    stage.querySelectorAll('.s0-variant').forEach(function (v) {
+      v.hidden = v.getAttribute('data-scenario') !== sc;
+    });
+  }
+  scns.forEach(function (b) {
+    b.addEventListener('click', function () {
+      setScenario(b.getAttribute('data-scenario'));
+    });
+  });
+  if (play) {
+    play.addEventListener('click', function () {
+      if (!stage.classList.contains('playing')) {
+        stage.classList.add('playing');
+        stage.classList.remove('paused');
+      } else {
+        stage.classList.toggle('paused');
+      }
+      var started = stage.classList.contains('playing');
+      var paused = stage.classList.contains('paused');
+      play.setAttribute('aria-pressed', started && !paused ? 'true' : 'false');
+      play.textContent = !started ? '\\u25BA Play the three requests'
+        : paused ? '\\u25BA Resume' : '\\u2016 Pause';
+    });
+  }
+})();
 </script>"""
 
 
