@@ -2235,6 +2235,262 @@ def _s6_section(grid: Grid, run: Run, meta: dict, prices: dict) -> str:
         '</section>')
 
 
+# --------------------------------------------------------------------------
+# S7 — amortization: total load vs read:write ratio (the break-even chart)
+# --------------------------------------------------------------------------
+
+S7_W, S7_H = 900, 430
+S7_MARGIN = {"l": 58, "r": 150, "t": 26, "b": 48}
+S7_SAMPLES = 49
+
+
+def _s7_ratio_samples(lo: float, hi: float) -> list:
+    """Log-spaced ratios spanning [lo, hi] for smooth curves (no random)."""
+    import math
+    a, b = math.log10(lo), math.log10(hi)
+    return [10.0 ** (a + (b - a) * i / (S7_SAMPLES - 1))
+            for i in range(S7_SAMPLES)]
+
+
+def _ratio_tick(dec: float) -> str:
+    return {1: "1", 10: "10", 100: "100", 1000: "1k", 10000: "10k"}.get(
+        int(dec), _tick_compact(dec))
+
+
+def _ratio_round(r: float) -> str:
+    return f"{r:,.0f}" if r >= 10 else f"{r:.1f}"
+
+
+def _s7_arch_label(s: AmortSeries, meta: dict) -> str:
+    # end label = the specific engine; the legend maps its colour to the
+    # architecture, so the label stays short enough not to clip the plot.
+    return meta["frameworks"][s.framework]["label"]
+
+
+def _s7_curve_svg(amort: Amortization, meta: dict, cfg: dict, layer: str,
+                  visible: bool) -> str:
+    ok = [s for s in amort.series if s.status == "ok"]
+    m = S7_MARGIN
+    pl, pr, pt, pb = m["l"], S7_W - m["r"], m["t"], S7_H - m["b"]
+    lo, hi = cfg["ratio_axis"]
+    xscale = svg.LogScale(lo, hi, pl, pr)
+    samples = _s7_ratio_samples(lo, hi)
+
+    if layer == "cost":
+        def valfn(s, r):
+            return s.sustainable_rps(r)
+        ytitle = "Sustainable requests / second — higher is better"
+        plotted = ok
+        top, ticks = svg.nice_axis(
+            max((valfn(s, r) for s in plotted for r in samples), default=1.0),
+            5)[0::2]
+        yscale = svg.Scale(0, top, pb, pt)
+        ylabel = _tick_compact
+    else:  # structural query count — spans decades, log-y, loudly labelled
+        def valfn(s, r):
+            return s.count(r)
+        ytitle = "SQL round-trips per workload-unit — structural, LOG, not cost"
+        plotted = [s for s in ok if s.count(samples[-1]) is not None]
+        vals = [valfn(s, r) for s in plotted for r in samples
+                if valfn(s, r)]
+        low, high, ticks = svg.nice_log_axis(min(vals, default=1.0),
+                                             max(vals, default=1.0))
+        yscale = svg.LogScale(low, high, pb, pt)
+        top = high
+        ylabel = _tick_compact
+
+    parts = []
+    for dec in (1, 10, 100, 1000, 10000):
+        x = xscale(dec)
+        parts.append(f'<line class="s7-grid" x1="{svg.n(x)}" y1="{svg.n(pt)}" '
+                     f'x2="{svg.n(x)}" y2="{svg.n(pb)}"/>')
+        parts.append(f'<text class="s7-xlabel" x="{svg.n(x)}" '
+                     f'y="{svg.n(pb + 18)}">{_ratio_tick(dec)}</text>')
+    for tk in ticks:
+        y = yscale(tk)
+        parts.append(f'<line class="s7-grid" x1="{svg.n(pl)}" y1="{svg.n(y)}" '
+                     f'x2="{svg.n(pr)}" y2="{svg.n(y)}"/>')
+        parts.append(f'<text class="s7-ylabel" x="{svg.n(pl - 8)}" '
+                     f'y="{svg.n(y + 3.5)}">{ylabel(tk)}</text>')
+    parts.append(f'<text class="s7-axis-title" x="{svg.n(pl - 44)}" '
+                 f'y="{svg.n(pt - 12)}">{esc(ytitle)}</text>')
+    parts.append(f'<text class="s7-axis-title xt" x="{svg.n((pl + pr) / 2)}" '
+                 f'y="{svg.n(S7_H - 8)}">reads per write →</text>')
+
+    end_labels = []
+    for s in plotted:
+        arch = _arch_of(s.framework, meta)
+        hero = " hero" if s.framework == cfg["anchor_series"] else ""
+        pts = []
+        for r in samples:
+            v = valfn(s, r)
+            if v is None:
+                continue
+            pts.append((xscale(r), yscale(min(v, top))))
+        if not pts:
+            continue
+        parts.append(
+            f'<g class="s7-series arch-{arch}{hero}" '
+            f'data-framework="{esc(s.framework)}"><path class="s7-line" '
+            f'd="{svg.path_d(pts)}"/></g>')
+        end_labels.append({"y0": pts[-1][1], "arch": arch, "fw": s.framework,
+                           "text": _s7_arch_label(s, meta)})
+
+    if layer == "count":
+        omitted = [meta["frameworks"][s.framework]["label"] for s in ok
+                   if s.count(samples[-1]) is None]
+        if omitted:
+            parts.append(
+                f'<text class="s7-omit" x="{svg.n(pl + 6)}" '
+                f'y="{svg.n(pt + 14)}">{esc(", ".join(omitted))} omitted — '
+                'cascade fan-out not measured this run (see S5)</text>')
+
+    if layer == "cost":
+        anchor = next((s for s in ok if s.framework == cfg["anchor_series"]),
+                      None)
+        for be in amort.breakevens:
+            if be.ratio is None or not (lo <= be.ratio <= hi):
+                continue
+            x = xscale(be.ratio)
+            y = yscale(min(anchor.sustainable_rps(be.ratio), top))
+            parts.append(f'<circle class="s7-cross" cx="{svg.n(x)}" '
+                         f'cy="{svg.n(y)}" r="4"/>')
+            parts.append(f'<text class="s7-cross-lbl" x="{svg.n(x)}" '
+                         f'y="{svg.n(y - 9)}">≈{_ratio_round(be.ratio)}</text>')
+
+    gap = 14.5
+    for lab in sorted(end_labels, key=lambda d: d["y0"]):
+        lab["y"] = lab["y0"]
+    ordered = sorted(end_labels, key=lambda d: d["y0"])
+    prev = pt - gap
+    for lab in ordered:
+        lab["y"] = max(lab["y0"], prev + gap)
+        prev = lab["y"]
+    overflow = ordered[-1]["y"] - pb if ordered else 0
+    if overflow > 0:
+        for lab in ordered:
+            lab["y"] -= overflow
+    for lab in ordered:
+        parts.append(
+            f'<text class="s7-endlabel arch-{lab["arch"]}" '
+            f'x="{svg.n(pr + 10)}" y="{svg.n(lab["y"] + 3)}" '
+            f'data-framework="{esc(lab["fw"])}">{esc(lab["text"])}</text>')
+
+    hidden = "" if visible else " hidden"
+    return (
+        f'<svg class="s7-svg s7-{layer}"{hidden} viewBox="0 0 {S7_W} {S7_H}" '
+        f'preserveAspectRatio="xMinYMid meet" role="img" '
+        f'aria-label="{esc(ytitle)} across the read:write ratio">'
+        + "".join(parts) + "</svg>")
+
+
+def _s7_breakeven_sentence(amort: Amortization, meta: dict) -> str:
+    anchor_label = meta["frameworks"][meta["amortization"]["anchor_series"]]["label"]
+    hits = [(b, meta["frameworks"][b.other]["label"]) for b in amort.breakevens
+            if b.ratio is not None]
+    if not hits:
+        if amort.breakevens and all(b.anchor_wins_above for b in amort.breakevens):
+            return (f'<strong>{esc(anchor_label)}</strong> leads every '
+                    'architecture at every ratio measured here.')
+        return (f'<strong>{esc(anchor_label)}</strong> trails at every ratio '
+                'in this combination.')
+    hits.sort(key=lambda h: h[0].ratio)
+    parts = ", ".join(f'{esc(lbl)} at ≈{_ratio_round(b.ratio)}'
+                      for b, lbl in hits)
+    return (f'<strong>{esc(anchor_label)}</strong> overtakes {parts} '
+            'reads per write — below that, its write cost dominates.')
+
+
+def _s7_table(amort: Amortization, meta: dict, cfg: dict) -> str:
+    ok = [s for s in amort.series if s.status == "ok"]
+    head = "".join(f'<th>{esc(meta["frameworks"][s.framework]["label"])}</th>'
+                   for s in ok)
+    rows = ""
+    for r in cfg["ratios"]:
+        cells = "".join(
+            f'<td>{fmt_rps(s.sustainable_rps(r))}</td>' for s in ok)
+        rows += f'<tr><th>{r}:1</th>{cells}</tr>'
+    return (
+        '<table class="s7-tbl"><caption>Sustainable requests/second by '
+        'read:write ratio (cost layer, default read/write). Every value '
+        'recomputed from the grid.</caption>'
+        f'<thead><tr><th>reads : writes</th>{head}</tr></thead>'
+        f'<tbody>{rows}</tbody></table>')
+
+
+def _s7_panel(grid: Grid, meta: dict, cfg: dict, read: str, write: str,
+              default: bool) -> str:
+    amort = amortize(grid, meta, read, write)
+    cost = _s7_curve_svg(amort, meta, cfg, "cost", visible=True)
+    count = _s7_curve_svg(amort, meta, cfg, "count", visible=False)
+    sentence = _s7_breakeven_sentence(amort, meta)
+    hidden = "" if default else " hidden"
+    return (
+        f'<div class="s7-panel"{hidden} data-read="{esc(read)}" '
+        f'data-write="{esc(write)}">{cost}{count}'
+        f'<p class="s7-breakeven">{sentence}</p></div>')
+
+
+def _s7_btn_group(dim: str, options: list, current: str, label: str) -> str:
+    btns = "".join(
+        f'<button class="s7-btn" type="button" data-dim="{esc(dim)}" '
+        f'data-val="{esc(v)}" aria-pressed="{"true" if v == current else "false"}">'
+        f'{esc(t)}</button>' for v, t in options)
+    return (f'<div class="s7-ctl"><span class="s7-ctl-label">{esc(label)}</span>'
+            f'<div class="s7-seg" role="group" aria-label="{esc(label)}">'
+            f'{btns}</div></div>')
+
+
+def _s7_legend(meta: dict, cfg: dict) -> str:
+    items = "".join(
+        f'<span class="s7-leg arch-{_arch_of(s["framework"], meta)}">'
+        f'<span class="s7-leg-swatch"></span>'
+        f'{esc(meta["query_strategies"][s["architecture"]]["short"])}</span>'
+        for s in cfg["series"])
+    return f'<div class="s7-legend">{items}</div>'
+
+
+def _s7_section(grid: Grid, meta: dict) -> str:
+    cfg = meta["amortization"]
+    default_read, default_write = cfg["default_read"], cfg["default_write"]
+    reads = [(r, r) for r in cfg["reads"]]
+    writes = [(k, w["label"]) for k, w in cfg["writes"].items()]
+    default_amort = amortize(grid, meta, default_read, default_write)
+    panels = "".join(
+        _s7_panel(grid, meta, cfg, r, w,
+                  default=(r == default_read and w == default_write))
+        for r in cfg["reads"] for w in cfg["writes"])
+    controls = (
+        '<div class="s7-controls" hidden>'
+        + _s7_btn_group("read", reads, default_read, "Read")
+        + _s7_btn_group("write", writes, default_write, "Write")
+        + _s7_btn_group("layer", [("cost", "Cost-weighted"),
+                                  ("count", "Query count")], "cost", "Layer")
+        + '</div>')
+    return (
+        '<section id="s7-amortization" aria-labelledby="s7-h">'
+        '<h2 id="s7-h">S7 — Amortization: total load vs read:write ratio</h2>'
+        f'<p class="lede">{esc_text(cfg["summary"])}</p>'
+        f'<div class="s7-caveat" role="note"><strong>Illustrative model.</strong> '
+        f'{esc_text(cfg["caveat"])}</div>'
+        + controls + _s7_legend(meta, cfg)
+        + f'<div class="s7-stage" data-read="{esc(default_read)}" '
+        f'data-write="{esc(default_write)}" data-layer="cost">{panels}</div>'
+        + f'<p class="s7-layer-note cost">{esc_text(cfg["cost_layer"])}</p>'
+        + f'<p class="s7-layer-note count" hidden>{esc_text(cfg["count_layer"])}'
+        '</p>'
+        + '<details class="s7-table-wrap"><summary>All preset ratios as a table '
+        '(works without JavaScript)</summary>'
+        + _s7_table(default_amort, meta, cfg) + '</details>'
+        + '<p class="footnote">A derived what-if, not a measured cell: every '
+        'line is computed from the grid above (read throughput × the ratio, '
+        'plus one write) — trace any point to its cell. The cost layer decides '
+        'the winner; the query-count layer is structural context, never cost. '
+        'Illustrative on this single-pass sweep; crossovers become claims at the '
+        'Phase 06 median-of-three rebind.</p>'
+        '</section>')
+
+
 def _workload_selector(grid: Grid, meta: dict) -> str:
     shapes = meta.get("workload_shapes", {})
     cards = []
@@ -2372,6 +2628,46 @@ function vbSwitcher(o) {
   vbSwitcher({ btnScope: s2, btnSel: '.s2-scn',
                panelScope: stage, panelSel: '.s2-variant', stateEl: stage });
 })();
+(function () {
+  // S7 amortization — a 3-dimension switcher (read rung / write mode / layer)
+  // over pre-rendered panels. Progressive enhancement only: without this the
+  // default panel (Q2b, full, cost layer) + the preset-ratio table are the
+  // whole story; the controls stay hidden and nothing recomputes in the browser.
+  var s7 = document.getElementById('s7-amortization');
+  if (!s7) return;
+  var stage = s7.querySelector('.s7-stage');
+  if (!stage) return;
+  s7.querySelectorAll('.s7-controls').forEach(function (c) { c.hidden = false; });
+  function apply() {
+    var read = stage.getAttribute('data-read');
+    var write = stage.getAttribute('data-write');
+    var layer = stage.getAttribute('data-layer');
+    s7.querySelectorAll('.s7-panel').forEach(function (p) {
+      p.hidden = !(p.getAttribute('data-read') === read
+                   && p.getAttribute('data-write') === write);
+    });
+    s7.querySelectorAll('.s7-svg').forEach(function (sv) {
+      var isCost = sv.classList.contains('s7-cost');
+      sv.hidden = layer === 'cost' ? !isCost : isCost;
+    });
+    s7.querySelectorAll('.s7-layer-note').forEach(function (n) {
+      n.hidden = !n.classList.contains(layer);
+    });
+    s7.querySelectorAll('.s7-btn').forEach(function (b) {
+      b.setAttribute('aria-pressed',
+        stage.getAttribute('data-' + b.getAttribute('data-dim'))
+          === b.getAttribute('data-val') ? 'true' : 'false');
+    });
+  }
+  s7.querySelectorAll('.s7-btn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      stage.setAttribute('data-' + b.getAttribute('data-dim'),
+                         b.getAttribute('data-val'));
+      apply();
+    });
+  });
+  apply();
+})();
 </script>"""
 
 
@@ -2401,6 +2697,7 @@ def _render_index(run: Run, meta: dict, grid: Grid, prices: dict) -> str:
         _s4_section(grid, meta),
         _s5_section(grid, meta),
         _s6_section(grid, run, meta, prices),
+        _s7_section(grid, meta),
         _workload_selector(grid, meta),
         _footnote(run),
     ])

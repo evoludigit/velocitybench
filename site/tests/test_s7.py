@@ -127,3 +127,115 @@ def test_amort_missing_read_cell_degrades(grid, meta):
     # and it sorts after the ok series
     assert [s.status for s in a.series] == sorted(
         [s.status for s in a.series], key=lambda st: st != "ok")
+
+
+# --------------------------------------------------------------------------
+# Phase 07b Step 2 [design→pin] — S7 markup pins (written after the chart
+# design settled; they guard the honesty-critical invariants).
+# --------------------------------------------------------------------------
+
+import re  # noqa: E402
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture()
+def page(sweep3_run, meta):
+    return build.render(sweep3_run, meta)["index.html"].decode("utf-8")
+
+
+def s7(page):
+    m = re.search(r'<section id="s7-amortization".*?</section>', page, re.DOTALL)
+    assert m, "S7 section missing"
+    return m.group(0)
+
+
+def panel(page, read, write):
+    m = re.search(
+        rf'<div class="s7-panel"[^>]*data-read="{read}"[^>]*data-write="{write}".*?'
+        r'(?=<div class="s7-panel"|</div><p class="s7-layer-note)',
+        s7(page), re.DOTALL)
+    assert m, f"no s7 panel {read}/{write}"
+    return m.group(0)
+
+
+def test_s7_anchored_after_s6_before_selector(page):
+    assert (page.index('id="s6-footprint"') < page.index('id="s7-amortization"')
+            < page.index('id="workload-selector"'))
+
+
+def test_s7_cost_is_the_default_layer(page):
+    """The default panel leads with the cost SVG visible and the count SVG
+    hidden — cost decides the winner, count is opt-in secondary."""
+    p = panel(page, "Q2b", "full")
+    assert re.search(r'<svg class="s7-svg s7-cost" viewBox', p)     # not hidden
+    assert '<svg class="s7-svg s7-count" hidden' in p
+
+
+def test_s7_illustrative_caveat_present(page, meta):
+    sec = s7(page)
+    assert 's7-caveat' in sec and 'Illustrative model' in sec
+    assert meta["amortization"]["caveat"] in sec
+
+
+def test_s7_crossovers_recomputed_and_marked(page):
+    """The three break-even markers on the default cost chart equal the model's
+    computed crossovers — never typed in."""
+    cost = re.search(r'<svg class="s7-svg s7-cost" viewBox.*?</svg>',
+                     panel(page, "Q2b", "full"), re.DOTALL).group(0)
+    for r in ("≈38", "≈127", "≈190"):
+        assert r in cost
+
+
+def test_s7_breakeven_sentence_matches_model(sweep3_run, meta, page):
+    grid = build.build_grid(sweep3_run, meta)
+    a = build.amortize(grid, meta, "Q2b", "full")
+    be = {b.other: round(b.ratio) for b in a.breakevens}
+    sent = re.search(r's7-breakeven">(.*?)</p>', panel(page, "Q2b", "full"),
+                     re.DOTALL).group(1)
+    assert f'≈{be["async-graphql"]}' in sent      # 190, from the model
+    assert "overtakes" in sent
+
+
+def test_s7_count_layer_labelled_structural_not_cost(page):
+    count = re.search(r'<svg class="s7-svg s7-count".*?</svg>',
+                      panel(page, "Q2b", "full"), re.DOTALL).group(0)
+    assert "structural" in count and "not cost" in count.lower()
+
+
+def test_s7_count_omits_unmeasured_cascade_with_note(page):
+    """In full-cascade mode FraiseQL's write count is unmeasured, so its line is
+    absent from the count layer and an in-chart note says why — never a zero."""
+    count = re.search(r'<svg class="s7-svg s7-count".*?</svg>',
+                      panel(page, "Q2b", "full"), re.DOTALL).group(0)
+    assert 'data-framework="fraiseql-tv"' not in count
+    assert "cascade fan-out not measured" in count
+
+
+def test_s7_delta_mode_leads_everywhere(page):
+    sent = re.search(r's7-breakeven">(.*?)</p>', panel(page, "Q2b", "delta"),
+                     re.DOTALL).group(1)
+    assert "leads every architecture" in sent
+
+
+def test_s7_provenance_data_attrs_on_lines(page):
+    """Every plotted line carries its framework so a reader can trace it to the
+    grid cell above (no chart-only, unsourced numbers)."""
+    cost = re.search(r'<svg class="s7-svg s7-cost" viewBox.*?</svg>',
+                     panel(page, "Q2b", "full"), re.DOTALL).group(0)
+    for fw in ("fraiseql-tv", "postgraphile", "async-graphql", "actix-web-rest"):
+        assert f'data-framework="{fw}"' in cost
+
+
+def test_s7_no_js_preset_table(page):
+    """A table of preset ratios → per-engine sustainable rps works without JS."""
+    sec = s7(page)
+    assert 's7-tbl' in sec
+    assert '1:1' in sec and '1000:1' in sec           # preset ratio rows
+
+
+def test_s7_six_panels_default_visible(page):
+    sec = s7(page)
+    assert sec.count('class="s7-panel"') == 6         # 3 reads × 2 writes
+    # exactly one panel (the default) renders without the hidden attribute
+    assert len(re.findall(r'<div class="s7-panel" hidden', sec)) == 5
