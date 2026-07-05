@@ -30,6 +30,10 @@ import svg
 BUILD_DIR = Path(__file__).resolve().parent
 SCENARIOS_PATH = BUILD_DIR / "scenarios.json"
 TEMPLATES_DIR = BUILD_DIR / "templates"
+COSTS_PATH = BUILD_DIR.parent / "costs" / "instance-prices-2026-07.yaml"
+
+# Hetzner bills 730 h/month; the cost composite mirrors bench_sequential exactly.
+SECONDS_PER_MONTH = 730 * 3600
 
 REQUIRED_RUN_KEYS = ("environment", "framework_versions", "results")
 BANNER_TEXT = "LOCAL DATA — NOT PUBLISHABLE"
@@ -84,6 +88,67 @@ def load_run(path: Path | str) -> Run:
         source_path=str(path),
         raw=doc,
     )
+
+
+def _price_scalar(v: str):
+    """Coerce a YAML scalar: quoted string, else int, else float, else raw str
+    (so 4 → int, 85.99 → float, 2026-07-04 → str)."""
+    if len(v) >= 2 and v[0] in "\"'" and v[-1] == v[0]:
+        return v[1:-1]
+    try:
+        return int(v)
+    except ValueError:
+        pass
+    try:
+        return float(v)
+    except ValueError:
+        return v
+
+
+def load_prices(path: Path | str = COSTS_PATH) -> dict:
+    """Parse the small, fixed-shape instance-price YAML with the stdlib only.
+
+    The site build takes no third-party deps (README hard rule), and this file
+    is a flat scalar header plus one two-level ``instances:`` mapping, so a
+    purpose-built reader is enough — and anything outside that shape raises, so
+    a malformed or truncated price file fails the build loudly rather than
+    letting a silent zero cost through. The YAML stays the single source; its
+    prices are embedded into data.json at build time."""
+    path = Path(path)
+    root: dict = {}
+    instances: dict = {}
+    cur: dict | None = None
+    for lineno, raw in enumerate(
+            path.read_text(encoding="utf-8").splitlines(), 1):
+        line = raw.split("#", 1)[0].rstrip()   # no value in this file holds '#'
+        if not line.strip():
+            continue
+        indent = len(line) - len(line.lstrip())
+        key, sep, val = line.strip().partition(":")
+        if not sep:
+            raise ValueError(f"{path}:{lineno}: expected 'key: value', got {raw!r}")
+        key, val = key.strip(), val.strip()
+        if indent == 0:
+            if key == "instances":
+                root["instances"] = instances
+                cur = None
+            elif val == "":
+                raise ValueError(f"{path}:{lineno}: unexpected block key {key!r}")
+            else:
+                root[key] = _price_scalar(val)
+        elif indent == 2:
+            cur = {}
+            instances[key] = cur
+        elif indent == 4:
+            if cur is None:
+                raise ValueError(
+                    f"{path}:{lineno}: instance field before any instance name")
+            cur[key] = _price_scalar(val)
+        else:
+            raise ValueError(f"{path}:{lineno}: unexpected indent {indent}")
+    if "instances" not in root:
+        raise ValueError(f"{path}: no 'instances:' mapping found")
+    return root
 
 
 # --------------------------------------------------------------------------
@@ -548,6 +613,111 @@ def cache_pairs(grid: Grid) -> CacheUnderFire:
     coverage.sort(key=lambda c: (_APQ_RANK[c.status], order[c.framework]))
     return CacheUnderFire(miss=miss, hit=hit, variants=variants,
                           coverage=coverage)
+
+
+# --------------------------------------------------------------------------
+# S6 footprint & cost — RSS / cold start, the cost composite, the storage trade
+# --------------------------------------------------------------------------
+
+@dataclass
+class CostRow:
+    framework: str
+    rps: float                       # measured throughput for the cost scenario
+    per_million: dict                # instance -> € / 1M requests (derived)
+    rps_per_euro_month: dict         # instance -> RPS served per €/month
+
+
+def cost_composite(grid: Grid, prices: dict, scenario: str = "Q1") -> list:
+    """€ / 1M requests per framework, priced on each dated instance class from
+    measured throughput — the report's exact model:
+
+        € / 1M req = price_month / (RPS × 2,628,000 s) × 10⁶
+
+    A derived figure (the formula is shown in the UI), never a measurement.
+    Frameworks are ranked by throughput like the report; one with no measured
+    result for the cost scenario is skipped, and the appendix audit row (no Q1)
+    never appears. A priced instance missing its price_month raises — no silent
+    zero costs."""
+    instances = prices["instances"]
+    for name, spec in instances.items():
+        if "price_month" not in spec:
+            raise ValueError(
+                f"cost file instance {name!r} has no price_month")
+    rows = []
+    for fw in grid.meta["framework_order"]:
+        if grid.meta["frameworks"][fw].get("appendix"):
+            continue
+        cell = grid.cell(fw, scenario)
+        if cell.status != STATUS_RESULT or not cell.rps:
+            continue
+        rps = cell.rps
+        per_million, per_euro = {}, {}
+        for name, spec in instances.items():
+            pm = spec["price_month"]
+            per_million[name] = pm / (rps * SECONDS_PER_MONTH) * 1_000_000
+            per_euro[name] = rps / pm
+        rows.append(CostRow(fw, rps, per_million, per_euro))
+    rows.sort(key=lambda r: -r.rps)
+    return rows
+
+
+@dataclass
+class FootprintRow:
+    framework: str
+    peak_ram_mb: float | None
+    cold_start_ms: float | None
+    image_mb: float | None
+    loc: int | None
+
+
+def footprint_rows(run: Run, meta: dict) -> list:
+    """Per non-appendix framework: steady-state process memory (peak_ram_mb from
+    resource_metrics), cold-start time (from a measured result — a startup
+    property, constant across scenarios), and container-image size. Ordered
+    lightest-RAM first for the runs-on-a-toaster reading; every framework is
+    shown, no cherry-picking (hand-written REST can be lighter than FraiseQL,
+    and it is shown so)."""
+    rm = {m["framework"]: m for m in run.resource_metrics}
+    cold: dict = {}
+    for r in run.results:
+        cold.setdefault(r["framework"], r.get("cold_start_ms"))
+    rows = []
+    for fw in meta["framework_order"]:
+        if meta["frameworks"][fw].get("appendix"):
+            continue
+        m = rm.get(fw, {})
+        rows.append(FootprintRow(
+            framework=fw, peak_ram_mb=m.get("peak_ram_mb"),
+            cold_start_ms=cold.get(fw), image_mb=m.get("image_mb"),
+            loc=m.get("loc")))
+    rows.sort(key=lambda r: (r.peak_ram_mb is None, r.peak_ram_mb or 0.0))
+    return rows
+
+
+@dataclass
+class DbPair:
+    precompute: str
+    base: str
+    precompute_bytes: int
+    base_bytes: int
+    ratio: float                     # precompute / base
+
+
+def db_footprint_pairs(run: Run, meta: dict) -> list:
+    """The storage trade: each precomputed tv_* table beside the base tb_* table
+    it derives from, with the size ratio. Precompute buys read speed and cheap
+    RAM; it costs disk, and this shows how much. Pairs come from scenarios.json;
+    a named table absent from the run's db_footprint raises (no invented rows)."""
+    sizes = {f["table"]: f["total_bytes"] for f in run.db_footprint}
+    pairs = []
+    for p in meta["footprint"]["db_pairs"]:
+        pc, base = p["precompute"], p["base"]
+        if pc not in sizes or base not in sizes:
+            raise ValueError(
+                f"db_footprint pair {pc}/{base} not found in run db_footprint")
+        pb, bb = sizes[pc], sizes[base]
+        pairs.append(DbPair(pc, base, pb, bb, (pb / bb) if bb else 0.0))
+    return pairs
 
 
 # --------------------------------------------------------------------------
@@ -1966,8 +2136,8 @@ def _render_index(run: Run, meta: dict, grid: Grid) -> str:
 # AI layer — data.json + llms.txt
 # --------------------------------------------------------------------------
 
-def _render_data_json(run: Run, meta: dict) -> str:
-    return json.dumps({"run": run.raw, "scenarios": meta},
+def _render_data_json(run: Run, meta: dict, prices: dict) -> str:
+    return json.dumps({"run": run.raw, "scenarios": meta, "costs": prices},
                       indent=2, ensure_ascii=False) + "\n"
 
 
@@ -2031,13 +2201,17 @@ def _render_llms_txt(run: Run, meta: dict) -> str:
         apq_note=anatomy.get("apq_note", ""))
 
 
-def render(run: Run, meta: dict) -> dict[str, bytes]:
-    """Pure renderer: returns every output file as bytes. Tests never touch
-    the filesystem twice."""
+def render(run: Run, meta: dict, prices: dict | None = None) -> dict[str, bytes]:
+    """Renderer: returns every output file as bytes. Deterministic for a given
+    (run, meta, prices); ``prices`` defaults to the committed cost file so the
+    common call stays two-argument, but a caller (or test) may pass an explicit
+    dict to keep the render filesystem-free."""
+    if prices is None:
+        prices = load_prices()
     grid = build_grid(run, meta)
     return {
         "index.html": _render_index(run, meta, grid).encode("utf-8"),
-        "data.json": _render_data_json(run, meta).encode("utf-8"),
+        "data.json": _render_data_json(run, meta, prices).encode("utf-8"),
         "llms.txt": _render_llms_txt(run, meta).encode("utf-8"),
     }
 
@@ -2072,6 +2246,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--scenarios", type=Path, default=SCENARIOS_PATH,
         help="path to scenarios.json metadata contract")
+    parser.add_argument(
+        "--costs", type=Path, default=COSTS_PATH,
+        help="path to the dated instance-price YAML (cost composite input)")
     args = parser.parse_args(argv)
 
     if len(args.run_json) > 1:
@@ -2090,7 +2267,8 @@ def main(argv: list[str] | None = None) -> int:
 
     run = load_run(path)
     meta = load_meta(args.scenarios)
-    files = render(run, meta)
+    prices = load_prices(args.costs)
+    files = render(run, meta, prices)
     write_site(files, args.out)
     print(f"build.py: wrote {len(files)} file(s) to {args.out}")
     return 0

@@ -390,6 +390,24 @@
     "summary": "Caching under fire: the same single-row lookup run two ways — against 20 rotating keys (C3, a cache can never hit) and against a 5-key hot pool (HC3, a cache should hit almost every time). The cache-off variants (v, tv) sit beside the cache-on ones (v+cache, tv+cache) on purpose: if the cache earned its keep, the cache-on rows would jump from C3 to HC3 while the cache-off rows stayed flat. In this run every row is flat — a single-row read is already so cheap (~4 ms) that caching the result saves almost nothing, hot pool or not, and tv+cache is a touch slower with the cache in the path. The chart shows that as-is.",
     "not_measured_note": "Wired in the benchmark but not run against the hot-key scenarios in this prototype sweep — distinct from excluded, and neither slow nor missing on purpose. The Phase 06 median-of-three run fills them."
   },
+  "footprint": {
+    "cost": {
+      "scenario": "Q1",
+      "headline_instance": "ccx33",
+      "summary": "The runs-on-a-toaster closer, priced honestly. This is the instance cost attributable to a million requests at the measured Q1 throughput, on the machine the sweep actually ran on (the CCX33 system-under-test). Because FraiseQL serves Q1 several times faster than the resolver engines on the same box, and in a fraction of their RAM, it costs a fraction per request — but these are derived figures (formula below), not a separate measurement.",
+      "formula": "€ / 1M requests = price/month ÷ (measured Q1 RPS × 2,628,000 s) × 10⁶ — the instance cost attributable to a million requests at sustained throughput. Derived from the measured RPS and the dated price file, not itself measured; the same model as the report's cost composite. Meaningful because the sweep ran on this instance class (CCX33, the SUT); on other hardware it is a projection.",
+      "price_note": "Hetzner dedicated-vCPU pricing, EUR excl. VAT, from costs/instance-prices-2026-07.yaml (captured 2026-07-04). CCX33 = 8 dedicated vCPU / 32 GB."
+    },
+    "rss": {
+      "summary": "Steady-state process memory, cold-start time and container-image size per framework. The FraiseQL variants sit around 11–13 MB; the Node and Python GraphQL servers run several times heavier, and hand-written Actix REST is lighter still. Shown as-is, no cherry-picking — Actix wins on RAM, but it serves a fifth of FraiseQL's Q1 throughput and speaks REST, not GraphQL."
+    },
+    "db_pairs": [
+      {"precompute": "tv_comment", "base": "tb_comment"},
+      {"precompute": "tv_post", "base": "tb_post"},
+      {"precompute": "tv_user", "base": "tb_user"}
+    ],
+    "db_summary": "The trade the RAM-and-CPU win is paid with. FraiseQL's read speed comes from precomputed tv_* rows, and those rows cost disk: tv_comment is 4.4× the size of the tb_comment base table it derives from. The storage trade belongs to the same story as the footprint — cheaper memory and cores, more disk."
+  },
   "exclusion_reasons": {
     "1": "M1d on v-variants — updateUserDelta patches the tvd_* delta tables of the tv pipeline; the v-variants serve on-the-fly JSONB views and have no delta pipeline to contrast (structural, see frameworks/fraiseql/database/extensions.sql).",
     "2": "fraiseql-tv-audit — audit-overhead appendix row: measures M1 only, to isolate the cost of audit logging on the mutation path. Deliberately not a full-grid framework; do not expand.",

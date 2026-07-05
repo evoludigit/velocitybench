@@ -156,7 +156,8 @@ def test_error_cell_is_greyed_with_breakdown(tmp_path, meta):
 
 def test_data_json_round_trips(built, sweep3_run, meta):
     data = json.loads(built["data.json"].decode("utf-8"))
-    assert data == {"run": sweep3_run.raw, "scenarios": meta}
+    assert data == {"run": sweep3_run.raw, "scenarios": meta,
+                    "costs": build.load_prices(build.COSTS_PATH)}
 
 
 def test_llms_txt_describes_structure(built):

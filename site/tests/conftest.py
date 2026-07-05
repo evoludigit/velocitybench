@@ -34,6 +34,12 @@ def meta():
 
 
 @pytest.fixture()
+def prices():
+    import build
+    return build.load_prices(build.COSTS_PATH)
+
+
+@pytest.fixture()
 def sweep3_run(sweep3_path):
     import build
     return build.load_run(sweep3_path)
