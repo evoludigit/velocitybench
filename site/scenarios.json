@@ -620,7 +620,7 @@
         "C3",
         "HC3"
       ],
-      "section": null,
+      "section": "s4-cache-under-fire",
       "blurb": "A hot 5-key pool (HC3) is where a result cache should shine; the 20-UUID miss regime (C3) shows what a cache does when it cannot help. In this run both regimes land flat — the single-row read is already too cheap for the cache to matter."
     }
   },

@@ -107,3 +107,76 @@ def test_cache_appendix_audit_row_never_appears(grid):
     view = build.cache_pairs(grid)
     everyone = [r.framework for r in view.variants + view.coverage]
     assert "fraiseql-tv-audit" not in everyone
+
+
+# --------------------------------------------------------------------------
+# Phase 07 Step 1 [design→pin] — S4 markup pins (written after the design
+# settled; they guard the honesty-critical invariants when the grid or styling
+# changes).
+# --------------------------------------------------------------------------
+
+import re  # noqa: E402
+
+import pytest  # noqa: E402
+
+
+@pytest.fixture()
+def page(sweep3_run, meta):
+    return build.render(sweep3_run, meta)["index.html"].decode("utf-8")
+
+
+def s4(page):
+    m = re.search(r'<section id="s4-cache-under-fire".*?</section>', page,
+                  re.DOTALL)
+    assert m, "S4 section missing"
+    return m.group(0)
+
+
+def test_s4_anchored_between_s3_and_s5(page):
+    assert 'id="s4-cache-under-fire"' in page
+    assert page.index('id="s3-apq"') < page.index('id="s4-cache-under-fire"')
+    assert page.index('id="s4-cache-under-fire"') < page.index('id="s5-write-trade"')
+
+
+def test_s4_both_regimes_explained_before_the_bars(page, meta):
+    sec = s4(page)
+    reg = meta["cache_under_fire"]["regimes"]
+    assert reg["miss"] in sec and reg["hit"] in sec
+    # the regimes come before the first bar so the reader understands them first
+    assert sec.index("Miss regime") < sec.index('class="s4-chart"')
+    assert sec.index("Hit regime") < sec.index('class="s4-chart"')
+
+
+def test_s4_four_variants_with_cache_state_badges(page):
+    sec = s4(page)
+    # cache off / on / off / on in the config order (no-cache rows present)
+    assert re.findall(r'data-cache="(\w+)"', sec) == ["off", "on", "off", "on"]
+    assert sec.count("s4-badge-on") == 2 and sec.count("s4-badge-off") == 2
+
+
+def test_s4_bars_from_zero(page):
+    sec = s4(page)
+    assert 's4-axis' in sec and '<span>0</span>' in sec
+
+
+def test_s4_tv_cache_negative_delta_shown_as_is(page):
+    """The cache-on tv+cache variant is slower on the hot pool — its chip is the
+    down/negative delta, verbatim, never softened."""
+    sec = s4(page)
+    m = re.search(r'data-framework="fraiseql-tv-cache".*?</div>\s*<div class="s4-barline',
+                  sec, re.DOTALL)
+    assert m and 's4-delta dir-down' in m.group(0)
+    assert '−169 RPS (−1.7%)' in m.group(0)
+
+
+def test_s4_coverage_lists_not_measured_engines(page):
+    sec = s4(page)
+    cov = re.search(r's4-cov-list nm">(.*?)</ul>', sec, re.DOTALL).group(1)
+    assert cov.count("<li") == 7
+    assert 'fraiseql-tv-audit' not in sec       # appendix never rendered
+
+
+def test_s4_hotkey_workload_card_resolves_to_this_section(page):
+    """The Phase 04 stub pointed the hot-key card at section: null; it now
+    resolves to the real S4 anchor."""
+    assert 'href="#s4-cache-under-fire"' in page

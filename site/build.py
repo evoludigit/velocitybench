@@ -1545,6 +1545,121 @@ def _s3_section(grid: Grid, meta: dict) -> str:
 
 
 # --------------------------------------------------------------------------
+# S4 — caching under fire (C3 miss regime vs HC3 hit regime, paired bars)
+# --------------------------------------------------------------------------
+
+S4_BAR = {"fraiseql-v-nocache": "v", "fraiseql-v-cache": "vc",
+          "fraiseql-tv": "tv", "fraiseql-tv-cache": "tvc"}
+
+
+def _s4_axis(axis_max: float) -> str:
+    return (
+        '<div class="s4-axis" aria-hidden="true">'
+        '<span>0</span>'
+        f'<span>{fmt_rps(axis_max / 2)}</span>'
+        f'<span>{fmt_rps(axis_max)} RPS</span></div>')
+
+
+def _s4_regimes(cfg: dict) -> str:
+    reg = cfg["regimes"]
+    return (
+        '<div class="s4-regimes">'
+        '<div class="s4-regime s4-regime-miss"><h3>Miss regime</h3>'
+        f'<p>{esc_text(reg["miss"])}</p></div>'
+        '<div class="s4-regime s4-regime-hit"><h3>Hit regime</h3>'
+        f'<p>{esc_text(reg["hit"])}</p></div></div>')
+
+
+def _s4_bar(regime: str, label: str, rps: float, axis_max: float,
+            barcls: str) -> str:
+    pct = _bar_pct(rps, axis_max)
+    return (
+        f'<div class="s4-barline s4-{regime}">'
+        f'<span class="s4-reg">{esc(label)}</span>'
+        f'<span class="s4-track"><span class="s4-bar s4-bar-{barcls}" '
+        f'style="width:{svg.n(pct)}%"></span></span>'
+        f'<span class="s4-val">{fmt_rps(rps)} RPS</span></div>')
+
+
+def _s4_delta(row: CacheRow) -> str:
+    if row.delta is None:
+        return ""
+    return (f'<span class="s4-delta dir-{row.delta.direction}">'
+            f'{esc(fmt_delta(row.delta, "RPS"))}</span>')
+
+
+def _s4_variant(row: CacheRow, axis_max: float, meta: dict) -> str:
+    fw_label = meta["frameworks"][row.framework]["label"]
+    state = "on" if row.cache_on else "off"
+    barcls = S4_BAR.get(row.framework, "tv")
+    head = (
+        '<div class="s4-head">'
+        f'<span class="s4-fw">{esc(fw_label)}</span>'
+        f'<span class="s4-badge s4-badge-{state}">cache {state}</span>'
+        f'{_s4_delta(row)}</div>')
+    return (
+        f'<div class="s4-variant" data-framework="{esc(row.framework)}" '
+        f'data-cache="{state}" data-miss-rps="{esc(row.miss_rps)}" '
+        f'data-hit-rps="{esc(row.hit_rps)}">{head}'
+        + _s4_bar("miss", "miss · C3", row.miss_rps, axis_max, barcls)
+        + _s4_bar("hit", "hit · HC3", row.hit_rps, axis_max, barcls)
+        + '</div>')
+
+
+def _s4_coverage(view: CacheUnderFire, meta: dict) -> str:
+    nm = [r for r in view.coverage if r.status == STATUS_NOT_MEASURED]
+    excl = [r for r in view.coverage if r.status == STATUS_EXCLUDED]
+    fw_label = meta["frameworks"]
+    blocks = ""
+    if nm:
+        chips = "".join(
+            f'<li data-framework="{esc(r.framework)}">'
+            f'{esc(fw_label[r.framework]["label"])}</li>' for r in nm)
+        blocks += (
+            '<div class="s4-cov-block">'
+            '<h4>Not measured on the hot-key scenarios in this run</h4>'
+            f'<p class="s4-cov-note">'
+            f'{esc_text(meta["cache_under_fire"]["not_measured_note"])}</p>'
+            f'<ul class="s4-cov-list nm">{chips}</ul></div>')
+    if excl:
+        items = "".join(
+            f'<li data-framework="{esc(r.framework)}" '
+            f'data-reason-id="{esc(r.reason_id)}">'
+            f'<span class="s4-cov-fw">{esc(fw_label[r.framework]["label"])} '
+            f'<span class="tag">excluded · {esc(r.reason_id)}</span></span>'
+            f'<span class="s4-cov-reason">{esc_text(r.reason)}</span></li>'
+            for r in excl)
+        blocks += (
+            '<div class="s4-cov-block">'
+            '<h4>Excluded by design</h4>'
+            f'<ul class="s4-cov-list excl">{items}</ul></div>')
+    return f'<div class="s4-coverage">{blocks}</div>' if blocks else ""
+
+
+def _s4_section(grid: Grid, meta: dict) -> str:
+    cfg = meta["cache_under_fire"]
+    view = cache_pairs(grid)
+    vals = [v for r in view.variants for v in (r.miss_rps, r.hit_rps) if v]
+    axis_max = svg.nice_axis(max(vals, default=1.0), 5)[0]
+    variants = "".join(_s4_variant(r, axis_max, meta) for r in view.variants)
+    return (
+        '<section id="s4-cache-under-fire" aria-labelledby="s4-h">'
+        '<h2 id="s4-h">S4 — Caching under fire</h2>'
+        f'<p class="lede">{esc_text(cfg["summary"])}</p>'
+        + _s4_regimes(cfg)
+        + _s4_axis(axis_max)
+        + f'<div class="s4-chart">{variants}</div>'
+        + _s4_coverage(view, meta)
+        + '<p class="footnote">Two bars per variant — the same single-row read '
+        'against 20 rotating keys (miss) and a 5-key hot pool (hit), on one '
+        'linear axis from zero. Equal-length pairs mean the cache changed '
+        'nothing; the chip is the real, signed hit-over-miss delta. Every '
+        'value is also in the grid table above (no chart-only numbers). '
+        'Prototype single-pass sweep.</p>'
+        '</section>')
+
+
+# --------------------------------------------------------------------------
 # S5 — the write trade (mandatory honesty section) + workload selector
 # --------------------------------------------------------------------------
 
@@ -1835,6 +1950,7 @@ def _render_index(run: Run, meta: dict, grid: Grid) -> str:
         _s0_section(grid, meta),
         _s2_section(grid, meta),
         _s3_section(grid, meta),
+        _s4_section(grid, meta),
         _s5_section(grid, meta),
         _workload_selector(grid, meta),
         _footnote(run),
