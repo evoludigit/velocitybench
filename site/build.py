@@ -307,6 +307,68 @@ def write_trade(grid: Grid) -> list:
 
 
 # --------------------------------------------------------------------------
+# S0 request anatomy — the hop model (movement layer)
+# --------------------------------------------------------------------------
+
+@dataclass
+class Hop:
+    n: int
+    kind: str            # "http" | "parse" | "sql" | "serialize"
+    label: str
+    sql_roundtrips: int
+    source: str
+
+
+def strategy_of(framework: str, meta: dict) -> str:
+    return meta["framework_strategy"][framework]
+
+
+def hop_diagram(strategy: str, scenario: str, meta: dict) -> list:
+    """Ordered browser→server→DB hop list for one (strategy, scenario). Every
+    hop is provenanced to the strategy's implementation source; the SQL hops are
+    structural truth — resolver + DataLoader adds one batched trip per nesting
+    level, compile-to-SQL and precompute stay at one at any depth. No hop is
+    drawn without a source (the section's honesty rule)."""
+    s = meta["query_strategies"][strategy]
+    src = s["source"]
+    hops: list = []
+
+    def add(kind: str, label: str, rt: int = 0) -> None:
+        hops.append(Hop(len(hops) + 1, kind, label, rt, src))
+
+    add("http", "HTTP request — GraphQL document uploaded")
+    if strategy == "resolver-dataloader":
+        shape = meta["read_shape"][scenario]
+        add("parse", "Parse · validate · plan the query")
+        add("sql", f"Root SQL — select the {shape['root']}", 1)
+        for lvl in shape["levels"]:
+            add("sql",
+                f"DataLoader batch — {lvl} in one WHERE key = ANY($1) query", 1)
+        add("serialize", "Resolve fields in-process · serialise JSON")
+    elif strategy == "compile-to-sql":
+        add("parse",
+            "Compile the whole tree to ONE SQL — LATERAL joins · jsonb_agg")
+        add("sql", "One composed SQL round-trip — full nested JSON returned", 1)
+    elif strategy == "precompute":
+        add("parse",
+            "Look up the pre-computed tv_* row (JSONB built at write time)")
+        add("sql", "One SQL round-trip — SELECT jsonb, no joins", 1)
+    elif strategy == "rest":
+        levels = meta["read_shape"][scenario]["levels"]
+        add("sql",
+            f"Hand-written SQL — {'a JOIN' if levels else 'single-table select'}",
+            1)
+    add("http", "Serialise + HTTP response")
+    return hops
+
+
+def anatomy_duration(p50_ms: float, scale: float) -> float:
+    """Playback seconds for one request-dot = measured p50 × the stated scale.
+    Rounded to 2 dp so the generated SVG is byte-stable."""
+    return round(p50_ms * scale, 2)
+
+
+# --------------------------------------------------------------------------
 # Rendering helpers
 # --------------------------------------------------------------------------
 

@@ -239,6 +239,96 @@
       "classical": "vanilla-update"
     }
   },
+  "framework_strategy": {
+    "fraiseql-tv": "precompute",
+    "fraiseql-tv-cache": "precompute",
+    "fraiseql-v-nocache": "compile-to-sql",
+    "fraiseql-v-cache": "compile-to-sql",
+    "fraiseql-tv-audit": "precompute",
+    "hasura": "compile-to-sql",
+    "postgraphile": "compile-to-sql",
+    "actix-web-rest": "rest",
+    "async-graphql": "resolver-dataloader",
+    "mercurius": "resolver-dataloader",
+    "apollo-server": "resolver-dataloader",
+    "strawberry": "resolver-dataloader"
+  },
+  "query_strategies": {
+    "resolver-dataloader": {
+      "label": "Per-level batched resolvers",
+      "short": "resolver + DataLoader",
+      "members": ["async-graphql", "mercurius", "apollo-server", "strawberry"],
+      "representative": "async-graphql",
+      "depth_scaling": true,
+      "sql_roundtrips": {"Q1": 1, "Q2b": 2, "Q3": 3},
+      "source": "frameworks/async-graphql/src/dataloaders.rs",
+      "sources": [
+        "frameworks/async-graphql/src/dataloaders.rs",
+        "frameworks/mercurius/src/dataloaders.ts",
+        "frameworks/apollo-server/src/dataloaders.ts",
+        "frameworks/strawberry/main.py"
+      ],
+      "summary": "One HTTP hop, then the root SQL, then one BATCHED SQL per nesting level — each DataLoader coalesces a level's lookups into a single WHERE key = ANY($1) query, so there is no N+1. The residual cost is that those trips are serial (each level waits on the parent's ids) plus in-process resolver execution, so depth adds round-trips."
+    },
+    "compile-to-sql": {
+      "label": "Compile the whole query to one SQL",
+      "short": "compile-to-SQL",
+      "members": ["hasura", "postgraphile", "fraiseql-v-nocache", "fraiseql-v-cache"],
+      "representative": "postgraphile",
+      "depth_scaling": false,
+      "sql_roundtrips": {"Q1": 1, "Q2b": 1, "Q3": 1},
+      "source": "frameworks/postgraphile/src/index.ts",
+      "sources": [
+        "frameworks/postgraphile/src/index.ts",
+        "frameworks/hasura/README.md",
+        "frameworks/fraiseql/database/extensions.sql"
+      ],
+      "summary": "The engine compiles the entire GraphQL tree into ONE composed SQL statement (LATERAL joins / jsonb aggregation) and issues a single round-trip that returns the whole nested document — at any depth. Hasura, PostGraphile and FraiseQL's on-the-fly v views are all in this class; FraiseQL·v is one compiler among several, not a category of its own."
+    },
+    "precompute": {
+      "label": "Read a pre-computed JSONB row",
+      "short": "precompute (tv_*)",
+      "members": ["fraiseql-tv", "fraiseql-tv-cache"],
+      "representative": "fraiseql-tv",
+      "cache_member": "fraiseql-tv-cache",
+      "depth_scaling": false,
+      "sql_roundtrips": {"Q1": 1, "Q2b": 1, "Q3": 1},
+      "source": "frameworks/fraiseql/schema_tv.py",
+      "sources": [
+        "frameworks/fraiseql/schema_tv.py"
+      ],
+      "summary": "The nested document is denormalised into a tv_* table at write time, so a read is a single SELECT of pre-built JSONB with no joins — one round-trip at any depth. On a result-cache hit (tv+cache) the database is not touched at all: the path stops at the server."
+    },
+    "rest": {
+      "label": "Hand-written REST + SQL",
+      "short": "REST",
+      "members": ["actix-web-rest"],
+      "representative": "actix-web-rest",
+      "depth_scaling": false,
+      "animated": false,
+      "sql_roundtrips": {"Q1": 1, "Q2b": 1},
+      "source": "frameworks/actix-web-rest/src/repositories.rs",
+      "sources": [
+        "frameworks/actix-web-rest/src/repositories.rs"
+      ],
+      "summary": "No GraphQL document on the wire: each endpoint runs a hand-written SQL (a JOIN for the nested case) — one round-trip like a compiler, but bespoke per endpoint. Not one of the three animated GraphQL lanes; shown here for completeness."
+    }
+  },
+  "read_shape": {
+    "Q1":  {"root": "users",    "levels": []},
+    "Q2b": {"root": "posts",    "levels": ["author"]},
+    "Q3":  {"root": "comments", "levels": ["author", "post"]}
+  },
+  "anatomy": {
+    "scenarios": ["Q1", "Q2b", "Q3"],
+    "default_scenario": "Q2b",
+    "p50_scale_s_per_ms": 0.1,
+    "lanes": ["resolver-dataloader", "compile-to-sql", "precompute"],
+    "stations": ["Browser", "Server", "Database"],
+    "dataloader_credit": "The classical GraphQL engines here are best-practice, not strawmen: every one batches its nested lookups with a DataLoader (WHERE key = ANY($1)), so there is no N+1 swarm. What the nesting cliff measures is the residual cost — the serial per-level round-trips plus in-process resolver execution — which is exactly what compile-to-SQL and precompute avoid.",
+    "apq_note": "APQ (automatic persisted queries) elides the document-upload work of the first hop: instead of sending the whole GraphQL query text, the client sends a 32-byte SHA-256 hash the server has already parsed. It shortens the request hop but changes no SQL round-trip; measured in the Q1_APQ / Q2b_APQ / M1_APQ cells.",
+    "lens_note": "These lanes are coloured by request mechanism, not by product family: FraiseQL·v is drawn in the compile-to-SQL lane because that is what it is, and only the pre-computed tv_* path stands apart."
+  },
   "exclusion_reasons": {
     "1": "M1d on v-variants — updateUserDelta patches the tvd_* delta tables of the tv pipeline; the v-variants serve on-the-fly JSONB views and have no delta pipeline to contrast (structural, see frameworks/fraiseql/database/extensions.sql).",
     "2": "fraiseql-tv-audit — audit-overhead appendix row: measures M1 only, to isolate the cost of audit logging on the mutation path. Deliberately not a full-grid framework; do not expand.",
