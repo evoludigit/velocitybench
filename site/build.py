@@ -338,17 +338,23 @@ def delta_of(prev: float, cur: float, flat_pct: float = 1.5) -> Delta:
 DELTA_GLYPH = {"up": "▲", "down": "▼", "flat": "▬"}
 
 
+def pct_signed(pct: float) -> str:
+    """Signed percent to 1 dp; a value that rounds to zero reads ±0.0% so a tiny
+    negative never renders as the odd '−0.0%'."""
+    r = round(pct, 1)
+    sign = "±" if r == 0 else ("+" if r > 0 else "−")
+    return f"{sign}{abs(r):.1f}%"
+
+
 def fmt_delta(delta: Delta, unit: str = "") -> str:
     """'▲ +2,836 RPS (+56.0%)' — explicit sign, real percent (a flat rung shows
     its true near-zero number, a negative one its minus). Deterministic."""
-    minus = "−"
-    asign = "+" if delta.abs >= 0 else minus
+    asign = "+" if delta.abs >= 0 else "−"
     aval = abs(delta.abs)
     afmt = f"{aval:,.0f}" if aval >= 100 else f"{aval:,.1f}"
     unit_s = f" {unit}" if unit else ""
-    psign = "+" if delta.pct >= 0 else minus
     return (f"{DELTA_GLYPH[delta.direction]} {asign}{afmt}{unit_s} "
-            f"({psign}{abs(delta.pct):.1f}%)")
+            f"({pct_signed(delta.pct)})")
 
 
 # --------------------------------------------------------------------------
@@ -1368,6 +1374,114 @@ def _s2_section(grid: Grid, meta: dict) -> str:
 
 
 # --------------------------------------------------------------------------
+# S3 — APQ isolated (diverging delta bars + a coverage panel)
+# --------------------------------------------------------------------------
+
+def _num(v) -> str:
+    return f"{v:g}"
+
+
+def _s3_axis(axis_pct: float) -> str:
+    return (
+        '<div class="s3-axis" aria-hidden="true">'
+        f'<span>−{_num(axis_pct)}%</span>'
+        '<span class="s3-axis-mid">◄ APQ slower · 0, no change · APQ faster ►'
+        '</span>'
+        f'<span>+{_num(axis_pct)}%</span></div>')
+
+
+def _s3_delta_bar(cell: ApqPairCell, axis_pct: float) -> str:
+    """A diverging bar growing from the centre 0%-line: left/red when APQ was
+    slower, right/green when faster, a thin muted stub when ~flat. |pct| is
+    scaled against the shared symmetric axis; a real negative stays left."""
+    d = cell.delta
+    frac = min(1.0, abs(d.pct) / axis_pct) if axis_pct else 0.0
+    w = frac * 50.0
+    if d.pct >= 0:
+        pos = f"left:50%;width:{svg.n(w)}%"
+    else:
+        pos = f"left:{svg.n(50.0 - w)}%;width:{svg.n(w)}%"
+    return (
+        '<span class="s3-track"><span class="s3-zero"></span>'
+        f'<span class="s3-bar dir-{d.direction}" style="{pos}"></span></span>')
+
+
+def _s3_result_row(cell: ApqPairCell, meta: dict, axis_pct: float) -> str:
+    label = meta["frameworks"][cell.framework]["label"]
+    d = cell.delta
+    return (
+        f'<div class="s3-row" data-framework="{esc(cell.framework)}" '
+        f'data-base-rps="{esc(cell.base_rps)}" data-apq-rps="{esc(cell.apq_rps)}">'
+        f'<span class="s3-fw">{esc(label)}</span>'
+        f'<span class="s3-ba">{fmt_rps(cell.base_rps)} → '
+        f'{fmt_rps(cell.apq_rps)} RPS</span>'
+        + _s3_delta_bar(cell, axis_pct)
+        + f'<span class="s3-delta dir-{d.direction}">{DELTA_GLYPH[d.direction]} '
+        f'{pct_signed(d.pct)}</span></div>')
+
+
+def _s3_pair(group: ApqPairGroup, meta: dict, axis_pct: float) -> str:
+    base_label = meta["scenarios"][group.base]["label"]
+    results = [c for c in group.cells if c.status == STATUS_RESULT]
+    rows = "".join(_s3_result_row(c, meta, axis_pct) for c in results)
+    return (
+        f'<div class="s3-pair" data-pair="{esc(group.base)}">'
+        f'<h3>{esc(group.base)} → {esc(group.apq)} '
+        f'<span class="s3-pair-sub">{esc(base_label)}</span></h3>'
+        f'<div class="s3-rows">{rows}</div></div>')
+
+
+def _s3_coverage(groups: list, meta: dict) -> str:
+    """The not-measured and excluded frameworks — presence with reason, never
+    omission. APQ capability is a property of the framework, not the scenario,
+    so it is constant across pairs; read it off the first pair."""
+    ref = groups[0].cells
+    nm = [c for c in ref if c.status == STATUS_NOT_MEASURED]
+    excl = [c for c in ref if c.status == STATUS_EXCLUDED]
+    fw_label = meta["frameworks"]
+    nm_html = "".join(
+        f'<li data-framework="{esc(c.framework)}">'
+        f'{esc(fw_label[c.framework]["label"])}</li>' for c in nm)
+    excl_html = "".join(
+        f'<li data-framework="{esc(c.framework)}" '
+        f'data-reason-id="{esc(c.reason_id)}">'
+        f'<span class="s3-cov-fw">{esc(fw_label[c.framework]["label"])} '
+        f'<span class="tag">excluded · {esc(c.reason_id)}</span></span>'
+        f'<span class="s3-cov-reason">{esc_text(c.reason)}</span></li>'
+        for c in excl)
+    return (
+        '<div class="s3-coverage">'
+        '<div class="s3-cov-block">'
+        '<h4>APQ-capable · not measured in this run</h4>'
+        f'<p class="s3-cov-note">{esc_text(meta["apq"]["not_measured_note"])}</p>'
+        f'<ul class="s3-cov-list nm">{nm_html}</ul></div>'
+        '<div class="s3-cov-block">'
+        '<h4>No first-party APQ handshake · excluded by design</h4>'
+        f'<ul class="s3-cov-list excl">{excl_html}</ul></div>'
+        '</div>')
+
+
+def _s3_section(grid: Grid, meta: dict) -> str:
+    groups = apq_pairs(grid)
+    all_pct = [abs(c.delta.pct) for g in groups for c in g.cells
+               if c.status == STATUS_RESULT and c.delta]
+    axis_pct = svg.nice_axis(max(all_pct, default=1.0), 5)[0]
+    pairs = "".join(_s3_pair(g, meta, axis_pct) for g in groups)
+    return (
+        '<section id="s3-apq" aria-labelledby="s3-h">'
+        '<h2 id="s3-h">S3 — APQ, isolated</h2>'
+        f'<p class="lede">{esc_text(meta["apq"]["summary"])}</p>'
+        + _s3_axis(axis_pct)
+        + f'<div class="s3-pairs">{pairs}</div>'
+        + _s3_coverage(groups, meta)
+        + '<p class="footnote">Bars are the measured APQ delta against a 0% '
+        'no-change line — a bar to the left means APQ was <em>slower</em> in '
+        'this run. Every before/after value is also in the grid table above '
+        '(no chart-only numbers). Prototype single-pass sweep.</p>'
+        '</section>')
+
+
+# --------------------------------------------------------------------------
 # S5 — the write trade (mandatory honesty section) + workload selector
 # --------------------------------------------------------------------------
 
@@ -1657,6 +1771,7 @@ def _render_index(run: Run, meta: dict, grid: Grid) -> str:
         _s1_section(grid, meta),
         _s0_section(grid, meta),
         _s2_section(grid, meta),
+        _s3_section(grid, meta),
         _s5_section(grid, meta),
         _workload_selector(grid, meta),
         _footnote(run),
