@@ -122,8 +122,18 @@ destroy_all() {
         read -r -p "Delete ALL resources labeled ${CAMPAIGN_LABEL}? [y/N] " reply
         [[ "$reply" == [yY]* ]] || { say "aborted — nothing destroyed"; return 1; }
     fi
-    # Delete only what carries the campaign label — never anything else.
-    run hcloud server delete -l "$CAMPAIGN_LABEL"
+    # Delete only what this script created — exact names, verified against the
+    # campaign label first (hcloud server delete has no label selector).
+    if (( ! PLAN )); then
+        for name in "$SUT_NAME" "$LOADGEN_NAME"; do
+            if hcloud server describe "$name" -o 'format={{.Labels}}' 2>/dev/null | grep -q "velocitybench"; then
+                run hcloud server delete "$name"
+            fi
+        done
+    else
+        run hcloud server delete "$SUT_NAME"    # label-verified at runtime
+        run hcloud server delete "$LOADGEN_NAME"
+    fi
     run hcloud firewall delete "$FIREWALL_NAME"
     run hcloud network delete "$NETWORK_NAME"
     run hcloud ssh-key delete "$SSH_KEY_NAME"
