@@ -91,6 +91,10 @@ ssh_sut()     { run ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=accept-new "
 ssh_loadgen() { run ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=accept-new "root@${LOADGEN_IP:-<loadgen-public-ip>}" "$@"; }
 
 START_EPOCH="$(date +%s)"
+# Fixed once per session: sweep filenames must not drift across midnight
+# (sweep 1 launched at 23:5x and sweep 2 at 00:0x would otherwise disagree
+# with the delta step's date computation).
+SESSION_DATE="$(date +%F)"
 
 cost_note() {
     local end_epoch hours cost
@@ -243,7 +247,7 @@ for n in $(seq 1 "$SWEEPS"); do
 nohup env DOCKER_HOST=ssh://root@${SUT_PRIVATE_IP} \
 python3 tests/benchmark/bench_sequential.py \
 --target-host ${SUT_PRIVATE_IP} --frameworks ${FRAMEWORKS} ${SWEEP_ARGS} \
---output ${REMOTE_DIR}/reports/bench-hetzner-\$(date +%F)-sweep${n}.md \
+--output ${REMOTE_DIR}/reports/bench-hetzner-${SESSION_DATE}-sweep${n}.md \
 > ${REMOTE_DIR}/reports/sweep${n}.log 2>&1 < /dev/null & \
 echo \$! > ${REMOTE_DIR}/reports/sweep${n}.pid; }"
     if (( ! PLAN )); then
@@ -273,9 +277,9 @@ if (( SWEEPS >= 2 )); then
     say "── 4.9 Variance baseline: bench-delta sweep 1 vs sweep 2 ────"
     # Non-fatal: the baseline documents the variance; gating happens in Phase 06.
     run bash -c "cd ${REPO_ROOT} && python3 scripts/bench-delta.py \
-reports/hetzner-2026-07/bench-hetzner-\$(date +%F)-sweep1.json \
-reports/hetzner-2026-07/bench-hetzner-\$(date +%F)-sweep2.json \
---output reports/hetzner-2026-07/variance-baseline-\$(date +%F).md" || true
+reports/hetzner-2026-07/bench-hetzner-${SESSION_DATE}-sweep1.json \
+reports/hetzner-2026-07/bench-hetzner-${SESSION_DATE}-sweep2.json \
+--output reports/hetzner-2026-07/variance-baseline-${SESSION_DATE}.md" || true
 fi
 
 # ── 6. Destroy ──────────────────────────────────────────────────────────────
