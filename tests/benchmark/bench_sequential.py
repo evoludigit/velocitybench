@@ -109,6 +109,9 @@ _PG_C3_TMPL = (
     '{{ user: tbUserByRowId(rowId: "{user_id}") {{ id: rowId username fullName }} }}'
 )
 
+# F3 ORDER BY baseline — identical document to the FraiseQL F3 baseline
+# (users(limit: 20), no orderBy yet; see _FRAISEQL_F3).
+_PG_F3 = "{ allTbUsers(first: 20) { nodes { id: rowId username fullName } } }"
 _GQL_M1_TMPL = (
     'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "{bio}" }}) {{ id bio }} }}'
 )
@@ -325,6 +328,9 @@ FRAMEWORKS: dict[str, dict] = {
             "M1": "M1",
             "F1": "http://localhost:8015/posts?published=true&limit=10",
             "F2": "http://localhost:8015/posts?published=true&limit=10&include=author",
+            # F3 == Q1's request while the ORDER BY baseline stays orderBy-free
+            # (the endpoint already sorts by created_at DESC, like every list).
+            "F3": "http://localhost:8015/users?limit=20",
             "T1": "T1",
             "MC1": "MC1",  # REST workflow cycle: PUT /users/{id} + GET /users re-fetch
         },
@@ -345,6 +351,7 @@ FRAMEWORKS: dict[str, dict] = {
             "M1": "M1",
             "F1": ("http://localhost:8016/graphql", _GQL_F1),
             "F2": ("http://localhost:8016/graphql", _GQL_F2),
+            "F3": ("http://localhost:8016/graphql", _FRAISEQL_F3),
             "T1": "T1",
             "MC1": "MC1",
             # First-party APQ: built-in ApolloPersistedQueries extension
@@ -467,6 +474,7 @@ FRAMEWORKS: dict[str, dict] = {
             "M1": "M1",
             "F1": ("http://localhost:4002/graphql", _GQL_F1),
             "F2": ("http://localhost:4002/graphql", _GQL_F2),
+            "F3": ("http://localhost:4002/graphql", _FRAISEQL_F3),
             "T1": "T1",
             "MC1": "MC1",
             # Apollo Server 4 ships APQ natively (on by default, bounded LRU).
@@ -572,6 +580,7 @@ FRAMEWORKS: dict[str, dict] = {
             "M1": "M1",
             "F1": ("http://localhost:4008/graphql", _GQL_F1),
             "F2": ("http://localhost:4008/graphql", _GQL_F2),
+            "F3": ("http://localhost:4008/graphql", _FRAISEQL_F3),
             "T1": "T1",
             "MC1": "MC1",
             # First-party APQ: mercurius.persistedQueryDefaults.automatic()
@@ -601,6 +610,7 @@ FRAMEWORKS: dict[str, dict] = {
             "M1": "M1",
             "F1": ("http://localhost:8011/graphql", _GQL_F1),
             "F2": ("http://localhost:8011/graphql", _GQL_F2),
+            "F3": ("http://localhost:8011/graphql", _FRAISEQL_F3),
             "T1": "T1",
             "MC1": "MC1",
         },
@@ -885,6 +895,7 @@ FRAMEWORKS: dict[str, dict] = {
             "HC3": "HC3",
             "F1": ("http://localhost:4014/graphql", _PG_F1),
             "F2": ("http://localhost:4014/graphql", _PG_F2),
+            "F3": ("http://localhost:4014/graphql", _PG_F3),
             "M1": "M1",
             "T1": "T1",
             "MC1": "MC1",
@@ -912,6 +923,7 @@ FRAMEWORKS: dict[str, dict] = {
             "HC3": "HC3",
             "F1": ("http://localhost:4000/v1/graphql", _HASURA_F1),
             "F2": ("http://localhost:4000/v1/graphql", _HASURA_F2),
+            "F3": ("http://localhost:4000/v1/graphql", _FRAISEQL_F3),
             "M1": "M1",
             "T1": "T1",
             "MC1": "MC1",
@@ -1016,6 +1028,8 @@ FRAMEWORKS: dict[str, dict] = {
             "C3": "C3",
             "HC3": "HC3",
             "M1": "M1",
+            # Same schema_tv.compiled.json as fraiseql-tv — updateUserDelta served.
+            "M1d": "M1d",
             "F1": ("http://localhost:8816/graphql", _FRAISEQL_F1),
             "F2": ("http://localhost:8816/graphql", _FRAISEQL_F2),
             "F3": ("http://localhost:8816/graphql", _FRAISEQL_F3),

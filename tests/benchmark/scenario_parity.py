@@ -28,9 +28,17 @@ AUDITED = ("hasura", "postgraphile")
 # Read scenarios under audit. Mutations (M1/MC1) are deliberately excluded:
 # their cross-engine definition is workflow-based (see _QUERY_LABELS["MC1"])
 # and their response shape is engine-native by design.
-SCENARIOS = ("Q1", "Q2", "Q2b", "Q3", "F1", "F2", "T1")
+SCENARIOS = ("Q1", "Q2", "Q2b", "Q3", "F1", "F2", "F3", "T1")
 
-EXPECTED_COUNTS = {"Q1": 20, "Q2": 10, "Q2b": 10, "Q3": 20, "F1": 10, "F2": 10}
+EXPECTED_COUNTS = {
+    "Q1": 20,
+    "Q2": 10,
+    "Q2b": 10,
+    "Q3": 20,
+    "F1": 10,
+    "F2": 10,
+    "F3": 20,
+}
 
 # Relation/collection fields renamed to the cross-framework shape before
 # comparison. Hasura needs no map (renames live in its metadata).
