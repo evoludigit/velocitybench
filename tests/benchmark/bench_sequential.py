@@ -347,6 +347,11 @@ FRAMEWORKS: dict[str, dict] = {
             "F2": ("http://localhost:8016/graphql", _GQL_F2),
             "T1": "T1",
             "MC1": "MC1",
+            # First-party APQ: built-in ApolloPersistedQueries extension
+            # (apollo_persisted_queries feature, enabled in the app).
+            "Q1_APQ": "Q1_APQ",
+            "Q2b_APQ": "Q2b_APQ",
+            "M1_APQ": "M1_APQ",
         },
         "health_url": "http://localhost:8016/health",
         "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "{bio}" }}) {{ id bio }} }}',
@@ -464,6 +469,10 @@ FRAMEWORKS: dict[str, dict] = {
             "F2": ("http://localhost:4002/graphql", _GQL_F2),
             "T1": "T1",
             "MC1": "MC1",
+            # Apollo Server 4 ships APQ natively (on by default, bounded LRU).
+            "Q1_APQ": "Q1_APQ",
+            "Q2b_APQ": "Q2b_APQ",
+            "M1_APQ": "M1_APQ",
         },
         "health_url": "http://localhost:4002/health",
         "m1_template": _GQL_M1_FLAT_TMPL,
@@ -565,6 +574,11 @@ FRAMEWORKS: dict[str, dict] = {
             "F2": ("http://localhost:4008/graphql", _GQL_F2),
             "T1": "T1",
             "MC1": "MC1",
+            # First-party APQ: mercurius.persistedQueryDefaults.automatic()
+            # (enabled in the app — core mercurius feature, no custom code).
+            "Q1_APQ": "Q1_APQ",
+            "Q2b_APQ": "Q2b_APQ",
+            "M1_APQ": "M1_APQ",
         },
         "health_url": "http://localhost:4008/health",
         "m1_template": _GQL_M1_FLAT_TMPL,

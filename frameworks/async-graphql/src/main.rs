@@ -6,6 +6,9 @@ mod schema;
 use actix_web::{guard, web, App, HttpServer};
 use async_graphql::http::GraphiQLSource;
 use async_graphql_actix_web::{GraphQLRequest, GraphQLResponse};
+use async_graphql::extensions::apollo_persisted_queries::{
+    ApolloPersistedQueries, LruCacheStorage,
+};
 use async_graphql::{EmptySubscription, Schema};
 
 async fn graphiql() -> actix_web::Result<actix_web::HttpResponse> {
@@ -69,6 +72,9 @@ async fn main() -> std::io::Result<()> {
         .data(posts_by_author_loader)
         .data(comments_by_post_loader)
         .data(comment_loader)
+        // First-party Apollo-style Automatic Persisted Queries (sha256
+        // handshake, in-memory LRU) — built-in async-graphql extension.
+        .extension(ApolloPersistedQueries::new(LruCacheStorage::new(1024)))
         .finish();
 
     println!("🚀 GraphQL server starting on http://localhost:8000");

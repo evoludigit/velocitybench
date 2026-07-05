@@ -339,6 +339,9 @@ app.register(mercurius, {
     loaders: createDataLoaders(),
   }),
   graphiql: false, // Disable for benchmarks
+  // First-party Apollo-style Automatic Persisted Queries (APQ):
+  // sha256 hash handshake with an in-memory LRU — core mercurius feature.
+  persistedQueryProvider: mercurius.persistedQueryDefaults.automatic(),
 });
 
 // Health check endpoint
