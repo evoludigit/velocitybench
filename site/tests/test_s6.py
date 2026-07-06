@@ -228,3 +228,12 @@ def test_s6_omits_uncaptured_charts_never_fakes_them(localhost_path, meta, price
     assert "Steady-state memory" not in sec             # no RAM chart
     assert "The storage trade" not in sec               # no storage trade
     assert "Cost per million requests" in sec           # cost still derivable
+
+
+def test_llms_txt_carries_footprint_and_cost(sweep3_run, meta):
+    """S6 in llms.txt marks the € figures DERIVED (not measured), ranks RAM
+    lightest-first (no cherry-picking), and shows the storage trade."""
+    txt = build.render(sweep3_run, meta)["llms.txt"].decode("utf-8")
+    assert "FOOTPRINT & COST (S6)" in txt and "DERIVED" in txt
+    assert "steady-state RAM (lightest first)" in txt
+    assert "storage trade (precompute costs disk)" in txt

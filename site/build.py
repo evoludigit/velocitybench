@@ -2768,7 +2768,7 @@ def _render_data_json(run: Run, meta: dict, prices: dict) -> str:
                       indent=2, ensure_ascii=False) + "\n"
 
 
-def _render_llms_txt(run: Run, meta: dict, grid: Grid) -> str:
+def _render_llms_txt(run: Run, meta: dict, grid: Grid, prices: dict) -> str:
     env = run.environment
     fr_lines = []
     for fw in meta["framework_order"]:
@@ -2820,6 +2820,101 @@ def _render_llms_txt(run: Run, meta: dict, grid: Grid) -> str:
         st_lines.append(f"      SQL round-trips: {trips}")
         st_lines.append(f"      source: {s['source']}")
         st_lines.append(f"      {s['summary']}")
+
+    # S2 mechanism ladder — the default-scenario rungs, plus the precompute step
+    # by depth (same mechanism_ladder() the on-page chart uses; no re-derivation).
+    mlcfg = meta["mechanism_ladder"]
+    s2_default = mlcfg["default_scenario"]
+    s2_lines = [f"  Ladder @ {s2_default} (rung: RPS, delta over the rung below):"]
+    for r in mechanism_ladder(grid, s2_default):
+        label = f"+APQ ({r.framework})" if r.is_apq else r.framework
+        head = f"    {label:<26} {r.mechanism:<15}"
+        if r.status == STATUS_RESULT:
+            chip = f"  ({pct_signed(r.delta.pct)})" if r.delta else ""
+            s2_lines.append(f"{head} {fmt_rps(r.rps)} RPS{chip}")
+        elif r.status == "na":
+            s2_lines.append(f"{head} na — {r.note}")
+        elif r.status == STATUS_EXCLUDED:
+            s2_lines.append(f"{head} excluded by design [{r.reason_id}]")
+        else:
+            s2_lines.append(f"{head} not measured this run")
+    tv_fw = mlcfg["variants"][2]["framework"]        # the tv-precompute rung
+    depth = []
+    for sc in mlcfg["scenarios"]:
+        rung = next((x for x in mechanism_ladder(grid, sc)
+                     if x.framework == tv_fw and not x.is_apq), None)
+        if rung and rung.delta:
+            depth.append(f"{sc} {pct_signed(rung.delta.pct)}")
+    if depth:
+        s2_lines.append("  precompute step (tv rung over the rung below) by depth: "
+                        + ", ".join(depth))
+
+    # S3 APQ isolated — measured twins per pair + coverage (not-measured vs excluded)
+    s3_lines = []
+    apq_groups = apq_pairs(grid)
+    for g in apq_groups:
+        measured = [f"{c.framework} {pct_signed(c.delta.pct)}"
+                    for c in g.cells if c.status == STATUS_RESULT and c.delta]
+        s3_lines.append(f"  {g.base:>3} -> {g.apq:<8} measured twins: "
+                        + (", ".join(measured) if measured else "none"))
+    if apq_groups:
+        rep = apq_groups[0]
+        nm = [c.framework for c in rep.cells if c.status == STATUS_NOT_MEASURED]
+        ex = [f"{c.framework} [{c.reason_id}]" for c in rep.cells
+              if c.status == STATUS_EXCLUDED]
+        if nm:
+            s3_lines.append("  APQ-capable but NOT measured this run: " + ", ".join(nm))
+        if ex:
+            s3_lines.append("  excluded by design: " + ", ".join(ex))
+
+    # S4 cache under fire — C3(miss)/HC3(hit) per FraiseQL variant + coverage
+    s4_lines = []
+    cuf = cache_pairs(grid)
+    s4_lines.append(f"  {cuf.miss} (miss) -> {cuf.hit} (hit), delta = hit over miss:")
+    for r in cuf.variants:
+        state = "(cache on)" if r.cache_on else "(cache off)"
+        head = f"    {r.framework:<20} {state:<11}"
+        if r.status == STATUS_RESULT:
+            chip = f"  ({pct_signed(r.delta.pct)})" if r.delta else ""
+            s4_lines.append(f"{head}  {cuf.miss} {fmt_rps(r.miss_rps)}  "
+                            f"{cuf.hit} {fmt_rps(r.hit_rps)}{chip}")
+        elif r.status == STATUS_EXCLUDED:
+            s4_lines.append(f"{head}  excluded by design [{r.reason_id}]")
+        else:
+            s4_lines.append(f"{head}  not measured this run")
+    cov_nm = [c.framework for c in cuf.coverage if c.status == STATUS_NOT_MEASURED]
+    cov_ex = [f"{c.framework} [{c.reason_id}]" for c in cuf.coverage
+              if c.status == STATUS_EXCLUDED]
+    if cov_nm:
+        s4_lines.append("  not measured this run (classical, C3/HC3 wired): "
+                        + ", ".join(cov_nm))
+    if cov_ex:
+        s4_lines.append("  excluded by design: " + ", ".join(cov_ex))
+
+    # S6 footprint & cost — measured RAM, DERIVED €/1M, the storage trade. Each
+    # sub-line is omitted (never faked) when this run captured no such measure.
+    s6_lines = []
+    fp = footprint_rows(run, meta)
+    ram = [f"{r.framework} {r.peak_ram_mb:,.0f} MB"
+           for r in fp if r.peak_ram_mb is not None]
+    if ram:
+        s6_lines.append("  steady-state RAM (lightest first): " + ", ".join(ram))
+    ccfg = meta["footprint"]["cost"]
+    inst = ccfg["headline_instance"]
+    priced = [f"{c.framework} €{c.per_million[inst]:.4f}"
+              for c in cost_composite(grid, prices, ccfg["scenario"])
+              if inst in c.per_million]
+    if priced:
+        s6_lines.append(f"  €/1M req @ {ccfg['scenario']} on {inst} (derived): "
+                        + ", ".join(priced))
+    dbp = db_footprint_pairs(run, meta)
+    if dbp:
+        s6_lines.append("  storage trade (precompute costs disk): "
+                        + ", ".join(f"{p.precompute} {p.ratio:.1f}× {p.base}"
+                                    for p in dbp))
+    if not s6_lines:
+        s6_lines.append("  (this run captured no resource, cost or db-size measures)")
+
     anatomy = meta.get("anatomy", {})
     local_warning = ""
     if run.is_local:
@@ -2849,6 +2944,10 @@ def _render_llms_txt(run: Run, meta: dict, grid: Grid) -> str:
         amortization_default=amort_default,
         amortization_lines="\n".join(am_lines),
         strategy_lines="\n".join(st_lines),
+        s2_lines="\n".join(s2_lines),
+        s3_lines="\n".join(s3_lines),
+        s4_lines="\n".join(s4_lines),
+        s6_lines="\n".join(s6_lines),
         dataloader_credit=anatomy.get("dataloader_credit", ""),
         apq_note=anatomy.get("apq_note", ""))
 
@@ -2864,7 +2963,7 @@ def render(run: Run, meta: dict, prices: dict | None = None) -> dict[str, bytes]
     return {
         "index.html": _render_index(run, meta, grid, prices).encode("utf-8"),
         "data.json": _render_data_json(run, meta, prices).encode("utf-8"),
-        "llms.txt": _render_llms_txt(run, meta, grid).encode("utf-8"),
+        "llms.txt": _render_llms_txt(run, meta, grid, prices).encode("utf-8"),
     }
 
 

@@ -131,3 +131,13 @@ def test_every_s2_result_value_is_also_in_the_grid(page, grid, meta):
                 cell = grid.cell(r.framework,
                                  build.apq_twin(sc, meta) if r.is_apq else sc)
                 assert cell.status == "result" and cell.rps == r.rps
+
+
+def test_llms_txt_carries_mechanism_ladder(sweep3_run, meta):
+    """llms.txt gives an agent the S2 ladder and its load-bearing finding: the
+    precompute step is the read win and it grows with nesting depth."""
+    txt = build.render(sweep3_run, meta)["llms.txt"].decode("utf-8")
+    assert "MECHANISM LADDER (S2)" in txt and "#s2-mechanism-ladder" in txt
+    assert "precompute step" in txt and "by depth:" in txt
+    for v in meta["mechanism_ladder"]["variants"]:
+        assert v["framework"] in txt

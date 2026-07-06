@@ -180,3 +180,12 @@ def test_s4_hotkey_workload_card_resolves_to_this_section(page):
     """The Phase 04 stub pointed the hot-key card at section: null; it now
     resolves to the real S4 anchor."""
     assert 'href="#s4-cache-under-fire"' in page
+
+
+def test_llms_txt_carries_cache_under_fire(sweep3_run, meta):
+    """S4 in llms.txt keeps the finding (hit-over-miss delta, which can go
+    negative) and the coverage honesty: the classical engines are not measured
+    here — not excluded, and not slow."""
+    txt = build.render(sweep3_run, meta)["llms.txt"].decode("utf-8")
+    assert "CACHE UNDER FIRE (S4)" in txt and "delta = hit over miss" in txt
+    assert "not measured this run (classical" in txt

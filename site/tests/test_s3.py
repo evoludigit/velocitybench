@@ -119,3 +119,13 @@ def test_no_chart_only_numbers(page, grid, meta):
             if c.status == "result":
                 assert grid.cell(c.framework, g.base).rps == c.base_rps
                 assert grid.cell(c.framework, g.apq).rps == c.apq_rps
+
+
+def test_llms_txt_apq_coverage_separates_not_measured_from_excluded(sweep3_run, meta):
+    """The S3 honesty crux survives into llms.txt: only measured _APQ twins get a
+    delta; APQ-capable-but-not-measured is stated distinctly from
+    excluded-by-design (an agent must not read 'not measured' as 'slow')."""
+    txt = build.render(sweep3_run, meta)["llms.txt"].decode("utf-8")
+    assert "APQ ISOLATED (S3)" in txt and "measured twins:" in txt
+    assert "NOT measured this run" in txt
+    assert "excluded by design" in txt

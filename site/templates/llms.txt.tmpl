@@ -75,6 +75,30 @@ REQUEST ANATOMY — QUERY STRATEGIES (S0)
 $strategy_lines
   APQ: $apq_note
 
+MECHANISM LADDER (S2) — where FraiseQL's read speed comes from   (#s2-mechanism-ladder)
+  Four FraiseQL variants, the same read, one mechanism added per rung: JOIN
+  views (v-nocache) -> + result cache (v-cache) -> tv precompute (tv) -> + result
+  cache (tv-cache) -> + APQ (persisted hash). The result cache and APQ change no
+  SQL; the tv precompute step is the read win, and it grows with nesting depth.
+  Absolute RPS per rung; the delta is over the result rung below it.
+$s2_lines
+
+APQ ISOLATED (S3) — persisted-query hash, before vs after   (#s3-apq)
+  Each query/mutation sent as a pre-registered SHA-256 hash instead of full
+  text. It changes no SQL round-trip, so any effect is transport-only. Status is
+  read from the grid, never a hand-kept capability list: a measured _APQ twin ->
+  a real (often ~zero or negative) delta; no twin -> APQ-capable-but-not-measured
+  in this run (NOT excluded); by-design N/A -> its verbatim exclusion reason.
+$s3_lines
+
+CACHE UNDER FIRE (S4) — hot pool (HC3) vs rotating keys (C3)   (#s4-cache-under-fire)
+  The same single-row lookup two ways: 20 rotating keys (C3, a cache can never
+  hit) and a 5-key hot pool (HC3, a cache should hit almost every time). If the
+  result cache earned its keep, the cache-on rows would jump C3->HC3 while the
+  cache-off rows stayed flat. Delta is HC3 (hit) over C3 (miss); ~zero or
+  negative renders as-is.
+$s4_lines
+
 FRAMEWORKS ($n_frameworks)
 $framework_lines
 
@@ -83,6 +107,14 @@ $scenario_lines
 
 WORKLOAD SHAPES → WHICH CELLS ANSWER THEM (winner scored on the S7 model)
 $workload_lines
+
+FOOTPRINT & COST (S6) — RAM, derived €/1M, the storage trade   (#s6-footprint)
+  Steady-state process memory and image size are MEASURED; the € figures are
+  DERIVED from measured Q1 throughput and the dated price file, not a separate
+  measurement:  € / 1M req = price_month / (Q1 RPS × 2,628,000 s) × 10⁶.
+  Ranked honestly — hand-written REST is lighter than FraiseQL and shown so. A
+  sub-line is omitted (never faked) when this run did not capture that measure.
+$s6_lines
 
 AMORTIZATION MODEL (S7) — total load vs the read:write ratio
   A DERIVED model, not a measured cell. Sustainable total requests/second for a
