@@ -4,7 +4,7 @@
 # Single source of truth for the FraiseQL version. The copied binaries must
 # report exactly this version; the build fails otherwise. Exported as
 # FRAISEQL_VERSION in the runtime image so benchmark runs can record it.
-ARG FRAISEQL_VERSION=2.10.0
+ARG FRAISEQL_VERSION=2.11.0
 
 # Build argument: which schema variant to compile.
 #   schema.py    -> Variant A (v_* on-the-fly JSONB views) -- default
