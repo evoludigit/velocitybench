@@ -642,7 +642,7 @@
         "T1"
       ],
       "section": "s1-nesting-cliff",
-      "blurb": "FraiseQL's precomputed reads stay flat as nesting deepens while resolver engines decay — the win grows with query depth. The trade: shallow Q1 sits mid-pack because the precomputed document is detoasted on every read.",
+      "blurb": "For read-heavy work the precomputed (tv) path wins: it tops the field at Q1, and its edge over FraiseQL's own JOIN-view (v) variants widens with nesting depth — level at Q1, decisive by Q3 — because precompute carries no N+1. Q1 is a strength here, not a soft spot; the cost of the precomputed document is paid on writes, not reads.",
       "score": {"read": "Q2b", "ratio": 1000}
     },
     "nested": {
@@ -653,7 +653,7 @@
         "T1"
       ],
       "section": "s1-nesting-cliff",
-      "blurb": "The deeper the nesting, the wider FraiseQL's lead — no N+1 by construction. The cost of that flat read line is paid on writes, not reads (see the write trade).",
+      "blurb": "The deeper the nesting, the wider FraiseQL's lead — no N+1 by construction. The cost of that read advantage is paid on writes, not reads (see the write trade).",
       "score": {"read": "Q3", "ratio": 100}
     },
     "write-heavy": {
@@ -680,7 +680,7 @@
   },
   "notes": {
     "same_run": "This page renders exactly one benchmark sweep. No cross-run or cross-hardware mixing — the generator refuses two JSON files.",
-    "q1_toast": "Q1 sits mid-pack, not on top. FraiseQL's tv_user row carries the full precomputed JSONB document; the extra bytes are TOAST-detoasted on every read — a deliberate trade that pays off as nesting deepens (Q2b → Q3 → T1).",
+    "q1_toast": "FraiseQL leads Q1 — its precomputed tv variants top the field here, not mid-pack. Each tv_user read still detoasts a full precomputed JSONB document, so the read-side cost is real; but in this run it is too small to surface — the tv variants sit level with their JOIN-view (v) siblings at Q1. The precompute trade is paid on writes (M1 → M1d), not on Q1 reads, and FraiseQL's read edge over its own v variants only widens as nesting deepens (Q2b → Q3).",
     "tview_scope": "pg_tviews cascade triggers fire only while a FraiseQL framework is under test (tview_trigger_scope = fraiseql-only). Classical stacks run against a vanilla table with the triggers disabled, then tv_* rows are resynced before the next FraiseQL run.",
     "mc1_workflow": "MC1 is a workflow benchmark, not raw server speed: it counts the client round-trips needed to reach a consistent state after a write. FraiseQL = 1 request/cycle (the mutation response carries the cascade); classical GraphQL and REST = 2 requests/cycle (mutation + serial re-fetch).",
     "m1_full_cascade": "Under logged tviews, M1 triggers a full cascade recompute across the affected precomputed rows (61-row fan-out here) — the maintenance price of always-consistent precomputed reads.",
