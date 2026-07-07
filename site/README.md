@@ -14,7 +14,7 @@ python site/build.py <run.json> --out site/dist
 ```
 
 - `<run.json>` — exactly one benchmark run. The publishable build uses the
-  Phase 06 median-of-three: `reports/hetzner-2026-07/bench-hetzner-2026-07-07-median.json`.
+  median-of-three: `reports/hetzner-2026-07/bench-hetzner-2026-07-07-median.json`.
 - Writes three files to `--out`: `index.html` (self-contained, offline,
   light/dark, no-JS fallback), `data.json` and `llms.txt` (the AI layer).
 - `--costs <prices.yaml>` overrides the cost-composite price file
