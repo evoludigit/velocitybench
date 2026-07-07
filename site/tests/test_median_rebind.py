@@ -71,6 +71,16 @@ def test_m1_and_m1d_adjacent_in_mutation_view(any_run, meta):
 
 # ── Median-specific: the publishable run's own facts ───────────────────────
 
+def test_provenance_link_is_self_contained(any_run, meta):
+    """The 'source run JSON' link must resolve wherever the site is served
+    (repo, file://, standalone Pages) — a same-dir link, never an ../.. escape
+    above the deploy root."""
+    html = build.render(any_run, meta)["index.html"].decode()
+    name = build.Path(any_run.source_path).name
+    assert f'href="./{name}"' in html
+    assert f'href="../../{name}"' not in html
+
+
 def test_median_versions_are_2_11(median_run):
     fq = {k: v for k, v in median_run.framework_versions.items()
           if k.startswith("fraiseql")}

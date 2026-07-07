@@ -1205,12 +1205,14 @@ def _exclusion_key(meta: dict) -> str:
 
 def _footnote(run: Run) -> str:
     rel = repo_relative(run.source_path)
+    name = Path(run.source_path).name
     return (
         '<footer class="footnote">'
         '<p>One sweep, rendered verbatim — no hand-editing, no cross-run '
         'mixing. Rebuilding from the same JSON yields byte-identical output.</p>'
-        f'<p>Source run JSON (committed, for provenance): '
-        f'<a href="../../{esc(rel)}"><code>{esc(rel)}</code></a> · '
+        f'<p>Source run JSON (this exact run, travels with the page): '
+        f'<a href="./{esc(name)}"><code>{esc(name)}</code></a>'
+        f' — committed at <code>{esc(rel)}</code> · '
         f'machine copy on this page: <a href="./data.json"><code>data.json</code>'
         f'</a> · agent guide: <a href="./llms.txt"><code>llms.txt</code></a></p>'
         '</footer>')
@@ -3026,6 +3028,10 @@ def main(argv: list[str] | None = None) -> int:
     meta = load_meta(args.scenarios)
     prices = load_prices(args.costs)
     files = render(run, meta, prices)
+    # Provenance travels with the site: the exact run JSON is written alongside,
+    # so the "source run JSON" link resolves wherever the site is served
+    # (repo, file://, or a standalone Pages deploy).
+    files[path.name] = path.read_bytes()
     write_site(files, args.out)
     print(f"build.py: wrote {len(files)} file(s) to {args.out}")
     return 0
