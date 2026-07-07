@@ -12,8 +12,8 @@ Contract enforced here (README "Hard rules"):
     cell; a result that collides with a by-design exclusion fails loudly;
   * LOCAL-DATA banner when the run targeted localhost.
 
-Phase 01 renders a placeholder index.html; Phases 02+ layer the real skeleton,
-honesty devices and charts on top of the same grid model.
+The skeleton, honesty devices and charts all layer on top of one grid model
+built from a single run JSON.
 """
 from __future__ import annotations
 

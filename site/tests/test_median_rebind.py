@@ -1,4 +1,4 @@
-"""Phase 08 rebind: the site ships the Phase 06 median-of-3 (2026-07-07).
+"""The site ships the publishable median-of-3 (2026-07-07) Hetzner run.
 
 Structural honesty invariants are parametrized over BOTH the shipping median
 and sweep-3 (permanent regression net) via the `any_run`/`any_grid` fixtures.

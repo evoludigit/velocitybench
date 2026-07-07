@@ -1,7 +1,7 @@
 /* VelocityBench site — shared design system.
  *
  * Colorblind-safe palette (dataviz reference instance, validated). Roles are
- * defined once here; Phase 03+ charts reference the same --series-* / --fql-*
+ * defined once here; every chart references the same --series-* / --fql-*
  * tokens so the whole page reads as one system.
  *
  * Theme: prefers-color-scheme is the default signal; :root[data-theme] wins in
