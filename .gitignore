@@ -91,6 +91,7 @@ build/
 results/
 *.jtl
 *.log
+*.pid
 logs/
 *.lprof
 .pytest_cache/
