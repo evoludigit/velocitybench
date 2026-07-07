@@ -2,56 +2,54 @@
 
 GraphQL & REST framework performance benchmarks — 8 languages, reproducible methodology, real PostgreSQL data.
 
-> **Latest run**: March 2026 · sequential isolation · 40 workers · 30s per framework · dataset: 10 000 users / 50 000 posts / 200 000 comments
+> **Latest run**: July 2026 · Hetzner CCX33 (dedicated vCPU) · k6 on a separate loadgen
+> box · median of three warm sweeps · FraiseQL v2.11 · 0 errors · dataset: 10 000 users /
+> 50 000 posts / 200 000 comments. Reproduce it with one command:
+> [docs/reproducing-on-hetzner.md](docs/reproducing-on-hetzner.md).
 
 ---
 
 ## Results
 
-Full tables: [reports/bench-sequential-2026-03-04.md](reports/bench-sequential-2026-03-04.md)
+**[▶ Explore the interactive results](site/)** · [publishable report](reports/report-2026-07.md) ·
+[full tables](reports/hetzner-2026-07/bench-hetzner-2026-07-07-median.md) ·
+[raw JSON](reports/hetzner-2026-07/bench-hetzner-2026-07-07-median.json)
 
-The **Author** column is the language the developer writes in; the **Runtime** column is
-what actually executes requests. For most frameworks these are the same. FraiseQL is the
-exception: schemas are authored in Python, compiled ahead of time, and served by a
-standalone Rust binary — **no Python runs per request**. See
-[FraiseQL variants](#fraiseql-variants) for what `-v` means.
+Two comparisons live in one grid, kept separate on purpose. **Schema-to-API engines**
+(FraiseQL, Hasura, PostGraphile) turn a schema into an API with no hand-written resolvers —
+this is FraiseQL's category. **Hand-written servers** (*actix-web*, *async-graphql*,
+*mercurius*) are reference points: the ceiling and the fast-GraphQL baseline, not the
+comparison. FraiseQL authors its schema in Python, compiles it ahead of time, and serves it
+from a standalone Rust binary — **no Python runs per request**.
 
-### Q1 — `users(limit: 20) { id username fullName }`
+### Schema-to-API engines — the direct comparison
 
-| Framework | Author | Runtime | Type | RPS | p50 | p99 | Errors |
-|-----------|--------|---------|------|----:|----:|----:|--------|
-| actix-web-rest | Rust | Rust | REST | 12 588 | 2.0 ms | 17.2 ms | 0% |
-| spring-boot | Java | JVM | REST | 9 150 | 3.3 ms | 17.4 ms | 0% |
-| mercurius | Node.js | Node.js | GraphQL | 9 008 | 4.0 ms | 10.7 ms | 0% |
-| async-graphql | Rust | Rust | GraphQL | 7 905 | 4.7 ms | 12.1 ms | 0% |
-| graphql-go | Go | Go | GraphQL | 7 576 | 4.3 ms | 19.3 ms | 0% |
-| express-rest | Node.js | Node.js | REST | 7 513 | 3.8 ms | 7.7 ms | 0% |
-| **fraiseql-v** | **Python** | **Rust** | GraphQL | 6 513 | 5.6 ms | 13.8 ms | 0% |
-| go-gqlgen | Go | Go | GraphQL | 6 442 | 4.3 ms | 30.1 ms | 0% |
-| play-graphql | Scala | JVM | GraphQL | 6 182 | 5.0 ms | 26.9 ms | 0% |
-| ruby-rails | Ruby | Ruby | REST | 5 642 | 5.5 ms | 26.8 ms | 0% |
-| gin-rest | Go | Go | REST | 5 586 | 4.5 ms | 37.2 ms | 0% |
+| Engine | Q1 RPS | p50 | p99 | Q3 (nested) | RAM | €/1M req | Errors |
+|--------|-------:|----:|----:|------------:|----:|---------:|--------|
+| **fraiseql-tv** | **6 550** | **6.0 ms** | **9.4 ms** | **3 207** | **12 MB** | **€0.008** | 0% |
+| fraiseql-v | 6 451 | 6.1 ms | 9.8 ms | 1 303 | 12 MB | €0.008 | 0% |
+| postgraphile v5 | 2 099 | 18.2 ms | 39.4 ms | 1 177 | 127 MB | €0.025 | 0% |
+| hasura v2.49 CE | 1 060 | 37.5 ms | 53.9 ms | 820 | 133 MB | €0.050 | 0% |
 
-### Q2b — `posts(limit: 10) { id title author { username fullName } }` (nested join)
+In its own category it is not close: **3.1× PostGraphile / 6.2× Hasura on Q1**, at a
+third-to-a-sixth of the latency, in ~11× less RAM, and its lead *widens* with nesting depth
+(no N+1 by construction). `-v` (JSONB composed on the fly) is the conservative variant;
+`-tv` (pre-materialized) buys read speed with storage + write-time refresh.
 
-| Framework | Author | Runtime | Type | RPS | p50 | p99 | Errors |
-|-----------|--------|---------|------|----:|----:|----:|--------|
-| actix-web-rest | Rust | Rust | REST | 11 019 | 2.4 ms | 19.1 ms | 0% |
-| mercurius | Node.js | Node.js | GraphQL | 8 252 | 4.5 ms | 11.6 ms | 0% |
-| express-rest | Node.js | Node.js | REST | 7 573 | 4.3 ms | 11.5 ms | 0% |
-| play-graphql | Scala | JVM | GraphQL | 7 421 | 4.6 ms | 16.6 ms | 0% |
-| graphql-go | Go | Go | GraphQL | 7 323 | 4.5 ms | 18.1 ms | 0% |
-| gin-rest | Go | Go | REST | 6 818 | 4.3 ms | 23.8 ms | 0% |
-| graphql-yoga | Node.js | Node.js | GraphQL | 6 437 | 5.6 ms | 10.8 ms | 0% |
-| csharp-dotnet | C# | .NET | REST | 6 386 | 5.2 ms | 15.6 ms | 0% |
-| go-gqlgen | Go | Go | GraphQL | 6 271 | 5.0 ms | 24.6 ms | 0% |
-| spring-boot | Java | JVM | REST | 5 265 | 6.0 ms | 27.9 ms | 0% |
-| async-graphql | Rust | Rust | GraphQL | 4 229 | 8.2 ms | 25.3 ms | 0% |
+### Reference points — hand-written servers
 
-> Read FraiseQL's position honestly: `fraiseql-v` is **competitive mid-pack throughput from
-> a compiled-from-schema engine with zero hand-written resolvers** — not the fastest raw
-> server here. The architectural story (Python ergonomics, Rust runtime, no N+1 by
-> construction) is the point, not a top-of-table RPS number.
+| Framework | Author | Runtime | Q1 RPS | Q3 | T1 |
+|-----------|--------|---------|-------:|---:|---:|
+| actix-web-rest | Rust | Rust | 1 339 | 3 281 | 2 568 |
+| async-graphql | Rust | Rust | 1 146 | 1 421 | 3 606 |
+| mercurius | Node.js | Node.js | 1 233 | 665 | 1 214 |
+
+> Read FraiseQL's position honestly: against **hand-written** servers it does not win the
+> trivial flat cases — raw Rust will always beat a compiled-from-schema engine on a query
+> someone hand-tuned, and that is why they are shown. Against its **own category** it tops
+> the field. The write path is shown just as honestly: FraiseQL's full-cascade mutation is
+> deliberately slow (strong consistency), while its delta path competes with the fastest
+> writers — see the [write-trade selector](site/#s5-write-trade).
 
 ---
 
@@ -67,10 +65,10 @@ is stored:
 | **`fraiseql-tv`** | `tv_*` tables — JSONB pre-materialized via incremental refresh ([pg_tviews](../fraiseql/)) | Faster reads; spends storage + write-time refresh to buy them |
 
 This is a **tradeoff, not a strict upgrade** — `tv-` is not universally faster (materialization
-overhead and TOAST effects can erase the win on write-heavy or wide-row workloads). The
-headline tables above show the conservative `-v` baseline on purpose. Per-variant numbers
-(including `-tv`, `-tv-audit`, and `-nocache` configurations) are in the dated runs under
-[`reports/`](reports/).
+overhead and TOAST effects can erase the win on write-heavy or wide-row workloads), which is
+why the table above shows `-v` and `-tv` side by side. Per-variant numbers (including
+`-tv-audit` and `-nocache` configurations) are in the
+[interactive grid](site/) and the dated runs under [`reports/`](reports/).
 
 ---
 
