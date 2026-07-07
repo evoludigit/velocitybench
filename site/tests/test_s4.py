@@ -135,7 +135,7 @@ def s4(page):
 def test_s4_anchored_between_s3_and_s5(page):
     assert 'id="s4-cache-under-fire"' in page
     assert page.index('id="s3-apq"') < page.index('id="s4-cache-under-fire"')
-    assert page.index('id="s4-cache-under-fire"') < page.index('id="s5-write-trade"')
+    assert page.index('id="s4-cache-under-fire"') < page.index('id="s6-footprint"')
 
 
 def test_s4_both_regimes_explained_before_the_bars(page, meta):

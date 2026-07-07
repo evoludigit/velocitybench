@@ -803,3 +803,27 @@ section { scroll-margin-top: 60px; }
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
 }
+
+/* Start-here intro — the human first screen (plain story before any table). */
+.intro { margin: 22px 0 10px; }
+.intro-what { font-size: 1.1rem; color: var(--text); max-width: 74ch; line-height: 1.6; }
+.intro-cards {
+  display: grid; gap: 14px; margin: 20px 0 4px;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+}
+.intro-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 18px;
+}
+.intro-card h3 { margin: 0 0 8px; font-size: 1.03rem; }
+.intro-pick { margin: 0; padding-left: 1.15em; }
+.intro-pick li { margin: 7px 0; color: var(--text-2); line-height: 1.5; }
+.intro-pick strong, .intro-card p strong { color: var(--text); }
+.intro-more { margin: 12px 0 0; font-weight: 600; }
+.intro-byline {
+  margin: 18px 0 2px; padding: 13px 16px; font-size: 0.96rem; line-height: 1.55;
+  color: var(--text-2); max-width: 82ch;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-left: 3px solid var(--baseline); border-radius: var(--radius);
+}
+.intro-byline strong { color: var(--text); }

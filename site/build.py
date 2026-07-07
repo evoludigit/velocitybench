@@ -931,8 +931,8 @@ def anatomy_duration(p50_ms: float, scale: float) -> float:
 # --------------------------------------------------------------------------
 
 TITLE = "VelocityBench — how fast, and why"
-DESCRIPTION = ("One benchmark sweep, explorable and honest: which framework "
-               "wins which workload shape, and by what mechanism.")
+DESCRIPTION = ("A reproducible speed test of schema-to-API tools: which "
+               "framework wins which workload shape, and by what mechanism.")
 
 # Environment keys shown first, in this order; any remaining keys are appended
 # so the methodology block is verbatim-complete, never a curated subset.
@@ -1042,8 +1042,13 @@ def _methodology(run: Run) -> str:
             rows.append((label, env[key]))
             seen.add(key)
     for key, val in env.items():          # verbatim-complete: nothing hidden
-        if key not in seen:
-            rows.append((key, val))
+        if key in seen:
+            continue
+        if key == "merge" and isinstance(val, dict):
+            n = val.get("n_sweeps")
+            val = (f"median of {n} warm sweeps" if n
+                   else str(val.get("method", val)))
+        rows.append((key, val))
     body = "".join(
         f'<div><span class="k">{esc(label)}</span>'
         f'<span class="v">{esc(val)}</span></div>'
@@ -1055,7 +1060,10 @@ def _methodology(run: Run) -> str:
         '<section id="methodology" aria-labelledby="methodology-h">'
         '<div class="panel">'
         '<h3 id="methodology-h">Methodology — this exact run</h3>'
-        f'<div class="meta-grid">{body}</div>'
+        '<p class="lede" style="margin-top:0">The single run everything on this '
+        'page is drawn from. Provenance first, then the full setup.</p>'
+        + _run_identity(run)
+        + f'<div class="meta-grid">{body}</div>'
         f'<p class="run-identity" style="margin-top:12px"><span class="k">'
         f'versions</span> <span>{versions}</span></p>'
         '</div></section>')
@@ -1432,7 +1440,7 @@ def _s1_section(grid: Grid, meta: dict) -> str:
         f'<li>{esc(v)}</li>' for v in (ann["spread"], ann["steepest"]) if v)
     return (
         '<section id="s1-nesting-cliff" aria-labelledby="s1-h">'
-        '<h2 id="s1-h">S1 — The nesting cliff</h2>'
+        '<h2 id="s1-h">The nesting cliff &mdash; why deep reads slow down</h2>'
         '<p class="lede">Throughput across the read ladder Q1 → Q2 → Q2b → Q3 '
         '→ T1, one line per framework. Colour marks the <em>architecture</em> '
         '(FraiseQL · compile-to-SQL · resolver · REST); line style and the '
@@ -1633,7 +1641,7 @@ def _s0_section(grid: Grid, meta: dict) -> str:
         'decorative.</p>')
     return (
         '<section id="s0-request-anatomy" aria-labelledby="s0-h">'
-        '<h2 id="s0-h">S0 — Anatomy of a request</h2>'
+        '<h2 id="s0-h">Anatomy of a request &mdash; what happens per query</h2>'
         '<p class="lede">Why the nesting cliff happens. The same nested read, '
         'three architectures, one lane each — watch where the round-trips come '
         'from as depth grows: the resolver lane gains a batched SQL trip per '
@@ -1741,7 +1749,7 @@ def _s2_section(grid: Grid, meta: dict) -> str:
         for sc in cfg["scenarios"])
     return (
         '<section id="s2-mechanism-ladder" aria-labelledby="s2-h">'
-        '<h2 id="s2-h">S2 — Where the speed comes from</h2>'
+        '<h2 id="s2-h">Where the speed comes from</h2>'
         f'<p class="lede">{esc_text(cfg["summary"])}</p>'
         + controls + _s2_axis(axis_max)
         + f'<div class="s2-stage" data-scenario="{esc(default_sc)}">'
@@ -1853,7 +1861,7 @@ def _s3_section(grid: Grid, meta: dict) -> str:
     pairs = "".join(_s3_pair(g, meta, axis_pct) for g in groups)
     return (
         '<section id="s3-apq" aria-labelledby="s3-h">'
-        '<h2 id="s3-h">S3 — APQ, isolated</h2>'
+        '<h2 id="s3-h">Query-by-hash (APQ), isolated</h2>'
         f'<p class="lede">{esc_text(meta["apq"]["summary"])}</p>'
         + _s3_axis(axis_pct)
         + f'<div class="s3-pairs">{pairs}</div>'
@@ -1965,7 +1973,7 @@ def _s4_section(grid: Grid, meta: dict) -> str:
     variants = "".join(_s4_variant(r, axis_max, meta) for r in view.variants)
     return (
         '<section id="s4-cache-under-fire" aria-labelledby="s4-h">'
-        '<h2 id="s4-h">S4 — Caching under fire</h2>'
+        '<h2 id="s4-h">Caching under fire</h2>'
         f'<p class="lede">{esc_text(cfg["summary"])}</p>'
         + _s4_regimes(cfg)
         + _s4_axis(axis_max)
@@ -2085,7 +2093,7 @@ def _s5_section(grid: Grid, meta: dict) -> str:
 
     return (
         '<section id="s5-write-trade" aria-labelledby="s5-h">'
-        '<h2 id="s5-h">S5 — The write trade</h2>'
+        '<h2 id="s5-h">The write trade &mdash; what precompute costs</h2>'
         '<p class="lede">The mandatory honesty section. FraiseQL’s precomputed '
         'reads are paid for on writes: its full-cascade <strong>M1</strong> is '
         'the slowest write here, shown at full linear prominence next to its '
@@ -2259,7 +2267,7 @@ def _s6_section(grid: Grid, run: Run, meta: dict, prices: dict) -> str:
         body += _s6_storage(pairs, meta)
     return (
         '<section id="s6-footprint" aria-labelledby="s6-h">'
-        '<h2 id="s6-h">S6 — Footprint &amp; cost</h2>'
+        '<h2 id="s6-h">Footprint &amp; cost</h2>'
         + body
         + '<p class="footnote">Memory, image size and cold start are measured; '
         'the cost figures are <em>derived</em> from measured throughput and the '
@@ -2503,7 +2511,7 @@ def _s7_section(grid: Grid, meta: dict) -> str:
         + '</div>')
     return (
         '<section id="s7-amortization" aria-labelledby="s7-h">'
-        '<h2 id="s7-h">S7 — Amortization: total load vs read:write ratio</h2>'
+        '<h2 id="s7-h">When does precompute pay off?</h2>'
         f'<p class="lede">{esc_text(cfg["summary"])}</p>'
         f'<div class="s7-caveat" role="note"><strong>Illustrative model.</strong> '
         f'{esc_text(cfg["caveat"])}</div>'
@@ -2538,12 +2546,17 @@ def _wl_verdict(grid: Grid, meta: dict, shape: dict) -> str:
     arch = _arch_of(v.framework, meta)
     strat = meta["query_strategies"][v.architecture]["short"]
     fw_label = meta["frameworks"][v.framework]["label"]
+    # Avoid redundant labels like "REST (Actix (REST))": when the mechanism name
+    # is already spelled out in the framework label, show the framework alone.
+    strat_core = strat.split(" (")[0].strip().lower()
+    winner_label = (esc(fw_label) if strat_core and strat_core in fw_label.lower()
+                    else f'<strong>{esc(strat)}</strong> ({esc(fw_label)})')
     return (
         f'<a class="wl-verdict arch-{arch}" href="#s7-amortization" '
         f'data-winner="{esc(v.framework)}" data-ratio="{esc(v.ratio)}">'
         f'<span class="wl-verdict-swatch"></span>'
-        f'<span>At ≈{v.ratio}:1 reads:writes, <strong>{esc(strat)}</strong> '
-        f'({esc(fw_label)}) sustains the most — ≈{fmt_rps(v.rps)} req/s</span>'
+        f'<span>At ≈{v.ratio}:1 reads:writes, {winner_label} '
+        f'sustains the most — ≈{fmt_rps(v.rps)} req/s</span>'
         '</a>')
 
 
@@ -2572,12 +2585,12 @@ def _workload_selector(grid: Grid, meta: dict) -> str:
     return (
         '<section id="workload-selector" aria-labelledby="wl-h">'
         '<h2 id="wl-h">Which workload shape is yours?</h2>'
-        '<p class="lede">Pick the shape that matches your workload; each names '
-        'the scenarios that answer it — a winner <em>and</em> the trade — links '
-        'to the section and the exact grid cells, and carries the architecture '
-        'that sustains the most load at that read:write mix, scored on the S7 '
-        'amortization model. The write-heavy shape names a resolver engine, not '
-        'FraiseQL — the honesty rule holds in the scoring too.</p>'
+        '<p class="lede">Pick the shape that matches your workload. Each names '
+        'the scenarios that answer it, links to the section and the exact grid '
+        'cells, and carries the architecture that sustains the most load at that '
+        'read:write mix — scored on the amortization model further down. The '
+        'winner is not always FraiseQL: the write-heavy shape names a resolver '
+        'engine instead, and the scoring says so in plain sight.</p>'
         f'<div class="wl-grid">{"".join(cards)}</div></section>')
 
 
@@ -2730,6 +2743,76 @@ function vbSwitcher(o) {
 </script>"""
 
 
+def _intro(grid: Grid, meta: dict) -> str:
+    """The human first screen: what this is, the short answer, the catch, the
+    obvious objection, and who is talking — all before any table."""
+    def rps(fw, sc):
+        c = grid.cells.get((fw, sc))
+        return c.rps if c and c.status == STATUS_RESULT else None
+
+    # The read win: FraiseQL-tv vs the fastest *other* schema-to-API engine at
+    # 2-level nesting; and the write cost vs the fastest writer measured here.
+    tv_q3 = rps("fraiseql-tv", "Q3")
+    rivals = [r for r in (rps("postgraphile", "Q3"), rps("hasura", "Q3")) if r]
+    read_x = (tv_q3 / max(rivals)) if tv_q3 and rivals else None
+    tv_m1 = rps("fraiseql-tv", "M1")
+    writers = [rps(f, "M1") for f in meta["framework_order"]
+               if not f.startswith("fraiseql")]
+    writers = [w for w in writers if w]
+    write_x = (max(writers) / tv_m1) if tv_m1 and writers else None
+    rf = f"about {read_x:.0f}× faster" if read_x else "several times faster"
+    wf = f"about {write_x:.0f}× slower" if write_x else "many times slower"
+
+    return (
+        '<section id="start" class="intro" aria-labelledby="intro-h">'
+        '<h2 id="intro-h">Start here</h2>'
+        '<p class="intro-what"><strong>What this is.</strong> A single, '
+        'reproducible speed test of the tools that turn a database schema into '
+        'an API &mdash; plus a few hand-written servers as a reference ceiling. '
+        'It exists to measure one idea: <strong>FraiseQL</strong>, a GraphQL '
+        'server that answers a query by reading <em>one pre-computed JSON '
+        'row</em> from PostgreSQL instead of assembling the answer '
+        'field-by-field at request time. Pre-computing the row makes nested '
+        f'reads {rf} and writes {wf} &mdash; measured below, including every '
+        'place FraiseQL loses.</p>'
+        '<div class="intro-cards">'
+        '<div class="intro-card">'
+        '<h3>Which should you use?</h3>'
+        '<ul class="intro-pick">'
+        '<li><strong>Mostly reads, especially nested?</strong> FraiseQL &mdash; '
+        'the pre-computed row is already the shape you asked for, and its lead '
+        'grows with nesting depth.</li>'
+        '<li><strong>Mostly writes?</strong> A resolver engine such as '
+        'async-graphql. FraiseQL is the <em>slowest writer here</em>.</li>'
+        '<li><strong>A mix, or not sure?</strong> Use the matcher just below '
+        '&mdash; it scores every shape from this run, and the winner is not '
+        'always FraiseQL.</li>'
+        '</ul>'
+        '<p class="intro-more"><a href="#workload-selector">Match your workload '
+        'to the data &rarr;</a></p>'
+        '</div>'
+        '<div class="intro-card">'
+        '<h3>&ldquo;Isn&rsquo;t this just a materialized view?&rdquo;</h3>'
+        '<p>Fair question &mdash; that is the first thing most backend '
+        'developers think. The difference: FraiseQL keeps the pre-computed rows '
+        '<em>incrementally</em> correct on every write (a trigger patches only '
+        'the rows that actually changed) and serves them through a typed GraphQL '
+        'API you never hand-write. A plain materialized view is stale until you '
+        'refresh the whole thing. That always-correct guarantee is exactly what '
+        'the slow writes buy &mdash; see '
+        '<a href="#s5-write-trade">the write trade</a>.</p>'
+        '</div>'
+        '</div>'
+        '<p class="intro-byline">Built by the author of FraiseQL &mdash; who has '
+        'every reason to make it look good, so the method is the guardrail. It '
+        'is <strong>one</strong> run on rented hardware anyone can re-rent for a '
+        'few euros, the raw measurements ship with this page, and the tool is '
+        'shown losing wherever it loses. A benchmark can only tell you about '
+        'speed on these shapes &mdash; not whether a tool is pleasant to use, '
+        'well-documented, or right for your team.</p>'
+        '</section>')
+
+
 def _render_index(run: Run, meta: dict, grid: Grid, prices: dict) -> str:
     banner = ""
     if run.is_local:
@@ -2739,25 +2822,30 @@ def _render_index(run: Run, meta: dict, grid: Grid, prices: dict) -> str:
         '<button id="theme-toggle" class="theme-toggle" type="button" '
         'aria-label="Toggle colour theme">◑ auto</button>'
         f'<h1>{esc(TITLE)}</h1>'
-        '<p class="lede">One benchmark sweep, explorable and honest — which '
-        'framework wins which workload shape, and by which mechanism. FraiseQL '
-        'is measured winning on nested reads and losing on full-cascade writes, '
-        'both in plain sight.</p>'
-        + _run_identity(run) + "</header>")
+        '<p class="lede">A reproducible speed test of the tools that turn a '
+        'database schema into an API. It measures one idea in particular — '
+        '<strong>FraiseQL</strong>, which answers a query by reading a '
+        'pre-computed JSON row from PostgreSQL instead of assembling the answer '
+        'field-by-field at request time — and shows what that trades: much '
+        'faster nested reads, much slower writes, in a single measured run.</p>'
+        "</header>")
     body = "\n".join([
         header,
-        _methodology(run),
-        _reading_panel(meta),
-        _grid_section(run, meta, grid),
+        # The human story first: what this is, who to use, the win, the catch.
+        _intro(grid, meta),
+        _workload_selector(grid, meta),
         _s1_section(grid, meta),
+        _s5_section(grid, meta),
         _s0_section(grid, meta),
         _s2_section(grid, meta),
         _s3_section(grid, meta),
         _s4_section(grid, meta),
-        _s5_section(grid, meta),
         _s6_section(grid, run, meta, prices),
         _s7_section(grid, meta),
-        _workload_selector(grid, meta),
+        # The reference layer last, for readers who want every cell + the setup.
+        _reading_panel(meta),
+        _grid_section(run, meta, grid),
+        _methodology(run),
         _footnote(run),
     ])
     shell = Template(_load_template("base.html"))

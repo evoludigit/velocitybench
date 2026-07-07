@@ -160,8 +160,8 @@ def s6(page):
 
 
 def test_s6_anchored_after_s5_before_selector(page):
-    assert (page.index('id="s5-write-trade"') < page.index('id="s6-footprint"')
-            < page.index('id="workload-selector"'))
+    assert (page.index('id="s4-cache-under-fire"') < page.index('id="s6-footprint"')
+            < page.index('id="s7-amortization"'))
 
 
 def test_s6_ram_bar_widths_proportional_to_value(page):

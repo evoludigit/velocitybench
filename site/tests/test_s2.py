@@ -44,7 +44,7 @@ def test_section_anchored_between_s0_and_s5(page):
     i_s0 = page.index('id="s0-request-anatomy"')
     i_s2 = page.index('id="s2-mechanism-ladder"')
     i_s5 = page.index('id="s5-write-trade"')
-    assert i_s0 < i_s2 < i_s5
+    assert i_s5 < i_s0 < i_s2   # write-trade, then anatomy, then mechanism ladder
 
 
 def test_default_variant_prerendered_visible_others_hidden(page, meta):

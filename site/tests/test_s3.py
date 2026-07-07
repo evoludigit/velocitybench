@@ -44,7 +44,7 @@ def test_section_anchored_between_s2_and_s5(page):
     i_s2 = page.index('id="s2-mechanism-ladder"')
     i_s3 = page.index('id="s3-apq"')
     i_s5 = page.index('id="s5-write-trade"')
-    assert i_s2 < i_s3 < i_s5
+    assert i_s5 < i_s2 < i_s3   # write-trade earlier; s3 follows s2
 
 
 def test_three_pairs_in_declared_order(page, meta):

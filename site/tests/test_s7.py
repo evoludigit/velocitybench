@@ -161,7 +161,7 @@ def panel(page, read, write):
 
 def test_s7_anchored_after_s6_before_selector(page):
     assert (page.index('id="s6-footprint"') < page.index('id="s7-amortization"')
-            < page.index('id="workload-selector"'))
+            < page.index('id="reading"'))
 
 
 def test_s7_cost_is_the_default_layer(page):

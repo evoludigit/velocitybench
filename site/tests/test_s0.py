@@ -70,7 +70,7 @@ def test_section_anchored_and_is_s1_why_companion(page):
     i_s1 = page.index('id="s1-nesting-cliff"')
     i_s0 = page.index('id="s0-request-anatomy"')
     i_s5 = page.index('id="s5-write-trade"')
-    assert i_s1 < i_s0 < i_s5
+    assert i_s1 < i_s5 < i_s0   # cliff, then the write-trade, then the why
 
 
 def test_exactly_three_animated_lanes(page, meta):
