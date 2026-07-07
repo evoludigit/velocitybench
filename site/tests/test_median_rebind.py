@@ -109,6 +109,15 @@ def test_median_data_json_carries_spread(median_run, meta):
         "median spread fields must reach the AI layer, not be dropped"
 
 
+def test_hostile_reader_objections_answered_on_page(any_run, meta):
+    """Every April-evaluation objection is answered in the text, not just fixed:
+    UNLOGGED durability, load-gen headroom, co-located loadgen, cross-run."""
+    html = build.render(any_run, meta)["index.html"].decode()
+    for needed in ("UNLOGGED", "never co-located", "30,000 RPS",
+                   "same-run", "median of three warm sweeps"):
+        assert needed in html, f"hostile-reader objection unanswered: {needed!r}"
+
+
 def test_median_no_stale_prototype_caveats(median_run, meta):
     out = build.render(median_run, meta)
     for name in ("index.html", "llms.txt"):

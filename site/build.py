@@ -956,6 +956,8 @@ ENV_ORDER = [
 # verbatim from scenarios.json.notes; only these short labels live in code.
 NOTE_ORDER = [
     ("same_run", "The same-run rule"),
+    ("loadgen_headroom", "The load generator is not the bottleneck"),
+    ("logged_durability", "Logged tables, not unlogged"),
     ("q1_toast", "Q1 and the TOAST read-cost"),
     ("tview_scope", "tview trigger scoping"),
     ("mc1_workflow", "MC1 is a workflow benchmark"),
