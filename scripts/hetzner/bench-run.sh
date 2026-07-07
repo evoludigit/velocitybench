@@ -4,13 +4,16 @@
 # the session cost, destroy everything. "Rent it and re-run" for readers.
 #
 # Usage:
-#   scripts/hetzner/bench-run.sh [--plan] [--keep] [--yes] [--single-sweep]
+#   scripts/hetzner/bench-run.sh [--plan] [--keep] [--yes] [--single-sweep] [--sweeps=N]
 #
 #   --plan          Print every action without calling the hcloud API.
 #   --keep          Skip destruction (debugging); instances keep billing!
 #   --yes           No confirmation prompt before destruction.
 #   --single-sweep  One sweep only (default is two sequential sweeps, whose
 #                   bench-delta report is the run-to-run variance baseline).
+#   --sweeps=N      Run N sequential sweeps (Phase 06 publishable = 4: a
+#                   throwaway warm-up on the fresh seed, discarded, then three
+#                   warm sweeps whose per-cell median is the published number).
 #
 # Requires: hcloud CLI authenticated (HCLOUD_TOKEN or active context),
 # ssh, rsync. Everything this script creates carries the campaign label and
@@ -56,9 +59,11 @@ for arg in "$@"; do
         --keep) KEEP=1 ;;
         --yes) YES=1 ;;
         --single-sweep) SWEEPS=1 ;;
+        --sweeps=*) SWEEPS="${arg#*=}" ;;
         *) echo "unknown flag: $arg" >&2; exit 2 ;;
     esac
 done
+[[ "$SWEEPS" =~ ^[1-9][0-9]*$ ]] || { echo "--sweeps must be a positive integer (got: $SWEEPS)" >&2; exit 2; }
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 say() { printf '%s\n' "$*"; }
@@ -283,12 +288,15 @@ collect_results
 trap 'cost_note' EXIT
 
 if (( SWEEPS >= 2 )); then
+    # Compare the last two sweeps — both warm (sweep 1 on a fresh seed is the
+    # discarded warm-up), so this baseline reflects warm-to-warm variance.
+    prev=$(( SWEEPS - 1 ))
     say ""
-    say "── 4.9 Variance baseline: bench-delta sweep 1 vs sweep 2 ────"
+    say "── 4.9 Variance baseline: bench-delta sweep ${prev} vs sweep ${SWEEPS} ────"
     # Non-fatal: the baseline documents the variance; gating happens in Phase 06.
     run bash -c "cd ${REPO_ROOT} && python3 scripts/bench-delta.py \
-reports/hetzner-2026-07/bench-hetzner-${SESSION_DATE}-sweep1.json \
-reports/hetzner-2026-07/bench-hetzner-${SESSION_DATE}-sweep2.json \
+reports/hetzner-2026-07/bench-hetzner-${SESSION_DATE}-sweep${prev}.json \
+reports/hetzner-2026-07/bench-hetzner-${SESSION_DATE}-sweep${SWEEPS}.json \
 --output reports/hetzner-2026-07/variance-baseline-${SESSION_DATE}.md" || true
 fi
 
