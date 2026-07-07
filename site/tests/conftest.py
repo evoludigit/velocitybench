@@ -14,6 +14,8 @@ TESTS_DIR = Path(__file__).resolve().parent
 SITE_DIR = TESTS_DIR.parent
 REPO_DIR = SITE_DIR.parent
 SWEEP3 = REPO_DIR / "reports/hetzner-2026-07/bench-hetzner-2026-07-05-sweep3.json"
+# The publishable median-of-3 (Phase 06, 2026-07-07) — the run the site ships.
+MEDIAN = REPO_DIR / "reports/hetzner-2026-07/bench-hetzner-2026-07-07-median.json"
 SCENARIOS = SITE_DIR / "scenarios.json"
 
 # Make `import build` resolve to site/build.py.
@@ -49,6 +51,43 @@ def sweep3_run(sweep3_path):
 def grid(sweep3_run, meta):
     import build
     return build.build_grid(sweep3_run, meta)
+
+
+@pytest.fixture()
+def median_path():
+    if not MEDIAN.exists():
+        pytest.skip(f"median fixture missing: {MEDIAN}")
+    return MEDIAN
+
+
+@pytest.fixture()
+def median_run(median_path):
+    import build
+    return build.load_run(median_path)
+
+
+@pytest.fixture()
+def median_grid(median_run, meta):
+    import build
+    return build.build_grid(median_run, meta)
+
+
+@pytest.fixture(params=["median", "sweep3"])
+def any_run(request):
+    """Parametrized over both fixtures: the shipping median-of-3 and sweep-3
+    (kept as a permanent regression net). Structural honesty invariants must
+    hold for both; value-specific assertions stay in the per-fixture tests."""
+    import build
+    path = MEDIAN if request.param == "median" else SWEEP3
+    if not path.exists():
+        pytest.skip(f"fixture missing: {path}")
+    return build.load_run(path)
+
+
+@pytest.fixture()
+def any_grid(any_run, meta):
+    import build
+    return build.build_grid(any_run, meta)
 
 
 @pytest.fixture()

@@ -1444,10 +1444,10 @@ def _s1_section(grid: Grid, meta: dict) -> str:
         + _s1_chart(grid, meta, "p99")
         + '</div>'
         f'<ul class="s1-callouts">{callouts}</ul>'
-        '<p class="footnote" style="margin-top:10px">Prototype sweep — single '
-        'pass; tail rungs (Q3, T1) are noisy and the Phase 06 median-of-three '
-        'run replaces them. Every value here is also in the grid table above '
-        '(no chart-only numbers).</p>'
+        '<p class="footnote" style="margin-top:10px">Median of three warm '
+        'sweeps; each cell&rsquo;s run-to-run spread is recorded in the run '
+        'JSON, and the tail rungs (Q3, T1) carry the most. Every value here is '
+        'also in the grid table above (no chart-only numbers).</p>'
         '</section>')
 
 
@@ -1745,8 +1745,8 @@ def _s2_section(grid: Grid, meta: dict) -> str:
         '<p class="footnote">Bars are absolute throughput from zero, so a rung '
         'that earns ~nothing reads flat — no visual inflation of small gains. '
         'Every value here is also in the grid table above (no chart-only '
-        'numbers). Prototype single-pass sweep; the Phase 06 median-of-three '
-        'run refines the tail.</p>'
+        'numbers). Median of three warm sweeps; per-cell spread is in the '
+        'run JSON.</p>'
         '</section>')
 
 
@@ -1816,26 +1816,29 @@ def _s3_coverage(groups: list, meta: dict) -> str:
     nm = [c for c in ref if c.status == STATUS_NOT_MEASURED]
     excl = [c for c in ref if c.status == STATUS_EXCLUDED]
     fw_label = meta["frameworks"]
-    nm_html = "".join(
-        f'<li data-framework="{esc(c.framework)}">'
-        f'{esc(fw_label[c.framework]["label"])}</li>' for c in nm)
-    excl_html = "".join(
-        f'<li data-framework="{esc(c.framework)}" '
-        f'data-reason-id="{esc(c.reason_id)}">'
-        f'<span class="s3-cov-fw">{esc(fw_label[c.framework]["label"])} '
-        f'<span class="tag">excluded · {esc(c.reason_id)}</span></span>'
-        f'<span class="s3-cov-reason">{esc_text(c.reason)}</span></li>'
-        for c in excl)
-    return (
-        '<div class="s3-coverage">'
-        '<div class="s3-cov-block">'
-        '<h4>APQ-capable · not measured in this run</h4>'
-        f'<p class="s3-cov-note">{esc_text(meta["apq"]["not_measured_note"])}</p>'
-        f'<ul class="s3-cov-list nm">{nm_html}</ul></div>'
-        '<div class="s3-cov-block">'
-        '<h4>No first-party APQ handshake · excluded by design</h4>'
-        f'<ul class="s3-cov-list excl">{excl_html}</ul></div>'
-        '</div>')
+    blocks = ""
+    if nm:
+        nm_html = "".join(
+            f'<li data-framework="{esc(c.framework)}">'
+            f'{esc(fw_label[c.framework]["label"])}</li>' for c in nm)
+        blocks += (
+            '<div class="s3-cov-block">'
+            '<h4>APQ-capable · not measured in this run</h4>'
+            f'<p class="s3-cov-note">{esc_text(meta["apq"]["not_measured_note"])}</p>'
+            f'<ul class="s3-cov-list nm">{nm_html}</ul></div>')
+    if excl:
+        excl_html = "".join(
+            f'<li data-framework="{esc(c.framework)}" '
+            f'data-reason-id="{esc(c.reason_id)}">'
+            f'<span class="s3-cov-fw">{esc(fw_label[c.framework]["label"])} '
+            f'<span class="tag">excluded · {esc(c.reason_id)}</span></span>'
+            f'<span class="s3-cov-reason">{esc_text(c.reason)}</span></li>'
+            for c in excl)
+        blocks += (
+            '<div class="s3-cov-block">'
+            '<h4>No first-party APQ handshake · excluded by design</h4>'
+            f'<ul class="s3-cov-list excl">{excl_html}</ul></div>')
+    return f'<div class="s3-coverage">{blocks}</div>' if blocks else ""
 
 
 def _s3_section(grid: Grid, meta: dict) -> str:
@@ -1854,7 +1857,7 @@ def _s3_section(grid: Grid, meta: dict) -> str:
         + '<p class="footnote">Bars are the measured APQ delta against a 0% '
         'no-change line — a bar to the left means APQ was <em>slower</em> in '
         'this run. Every before/after value is also in the grid table above '
-        '(no chart-only numbers). Prototype single-pass sweep.</p>'
+        '(no chart-only numbers). Median of three warm sweeps.</p>'
         '</section>')
 
 
@@ -1969,7 +1972,7 @@ def _s4_section(grid: Grid, meta: dict) -> str:
         'linear axis from zero. Equal-length pairs mean the cache changed '
         'nothing; the chip is the real, signed hit-over-miss delta. Every '
         'value is also in the grid table above (no chart-only numbers). '
-        'Prototype single-pass sweep.</p>'
+        'Median of three warm sweeps.</p>'
         '</section>')
 
 
@@ -2257,8 +2260,8 @@ def _s6_section(grid: Grid, run: Run, meta: dict, prices: dict) -> str:
         + '<p class="footnote">Memory, image size and cold start are measured; '
         'the cost figures are <em>derived</em> from measured throughput and the '
         'dated price file (formula above), not a separate measurement. Every '
-        'raw number is also in the run JSON linked below. Prototype single-pass '
-        'sweep; the Phase 06 median-of-three run refines the tail.</p>'
+        'raw number is also in the run JSON linked below. Median of three '
+        'warm sweeps.</p>'
         '</section>')
 
 
@@ -2513,8 +2516,9 @@ def _s7_section(grid: Grid, meta: dict) -> str:
         'line is computed from the grid above (read throughput × the ratio, '
         'plus one write) — trace any point to its cell. The cost layer decides '
         'the winner; the query-count layer is structural context, never cost. '
-        'Illustrative on this single-pass sweep; crossovers become claims at the '
-        'Phase 06 median-of-three rebind.</p>'
+        'A derived model on the median-of-three inputs, not a measured cell: '
+        'the read:write ratio is your assumption, shown across the whole '
+        'range rather than one flattering point.</p>'
         '</section>')
 
 

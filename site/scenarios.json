@@ -371,7 +371,7 @@
     ],
     "flat_threshold_pct": 1.5,
     "summary": "APQ isolated: the same query sent as a pre-registered SHA-256 hash instead of full text. It changes no SQL round-trip, so it only helps when uploading and parsing the document is the bottleneck. In this run the read and write documents are small, so the measured APQ delta is near zero — sometimes slightly negative — and the chart shows that as-is. Frameworks with no first-party APQ handshake are greyed with their reason, never dropped.",
-    "not_measured_note": "APQ-capable, but its persisted-query twin was not measured in this prototype sweep — distinct from excluded, and neither slow nor missing on purpose."
+    "not_measured_note": "APQ-capable, but its persisted-query twin was not measured in this run — distinct from excluded, and neither slow nor missing on purpose."
   },
   "cache_under_fire": {
     "miss": "C3",
@@ -388,7 +388,7 @@
       {"framework": "fraiseql-tv-cache", "cache": true}
     ],
     "summary": "Caching under fire: the same single-row lookup run two ways — against 20 rotating keys (C3, a cache can never hit) and against a 5-key hot pool (HC3, a cache should hit almost every time). The cache-off variants (v, tv) sit beside the cache-on ones (v+cache, tv+cache) on purpose: if the cache earned its keep, the cache-on rows would jump from C3 to HC3 while the cache-off rows stayed flat. In this run every row is flat — a single-row read is already so cheap (~4 ms) that caching the result saves almost nothing, hot pool or not, and tv+cache is a touch slower with the cache in the path. The chart shows that as-is.",
-    "not_measured_note": "Wired in the benchmark but not run against the hot-key scenarios in this prototype sweep — distinct from excluded, and neither slow nor missing on purpose. The Phase 06 median-of-three run fills them."
+    "not_measured_note": "Wired in the benchmark but not run against the hot-key scenarios in this run — distinct from excluded, and neither slow nor missing on purpose."
   },
   "footprint": {
     "cost": {
@@ -438,7 +438,7 @@
     "summary": "The one system-level view — every story above is one request at a time, but a real service runs a mix of reads and writes. This models total sustainable load as that read:write ratio changes, and finds the break-even. FraiseQL moves read cost to write time (the cascade builds the precomputed rows), so it needs enough reads per write to amortize that write. A derived MODEL, not a measured cell — every input traces to a grid cell above.",
     "cost_layer": "Cost-weighted — the headline. Each engine's sustainable requests/second for a workload of 1 write + r reads, from measured throughput (1/read_rps per read, 1/write_rps per write, composed). At r→0 the curve is the measured write throughput; at r→∞ the measured read throughput. Higher is better; where FraiseQL's line crosses above a rival is the break-even for that pair.",
     "count_layer": "Structural query count — secondary, and counts are not cost. SQL round-trips per workload-unit from the S0 hop model: a per-level resolver does 2–3 trips for a nested read, a compiler or precompute does one. This is why depth hurts resolvers — but a round-trip is not a fixed price, so this layer never decides the winner, and it never leads.",
-    "caveat": "Illustrative — single-pass prototype inputs. Aggregation multiplies per-request numbers, so it compounds this sweep's noisy tail; no crossover is stated as fact until the Phase 06 median-of-three rebind. The read:write ratio is your assumption, shown across the whole range rather than one flattering point."
+    "caveat": "A derived model on the median-of-three inputs, not a measured cell. Aggregation multiplies per-request numbers, so it compounds each cell's run-to-run spread (recorded in the run JSON); the read:write ratio is your assumption, shown across the whole range rather than one flattering point."
   },
   "exclusion_reasons": {
     "1": "M1d on v-variants — updateUserDelta patches the tvd_* delta tables of the tv pipeline; the v-variants serve on-the-fly JSONB views and have no delta pipeline to contrast (structural, see frameworks/fraiseql/database/extensions.sql).",
@@ -687,6 +687,6 @@
     "m1_delta": "M1d patches the tvd_* delta tables surgically instead of recomputing — the fast write path available only on the tv pipeline.",
     "m1_vanilla": "Classical M1 is a single UPDATE on a vanilla table with no derived state to maintain.",
     "tv_audit": "fraiseql-tv-audit measures M1 only — an audit-overhead appendix row isolating the cost of audit logging on the mutation path. It is never a full-grid framework.",
-    "not_measured": "Cells marked “not measured in this run” are wired in the benchmark but were not executed in this prototype sweep. They are distinct from “excluded by design” and are neither slow nor missing on purpose — the Phase 06 median-of-three run fills them."
+    "not_measured": "Cells marked “not measured in this run” are wired in the benchmark but were not executed in the run shown. They are distinct from “excluded by design” and are neither slow nor missing on purpose. This publishable run measured the full grid, so no cell carries this status."
   }
 }

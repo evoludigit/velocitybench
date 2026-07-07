@@ -43,8 +43,8 @@ THE GRID — three cell states, no silent gaps
                       wired in the benchmark but not executed in this sweep;
                       absent from results[] AND absent from exclusions.
                       Distinct from excluded-by-design; neither slow nor
-                      excluded on purpose. The Phase 06 median-of-3 run fills
-                      these.
+                      excluded on purpose. This publishable run measured the
+                      full grid, so no cell carries this status.
 
 CITING A CELL
   Every (framework, scenario) cell has a stable anchor:
@@ -122,7 +122,7 @@ AMORTIZATION MODEL (S7) — total load vs the read:write ratio
   measured throughput (endpoints: the measured write rps at r->0, read rps at
   r->infinity). FraiseQL moves read cost to write time (the logged cascade), so
   it needs enough reads per write to amortize the write. The cost layer decides
-  the winner; SQL round-trip COUNT is structural context, never cost. Illustrative
-  on this single-pass sweep; crossovers firm up at the Phase 06 rebind.
+  the winner; SQL round-trip COUNT is structural context, never cost. A derived
+  model on the median-of-three inputs; the read:write ratio is your assumption.
   Break-evens at the default read/write ($amortization_default):
 $amortization_lines
