@@ -1,0 +1,201 @@
+VelocityBench — machine-readable guide
+======================================
+
+WHAT THIS IS
+  One benchmark sweep rendered as a single self-contained page. Exactly ONE
+  run on ONE hardware target. No cross-run or cross-hardware mixing, ever — the
+  generator refuses two JSON files.
+
+RUN IDENTITY
+  timestamp:            2026-07-07T10:06:53+00:00
+  target_host:          10.7.0.2
+  cpu_model:            AMD EPYC-Genoa Processor
+  postgres_version:     17.10 (Debian 17.10-1.pgdg13+1)
+  load_generator:       k6-v2.0.0
+  concurrency:          40
+  duration_secs:        30
+  tview_mode:           logged
+  tview_trigger_scope:  fraiseql-only
+  fraiseql_version:     2.11.0
+
+DATA
+  Machine copy of this run + metadata:  ./data.json
+    { "run": <raw run JSON>, "scenarios": <the scenarios.json contract> }
+  Committed source run JSON (provenance):  bench-hetzner-2026-07-07-median.json
+
+RESULT-ROW GLOSSARY  (run.results[])
+  framework   engine under test (see FRAMEWORKS below)
+  query       THE SCENARIO ID — the field is named "query", NOT "scenario"
+  rps         requests/second (for MC1: cycles/second, a workflow metric)
+  p50_ms / p95_ms / p99_ms   latency percentiles, milliseconds
+  requests    total requests issued in the measured window
+  errors      failed/non-2xx responses; 0 on every published cell
+  rss_steady_mb / rss_max_mb   resident memory
+  cold_start_ms   time to first served request
+
+THE GRID — three cell states, no silent gaps
+  RESULT              one row in results[]; carries rps + latency + errors.
+  EXCLUDED BY DESIGN  the (framework, scenario) pair is structurally N/A. It is
+                      ABSENT from results[] and listed in scenarios.exclusions
+                      with a reason_id into scenarios.exclusion_reasons.
+                      Excluded is NOT slow and NOT missing by accident.
+  NOT MEASURED IN THIS RUN
+                      wired in the benchmark but not executed in this sweep;
+                      absent from results[] AND absent from exclusions.
+                      Distinct from excluded-by-design; neither slow nor
+                      excluded on purpose. This publishable run measured the
+                      full grid, so no cell carries this status.
+
+CITING A CELL
+  Every (framework, scenario) cell has a stable anchor:
+    #cell-<framework>-<scenario>      e.g.  #cell-fraiseql-tv-Q1
+  Each DOM cell carries data-framework and data-scenario, plus:
+    result       data-rps, data-p99-ms, data-errors
+    excluded     data-excluded="true", data-reason-id="<N>"
+    not measured data-not-measured="true"
+
+M1 vs M1d — READ THE MECHANISM, NOT JUST THE NUMBER
+  M1   full-cascade write. FraiseQL: a logged tview recompute (61-row fan-out
+       here) — the maintenance price of always-consistent precomputed reads.
+       Classical: a vanilla single UPDATE with no derived state.
+  M1d  jsonb-delta surgical patch — a FraiseQL-only fast write path, present on
+       the tv variants only.
+  They measure DIFFERENT mechanisms and are ALWAYS shown side by side. FraiseQL
+  losing on full-cascade M1 is a real, prominent result, not an artifact.
+  MC1 is a workflow benchmark, not raw server speed: it counts the client round-trips needed to reach a consistent state after a write. FraiseQL = 1 request/cycle (the mutation response carries the cascade); classical GraphQL and REST = 2 requests/cycle (mutation + serial re-fetch).
+
+REQUEST ANATOMY — QUERY STRATEGIES (S0)
+  Where a nested read's round-trips come from, by architecture. Round-trip
+  counts are STRUCTURAL truth (provenanced to the source files below), not
+  measured timings: resolver + DataLoader adds one BATCHED SQL trip per nesting
+  level (Q1/Q2b/Q3 = 1/2/3, WHERE key = ANY($1), so no N+1); compile-to-SQL and
+  precompute stay at one round-trip at any depth. The animation's dot pacing is
+  the ONLY measured overlay (each engine's p50 for the read).
+  DataLoader credit: The classical GraphQL engines here are best-practice, not strawmen: every one batches its nested lookups with a DataLoader (WHERE key = ANY($1)), so there is no N+1 swarm. What the nesting cliff measures is the residual cost — the serial per-level round-trips plus in-process resolver execution — which is exactly what compile-to-SQL and precompute avoid.
+  Per-level batched resolvers [resolver-dataloader]
+      members: async-graphql, mercurius, apollo-server, strawberry
+      SQL round-trips: Q1=1 Q2b=2 Q3=3
+      source: frameworks/async-graphql/src/dataloaders.rs
+      One HTTP hop, then the root SQL, then one BATCHED SQL per nesting level — each DataLoader coalesces a level's lookups into a single WHERE key = ANY($1) query, so there is no N+1. The residual cost is that those trips are serial (each level waits on the parent's ids) plus in-process resolver execution, so depth adds round-trips.
+  Compile the whole query to one SQL [compile-to-sql]
+      members: hasura, postgraphile, fraiseql-v-nocache, fraiseql-v-cache
+      SQL round-trips: Q1=1 Q2b=1 Q3=1
+      source: frameworks/postgraphile/src/index.ts
+      The engine compiles the entire GraphQL tree into ONE composed SQL statement (LATERAL joins / jsonb aggregation) and issues a single round-trip that returns the whole nested document — at any depth. Hasura, PostGraphile and FraiseQL's on-the-fly v views are all in this class; FraiseQL·v is one compiler among several, not a category of its own.
+  Read a pre-computed JSONB row [precompute]
+      members: fraiseql-tv, fraiseql-tv-cache
+      SQL round-trips: Q1=1 Q2b=1 Q3=1
+      source: frameworks/fraiseql/schema_tv.py
+      The nested document is denormalised into a tv_* table at write time, so a read is a single SELECT of pre-built JSONB with no joins — one round-trip at any depth. On a result-cache hit (tv+cache) the database is not touched at all: the path stops at the server.
+  Hand-written REST + SQL [rest]
+      members: actix-web-rest
+      SQL round-trips: Q1=1 Q2b=1 Q3=—
+      source: frameworks/actix-web-rest/src/repositories.rs
+      No GraphQL document on the wire: each endpoint runs a hand-written SQL (a JOIN for the nested case) — one round-trip like a compiler, but bespoke per endpoint. Not one of the three animated GraphQL lanes; shown here for completeness.
+  APQ: APQ (automatic persisted queries) elides the document-upload work of the first hop: instead of sending the whole GraphQL query text, the client sends a 32-byte SHA-256 hash the server has already parsed. It shortens the request hop but changes no SQL round-trip; measured in the Q1_APQ / Q2b_APQ / M1_APQ cells.
+
+MECHANISM LADDER (S2) — where FraiseQL's read speed comes from   (#s2-mechanism-ladder)
+  Four FraiseQL variants, the same read, one mechanism added per rung: JOIN
+  views (v-nocache) -> + result cache (v-cache) -> tv precompute (tv) -> + result
+  cache (tv-cache) -> + APQ (persisted hash). The result cache and APQ change no
+  SQL; the tv precompute step is the read win, and it grows with nesting depth.
+  Absolute RPS per rung; the delta is over the result rung below it.
+  Ladder @ Q2b (rung: RPS, delta over the rung below):
+    fraiseql-v-nocache         JOIN views      4,097 RPS
+    fraiseql-v-cache           + result cache  4,126 RPS  (+0.7%)
+    fraiseql-tv                tv precompute   6,260 RPS  (+51.7%)
+    fraiseql-tv-cache          + result cache  6,288 RPS  (+0.5%)
+    +APQ (fraiseql-tv-cache)   + APQ           5,880 RPS  (−6.5%)
+  precompute step (tv rung over the rung below) by depth: Q1 +1.5%, Q2 +28.3%, Q2b +51.7%, Q3 +146.1%, T1 +91.1%
+
+APQ ISOLATED (S3) — persisted-query hash, before vs after   (#s3-apq)
+  Each query/mutation sent as a pre-registered SHA-256 hash instead of full
+  text. It changes no SQL round-trip, so any effect is transport-only. Status is
+  read from the grid, never a hand-kept capability list: a measured _APQ twin ->
+  a real (often ~zero or negative) delta; no twin -> APQ-capable-but-not-measured
+  in this run (NOT excluded); by-design N/A -> its verbatim exclusion reason.
+   Q1 -> Q1_APQ   measured twins: fraiseql-tv −5.4%, fraiseql-tv-cache −4.9%, fraiseql-v-nocache −3.7%, fraiseql-v-cache −6.4%, async-graphql +0.2%, mercurius ±0.0%, apollo-server −0.6%
+  Q2b -> Q2b_APQ  measured twins: fraiseql-tv −2.6%, fraiseql-tv-cache −6.5%, fraiseql-v-nocache −3.4%, fraiseql-v-cache −2.7%, async-graphql −3.8%, mercurius −1.5%, apollo-server +1.4%
+   M1 -> M1_APQ   measured twins: fraiseql-tv −0.1%, fraiseql-tv-cache +1.2%, fraiseql-v-nocache +3.0%, fraiseql-v-cache +1.9%, async-graphql +4.3%, mercurius −1.7%, apollo-server +3.2%
+  excluded by design: hasura [4], postgraphile [5], actix-web-rest [6], strawberry [7]
+
+CACHE UNDER FIRE (S4) — hot pool (HC3) vs rotating keys (C3)   (#s4-cache-under-fire)
+  The same single-row lookup two ways: 20 rotating keys (C3, a cache can never
+  hit) and a 5-key hot pool (HC3, a cache should hit almost every time). If the
+  result cache earned its keep, the cache-on rows would jump C3->HC3 while the
+  cache-off rows stayed flat. Delta is HC3 (hit) over C3 (miss); ~zero or
+  negative renders as-is.
+  C3 (miss) -> HC3 (hit), delta = hit over miss:
+    fraiseql-v-nocache   (cache off)  C3 7,489  HC3 7,526  (+0.5%)
+    fraiseql-v-cache     (cache on)   C3 7,480  HC3 7,412  (−0.9%)
+    fraiseql-tv          (cache off)  C3 7,566  HC3 7,666  (+1.3%)
+    fraiseql-tv-cache    (cache on)   C3 7,628  HC3 7,629  (±0.0%)
+
+FRAMEWORKS (12)
+  fraiseql-tv          FraiseQL · tv — precomputed tv_* tables, no result cache (family: fraiseql)
+  fraiseql-tv-cache    FraiseQL · tv+cache — precomputed tv_* tables + result cache (family: fraiseql)
+  fraiseql-v-nocache   FraiseQL · v — on-the-fly JSONB JOIN views, no result cache (family: fraiseql)
+  fraiseql-v-cache     FraiseQL · v+cache — on-the-fly JSONB JOIN views + result cache (family: fraiseql)
+  fraiseql-tv-audit    FraiseQL · tv+audit — M1-only audit-overhead appendix row (family: fraiseql) [appendix: M1 only]
+  hasura               Hasura CE v2 — compiles GraphQL to a single SQL query (family: classical)
+  postgraphile         PostGraphile v5 — compiles GraphQL to a single SQL query (family: classical)
+  actix-web-rest       Actix (REST) — hand-written REST handlers over SQL (family: classical)
+  async-graphql        async-graphql — Rust per-level resolvers with DataLoader batching (family: classical)
+  mercurius            Mercurius — Fastify per-level resolvers with DataLoader batching (family: classical)
+  apollo-server        Apollo Server — Node per-level resolvers with DataLoader batching (family: classical)
+  strawberry           Strawberry — Python per-level resolvers with DataLoader batching (family: classical)
+
+SCENARIOS (16)
+  Q1         Flat user list (20 rows) [read, RPS]
+  Q2         Flat post list (10 rows) [read, RPS]
+  Q2b        Posts + author (1-level nest) [read, RPS]
+  Q3         Comments + author + post (2-level nest) [read, RPS]
+  F1         Published filter (10 rows) [read, RPS]
+  F2         Published filter + author (10 rows) [read, RPS]
+  F3         ORDER BY baseline (20 rows) [read, RPS]
+  T1         Full blog page (multi-root) [read, RPS]
+  C3         Single-row lookup, 20 rotating UUIDs (cache-miss) [read, RPS]
+  HC3        Single-row lookup, 5-UUID hot pool (cache-hit) [read, RPS]
+  M1         Update user bio (full recompute) [write, RPS]
+  M1d        Update user bio (delta patch) [write, RPS]
+  MC1        Mutation → consistent state (workflow) [workflow, cycles/s]
+  Q1_APQ     Q1 with APQ (persisted query) [read, RPS]
+  Q2b_APQ    Q2b with APQ (persisted query) [read, RPS]
+  M1_APQ     M1 with APQ (persisted query) [write, RPS]
+
+WORKLOAD SHAPES → WHICH CELLS ANSWER THEM (winner scored on the S7 model)
+  Read-heavy → Q1, Q2, Q2b, Q3, T1
+      For read-heavy work the precomputed (tv) path wins: it tops the field at Q1, and its edge over FraiseQL's own JOIN-view (v) variants widens with nesting depth — level at Q1, decisive by Q3 — because precompute carries no N+1. Q1 is a strength here, not a soft spot; the cost of the precomputed document is paid on writes, not reads.
+      winner @ ~1000:1 reads:writes → precompute (tv_*) (FraiseQL · tv), ~5,852 req/s
+  Deeply nested → Q2b, Q3, T1
+      The deeper the nesting, the wider FraiseQL's lead — no N+1 by construction. The cost of that read advantage is paid on writes, not reads (see the write trade).
+      winner @ ~100:1 reads:writes → REST (Actix (REST)), ~3,250 req/s
+  Write-heavy → M1, M1d, MC1
+      FraiseQL's delta path (M1d) competes with a classical single UPDATE; the full-cascade recompute (M1) is the price of always-consistent precomputed reads. MC1 needs one round-trip where classical needs two.
+      winner @ ~1:1 reads:writes → resolver + DataLoader (async-graphql), ~5,039 req/s
+  Hot-key lookups → C3, HC3
+      A hot 5-key pool (HC3) is where a result cache should shine; the 20-UUID miss regime (C3) shows what a cache does when it cannot help. In this run both regimes land flat — the single-row read is already too cheap for the cache to matter.
+      winner @ ~1000:1 reads:writes → precompute (tv_*) (FraiseQL · tv), ~6,105 req/s
+
+FOOTPRINT & COST (S6) — RAM, derived €/1M, the storage trade   (#s6-footprint)
+  Steady-state process memory and image size are MEASURED; the € figures are
+  DERIVED from measured Q1 throughput and the dated price file, not a separate
+  measurement:  € / 1M req = price_month / (Q1 RPS × 2,628,000 s) × 10⁶.
+  Ranked honestly — hand-written REST is lighter than FraiseQL and shown so. A
+  sub-line is omitted (never faked) when this run did not capture that measure.
+  steady-state RAM (lightest first): actix-web-rest 5 MB, fraiseql-v-nocache 11 MB, async-graphql 12 MB, fraiseql-tv 12 MB, fraiseql-v-cache 12 MB, fraiseql-tv-cache 12 MB, mercurius 56 MB, apollo-server 65 MB, postgraphile 127 MB, hasura 133 MB, strawberry 189 MB
+  €/1M req @ Q1 on ccx33 (derived): fraiseql-tv-cache €0.0080, fraiseql-tv €0.0080, fraiseql-v-cache €0.0082, fraiseql-v-nocache €0.0083, postgraphile €0.0251, actix-web-rest €0.0393, apollo-server €0.0406, mercurius €0.0427, async-graphql €0.0460, hasura €0.0497, strawberry €0.0615
+  storage trade (precompute costs disk): tv_comment 4.4× tb_comment, tv_post 2.1× tb_post, tv_user 1.8× tb_user
+
+AMORTIZATION MODEL (S7) — total load vs the read:write ratio
+  A DERIVED model, not a measured cell. Sustainable total requests/second for a
+  workload of 1 write + r reads = (r+1) / (r/read_rps + 1/write_rps), from
+  measured throughput (endpoints: the measured write rps at r->0, read rps at
+  r->infinity). FraiseQL moves read cost to write time (the logged cascade), so
+  it needs enough reads per write to amortize the write. The cost layer decides
+  the winner; SQL round-trip COUNT is structural context, never cost. A derived
+  model on the median-of-three inputs; the read:write ratio is your assumption.
+  Break-evens at the default read/write (read Q2b, full write mode):
+  FraiseQL · tv overtakes PostGraphile v5 at ~31 reads/write
+  FraiseQL · tv overtakes async-graphql at ~134 reads/write
+  FraiseQL · tv overtakes Actix (REST) at ~149 reads/write
