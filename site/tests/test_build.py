@@ -1,4 +1,4 @@
-"""Phase 01 — data pipeline & contract.
+"""Data pipeline & contract.
 
 100% data layer, strict TDD. Mirrors tests/benchmark/test_report_from_json.py.
 The stakes are asymmetric (README methodology): a silently dropped or

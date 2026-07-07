@@ -1,4 +1,4 @@
-"""Phase 05 Step 1 [TDD] — S0 request-anatomy hop model.
+"""S0 request-anatomy hop model.
 
 The load-bearing honesty rule of S0 is *no invented hops*: every hop the
 animation draws must be provenanced to real implementation code, and the

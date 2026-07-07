@@ -14,7 +14,7 @@ TESTS_DIR = Path(__file__).resolve().parent
 SITE_DIR = TESTS_DIR.parent
 REPO_DIR = SITE_DIR.parent
 SWEEP3 = REPO_DIR / "reports/hetzner-2026-07/bench-hetzner-2026-07-05-sweep3.json"
-# The publishable median-of-3 (Phase 06, 2026-07-07) — the run the site ships.
+# The publishable median-of-3 (2026-07-07) — the run the site ships.
 MEDIAN = REPO_DIR / "reports/hetzner-2026-07/bench-hetzner-2026-07-07-median.json"
 SCENARIOS = SITE_DIR / "scenarios.json"
 

@@ -1,4 +1,4 @@
-"""Phase 04 Step 1 [TDD] — write-trade data model (M1 / M1d / MC1)."""
+"""Write-trade data model (M1 / M1d / MC1)."""
 import sys
 from pathlib import Path
 

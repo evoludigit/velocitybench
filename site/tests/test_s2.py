@@ -1,4 +1,4 @@
-"""Phase 06 Step 2 [design→pin] — S2 mechanism-ladder markup pins.
+"""S2 mechanism-ladder markup pins.
 
 Written after the ladder design settled. They guard the honesty-critical
 invariants when the grid or styling changes: the section is anchored and placed

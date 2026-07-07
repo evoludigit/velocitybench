@@ -1,4 +1,4 @@
-"""Phase 07 Step 2 [TDD] — S6 footprint & cost data model.
+"""S6 footprint & cost data model.
 
 Test-first, recomputed from the sweep-3 grid + the dated price YAML. The
 honesty stakes: a cost figure is *derived*, and a wrong derivation (or a silent
@@ -140,7 +140,7 @@ def test_data_json_embeds_costs(sweep3_run, meta, prices):
 
 
 # --------------------------------------------------------------------------
-# Phase 07 Step 4 [design→pin] — S6 markup pins (written after the design
+# S6 markup pins (written after the design
 # settled; they guard the honesty-critical invariants: bars proportional, the
 # derived cost carries its formula, the storage trade is present).
 # --------------------------------------------------------------------------

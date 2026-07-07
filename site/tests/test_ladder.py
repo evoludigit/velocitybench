@@ -1,4 +1,4 @@
-"""Phase 03 Step 1 [TDD] — ladder data extraction for the S1 nesting cliff."""
+"""Ladder data extraction for the S1 nesting cliff."""
 import sys
 from pathlib import Path
 

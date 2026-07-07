@@ -1,4 +1,4 @@
-"""Phase 07 Step 1 [TDD] — S4 caching-under-fire data model.
+"""S4 caching-under-fire data model.
 
 Test-first, recomputed from the sweep-3 grid. The honesty stake here is the
 whole point of the section: a cache that earns nothing must be shown earning
@@ -110,7 +110,7 @@ def test_cache_appendix_audit_row_never_appears(grid):
 
 
 # --------------------------------------------------------------------------
-# Phase 07 Step 1 [design→pin] — S4 markup pins (written after the design
+# S4 markup pins (written after the design
 # settled; they guard the honesty-critical invariants when the grid or styling
 # changes).
 # --------------------------------------------------------------------------
@@ -177,7 +177,7 @@ def test_s4_coverage_lists_not_measured_engines(page):
 
 
 def test_s4_hotkey_workload_card_resolves_to_this_section(page):
-    """The Phase 04 stub pointed the hot-key card at section: null; it now
+    """The earlier stub pointed the hot-key card at section: null; it now
     resolves to the real S4 anchor."""
     assert 'href="#s4-cache-under-fire"' in page
 

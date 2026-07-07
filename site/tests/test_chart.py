@@ -1,4 +1,4 @@
-"""Phase 03 — S1 nesting-cliff chart pins + annotation TDD.
+"""S1 nesting-cliff chart pins + annotations.
 
 Pins are written AFTER the SVG design settled: they guard the honesty-critical
 invariants (y from 0 on RPS, log loudly labelled on p99, one path per

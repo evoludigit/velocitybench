@@ -1,4 +1,4 @@
-"""Phase 05 Steps 2–3 [design→pin] — S0 request-anatomy markup pins.
+"""S0 request-anatomy markup pins.
 
 Written after the markup settled. They guard the honesty-critical invariants of
 the movement layer when the grid or styling changes: the section is anchored and

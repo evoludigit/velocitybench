@@ -1,4 +1,4 @@
-"""Phase 02 — skeleton, honesty devices & AI layer (pins + AI-layer TDD).
+"""Skeleton, honesty devices & AI layer (pins + AI-layer tests).
 
 These are the design->pin regression tests: written AFTER the markup settled,
 they guard the honesty-critical invariants (every cell anchored, exclusion vs

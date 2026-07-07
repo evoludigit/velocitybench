@@ -1,4 +1,4 @@
-"""Phase 06 Step 1 [TDD] — S2 mechanism-ladder + S3 APQ-pair data model.
+"""S2 mechanism-ladder + S3 APQ-pair data model.
 
 Test-first, recomputed from the sweep-3 grid (never trusted from the page). The
 honesty stakes are the same as everywhere on this site: a fabricated APQ delta,

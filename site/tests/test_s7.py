@@ -1,4 +1,4 @@
-"""Phase 07b Step 1 [TDD] — S7 amortization model.
+"""S7 amortization model.
 
 Test-first, recomputed from the sweep-3 grid. This view is a misleading-chart
 minefield (see project_m1_scenario_invalid: conflating mechanisms is exactly
@@ -130,7 +130,7 @@ def test_amort_missing_read_cell_degrades(grid, meta):
 
 
 # --------------------------------------------------------------------------
-# Phase 07b Step 2 [design→pin] — S7 markup pins (written after the chart
+# S7 markup pins (written after the chart
 # design settled; they guard the honesty-critical invariants).
 # --------------------------------------------------------------------------
 
@@ -242,7 +242,7 @@ def test_s7_six_panels_default_visible(page):
 
 
 # --------------------------------------------------------------------------
-# Phase 07b Step 3 [design→pin] — scored workload selector + llms.txt
+# Scored workload selector + llms.txt
 # --------------------------------------------------------------------------
 
 def selector(page):

@@ -1,4 +1,4 @@
-"""Phase 04 — S5 write-trade pins + workload-selector mapping.
+"""S5 write-trade pins + workload-selector mapping.
 
 These pins guard the load-bearing honesty invariants of the whole site:
 M1 and M1d shown adjacent and labelled by mechanism, MC1 flagged as a workflow

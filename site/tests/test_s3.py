@@ -1,4 +1,4 @@
-"""Phase 06 Step 3 [design→pin] — S3 APQ-isolated markup pins.
+"""S3 APQ-isolated markup pins.
 
 Written after the design settled. They guard the honesty-critical invariants:
 the section is anchored between S2 and S5; each measured pair renders its real
