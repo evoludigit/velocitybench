@@ -12,6 +12,7 @@ include make/comments.mk
 include make/framework.mk
 include make/quality.mk
 include make/utils.mk
+include make/site.mk
 
 # Default target
 .PHONY: help
