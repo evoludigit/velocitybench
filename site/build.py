@@ -2797,13 +2797,16 @@ def _intro(grid: Grid, meta: dict) -> str:
     tv_q3 = rps("fraiseql-tv", "Q3")
     rivals = [r for r in (rps("postgraphile", "Q3"), rps("hasura", "Q3")) if r]
     read_x = (tv_q3 / max(rivals)) if tv_q3 and rivals else None
-    tv_m1 = rps("fraiseql-tv", "M1")
-    writers = [rps(f, "M1") for f in meta["framework_order"]
-               if not f.startswith("fraiseql")]
-    writers = [w for w in writers if w]
-    write_x = (max(writers) / tv_m1) if tv_m1 and writers else None
     rf = f"about {read_x:.0f}× faster" if read_x else "several times faster"
-    wf = f"about {write_x:.0f}× slower" if write_x else "many times slower"
+    # FraiseQL's real write path is the surgical delta patch (jsonb_delta / M1d),
+    # NOT the full-cascade recompute (M1). Headline the write path people
+    # actually use: check whether that delta write is the fastest write measured.
+    writes = [(rps(f, sc), f) for f in meta["framework_order"]
+              for sc in ("M1", "M1d") if rps(f, sc)]
+    top_write_fw = max(writes)[1] if writes else None
+    delta_fastest = bool(top_write_fw and top_write_fw.startswith("fraiseql"))
+    wf = ("the fastest write in this whole run" if delta_fastest
+          else "as quick as the fastest engines here")
 
     return (
         '<section id="start" class="intro" aria-labelledby="intro-h">'
@@ -2815,8 +2818,11 @@ def _intro(grid: Grid, meta: dict) -> str:
         'server that answers a query by reading <em>one pre-computed JSON '
         'row</em> from PostgreSQL instead of assembling the answer '
         'field-by-field at request time. Pre-computing the row makes nested '
-        f'reads {rf} and writes {wf} &mdash; measured below, including every '
-        'place FraiseQL loses.</p>'
+        f'reads {rf}. Writes stay fast too: FraiseQL patches only the rows that '
+        f'changed &mdash; its <code>jsonb_delta</code> path is {wf} &mdash; and '
+        'the one slow write is the full recompute that rebuilds every affected '
+        'row to keep reads always consistent. Measured below, including where '
+        'FraiseQL loses.</p>'
         '<div class="intro-cards">'
         '<div class="intro-card">'
         '<h3>Which should you use?</h3>'
@@ -2824,8 +2830,10 @@ def _intro(grid: Grid, meta: dict) -> str:
         '<li><strong>Mostly reads, especially nested?</strong> FraiseQL &mdash; '
         'the pre-computed row is already the shape you asked for, and its lead '
         'grows with nesting depth.</li>'
-        '<li><strong>Mostly writes?</strong> A resolver engine such as '
-        'async-graphql. FraiseQL is the <em>slowest writer here</em>.</li>'
+        '<li><strong>Mostly writes?</strong> Not the deal-breaker it first '
+        'looks: FraiseQL&rsquo;s delta write (<code>jsonb_delta</code>) is the '
+        '<em>fastest single write here</em>. Only its always-consistent full '
+        'recompute is slow &mdash; the matcher below weighs your exact mix.</li>'
         '<li><strong>A mix, or not sure?</strong> Use the matcher just below '
         '&mdash; it scores every shape from this run, and the winner is not '
         'always FraiseQL.</li>'
@@ -2840,8 +2848,9 @@ def _intro(grid: Grid, meta: dict) -> str:
         '<em>incrementally</em> correct on every write (a trigger patches only '
         'the rows that actually changed) and serves them through a typed GraphQL '
         'API you never hand-write. A plain materialized view is stale until you '
-        'refresh the whole thing. That always-correct guarantee is exactly what '
-        'the slow writes buy &mdash; see '
+        'refresh the whole thing; FraiseQL&rsquo;s delta patch keeps its rows '
+        'correct without that full refresh, and only a total recompute &mdash; '
+        'for the strictest consistency &mdash; costs real write speed. See '
         '<a href="#s5-write-trade">the write trade</a>.</p>'
         '</div>'
         '</div>'
@@ -2868,8 +2877,9 @@ def _render_index(run: Run, meta: dict, grid: Grid, prices: dict) -> str:
         'database schema into an API. It measures one idea in particular — '
         '<strong>FraiseQL</strong>, which answers a query by reading a '
         'pre-computed JSON row from PostgreSQL instead of assembling the answer '
-        'field-by-field at request time — and shows what that trades: much '
-        'faster nested reads, much slower writes, in a single measured run.</p>'
+        'field-by-field at request time — and shows the result: much faster '
+        'nested reads, and writes that stay fast because it patches only the '
+        'rows that changed, in a single measured run.</p>'
         "</header>")
     body = "\n".join([
         header,
