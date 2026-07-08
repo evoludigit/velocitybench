@@ -2094,7 +2094,7 @@ def _s5_section(grid: Grid, meta: dict) -> str:
     return (
         '<section id="s5-write-trade" aria-labelledby="s5-h">'
         '<h2 id="s5-h">The write trade &mdash; what precompute costs</h2>'
-        '<p class="lede">The mandatory honesty section. FraiseQL’s precomputed '
+        '<p class="lede">FraiseQL’s precomputed '
         'reads are paid for on writes: its full-cascade <strong>M1</strong> is '
         'the slowest write here, shown at full linear prominence next to its '
         'own delta path <strong>M1d</strong> and classical vanilla updates. '
@@ -2799,14 +2799,10 @@ def _intro(grid: Grid, meta: dict) -> str:
     read_x = (tv_q3 / max(rivals)) if tv_q3 and rivals else None
     rf = f"about {read_x:.0f}× faster" if read_x else "several times faster"
     # FraiseQL's real write path is the surgical delta patch (jsonb_delta / M1d),
-    # NOT the full-cascade recompute (M1). Headline the write path people
-    # actually use: check whether that delta write is the fastest write measured.
-    writes = [(rps(f, sc), f) for f in meta["framework_order"]
-              for sc in ("M1", "M1d") if rps(f, sc)]
-    top_write_fw = max(writes)[1] if writes else None
-    delta_fastest = bool(top_write_fw and top_write_fw.startswith("fraiseql"))
-    wf = ("the fastest write in this whole run" if delta_fastest
-          else "as quick as the fastest engines here")
+    # not the full-cascade recompute (M1). At this throughput the write is
+    # server-bound, so the delta write only ties the quickest engines — the
+    # write-trade section spells out exactly what it does and does not measure.
+    wf = "as fast as the quickest writes here"
 
     return (
         '<section id="start" class="intro" aria-labelledby="intro-h">'
@@ -2831,9 +2827,10 @@ def _intro(grid: Grid, meta: dict) -> str:
         'the pre-computed row is already the shape you asked for, and its lead '
         'grows with nesting depth.</li>'
         '<li><strong>Mostly writes?</strong> Not the deal-breaker it first '
-        'looks: FraiseQL&rsquo;s delta write (<code>jsonb_delta</code>) is the '
-        '<em>fastest single write here</em>. Only its always-consistent full '
-        'recompute is slow &mdash; the matcher below weighs your exact mix.</li>'
+        'looks: FraiseQL&rsquo;s delta write (<code>jsonb_delta</code>) '
+        '<em>keeps pace with the quickest engines here</em>. Only its '
+        'always-consistent full recompute is slow &mdash; the matcher below '
+        'weighs your exact mix.</li>'
         '<li><strong>A mix, or not sure?</strong> Use the matcher just below '
         '&mdash; it scores every shape from this run, and the winner is not '
         'always FraiseQL.</li>'
@@ -2844,9 +2841,9 @@ def _intro(grid: Grid, meta: dict) -> str:
         '<div class="intro-card">'
         '<h3>&ldquo;Isn&rsquo;t this just a materialized view?&rdquo;</h3>'
         '<p>Fair question &mdash; that is the first thing most backend '
-        'developers think. The difference: FraiseQL keeps the pre-computed rows '
-        '<em>incrementally</em> correct on every write (a trigger patches only '
-        'the rows that actually changed) and serves them through a typed GraphQL '
+        'developers think. The difference: on an update FraiseQL keeps the '
+        'pre-computed rows correct by patching only the fields that changed '
+        '(what this run measures), and serves them through a typed GraphQL '
         'API you never hand-write. A plain materialized view is stale until you '
         'refresh the whole thing; FraiseQL&rsquo;s delta patch keeps its rows '
         'correct without that full refresh, and only a total recompute &mdash; '
