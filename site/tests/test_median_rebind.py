@@ -81,6 +81,18 @@ def test_provenance_link_is_self_contained(any_run, meta):
     assert f'href="../../{name}"' not in html
 
 
+def test_scenario_glossary_defines_every_code(any_run, meta):
+    """Every Q1/M1/C3-style code that leads on the page is defined, in plain
+    English, in one visible glossary — a newcomer never meets an undefined code."""
+    import re
+    html = build.render(any_run, meta)["index.html"].decode()
+    m = re.search(r'<section id="glossary".*?</section>', html, re.S)
+    assert m, "no visible scenario glossary section"
+    gloss = m.group(0)
+    for sc in meta["scenario_order"]:
+        assert f'<code>{sc}</code>' in gloss, f"{sc} missing from the scenario key"
+
+
 def test_median_versions_are_2_11(median_run):
     fq = {k: v for k, v in median_run.framework_versions.items()
           if k.startswith("fraiseql")}

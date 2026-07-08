@@ -2743,6 +2743,48 @@ function vbSwitcher(o) {
 </script>"""
 
 
+# The scenario codes, grouped for a human-readable key. Codes lead everywhere
+# on the page; this is the one place they are all defined in plain English.
+_GLOSSARY_GROUPS = [
+    ("Reads — each one nests deeper", ["Q1", "Q2", "Q2b", "Q3", "T1"]),
+    ("Filtered lists", ["F1", "F2", "F3"]),
+    ("Single-row lookup (cache miss vs hit)", ["C3", "HC3"]),
+    ("Writes", ["M1", "M1d", "MC1"]),
+    ("Query-by-hash — APQ", ["Q1_APQ", "Q2b_APQ", "M1_APQ"]),
+]
+
+
+def _scenario_glossary(meta: dict) -> str:
+    """A visible key for every Q1/M1/C3-style code — built from the scenario
+    labels, so it can never drift from the grid. Nothing is silently dropped:
+    any scenario missing from the groups above lands in an 'Other' row."""
+    sc = meta["scenarios"]
+    grouped = {c for _, codes in _GLOSSARY_GROUPS for c in codes}
+    groups = list(_GLOSSARY_GROUPS)
+    missing = [k for k in meta["scenario_order"] if k not in grouped]
+    if missing:
+        groups.append(("Other", missing))
+    rows = []
+    for title, codes in groups:
+        items = " ".join(
+            f'<span class="gl-item"><code>{esc(c)}</code> '
+            f'{esc(sc[c]["label"])}</span>'
+            for c in codes if c in sc)
+        rows.append(
+            f'<div class="gl-row"><span class="gl-cat">{esc(title)}</span>'
+            f'<span class="gl-items">{items}</span></div>')
+    return (
+        '<section id="glossary" aria-labelledby="glossary-h">'
+        '<h2 id="glossary-h">What the tests measure</h2>'
+        '<p class="lede">Every scenario code on this page &mdash; <code>Q1</code>, '
+        '<code>M1</code>, <code>C3</code> and the rest &mdash; is one of these. '
+        'Reads get progressively more nested; writes trade raw speed for keeping '
+        'the pre-computed rows correct. Throughput is requests per second '
+        '(higher is better).</p>'
+        f'<div class="glossary">{"".join(rows)}</div>'
+        '</section>')
+
+
 def _intro(grid: Grid, meta: dict) -> str:
     """The human first screen: what this is, the short answer, the catch, the
     obvious objection, and who is talking — all before any table."""
@@ -2833,6 +2875,7 @@ def _render_index(run: Run, meta: dict, grid: Grid, prices: dict) -> str:
         header,
         # The human story first: what this is, who to use, the win, the catch.
         _intro(grid, meta),
+        _scenario_glossary(meta),
         _workload_selector(grid, meta),
         _s1_section(grid, meta),
         _s5_section(grid, meta),
