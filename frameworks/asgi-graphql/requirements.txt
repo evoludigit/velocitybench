@@ -2,7 +2,7 @@
 # Generic ASGI GraphQL using graphql-core directly
 
 # Web Framework
-starlette==0.32.0
+starlette==1.0.0
 uvicorn[standard]==0.24.0
 
 # GraphQL (reference implementation)
