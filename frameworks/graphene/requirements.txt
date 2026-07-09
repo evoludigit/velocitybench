@@ -1,4 +1,4 @@
-fastapi==0.104.1
+fastapi==0.135.1
 uvicorn[standard]==0.24.0
 graphene==3.4.3
 asyncpg==0.31.0
