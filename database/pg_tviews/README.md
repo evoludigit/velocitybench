@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
 [![Rust](https://img.shields.io/badge/Rust-1.81%2B-orange.svg)](https://www.rust-lang.org/)
-[![Version](https://img.shields.io/badge/version-0.1.0--beta.9-orange.svg)](https://github.com/fraiseql/pg_tviews/releases)
+[![Version](https://img.shields.io/badge/version-0.1.0--beta.11-orange.svg)](https://github.com/fraiseql/pg_tviews/releases)
 [![Status](https://img.shields.io/badge/status-beta-blue.svg)](https://github.com/fraiseql/pg_tviews/releases)
 
 **CI/CD Status**:
@@ -76,7 +76,7 @@ class Post: ...
 
 ## 📋 Version Status
 
-**Current Version**: `0.1.0-beta.9` (March 2026)
+**Current Version**: `0.1.0-beta.11` (April 2026)
 - **Status**: Public Beta - Feature-complete, API may change
 - **Production Use**: Suitable for evaluation, not mission-critical systems
 - **Support**: Community support via GitHub issues
@@ -209,6 +209,7 @@ JOIN tb_user u ON p.fk_user = u.pk_user;
 - **🔧 JSONB Optimized**: Built for modern JSONB-heavy applications
 - **📊 Array Support**: Full INSERT/DELETE handling for array columns
 - **🐛 Excellent Debugging**: Rich error messages, debug functions, health checks
+- **⏸️ Bulk Operations**: Suspend/resume triggers for safe bulk data loading (Issue #44)
 
 ---
 
@@ -255,14 +256,45 @@ SELECT pg_tviews_recover_after_crash('user_summary');
 
 ### Configuration
 
+All limits and toggles are runtime-tunable GUCs (`SET` per-session or set in
+`postgresql.conf`); none require recompiling:
+
+| GUC | Type | Default | Purpose |
+|-----|------|---------|---------|
+| `pg_tviews.max_propagation_depth` | int | 100 | Max cascade iterations before aborting |
+| `pg_tviews.max_dependency_depth` | int | 10 | Max `pg_depend` traversal depth |
+| `pg_tviews.max_queue_size` | int | 10000 | Refresh-queue backpressure limit |
+| `pg_tviews.batch_size` | int | 1000 | Max PKs per bulk-refresh statement (chunking) |
+| `pg_tviews.cache_size` | int | 10000 | Max entries per in-memory metadata cache |
+| `pg_tviews.graph_cache_enabled` | bool | on | Cache dependency graphs |
+| `pg_tviews.table_cache_enabled` | bool | on | Cache table→entity mappings |
+| `pg_tviews.metrics_enabled` | bool | off | Collect refresh metrics |
+| `pg_tviews.audit_enabled` | bool | off | Audit logging (opt-in) |
+| `pg_tviews.unlogged_by_default` | bool | on | Create TVIEW tables UNLOGGED |
+| `pg_tviews.suspend_triggers` | bool | off | Suspend trigger-based refresh (bulk loads) |
+| `pg_tviews.union_duplicate_policy` | string | error | `first` or `error` on duplicate UNION-ALL keys |
+| `pg_tviews.log_level` | string | info | Logging verbosity |
+
 ```sql
--- Control default UNLOGGED behavior (default: true)
-SET pg_tviews.unlogged_by_default = true;
+-- Examples
+SET pg_tviews.unlogged_by_default = true;   -- default UNLOGGED behavior
+SET pg_tviews.batch_size = 5000;            -- larger bulk-refresh chunks
+SET pg_tviews.cache_size = 50000;           -- bigger per-session caches
 
 -- Alter existing TVIEWs
 ALTER TABLE tv_my_view SET UNLOGGED;
 ALTER TABLE tv_my_view SET LOGGED;  -- ⚠️ Truncates data
 ```
+
+> GUCs require `shared_preload_libraries = 'pg_tviews'` (already needed for the
+> extension) so they are registered at backend start.
+
+### TVIEW naming convention
+
+A TVIEW's derived entity must be refreshable: either a `tb_<entity>` base table
+exists (its primary key is `pk_<entity>`), or the definition joins the base tables
+it derives from so cascade paths can route changes to it. `pg_tviews_create`
+rejects a definition that satisfies neither, since it could never refresh.
 
 ### Safety Guarantees
 
@@ -365,6 +397,80 @@ SELECT * FROM pg_tviews_health_check();
 -- View real-time metrics
 SELECT * FROM pg_tviews_queue_realtime;
 ```
+
+---
+
+## ⏸️ Bulk Operations (Issue #44)
+
+For bulk INSERT/UPDATE/DELETE operations (e.g., seed data loading, ETL imports) on tables with TVIEWs, use the suspend/resume API to prevent trigger-based refresh during the operation:
+
+### Basic Pattern
+
+```sql
+-- Suspend trigger-based refresh globally
+SELECT pg_tviews_suspend_triggers();
+
+-- Perform bulk operations
+INSERT INTO customers SELECT * FROM staging_customers;
+INSERT INTO orders SELECT * FROM staging_orders;
+
+-- Resume triggers and refresh all TVIEWs in dependency order
+SELECT pg_tviews_resume_triggers();
+SELECT pg_tviews_refresh_all();
+```
+
+### Why This Matters
+
+When bulk inserting into multiple related tables:
+- Triggers fire on EACH insert
+- But dependent TVIEWs may not have all their data yet
+- This causes silent refresh failures (due to ON CONFLICT DO NOTHING)
+
+The suspend/resume API ensures:
+1. All data is loaded before any refresh happens
+2. TVIEWs are refreshed in dependency order
+3. JOINs in TVIEWs succeed because all tables are populated
+
+### Transaction-Scoped
+
+Suspension auto-resumes at transaction end:
+
+```sql
+BEGIN;
+  SELECT pg_tviews_suspend_triggers();
+  -- Bulk operations
+  -- No explicit resume needed!
+COMMIT;  -- Auto-resumes and enqueues changes
+
+SELECT pg_tviews_refresh_all();
+```
+
+### API Reference
+
+- `pg_tviews_suspend_triggers()` - Start suspension (supports nesting)
+- `pg_tviews_resume_triggers()` - Resume; enqueues changed entities
+- `pg_tviews_refresh_all()` - Refresh all queued TVIEWs in dependency order
+- `pg_tviews_is_suspended()` - Check current suspension state
+- `pg_tviews_suspended_entities()` - List entities that changed during suspension
+
+### Nested Suspension
+
+Calls can be nested; each must be matched:
+
+```sql
+SELECT pg_tviews_suspend_triggers();  -- depth 1
+SELECT pg_tviews_suspend_triggers();  -- depth 2
+-- operations...
+SELECT pg_tviews_resume_triggers();   -- depth 1
+SELECT pg_tviews_resume_triggers();   -- depth 0 (now resumed)
+```
+
+### Use Cases
+
+- **Seed data loading**: DB initialization with initial data set
+- **ETL imports**: Loading data from external sources into staging tables
+- **Snapshot imports**: Restoring from database dumps or migrations
+- **Bulk migrations**: Large data transformations
 
 ---
 
@@ -474,11 +580,11 @@ SELECT * FROM pg_tviews_queue_realtime;
 - **[Upgrades](docs/operations/upgrades.md)** - Version migration guides
 
 ### Benchmarks
-- **[Overview](docs/benchmarks/overview.md)** - Performance testing methodology and 4-way comparison
-- **[Running Benchmarks](docs/benchmarks/running-benchmarks.md)** - How to run benchmarks (Docker, pgrx, manual)
-- **[Docker Setup](docs/benchmarks/docker-benchmarks.md)** - Advanced Docker benchmarking (requires jsonb_delta)
-- **[Results Interpretation](docs/benchmarks/results-interpretation.md)** - Understanding benchmark results
-- **[Results](docs/benchmarks/results.md)** - Detailed benchmark data
+- **[Overview](docs/benchmarks/overview.md)** - Methodology and the three-arm comparison
+- **[Running Benchmarks](docs/benchmarks/running-benchmarks.md)** - How to run the harness on a local pgrx cluster
+- **[Results](docs/benchmarks/results.md)** - Measured performance figures
+- **[Results Interpretation](docs/benchmarks/results-interpretation.md)** - Reading the numbers honestly
+- **[jsonb_delta Integration](docs/benchmarks/jsonb-ivm-integration.md)** - jsonb_delta's role and the parity finding
 
 ### Development
 - **[Contributing](docs/development/contributing.md)** - Development setup and contribution guidelines

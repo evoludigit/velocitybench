@@ -37,16 +37,23 @@ enum KeyExtraction {
 }
 
 /// Extract DISTINCT ON key value from tuple, trying multiple types
-/// Returns the extraction result: Value on success, Null if column is NULL, TypeMismatch if unsupported type
-fn extract_distinct_on_key<'a>(
-    tuple: &PgHeapTuple<'a, AllocatedByPostgres>,
+/// Returns the extraction result: Value on success, Null if column is NULL, `TypeMismatch` if unsupported type
+fn extract_distinct_on_key(
+    tuple: &PgHeapTuple<'_, AllocatedByPostgres>,
     key_col: &str,
 ) -> KeyExtraction {
-    // Try String (TEXT, UUID, VARCHAR)
+    // Try String (TEXT, VARCHAR)
     match tuple.get_by_name::<String>(key_col) {
         Ok(Some(val)) => return KeyExtraction::Value(val),
         Ok(None) => return KeyExtraction::Null,
         Err(_) => {} // type mismatch, try next
+    }
+    // Try UUID — pgrx's Display yields the canonical lowercase hyphenated form,
+    // matching PostgreSQL's `uuid::text` used by refresh_by_dedup_key's WHERE clause.
+    match tuple.get_by_name::<pgrx::Uuid>(key_col) {
+        Ok(Some(val)) => return KeyExtraction::Value(val.to_string()),
+        Ok(None) => return KeyExtraction::Null,
+        Err(_) => {}
     }
     // Try i64 (BIGINT)
     match tuple.get_by_name::<i64>(key_col) {
@@ -79,6 +86,34 @@ fn pg_tview_trigger_handler<'a>(
         }
     };
 
+    // If triggers are suspended, record the change instead of enqueuing
+    if crate::config::suspend_triggers() {
+        // Record direct entity if any
+        if let Ok(Some(entity_info)) =
+            crate::queue::cache::table_cache::entity_info_cached(table_oid)
+        {
+            crate::suspend::record_change(&entity_info.name);
+        }
+
+        // Record entities from cascade paths (indirect dependencies)
+        let paths: Vec<crate::cascade_path::CascadePath> =
+            match crate::queue::cache::cascade_cache::cascade_paths_for_table(table_oid) {
+                Ok(p) => p,
+                Err(e) => {
+                    warning!(
+                        "Failed to load cascade paths for suspended trigger: {:?}",
+                        e
+                    );
+                    vec![]
+                }
+            };
+        for path in paths {
+            crate::suspend::record_change(&path.entity_name);
+        }
+
+        return Ok(None);
+    }
+
     // 1. Direct entity: this table IS a TVIEW source (e.g. tb_user → entity "user")
     match crate::queue::cache::table_cache::entity_info_cached(table_oid) {
         Ok(Some(entity_info)) => {
@@ -86,12 +121,11 @@ fn pg_tview_trigger_handler<'a>(
             // Check if this is a DISTINCT ON TVIEW using cached distinct_on_key
             if let Some(key_col) = &entity_info.distinct_on_key {
                 // DISTINCT ON TVIEW: enqueue dedup key value instead of base PK
-                let tuple = match trigger.new().or_else(|| trigger.old()) {
-                    Some(t) => t,
-                    None => {
-                        warning!("No tuple in trigger context for DISTINCT ON TVIEW '{entity}'");
-                        return Ok(None);
-                    }
+                let tuple = if let Some(t) = trigger.new().or_else(|| trigger.old()) {
+                    t
+                } else {
+                    warning!("No tuple in trigger context for DISTINCT ON TVIEW '{entity}'");
+                    return Ok(None);
                 };
                 match extract_distinct_on_key(&tuple, key_col) {
                     KeyExtraction::Value(key_val) => {
@@ -243,11 +277,18 @@ fn follow_cascade_path(
 /// For explicit transactions (BEGIN...COMMIT), both this trigger and the
 /// `ProcessUtility` hook may run. The flush is idempotent — the second call
 /// finds an empty queue and returns immediately.
+///
+/// If triggers are suspended, this trigger skips the flush.
 #[pg_trigger]
 #[allow(clippy::unnecessary_wraps)] // Reason: pgrx #[pg_trigger] requires Result return type
 fn pg_tview_flush_trigger<'a>(
     _trigger: &'a PgTrigger<'a>,
 ) -> Result<Option<PgHeapTuple<'a, AllocatedByPostgres>>, spi::Error> {
+    // Skip flush if triggers are suspended
+    if crate::config::suspend_triggers() {
+        return Ok(None);
+    }
+
     if let Err(e) = crate::queue::flush_refresh_queue() {
         warning!("TVIEW refresh failed in statement trigger: {:?}", e);
     }

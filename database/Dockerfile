@@ -70,8 +70,8 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
     --no-modify-path
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-# Install cargo-pgrx matching jsonb_delta pgrx = "0.16.1"
-RUN cargo install --locked cargo-pgrx --version 0.16.1
+# Install cargo-pgrx matching jsonb_delta pgrx = "0.17.0"
+RUN cargo install --locked cargo-pgrx --version 0.17.0
 
 # Initialize pgrx with the PostgreSQL 17 from the base image
 RUN cargo pgrx init --pg17 "$(which pg_config)"

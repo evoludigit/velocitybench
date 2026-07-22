@@ -355,5 +355,6 @@
       "operation": "CREATE"
     }
   ],
-  "subscriptions": []
+  "subscriptions": [],
+  "naming_convention": "camelCase"
 }

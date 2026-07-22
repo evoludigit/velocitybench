@@ -17,7 +17,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        pg-version: [13, 14, 15, 16, 17]
+        # PG13 is EOL and lacks pg_sys::JsonbToJsonbValue (added in PG14), which
+        # the 0.3.x binary rewrite depends on — see docs/COMPATIBILITY.md.
+        pg-version: [14, 15, 16, 17]
 
     steps:
       - name: Checkout code
@@ -54,7 +56,7 @@ jobs:
 
       - name: Install cargo-pgrx
         run: |
-          cargo install --locked cargo-pgrx --version 0.16.1
+          cargo install --locked cargo-pgrx --version 0.17.0
 
       - name: Initialize pgrx
         run: |
@@ -105,15 +107,30 @@ jobs:
 
       - name: Validate SQL schema generation
         run: |
+          VERSION=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
           cargo pgrx schema pg${{ matrix.pg-version }} > /tmp/generated-schema.sql
 
-          if ! diff -u sql/jsonb_delta--0.1.0.sql /tmp/generated-schema.sql; then
+          if ! diff -u "sql/jsonb_delta--${VERSION}.sql" /tmp/generated-schema.sql; then
             echo "❌ Generated schema doesn't match committed version!"
-            echo "Run: cargo pgrx schema > sql/jsonb_delta--0.1.0.sql"
+            echo "Run: just schema"
             exit 1
           fi
 
           echo "✅ Schema generation validated"
+
+      - name: Test extension upgrade path
+        run: |
+          PG_PORT=$(sudo pg_lsclusters -h | grep "^${{ matrix.pg-version }} main" | awk '{print $3}')
+          SHAREDIR=$(/usr/lib/postgresql/${{ matrix.pg-version }}/bin/pg_config --sharedir)
+
+          # cargo pgrx install ships only the current version's script; the
+          # older scripts and the upgrade scripts must be present to test
+          # ALTER EXTENSION ... UPDATE from a real 0.1.0 install.
+          sudo cp sql/jsonb_delta--*.sql "$SHAREDIR/extension/"
+
+          sudo -u postgres psql -p "$PG_PORT" -c "DROP DATABASE IF EXISTS test_jsonb_delta_upgrade;" || true
+          sudo -u postgres psql -p "$PG_PORT" -c "CREATE DATABASE test_jsonb_delta_upgrade;"
+          sudo -u postgres psql -p "$PG_PORT" -d test_jsonb_delta_upgrade -v ON_ERROR_STOP=1 -f test/upgrade_path_test.sql
 
       - name: Generate coverage report
         if: matrix.pg-version == 17 && (github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'coverage'))
@@ -202,7 +219,7 @@ jobs:
           sudo apt-get install -y postgresql-17 postgresql-server-dev-17
 
       - name: Install cargo-pgrx
-        run: cargo install --locked cargo-pgrx --version 0.16.1
+        run: cargo install --locked cargo-pgrx --version 0.17.0
 
       - name: Initialize pgrx
         run: cargo pgrx init --pg17=/usr/lib/postgresql/17/bin/pg_config
@@ -297,7 +314,7 @@ jobs:
           echo "✅ PostgreSQL is ready and accepting connections"
 
       - name: Install cargo-pgrx
-        run: cargo install --locked cargo-pgrx --version 0.16.1
+        run: cargo install --locked cargo-pgrx --version 0.17.0
 
       - name: Initialize pgrx
         run: cargo pgrx init --pg17=/usr/lib/postgresql/17/bin/pg_config

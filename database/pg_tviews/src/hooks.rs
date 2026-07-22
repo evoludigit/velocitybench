@@ -93,7 +93,7 @@ unsafe extern "C-unwind" fn tview_process_utility_hook(
                 query_env,
                 dest,
                 qc,
-            )
+            );
         };
         return;
     }
@@ -154,6 +154,13 @@ unsafe extern "C-unwind" fn tview_process_utility_hook(
 
         // Skip extension-related statements to avoid infinite recursion during installation
         if query_lower.contains("create extension") || query_lower.contains("drop extension") {
+            // Invalidate the jsonb_delta availability latch first, so a backend that
+            // cached availability re-checks on its next refresh after CREATE/DROP
+            // EXTENSION jsonb_delta (issue #50). This is a pair of atomic stores — no
+            // SPI — and runs before the pass-through so the stale value cannot survive.
+            if query_lower.contains("jsonb_delta") {
+                crate::lifecycle::invalidate_jsonb_delta_cache();
+            }
             return Ok(false); // Pass through
         }
 
@@ -224,18 +231,37 @@ unsafe extern "C-unwind" fn tview_process_utility_hook(
             }
         }
         Err(panic_info) => {
-            // PANIC in ProcessUtility hook - reset guard BEFORE raising error!()
+            // Something unwound out of the handler. Reset the guard BEFORE re-raising
+            // so subsequent statements in this session are still intercepted.
             unsafe { HOOK_IN_PROGRESS = false };
+
+            // A PostgreSQL `ereport(ERROR)` raised by SPI inside the handler (e.g.
+            // "cannot drop ... because other objects depend on it") is converted by
+            // pgrx into a Rust panic carrying a `CaughtError`; a Rust-side `error!()`
+            // carries an `ErrorReportWithLevel`. Both are legitimate, actionable errors
+            // — not pg_tviews bugs — so re-raise them faithfully (preserving message,
+            // detail, hint, and SQLSTATE) rather than degrading to the opaque
+            // "Any { .. }" message.
+            let panic_info = match panic_info.downcast::<pg_sys::panic::CaughtError>() {
+                Ok(caught) => caught.rethrow(),
+                Err(panic_info) => panic_info,
+            };
+            let panic_info = match panic_info.downcast::<pg_sys::panic::ErrorReportWithLevel>() {
+                Ok(report) => pg_sys::panic::CaughtError::ErrorReport(*report).rethrow(),
+                Err(panic_info) => panic_info,
+            };
+
+            // A genuine Rust panic — this really is a bug in pg_tviews.
             let panic_msg = panic_info
                 .downcast_ref::<&str>()
                 .map(|s| (*s).to_string())
                 .or_else(|| panic_info.downcast_ref::<String>().cloned())
                 .unwrap_or_else(|| format!("{panic_info:?}"));
             error!(
-                "PANIC in ProcessUtility hook: {} - This is a bug in pg_tviews - please report it!",
-                panic_msg
+                "PANIC in ProcessUtility hook: {panic_msg} - This is a bug in pg_tviews - please report it!"
             );
-            #[allow(unreachable_code)] // Reason: pgrx error!() diverges via longjmp, not Rust's !
+            #[allow(unreachable_code)]
+            // Reason: rethrow()/error!() diverge via longjmp, not Rust's !
             {
                 true
             }
@@ -257,10 +283,12 @@ unsafe extern "C-unwind" fn tview_process_utility_hook(
             );
         }
 
-        // After the event trigger returns, populate any TVIEWs created via CTAS.
+        // After the event trigger should have fired, drain any pending populatesand convert
+        // any TVIEWs that weren't converted by the event trigger (fallback for bulk operations).
         // The INSERT runs via SPI (DML, not utility), so it does not re-enter
         // ProcessUtility and there is no reentrancy issue with HOOK_IN_PROGRESS.
         drain_pending_populates();
+        drain_pending_unconverted_tviews();
     }
 
     // Release the reentrancy guard
@@ -273,7 +301,7 @@ unsafe extern "C-unwind" fn tview_process_utility_hook(
 /// pass through. Returns `Err` on failures that should abort with `error!()` —
 /// the caller is responsible for resetting `HOOK_IN_PROGRESS` before raising.
 ///
-/// SAFETY: This function operates on raw PostgreSQL C pointers from the ProcessUtility hook.
+/// SAFETY: This function operates on raw `PostgreSQL` C pointers from the `ProcessUtility` hook.
 /// All pointers are validated with null checks before dereferencing.
 unsafe fn handle_create_table_as(
     ctas: *mut pg_sys::CreateTableAsStmt,
@@ -510,6 +538,94 @@ pub fn enqueue_pending_populate(tv_table_name: &str, view_name: &str, schema_nam
     }
 }
 
+/// Drain and convert any TVIEW tables that weren't converted by the event trigger.
+///
+/// This is a fallback mechanism for bulk SQL operations where event triggers don't fire.
+/// `PostgreSQL`'s event trigger system may not fire during certain bulk import operations,
+/// so we check if there are any pending TVIEWs still in the cache after the statement
+/// executes and convert them directly.
+fn drain_pending_unconverted_tviews() {
+    // Get all pending unconverted TVIEWs
+    let entries: Vec<(String, String, String)> = PENDING_TVIEW_SELECTS
+        .lock()
+        .map(|mut cache| {
+            cache
+                .drain()
+                .map(|(table_name, (schema_name, select_sql))| {
+                    (table_name, schema_name, select_sql)
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
+    if entries.is_empty() {
+        return; // No unconverted TVIEWs, event trigger must have fired
+    }
+
+    // Log that we're using the fallback mechanism
+    notice!(
+        "pg_tviews: Event trigger did not fire for {} TVIEW(s), using fallback conversion",
+        entries.len()
+    );
+
+    // Convert each TVIEW directly in this context
+    for (table_name, schema_name, select_sql) in entries {
+        notice!(
+            "pg_tviews: Fallback converting TVIEW table '{}' (schema: '{}')",
+            table_name,
+            if schema_name.is_empty() {
+                "(current_schema)"
+            } else {
+                &schema_name
+            }
+        );
+
+        // Resolve the target schema
+        let schema_override: Option<&str> = if schema_name.is_empty() {
+            None
+        } else {
+            Some(schema_name.as_str())
+        };
+
+        // Drop the regular table PostgreSQL created and replace it with TVIEW semantics
+        let drop_sql = match schema_override {
+            Some(s) => format!(
+                "DROP TABLE IF EXISTS {}.{} CASCADE",
+                crate::utils::quote_identifier(s),
+                crate::utils::quote_identifier(&table_name),
+            ),
+            None => format!(
+                "DROP TABLE IF EXISTS {} CASCADE",
+                crate::utils::quote_identifier(&table_name)
+            ),
+        };
+
+        if let Err(e) = Spi::run(&drop_sql) {
+            warning!(
+                "pg_tviews: Failed to drop table '{}' during fallback conversion: {e}",
+                table_name
+            );
+            continue;
+        }
+
+        // Create the proper TVIEW: backing view, materialized table, triggers
+        match crate::ddl::create_tview(&table_name, &select_sql, schema_override, true) {
+            Ok(()) => {
+                notice!(
+                    "pg_tviews: Fallback conversion SUCCEEDED for TVIEW '{}'",
+                    table_name
+                );
+            }
+            Err(e) => {
+                warning!(
+                    "pg_tviews: Fallback conversion FAILED for TVIEW '{}': {e}",
+                    table_name
+                );
+            }
+        }
+    }
+}
+
 /// Drain and execute all pending TVIEW population requests.
 ///
 /// Called by the `ProcessUtility` hook after `call_prev_hook_or_standard` returns
@@ -594,7 +710,7 @@ fn drain_pending_populates() {
 ///
 /// Returns `Err` on failures — caller resets `HOOK_IN_PROGRESS` before raising.
 ///
-/// SAFETY: This function operates on raw PostgreSQL C pointers from the ProcessUtility hook.
+/// SAFETY: This function operates on raw `PostgreSQL` C pointers from the `ProcessUtility` hook.
 /// All pointers are validated with null checks before dereferencing.
 unsafe fn handle_drop_table(
     drop_stmt: *mut pg_sys::DropStmt,
@@ -620,6 +736,11 @@ unsafe fn handle_drop_table(
 
         let if_exists = drop_ref.missing_ok;
 
+        // Honor the statement's CASCADE/RESTRICT behavior. Without this the internal
+        // drop was always RESTRICT, so `DROP TABLE tv_* CASCADE` on a TVIEW with
+        // dependents raised a dependency error that surfaced as an opaque panic.
+        let cascade = drop_ref.behavior == pg_sys::DropBehavior::DROP_CASCADE;
+
         // Collect table names and indices from DropStmt.objects.
         // Each element in objects is a List* of String* (name parts: [schema, table] or [table]).
         let num_tables = pg_sys::list_length(objects);
@@ -627,7 +748,7 @@ unsafe fn handle_drop_table(
         let mut has_non_tv = false;
 
         for i in 0..num_tables {
-            let name_list = pg_sys::list_nth(objects, i) as *mut pg_sys::List;
+            let name_list = pg_sys::list_nth(objects, i).cast::<pg_sys::List>();
             if name_list.is_null() {
                 has_non_tv = true;
                 continue;
@@ -641,7 +762,7 @@ unsafe fn handle_drop_table(
             }
 
             // Get the last name part (table name, ignoring schema qualification)
-            let last_part = pg_sys::list_nth(name_list, name_parts - 1) as *mut pg_sys::String;
+            let last_part = pg_sys::list_nth(name_list, name_parts - 1).cast::<pg_sys::String>();
             if last_part.is_null() {
                 has_non_tv = true;
                 continue;
@@ -671,7 +792,7 @@ unsafe fn handle_drop_table(
 
         // Drop each tv_* table via drop_tview
         for (_, name) in &tv_entries {
-            match drop_tview(name, if_exists) {
+            match drop_tview(name, if_exists, cascade) {
                 Ok(()) => {}
                 Err(e) => {
                     if if_exists {
@@ -700,7 +821,7 @@ unsafe fn handle_drop_table(
 
 /// Handle ALTER TABLE statements on TVIEW tables
 ///
-/// SAFETY: This function operates on raw PostgreSQL C pointers from the ProcessUtility hook.
+/// SAFETY: This function operates on raw `PostgreSQL` C pointers from the `ProcessUtility` hook.
 /// All pointers are validated with null checks before dereferencing.
 unsafe fn handle_alter_table(
     alter_stmt: *mut pg_sys::AlterTableStmt,
@@ -746,7 +867,7 @@ unsafe fn handle_alter_table(
                 continue;
             }
 
-            let cmd = cmd_node as *mut pg_sys::AlterTableCmd;
+            let cmd = cmd_node.cast::<pg_sys::AlterTableCmd>();
             if cmd.is_null() {
                 continue;
             }
@@ -770,8 +891,8 @@ unsafe fn handle_alter_table(
 
 /// Call the previous hook if it exists, otherwise call `standard_ProcessUtility`
 ///
-/// SAFETY: This calls into either a previous PostgreSQL hook or standard_ProcessUtility.
-/// The parameters are raw C pointers from the calling ProcessUtility hook.
+/// SAFETY: This calls into either a previous `PostgreSQL` hook or `standard_ProcessUtility`.
+/// The parameters are raw C pointers from the calling `ProcessUtility` hook.
 #[allow(clippy::too_many_arguments)] // Reason: PostgreSQL ProcessUtility_hook C callback signature
 unsafe fn call_prev_hook_or_standard(
     pstmt: *mut pg_sys::PlannedStmt,

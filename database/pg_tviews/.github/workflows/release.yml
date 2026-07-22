@@ -19,14 +19,14 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install pgrx
-        run: cargo install --locked cargo-pgrx --version 0.16.1
+        run: cargo install --locked cargo-pgrx --version 0.17.0
 
       - name: Install cosign
         uses: sigstore/cosign-installer@v3
 
       - name: Build extension
         run: |
-          cargo pgrx package --release
+          cargo pgrx package
           tar czf pg_tviews-${{ github.ref_name }}.tar.gz target/release/
 
       - name: Generate SBOM

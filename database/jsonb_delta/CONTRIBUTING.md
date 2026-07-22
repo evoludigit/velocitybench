@@ -42,7 +42,7 @@ Enhancement suggestions are welcome! Please provide:
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
    # Install pgrx
-   cargo install --locked cargo-pgrx --version 0.16.1
+   cargo install --locked cargo-pgrx --version 0.17.0
    cargo pgrx init
 
    # Install just (task runner)
@@ -140,6 +140,22 @@ Enhancement suggestions are welcome! Please provide:
 - Add inline code documentation
 - Update TESTING.md for test-related changes
 - Follow documentation standards in `docs/contributing/documentation-standards.md`
+
+## Cutting a Release
+
+The crate version, the extension control file, and the shipped SQL scripts
+must move together (`tests/version_coherence.rs` enforces the first two):
+
+1. Bump `version` in `Cargo.toml` and `default_version` in
+   `jsonb_delta.control` to the same value.
+2. Regenerate the versioned script: `just schema` (writes
+   `sql/jsonb_delta--<version>.sql`; the name is derived from `Cargo.toml`).
+3. Write the upgrade script `sql/jsonb_delta--<previous>--<version>.sql`.
+   Diff the newly generated script against the previous one first — any
+   signature change must appear in the upgrade script and in CHANGELOG.md.
+4. Keep the previous versioned script in-tree: it is needed to install the
+   older label and to exercise the upgrade path (`just test-upgrade`).
+5. Update CHANGELOG.md and run `just ci`.
 
 ## Project Structure
 

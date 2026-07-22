@@ -7,28 +7,132 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/SemVer
 
 ## [Unreleased]
 
-### Removed
+## [0.1.0-beta.13] - 2026-07-22
 
-- **Two-Phase Commit (2PC) infrastructure**: Removed unimplemented 2PC support:
-  - `pg_tviews_commit_prepared()` and `pg_tviews_rollback_prepared()` SQL functions (never called)
-  - `src/twophase.rs` module (2PC transaction handlers)
-  - `src/queue/persistence.rs` module (queue serialization for 2PC)
-  - `src/refresh/cache.rs` module (prepared statement caching, planned optimization)
-  - Architectural decision: Use implicit transaction commit via statement-level trigger flushing instead
-- **2PC GID validation**: Removed `validate_gid()` function (2PC functions deleted)
+### Fixed
 
-### Security
-
-- **SQL injection prevention**: Parameterized all user-controlled string inputs
-  that were previously embedded via `format!()` or quote-doubling:
-  - `pg_tviews_show_cascade_path()` entity parameter
-  - `entity_for_table_uncached()` catalog lookup
-  - All three audit log functions (`log_create`, `log_drop`, `log_refresh`)
-- **Privilege escalation**: Removed unnecessary `SECURITY DEFINER` from the
-  `pg_tviews_debug_queue()` PL/pgSQL stub in `pg_tviews_monitoring.sql`
+- **Incremental refresh silently dropped INSERTs and failed DELETE (#48)**: After the
+  first change statement per entity, subsequent INSERTs were silently lost and DELETEs
+  left stale rows. Three write sites were UPDATE-only (a not-yet-materialized row matched
+  nothing and was dropped), and a deleted base row raised a swallowed SPI error instead of
+  removing the tview row. `apply_patch` and `refresh_bulk` now UPSERT
+  (`INSERT … ON CONFLICT DO UPDATE`), and a missing backing-view row now deletes the tview
+  row. Fixed in both jsonb_delta modes.
+- **`jsonb_smart_patch_array` signature mismatch (#50, #24)**: pg_tviews emitted a 4-arg
+  call that jsonb_delta 0.1.0 never exported (a test stub masked it), so every array
+  dependency errored against the real extension. Array-dependency tviews are now recomputed
+  via full replacement — correct for array element insert/update/delete and for the entity's
+  own-column changes. This also resolves the array test failures reported as #24. The
+  jsonb_delta availability latch is now invalidated on `CREATE/DROP EXTENSION jsonb_delta`.
 
 ### Added
 
+- **Create-time refreshability validation (#49)**: `pg_tviews_create` now rejects a
+  definition whose derived entity can never refresh — no `tb_<entity>` base table **and** no
+  cascade path routing changes to it — instead of registering a permanently-stale tview that
+  can silently shadow a correctly-named sibling on the same base table.
+- **New tunable GUCs (#27)**: `pg_tviews.max_dependency_depth` (was a compile-time constant),
+  `pg_tviews.batch_size` (bulk refresh is now chunked), and `pg_tviews.cache_size` (bounds
+  the previously unbounded per-session metadata caches). Existing `pg_tviews.max_queue_size`
+  already covered the issue's `queue_depth`.
+
+### Changed
+
+- **jsonb_delta 0.3.0 is the documented drop-in minimum**: CI and docs now target
+  jsonb_delta **0.3.0**. The upgrade is zero-code for pg_tviews — the extension is
+  detected by presence only (no version pin), and the SQL contract is byte-identical
+  to 0.1.0/0.2.0. 0.3.0 installs cleanly over an existing extension via
+  `ALTER EXTENSION jsonb_delta UPDATE TO '0.3.0'`. pg_tviews' only live runtime call
+  into jsonb_delta is the stable `jsonb_smart_patch_scalar` entry point; benchmarking
+  0.3.0 against the native fallback shows the two at parity for pg_tviews' refresh
+  workload (see `docs/benchmarks/results.md`), so this is a maintenance/compatibility
+  bump, not a performance change. Resolves jsonb_delta #12 on the consumer side
+  (Option A: contract test only).
+
+### Documentation
+
+- **Benchmark docs rewritten to the real harness**: the entire `docs/benchmarks/`
+  section now documents `test/sql/real_benchmark/` (the real `pg_tviews_create`
+  API) instead of the removed `comprehensive_benchmarks/` harness. Every figure
+  traces to a measured run in `docs/benchmarks/results.md`. Removed the dead
+  Docker/podman benchmark tooling (`docker/dockerfile-benchmarks`, its helper
+  scripts, and `scripts/{01..06,master}.sh`), which targeted the removed harness.
+
+## [0.1.0-beta.12] - 2026-06-15
+
+### Added
+
+- **Pause/resume API for bulk INSERT operations (#44)**: Suspend row-level refresh
+  triggers during bulk loads, then refresh affected TVIEWs in dependency order on resume.
+  Adds `pg_tviews_suspend_triggers()`, `pg_tviews_resume_triggers()`, and
+  `pg_tviews_refresh_all()`, the `pg_tviews.suspend_triggers` GUC, nested suspend/resume
+  depth tracking, and auto-resume on COMMIT/ABORT to prevent orphaned state.
+- **Automatic `tv_*` to TVIEW conversion**: SQL helpers (`pg_tviews_auto_convert()` and
+  `pg_tviews_auto_convert_plan()` dry-run) plus a `convert_tviews.sh` CLI to detect `tv_*`
+  tables created via bulk DDL and convert them to TVIEWs after schema creation.
+- **`cascade` argument for `pg_tviews_drop()`**: Optional third argument to drop dependent
+  objects along with the TVIEW.
+
+### Fixed
+
+- **`DROP TABLE tv_* CASCADE` panics in ProcessUtility hook (#47)**: The hook ignored
+  `DropStmt.behavior`, so the internal drop was always RESTRICT — dropping a TVIEW with
+  any dependent object raised "cannot drop ... because other objects depend on it"
+  internally, which `catch_unwind` degraded to the opaque
+  `PANIC in ProcessUtility hook: Any { .. }` message. The hook now honors CASCADE/RESTRICT
+  and re-raises caught PostgreSQL errors faithfully (preserving SQLSTATE, detail, and hint)
+  instead of mislabeling them as a pg_tviews bug.
+- **Schema collision in `VIEW_COLUMNS_CACHE`**: The cache was keyed by view name only, so
+  identically named backing views in different schemas (e.g. `public.v_machine` and
+  `app.v_machine`) returned the wrong columns. The cache is now keyed by
+  `{schema}.{view_name}`, fixing multi-schema deployments.
+- **TVIEW conversion fallback when event triggers don't fire**: During bulk SQL, the
+  `ddl_command_end` event trigger may not fire for every statement. The ProcessUtility hook
+  now drains any pending unconverted `tv_*` entries after each statement so registration
+  still succeeds.
+- **Schema inference prioritizes the `pk` column over `id`**: A `SELECT` exposing both `pk`
+  (BIGINT) and `id` (UUID) incorrectly chose `id` as the primary key, causing type-mismatch
+  errors when populating the materialized table. PK detection now prefers an explicit `pk`
+  column, then integer/serial types, and falls back to `id` last.
+- **PL/pgSQL syntax in the auto-convert functions**: Loop variables in
+  `pg_tviews_auto_convert()` / `pg_tviews_auto_convert_plan()` are now declared as record
+  types so both functions parse correctly.
+
+### Documentation
+
+- **`INTEGRATION_GUIDE` for automatic TVIEW conversion**: End-to-end guide for wiring
+  `tv_*` detection and conversion into schema build workflows, including shell-script usage,
+  custom backing views, multi-database builds, and troubleshooting.
+
+## [0.1.0-beta.11] - 2026-04-19
+
+### Fixed
+
+- **`spi_batch_lookup` OID cast fails in FROM clause (#010)**: Cast expressions like
+  `(52276294::regclass)` are not valid PostgreSQL FROM-clause table references. The
+  function now resolves OIDs to schema-qualified names via `pg_class + pg_namespace`
+  (`quote_ident(nspname) || '.' || quote_ident(relname)`) before building the query,
+  making cascade traversal work correctly for tables in any schema.
+- **`cascade_paths` column serialization**: Changed from `JSONB[]` to `TEXT[]` throughout
+  the runtime schema to fix pgrx deserialization failures; added `pg_array_elem` for
+  proper `TEXT[]` serialization in `CREATE TVIEW`.
+
+### Added
+
+- **Multi-hop cascade integration tests**: SQL test suite covering transitive FK cascade
+  paths across three or more hops (e.g. `tb_currency` → `tv_contract` → `tv_invoice`).
+
+## [0.1.0-beta.10] - 2026-04-01
+
+### Added
+
+- **Multi-hop cascade path support**: Full end-to-end cascade path computation,
+  storage, and traversal across arbitrary FK chains. TVIEWs now automatically
+  propagate refreshes through transitive dependencies.
+- **SQL JOIN parser**: Extracts FK relationships from TVIEW `SELECT` definitions
+  to build the cascade path graph at registration time.
+- **`cascade_paths` catalog column**: Stores serialized hop sequences per TVIEW
+  for O(1) lookup during trigger processing.
 - **Error message improvements**: Enhanced error messages for missing rows during refresh with:
   - Entity name and view name context
   - Actual SQL query being executed
@@ -37,6 +141,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/SemVer
 - **GUC parameter**: `pg_tviews.max_queue_size` for queue backpressure enforcement
 - **Regex caching**: LazyLock static patterns for parser and analyzer regexes
 - `InvalidInput` error variant (SQLSTATE `22023`) for input validation errors
+
+### Removed
+
+- **Two-Phase Commit (2PC) infrastructure**: Removed unimplemented 2PC support
+  (`pg_tviews_commit_prepared`, `pg_tviews_rollback_prepared`, `src/twophase.rs`,
+  `src/queue/persistence.rs`, `src/refresh/cache.rs`). Implicit transaction commit
+  via statement-level trigger flushing supersedes the 2PC design.
+
+### Security
+
+- **SQL injection prevention**: Parameterized all user-controlled string inputs
+  previously embedded via `format!()` in `pg_tviews_show_cascade_path()`,
+  `entity_for_table_uncached()`, and all three audit log functions.
+- **Privilege escalation**: Removed unnecessary `SECURITY DEFINER` from
+  `pg_tviews_debug_queue()` in `pg_tviews_monitoring.sql`.
 
 ## [0.1.0-beta.9] - 2026-03-01
 

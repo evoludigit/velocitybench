@@ -24,7 +24,7 @@ fn current_schema() -> TViewResult<String> {
 
 /// Expand `SELECT * FROM [schema.]source` to an explicit column list.
 ///
-/// When the SELECT is just `SELECT * FROM …`, pg_tviews cannot infer the
+/// When the SELECT is just `SELECT * FROM …`, `pg_tviews` cannot infer the
 /// Trinity schema (pk_*, id, data columns) from the wildcard at parse time.
 /// This function detects that pattern and expands it by querying
 /// `information_schema.columns` for the source view/table's actual columns,
@@ -51,13 +51,7 @@ fn expand_select_star_if_needed(select_sql: &str) -> TViewResult<String> {
 
     // The token after * must be FROM (no other clauses like WHERE before FROM)
     let after_from = match after_star.strip_prefix("from") {
-        Some(rest)
-            if rest
-                .chars()
-                .next()
-                .map(|c| c.is_ascii_whitespace())
-                .unwrap_or(true) =>
-        {
+        Some(rest) if rest.chars().next().is_none_or(|c| c.is_ascii_whitespace()) => {
             rest.trim_start()
         }
         _ => return Ok(select_sql.to_string()),
@@ -276,20 +270,50 @@ pub fn create_tview(
         None => current_schema()?,
     };
 
+    // Reject WITH RECURSIVE up front (issue #51): cascade paths cannot be tracked
+    // through a recursive CTE, so creating one would leave a tview that silently
+    // refreshes incompletely.
+    if crate::sql_parser::has_recursive_cte(&final_select_sql) {
+        return Err(TViewError::InvalidInput {
+            parameter: "tview definition".to_string(),
+            reason: format!(
+                "TVIEW '{tv_table_name}' uses WITH RECURSIVE, which pg_tviews does not support: \
+                 cascade paths cannot be tracked through a recursive CTE, so the tview would \
+                 refresh incompletely. Rewrite the definition without recursion."
+            ),
+        });
+    }
+
+    // Resolve DISTINCT ON keys before creating any objects, so an unresolvable
+    // dedup key rejects the create cleanly (issue #51). `distinct_on_keys` is the
+    // raw SOURCE column the trigger reads off the base tuple; `distinct_on_output_keys`
+    // is the projected OUTPUT column the view / tv expose and that refresh + the
+    // tview primary key must use. They differ when the DISTINCT ON key is aliased
+    // (e.g. `c.id_contract AS pk_contract`).
+    let distinct_on_keys =
+        crate::schema::parser::extract_distinct_on_keys(&final_select_sql).unwrap_or_default();
+    let distinct_on_output_keys = if distinct_on_keys.is_empty() {
+        Vec::new()
+    } else {
+        crate::sql_parser::extract_distinct_on_output_keys(&final_select_sql).map_err(|reason| {
+            TViewError::InvalidInput {
+                parameter: "DISTINCT ON key".to_string(),
+                reason,
+            }
+        })?
+    };
+
     // Step 3: Create backing view v_<entity>
     let view_name = format!("v_{entity_name}");
     create_backing_view(&view_name, &final_select_sql, &schema_name)?;
 
-    // Extract DISTINCT ON keys from SQL
-    let distinct_on_keys =
-        crate::schema::parser::extract_distinct_on_keys(&final_select_sql).unwrap_or_default();
-
-    // Step 4: Create materialized table tv_<entity>
+    // Step 4: Create materialized table tv_<entity>.
+    // DISTINCT ON tviews key the table on the projected OUTPUT column.
     create_materialized_table(
         &tv_table_name,
         &final_schema,
         &schema_name,
-        &distinct_on_keys,
+        &distinct_on_output_keys,
     )?;
 
     // Step 5: Populate initial data
@@ -316,6 +340,52 @@ pub fn create_tview(
         &dep_graph.base_tables,
     )?;
 
+    // Step 6.55: Reject a DISTINCT ON tview that also has JOIN-based cascade paths
+    // (issue #51). A DISTINCT ON tview refreshes by dedup key (the trigger enqueues
+    // the DISTINCT ON key value); a cascade path enqueues a base-table PK that
+    // `refresh_pk` looks up by `pk_<entity>`. When the dedup key is aliased the two
+    // are different values, so mixing them would refresh the wrong row silently.
+    // The dedup and PK refresh paths are mutually exclusive by design.
+    if !distinct_on_keys.is_empty() && !cascade_paths.is_empty() {
+        return Err(TViewError::InvalidInput {
+            parameter: "tview definition".to_string(),
+            reason: format!(
+                "TVIEW '{tv_table_name}' combines DISTINCT ON with a JOIN that produces \
+                 cascade paths ({} dependent table(s)). DISTINCT ON tviews refresh by \
+                 deduplication key and cannot also track PK-based cascade dependencies — the \
+                 two refresh paths are mutually exclusive. Remove the DISTINCT ON, or express \
+                 the dependency without a join that pg_tviews would cascade.",
+                cascade_paths.len()
+            ),
+        });
+    }
+
+    // Step 6.6: Reject a tview that can never be incrementally refreshed (issue #49).
+    // A refresh is enqueued for this entity only if either a `tb_<entity>` base table
+    // exists (its row trigger resolves the entity by stripping `tb_`) or a cascade
+    // path routes some base-table change to it. With neither, the tview would silently
+    // never refresh — and, when built directly on a `tb_` base table that already
+    // backs another entity (e.g. `order_summary` over `tb_order`), shadow that
+    // sibling. Aggregate/summary tviews without a `tb_<entity>` stay valid as long as
+    // their joins produce cascade paths. This runs before metadata registration and
+    // trigger installation, and any objects created above roll back with the ERROR,
+    // so a rejected create leaves the incumbent tview untouched.
+    if cascade_paths.is_empty() && !entity_base_table_exists(entity_name, &schema_name)? {
+        return Err(TViewError::InvalidInput {
+            parameter: "tview definition".to_string(),
+            reason: format!(
+                "TVIEW '{tv_table_name}' (entity '{entity_name}') can never be refreshed: \
+                 there is no base table 'tb_{entity_name}', and no cascade path routes any \
+                 base-table change to it. pg_tviews maintains a tview either directly (a \
+                 pk_<entity> primary key over a tb_<entity> base table) or via cascade \
+                 paths from its joined base tables. Rename the primary-key column to match \
+                 an existing base table, or ensure the definition joins the base tables it \
+                 derives from. Creating it as-is would leave a permanently stale tview and \
+                 can silently shadow a correctly-named tview on the same base table."
+            ),
+        });
+    }
+
     // Step 7: Register metadata (with cascade paths)
     register_metadata(
         entity_name,
@@ -326,6 +396,7 @@ pub fn create_tview(
         &cascade_paths,
         &schema_name,
         &distinct_on_keys,
+        &distinct_on_output_keys,
     )?;
 
     // Step 8: Install triggers on base tables
@@ -471,9 +542,7 @@ fn resolve_join_path(
             .get(&root_table)
             .ok_or_else(|| TViewError::CatalogError {
                 operation: "resolve cascade path reverse-lookup hop".to_string(),
-                pg_error: format!(
-                    "Root table '{root_table}' not found in base table dependencies"
-                ),
+                pg_error: format!("Root table '{root_table}' not found in base table dependencies"),
             })?;
         hops.push(cascade_path::CascadeHop {
             table_oid: root_oid,
@@ -511,45 +580,147 @@ fn tview_exists(tview_name: &str) -> TViewResult<bool> {
     .map(|opt| opt.unwrap_or(false))
 }
 
+/// Does a `tb_<entity>` base table exist for this entity?
+///
+/// Used by the issue #49 refreshability guard: a `tb_<entity>` base table means the
+/// entity is reachable directly (its row trigger resolves the entity by stripping
+/// `tb_`). The table is resolved in the tview's target schema first, then via the
+/// active `search_path`, so both explicit-schema and `current_schema()` callers are
+/// handled.
+fn entity_base_table_exists(entity_name: &str, schema_name: &str) -> TViewResult<bool> {
+    let tb_name = format!("tb_{entity_name}");
+    let qualified = format!(
+        "{}.{}",
+        quote_identifier(schema_name),
+        quote_identifier(&tb_name)
+    );
+
+    Spi::get_one_with_args::<bool>(
+        "SELECT COALESCE(to_regclass($1), to_regclass($2)) IS NOT NULL",
+        &[
+            unsafe {
+                DatumWithOid::new(
+                    qualified.as_str(),
+                    PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value(),
+                )
+            },
+            unsafe {
+                DatumWithOid::new(
+                    tb_name.as_str(),
+                    PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value(),
+                )
+            },
+        ],
+    )
+    .map_err(|e| TViewError::CatalogError {
+        operation: format!("Check base table exists for entity '{entity_name}'"),
+        pg_error: format!("{e:?}"),
+    })
+    .map(|opt| opt.unwrap_or(false))
+}
+
 /// Create the backing view that contains the user's SELECT definition
 fn create_backing_view(view_name: &str, select_sql: &str, schema_name: &str) -> TViewResult<()> {
     let qi_schema = quote_identifier(schema_name);
     let qi_view = quote_identifier(view_name);
     let create_view_sql = format!("CREATE VIEW {qi_schema}.{qi_view} AS {select_sql}");
 
-    crate::utils::spi_run_ddl(&create_view_sql).map_err(|e| TViewError::SpiError {
-        query: create_view_sql.clone(),
-        error: e,
-    })?;
+    // Use notice! instead of info! to ensure visibility
+    notice!(
+        "DEBUG: create_backing_view START - schema='{}', view='{}', sql_len={}",
+        schema_name,
+        view_name,
+        create_view_sql.len()
+    );
+
+    match crate::utils::spi_run_ddl(&create_view_sql) {
+        Ok(()) => {
+            // Log successful spi_run_ddl
+            notice!(
+                "DEBUG: spi_run_ddl SUCCEEDED for {}.{}",
+                schema_name,
+                view_name
+            );
+        }
+        Err(e) => {
+            // Log spi_run_ddl failure
+            notice!(
+                "DEBUG: spi_run_ddl FAILED - {}.{} - error: {}",
+                schema_name,
+                view_name,
+                e
+            );
+            // Note: error!() macro diverges, so this return is unreachable but needed for type checking
+            return Err(TViewError::SpiError {
+                query: create_view_sql.clone(),
+                error: e,
+            });
+        }
+    }
+
+    // Log before verification check
+    notice!(
+        "DEBUG: checking if view exists - schema='{}', view='{}' in pg_class",
+        schema_name,
+        view_name
+    );
 
     // Verify the view was created (schema-qualified to avoid false positives across schemas)
     let check_args = vec![
         unsafe { DatumWithOid::new(view_name, PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value()) },
         unsafe { DatumWithOid::new(schema_name, PgOid::BuiltIn(PgBuiltInOids::TEXTOID).value()) },
     ];
-    let exists = Spi::get_one_with_args::<i32>(
+    let exists = match Spi::get_one_with_args::<i32>(
         "SELECT 1 FROM pg_class c \
          JOIN pg_namespace n ON c.relnamespace = n.oid \
          WHERE c.relname = $1 AND n.nspname = $2 AND c.relkind = 'v'",
         &check_args,
-    )
-    .map_err(|e| TViewError::SpiError {
-        query: format!("Check view {schema_name}.{view_name} exists"),
-        error: e.to_string(),
-    })?
-    .is_some();
+    ) {
+        Ok(result) => {
+            if result.is_some() {
+                // Log successful verification
+                notice!(
+                    "DEBUG: VERIFIED - backing view {}.{} exists in pg_class",
+                    schema_name,
+                    view_name
+                );
+                true
+            } else {
+                // Log verification failure
+                notice!(
+                    "DEBUG: VERIFICATION FAILED - backing view {}.{} not found in pg_class after spi_run_ddl",
+                    schema_name,
+                    view_name
+                );
+                false
+            }
+        }
+        Err(e) => {
+            // Log verification query failure
+            notice!(
+                "DEBUG: verification query FAILED - could not check pg_class: {}",
+                e
+            );
+            // Note: error!() macro diverges, so this return is unreachable but needed for type checking
+            return Err(TViewError::SpiError {
+                query: format!("Check view {schema_name}.{view_name} exists"),
+                error: e.to_string(),
+            });
+        }
+    };
 
     if !exists {
         return Err(TViewError::CatalogError {
             operation: format!("Create view {schema_name}.{view_name}"),
-            pg_error: "View was not created".to_string(),
+            pg_error: "View was not created (CREATE VIEW succeeded but view missing from pg_class)"
+                .to_string(),
         });
     }
 
     Ok(())
 }
 
-/// Map a scalar PostgreSQL type name to an uppercase SQL type string for CREATE TABLE.
+/// Map a scalar `PostgreSQL` type name to an uppercase SQL type string for CREATE TABLE.
 ///
 /// Handles both `information_schema.data_type` values (e.g. `"boolean"`, `"uuid"`) and
 /// `udt_name` values for extension types (e.g. `"ltree"`, `"geometry"`).
@@ -621,10 +792,10 @@ fn scalar_pg_type_to_sql(pg_type: &str) -> &'static str {
     }
 }
 
-/// Resolve an `information_schema.columns` row (data_type + udt_name) to a SQL type
+/// Resolve an `information_schema.columns` row (`data_type` + `udt_name`) to a SQL type
 /// string suitable for a CREATE TABLE column definition.
 ///
-/// Handles the three cases PostgreSQL presents:
+/// Handles the three cases `PostgreSQL` presents:
 /// - Built-in scalar: `data_type` is the canonical name, `udt_name` is redundant.
 /// - Extension / user-defined: `data_type = "USER-DEFINED"`, `udt_name` is the type name.
 /// - Array: `data_type = "ARRAY"`, `udt_name` is `_<element_udt_name>` (e.g. `_uuid`).
@@ -632,16 +803,16 @@ fn resolve_pg_column_type(data_type: &str, udt_name: Option<&str>) -> String {
     match data_type {
         "USER-DEFINED" => {
             // udt_name holds the extension type name (ltree, geometry, hstore, citext, …)
-            udt_name
-                .map(|u| scalar_pg_type_to_sql(u).to_string())
-                .unwrap_or_else(|| "TEXT".to_string())
+            udt_name.map_or_else(
+                || "TEXT".to_string(),
+                |u| scalar_pg_type_to_sql(u).to_string(),
+            )
         }
         "ARRAY" => {
             // udt_name is "_<element>" (e.g. "_uuid" → UUID[], "_ltree" → LTREE[])
             let element_sql = udt_name
                 .and_then(|u| u.strip_prefix('_'))
-                .map(scalar_pg_type_to_sql)
-                .unwrap_or("TEXT");
+                .map_or("TEXT", scalar_pg_type_to_sql);
             format!("{element_sql}[]")
         }
         other => scalar_pg_type_to_sql(other).to_string(),
@@ -653,13 +824,14 @@ fn create_materialized_table(
     tview_name: &str,
     schema: &TViewSchema,
     schema_name: &str,
-    distinct_on_keys: &[String],
+    distinct_on_output_keys: &[String],
 ) -> TViewResult<()> {
     let qi_schema = quote_identifier(schema_name);
     let qi_tview = quote_identifier(tview_name);
 
-    // For DISTINCT ON TVIEWs the dedup key is the table PK; pk_<entity> becomes a plain column.
-    let first_dedup = distinct_on_keys.first().map(String::as_str);
+    // For DISTINCT ON TVIEWs the dedup key is the table PK; pk_<entity> becomes a plain
+    // column. The key here is the projected OUTPUT column (the name the view exposes).
+    let first_dedup = distinct_on_output_keys.first().map(String::as_str);
     let is_distinct_on = first_dedup.is_some();
 
     // Build column definitions based on inferred schema
@@ -756,8 +928,7 @@ fn create_materialized_table(
     for uuid_fk in &schema.uuid_fk_columns {
         let sql_type = actual_col_types
             .get(uuid_fk.as_str())
-            .map(String::as_str)
-            .unwrap_or("UUID"); // if not found, trust name-based inference
+            .map_or("UUID", String::as_str); // if not found, trust name-based inference
         columns.push(format!("{} {sql_type}", quote_identifier(uuid_fk)));
     }
 
@@ -767,8 +938,7 @@ fn create_materialized_table(
     for (col_name, col_type) in &schema.additional_columns_with_types {
         let effective_type = actual_col_types
             .get(col_name.as_str())
-            .map(String::as_str)
-            .unwrap_or(col_type.as_str());
+            .map_or(col_type.as_str(), String::as_str);
         let qi_col = quote_identifier(col_name);
         if first_dedup == Some(col_name.as_str()) {
             columns.push(format!("{qi_col} {effective_type} PRIMARY KEY"));
@@ -867,8 +1037,7 @@ fn populate_initial_data(
     // This ensures consistency and handles any discrepancies between inferred schema and actual view
     let view_oid = Spi::get_one::<Oid>(&format!(
         "SELECT c.oid FROM pg_class c JOIN pg_namespace n ON c.relnamespace = n.oid \
-         WHERE c.relname::text = '{}' AND n.nspname::text = '{}' AND c.relkind = 'v'",
-        view_name, schema_name
+         WHERE c.relname::text = '{view_name}' AND n.nspname::text = '{schema_name}' AND c.relkind = 'v'"
     ))?
     .ok_or_else(|| TViewError::CatalogError {
         operation: format!("Find view {view_name} in schema {schema_name}"),
@@ -932,6 +1101,7 @@ fn register_metadata(
     cascade_paths: &[cascade_path::CascadePath],
     schema_name: &str,
     distinct_on_keys: &[String],
+    distinct_on_output_keys: &[String],
 ) -> TViewResult<()> {
     // Detect whether the definition is a UNION / UNION ALL query.
     // CTE bodies are inside (...) so their UNION is at depth > 0 and not matched.
@@ -1036,8 +1206,13 @@ fn register_metadata(
         pg_error: "Table OID not found".to_string(),
     })?;
 
-    // Serialize distinct_on_keys as a PostgreSQL array literal
+    // Serialize distinct_on_keys (source) and distinct_on_output_keys as array literals
     let distinct_on_str = distinct_on_keys
+        .iter()
+        .map(|s| pg_array_elem(s))
+        .collect::<Vec<_>>()
+        .join(",");
+    let distinct_on_output_str = distinct_on_output_keys
         .iter()
         .map(|s| pg_array_elem(s))
         .collect::<Vec<_>>()
@@ -1057,8 +1232,9 @@ fn register_metadata(
             dependency_paths,
             array_match_keys,
             distinct_on_keys,
+            distinct_on_output_keys,
             is_union
-        ) VALUES ($1, {}, {}, $2, {}, '{{{}}}', '{{{}}}', '{{{}}}', '{{{}}}', '{{{}}}', '{{{}}}', {})
+        ) VALUES ($1, {}, {}, $2, {}, '{{{}}}', '{{{}}}', '{{{}}}', '{{{}}}', '{{{}}}', '{{{}}}', '{{{}}}', {})
         ON CONFLICT (entity) DO NOTHING",
         view_oid.to_u32(),
         table_oid.to_u32(),
@@ -1069,6 +1245,7 @@ fn register_metadata(
         dep_paths,
         array_keys,
         distinct_on_str,
+        distinct_on_output_str,
         is_union
     );
 
@@ -1155,19 +1332,24 @@ fn transform_raw_select_to_tview(
     // Drop temp view
     crate::utils::spi_run_ddl(&format!("DROP VIEW {qi_temp_view}")).ok();
 
-    // Find primary key column (look for 'id' or first integer/bigint column)
+    // Find primary key column using this priority order:
+    // 1. Column named exactly 'pk' (original source PK, most reliable)
+    // 2. Column that is integer/serial type (natural database PKs)
+    // 3. Column named 'id' (may be UUID identifier, fallback only)
+    // This avoids incorrectly selecting a UUID 'id' column when an actual 'pk' exists.
     let pk_source_col = columns
         .iter()
-        .find(|(name, _)| name == "id")
+        .find(|(name, _)| name == "pk")
         .or_else(|| {
             columns
                 .iter()
                 .find(|(_, typ)| typ.contains("int") || typ.contains("serial"))
         })
+        .or_else(|| columns.iter().find(|(name, _)| name == "id"))
         .map(|(name, _)| name.clone())
         .ok_or_else(|| TViewError::InvalidSelectStatement {
             sql: select_sql.to_string(),
-            reason: "No suitable primary key column found (need 'id' or an integer column)"
+            reason: "No suitable primary key column found (need 'pk', an integer column, or 'id')"
                 .to_string(),
         })?;
 
@@ -1496,7 +1678,7 @@ mod tests {
         assert!(alice_exists, "Alice should be in the TVIEW");
     }
 
-    /// Test that TVIEW tables respect the unlogged_by_default GUC.
+    /// Test that TVIEW tables respect the `unlogged_by_default` GUC.
     #[pg_test]
     fn test_tview_unlogged_guc_control() {
         Spi::run("SET search_path TO public").unwrap();

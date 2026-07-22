@@ -124,7 +124,7 @@ pub fn parse_path(path: &str) -> Result<Vec<PathSegment>, String> {
 ///
 /// # Examples
 /// ```
-/// use serde_json::json;
+/// use jsonb_delta::serde_json::json;
 /// use jsonb_delta::path::{parse_path, navigate_path};
 ///
 /// let data = json!({
@@ -148,18 +148,10 @@ pub fn navigate_path<'a>(json: &'a Value, path: &[PathSegment]) -> Option<&'a Va
     for segment in path {
         match segment {
             PathSegment::Key(key) => {
-                if let Some(obj) = current.as_object() {
-                    current = obj.get(key)?;
-                } else {
-                    return None;
-                }
+                current = current.as_object()?.get(key)?;
             }
             PathSegment::Index(idx) => {
-                if let Some(arr) = current.as_array() {
-                    current = arr.get(*idx)?;
-                } else {
-                    return None;
-                }
+                current = current.as_array()?.get(*idx)?;
             }
         }
     }
@@ -193,7 +185,7 @@ fn ensure_array_capacity(arr: &mut Vec<Value>, idx: usize) -> Result<(), String>
 ///
 /// # Examples
 /// ```
-/// use serde_json::json;
+/// use jsonb_delta::serde_json::json;
 /// use jsonb_delta::path::{parse_path, set_path};
 ///
 /// let mut data = json!({"user": {"profile": {}}});
