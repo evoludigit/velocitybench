@@ -141,7 +141,11 @@ SELECT pg_tviews_create('tv_user', $TVIEW_SQL$
 $TVIEW_SQL$);
 ALTER TABLE benchmark.tv_user SET (fillfactor=70);
 
--- tv_post — author embedded via JOIN
+-- tv_post — LEAN author summary {id, username, full_name, bio} embedded via JOIN.
+-- Only the fields Q2b/T1 read. bio stays materialized here so T1's post.author.bio
+-- resolves from the row (the tv path has no reference resolution); a bio change fans
+-- out to this user's posts only — column-aware refresh skips tv_comment (no bio there).
+-- (Comments must stay OUTSIDE the $TVIEW_SQL$ DSL; pg_tviews's parser rejects inline --.)
 SELECT pg_tviews_create('tv_post', $TVIEW_SQL$
     SELECT
         p.pk_post     AS pk_post,
@@ -159,14 +163,10 @@ SELECT pg_tviews_create('tv_post', $TVIEW_SQL$
             'created_at', p.created_at,
             'updated_at', p.updated_at,
             'author',     jsonb_build_object(
-                'id',         u.id::text,
-                'identifier', u.identifier,
-                'email',      u.email,
-                'username',   u.username,
-                'full_name',  u.full_name,
-                'bio',        u.bio,
-                'created_at', u.created_at,
-                'updated_at', u.updated_at
+                'id',        u.id::text,
+                'username',  u.username,
+                'full_name', u.full_name,
+                'bio',       u.bio
             )
         )             AS data
     FROM benchmark.tb_post p
@@ -178,7 +178,12 @@ $TVIEW_SQL$);
 ALTER TABLE benchmark.tv_post ALTER COLUMN _published TYPE boolean USING _published::boolean;
 ALTER TABLE benchmark.tv_post SET (fillfactor=70);
 
--- tv_comment — author + post (with its author) embedded via JOINs
+-- tv_comment — LEAN author {id, username} + post summary {id, title} via JOINs.
+-- Q3/T1 read only comment.author.username and comment.post.title. The deep post.author
+-- is dropped entirely, so a post-author's bio/username no longer cascades to comments on
+-- that post (the pu JOIN and its dependency edge are gone). A user's own comments still
+-- carry their username, so an updateUser(username) does fan out to tv_comment (the trade).
+-- (Comments must stay OUTSIDE the $TVIEW_SQL$ DSL; pg_tviews's parser rejects inline --.)
 SELECT pg_tviews_create('tv_comment', $TVIEW_SQL$
     SELECT
         c.pk_comment  AS pk_comment,
@@ -195,39 +200,17 @@ SELECT pg_tviews_create('tv_comment', $TVIEW_SQL$
             'created_at', c.created_at,
             'updated_at', c.updated_at,
             'author',     jsonb_build_object(
-                'id',         u.id::text,
-                'identifier', u.identifier,
-                'email',      u.email,
-                'username',   u.username,
-                'full_name',  u.full_name,
-                'bio',        u.bio,
-                'created_at', u.created_at,
-                'updated_at', u.updated_at
+                'id',       u.id::text,
+                'username', u.username
             ),
             'post',       jsonb_build_object(
-                'id',         p.id::text,
-                'identifier', p.identifier,
-                'title',      p.title,
-                'content',    p.content,
-                'published',  p.published,
-                'created_at', p.created_at,
-                'updated_at', p.updated_at,
-                'author',     jsonb_build_object(
-                    'id',         pu.id::text,
-                    'identifier', pu.identifier,
-                    'email',      pu.email,
-                    'username',   pu.username,
-                    'full_name',  pu.full_name,
-                    'bio',        pu.bio,
-                    'created_at', pu.created_at,
-                    'updated_at', pu.updated_at
-                )
+                'id',    p.id::text,
+                'title', p.title
             )
         )             AS data
     FROM benchmark.tb_comment c
     JOIN benchmark.tb_user u  ON u.pk_user  = c.fk_author
     JOIN benchmark.tb_post  p ON p.pk_post  = c.fk_post
-    JOIN benchmark.tb_user pu ON pu.pk_user = p.fk_author
 $TVIEW_SQL$);
 ALTER TABLE benchmark.tv_comment SET (fillfactor=70);
 
@@ -239,8 +222,8 @@ COMMENT ON TABLE benchmark.tb_user    IS 'Command side: Normalized users with Tr
 COMMENT ON TABLE benchmark.tb_post    IS 'Command side: Normalized posts with INT foreign keys for fast joins';
 COMMENT ON TABLE benchmark.tb_comment IS 'Command side: Normalized comments with INT foreign keys for fast joins';
 COMMENT ON TABLE benchmark.tv_user    IS 'Query side: TVIEW managed by pg_tviews — pre-computed user JSONB';
-COMMENT ON TABLE benchmark.tv_post    IS 'Query side: TVIEW managed by pg_tviews — pre-computed post JSONB with embedded author';
-COMMENT ON TABLE benchmark.tv_comment IS 'Query side: TVIEW managed by pg_tviews — pre-computed comment JSONB with embedded author and post';
+COMMENT ON TABLE benchmark.tv_post    IS 'Query side: TVIEW managed by pg_tviews — pre-computed post JSONB with lean author summary {id, username, full_name, bio}';
+COMMENT ON TABLE benchmark.tv_comment IS 'Query side: TVIEW managed by pg_tviews — pre-computed comment JSONB with lean author {id, username} and post summary {id, title}';
 
 -- ============================================================================
 -- PERFORMANCE ANALYSIS QUERIES

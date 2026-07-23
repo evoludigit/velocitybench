@@ -32,7 +32,9 @@ ON CONFLICT (pk_user) DO UPDATE
 
 ANALYZE benchmark.tv_user;
 
--- Sync tv_post from tb_post (with embedded author)
+-- Sync tv_post from tb_post (with lean embedded author summary — MUST match the
+-- pg_tviews_create shape in fraiseql_cqrs_schema.sql exactly, or trigger-recomputed
+-- rows would diverge from bulk-seeded rows).
 INSERT INTO benchmark.tv_post (pk_post, id, identifier, fk_author, _published, author_id, data)
 SELECT
     p.pk_post,
@@ -50,14 +52,10 @@ SELECT
         'created_at', p.created_at,
         'updated_at', p.updated_at,
         'author',     jsonb_build_object(
-            'id',         u.id::text,
-            'identifier', u.identifier,
-            'email',      u.email,
-            'username',   u.username,
-            'full_name',  u.full_name,
-            'bio',        u.bio,
-            'created_at', u.created_at,
-            'updated_at', u.updated_at
+            'id',        u.id::text,
+            'username',  u.username,
+            'full_name', u.full_name,
+            'bio',       u.bio
         )
     )
 FROM benchmark.tb_post p
@@ -71,7 +69,8 @@ ON CONFLICT (pk_post) DO UPDATE
 
 ANALYZE benchmark.tv_post;
 
--- Sync tv_comment from tb_comment (with embedded author + post + post.author)
+-- Sync tv_comment from tb_comment (lean author {id, username} + post summary
+-- {id, title}; MUST match the pg_tviews_create shape in fraiseql_cqrs_schema.sql).
 INSERT INTO benchmark.tv_comment (pk_comment, id, identifier, fk_author, fk_post, author_id, post_id, data)
 SELECT
     c.pk_comment,
@@ -88,39 +87,17 @@ SELECT
         'created_at', c.created_at,
         'updated_at', c.updated_at,
         'author',     jsonb_build_object(
-            'id',         u.id::text,
-            'identifier', u.identifier,
-            'email',      u.email,
-            'username',   u.username,
-            'full_name',  u.full_name,
-            'bio',        u.bio,
-            'created_at', u.created_at,
-            'updated_at', u.updated_at
+            'id',       u.id::text,
+            'username', u.username
         ),
         'post',       jsonb_build_object(
-            'id',         p.id::text,
-            'identifier', p.identifier,
-            'title',      p.title,
-            'content',    p.content,
-            'published',  p.published,
-            'created_at', p.created_at,
-            'updated_at', p.updated_at,
-            'author',     jsonb_build_object(
-                'id',         pu.id::text,
-                'identifier', pu.identifier,
-                'email',      pu.email,
-                'username',   pu.username,
-                'full_name',  pu.full_name,
-                'bio',        pu.bio,
-                'created_at', pu.created_at,
-                'updated_at', pu.updated_at
-            )
+            'id',    p.id::text,
+            'title', p.title
         )
     )
 FROM benchmark.tb_comment c
 JOIN benchmark.tb_user u  ON u.pk_user  = c.fk_author
 JOIN benchmark.tb_post  p ON p.pk_post  = c.fk_post
-JOIN benchmark.tb_user pu ON pu.pk_user = p.fk_author
 ON CONFLICT (pk_comment) DO UPDATE
     SET data       = EXCLUDED.data,
         fk_author  = EXCLUDED.fk_author,

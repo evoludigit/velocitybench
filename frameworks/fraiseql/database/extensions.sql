@@ -55,15 +55,12 @@ SELECT
         'published',  p.published,
         'created_at',  p.created_at,
         'updated_at',  p.updated_at,
+        -- LEAN author summary — matches tv_post.author so the fv/tv document shapes agree.
         'author',     jsonb_build_object(
-            'id',         u.id::text,
-            'identifier', u.identifier,
-            'email',      u.email,
-            'username',   u.username,
-            'full_name',   u.full_name,
-            'bio',        u.bio,
-            'created_at',  u.created_at,
-            'updated_at',  u.updated_at
+            'id',        u.id::text,
+            'username',  u.username,
+            'full_name', u.full_name,
+            'bio',       u.bio
         )
     ) AS data,
     p.pk_post      AS _pk,
@@ -85,32 +82,14 @@ SELECT
         'content',    c.content,
         'created_at',  c.created_at,
         'updated_at',  c.updated_at,
+        -- LEAN author {id, username} + post summary {id, title} — matches tv_comment.
         'author',     jsonb_build_object(
-            'id',         u.id::text,
-            'identifier', u.identifier,
-            'email',      u.email,
-            'username',   u.username,
-            'full_name',   u.full_name,
-            'bio',        u.bio,
-            'created_at',  u.created_at,
-            'updated_at',  u.updated_at
+            'id',       u.id::text,
+            'username', u.username
         ),
         'post',       jsonb_build_object(
-            'id',         p.id::text,
-            'identifier', p.identifier,
-            'title',      p.title,
-            'content',    p.content,
-            'published',  p.published,
-            'created_at',  p.created_at,
-            'updated_at',  p.updated_at,
-            'author',     jsonb_build_object(
-                'id',         pu.id::text,
-                'identifier', pu.identifier,
-                'email',      pu.email,
-                'username',   pu.username,
-                'full_name',   pu.full_name,
-                'bio',        pu.bio
-            )
+            'id',    p.id::text,
+            'title', p.title
         )
     ) AS data,
     c.pk_comment   AS _pk,
@@ -119,8 +98,7 @@ SELECT
     p.id           AS post_id
 FROM benchmark.tb_comment c
 LEFT JOIN benchmark.tb_user u  ON u.pk_user   = c.fk_author
-LEFT JOIN benchmark.tb_post p  ON p.pk_post   = c.fk_post
-LEFT JOIN benchmark.tb_user pu ON pu.pk_user  = p.fk_author;
+LEFT JOIN benchmark.tb_post p  ON p.pk_post   = c.fk_post;
 
 -- ============================================================================
 -- COMPOSED VIEW: v_post_full
@@ -135,10 +113,10 @@ LEFT JOIN benchmark.tb_user pu ON pu.pk_user  = p.fk_author;
 --   C) jsonb_build_object from raw tables → 2,561 RPS, 8.7KB (CPU cost > wire savings)
 --   D) LATERAL + strip                → 3,120 RPS, 8.7KB
 --
--- tv_comment embeds the full post JSONB at write time. Stripping the 'post' key
--- at aggregation time (data - 'post') cuts payload 2.7× with negligible CPU cost,
--- since key removal on a small key set is O(1) compared to jsonb_build_object
--- over join rows. The pre-computed author inside tv_comment is preserved.
+-- Under the lean model tv_comment.post is already just {id, title}; the 'post' key
+-- is still dropped at aggregation time (data - 'post') because the full blog page
+-- carries the post once at the top level, so repeating even a tiny post per comment
+-- is redundant. Key removal stays O(1). The lean author inside tv_comment is preserved.
 -- ============================================================================
 
 DROP VIEW IF EXISTS benchmark.v_post_full;
@@ -345,7 +323,6 @@ DECLARE
     v_user_uuid   UUID;
     v_data        JSONB;
     v_patch       JSONB;
-    v_post_pks    BIGINT[];
     v_current_bio TEXT;
     v_changed     BOOLEAN;
 BEGIN
@@ -381,19 +358,11 @@ BEGIN
     SET data = jsonb_smart_patch_nested(data, v_patch, '{author}')
     WHERE fk_author = v_pk;
 
-    UPDATE benchmark.tvd_comment
-    SET data = jsonb_smart_patch_nested(data, v_patch, '{author}')
-    WHERE fk_author = v_pk;
-
-    -- Also patch embedded post.author in comments on this user's posts
-    SELECT ARRAY(SELECT pk_post FROM benchmark.tb_post WHERE fk_author = v_pk)
-    INTO v_post_pks;
-
-    IF array_length(v_post_pks, 1) > 0 THEN
-        UPDATE benchmark.tvd_comment
-        SET data = jsonb_smart_patch_nested(data, v_patch, '{post,author}')
-        WHERE fk_post = ANY(v_post_pks);
-    END IF;
+    -- LEAN model: tvd_comment.author is {id, username} (no bio) and tvd_comment.post
+    -- is {id, title} (no nested author), so a bio update touches neither. The full-embed
+    -- version patched {author} and {post,author} in tvd_comment; both are now no-ops and
+    -- have been removed. This mirrors the pg_tviews cascade, where column-aware refresh
+    -- skips tv_comment for a bio change.
 
     SELECT data INTO v_data FROM benchmark.tvd_user WHERE pk_user = v_pk;
 
@@ -406,32 +375,10 @@ $$ LANGUAGE plpgsql;
 GRANT EXECUTE ON FUNCTION benchmark.fn_update_user_delta(TEXT, TEXT) TO PUBLIC;
 
 -- ============================================================================
--- v_comment_slim — Q3 optimized view: strips heavy post fields from tv_comment
---
--- tv_comment embeds the full post JSONB (5KB content + author), yielding 1,936
--- bytes/row in Q3 responses. The Q3 query only needs post identity fields.
--- Stripping to {id, identifier, title, published, created_at} cuts rows to
--- ~761 bytes (-37%), reducing Q3 wire payload without a schema change.
+-- (v_comment_slim removed) — with the lean model tv_comment.post is already just
+-- {id, title}, so Q3 reads tv_comment directly. The old slim view existed only to
+-- strip the full embedded post JSONB at query time; that heavy embed no longer exists.
 -- ============================================================================
-
-DROP VIEW IF EXISTS benchmark.v_comment_slim;
-
-CREATE VIEW benchmark.v_comment_slim AS
-SELECT
-    pk_comment, id, identifier, fk_author, fk_post, author_id, post_id,
-    created_at, updated_at,
-    data || jsonb_build_object('post',
-        jsonb_build_object(
-            'id',         data->'post'->>'id',
-            'identifier', data->'post'->>'identifier',
-            'title',      data->'post'->>'title',
-            'published',  data->'post'->'published',
-            'created_at', data->'post'->>'created_at'
-        )
-    ) AS data
-FROM benchmark.tv_comment;
-
-GRANT SELECT ON benchmark.v_comment_slim TO PUBLIC;
 
 -- ============================================================================
 -- Permissions

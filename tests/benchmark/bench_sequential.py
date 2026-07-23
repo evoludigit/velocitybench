@@ -3675,8 +3675,9 @@ def format_report(
         lines += [
             "## Database Footprint",
             "",
-            "TV tables (pre-computed JSONB) inflate storage by embedding denormalized data at write time.",
-            "Views (v_*) add no storage — they are computed at query time.",
+            "TV tables (pre-computed JSONB) trade storage for read speed by materializing a lean "
+            "summary embed at write time (post.author = {id, username, full_name, bio}; comment.author "
+            "= {id, username}; comment.post = {id, title}). Views (v_*) add no storage — computed at query time.",
             "",
             "| Table | Heap | Indexes | Total |",
             "|-------|------|---------|-------|",
@@ -3690,8 +3691,9 @@ def format_report(
             f"**Storage amplification**: {amplification:.2f}× "
             f"(TV adds {sample._fmt(tv_bytes)} on top of the normalized {sample._fmt(tb_bytes)})  ",
             "",
-            "> Each `tv_comment` row embeds the full comment author + the full post + the post's author.",
-            "> With 200 000 comments this JSONB duplication dominates the TV storage cost.",
+            "> Each `tv_comment` row embeds a lean author `{id, username}` and a lean post summary "
+            "`{id, title}` (no comment content duplication of the post body or the post's author).",
+            "> The lean embed cuts ~80% of the per-row JSONB vs a full embed (post body + nested authors).",
             "",
             "---",
             "",
@@ -3875,7 +3877,11 @@ def format_report(
     # M1 cascade characteristics note — only when M1 results are present
     m1_results = [r for r in results if r.query_name == "M1" and not r.skipped]
     if m1_results:
-        # tb_user update cascades to tv_user (1) + tv_post (~10) + tv_comment (~50) = ~61 rows
+        # M1 = updateUser(bio). Under the lean embed + column-aware refresh, a bio change cascades to
+        # tv_user (1) + tv_post (~10, projects author.bio) + tv_comment (~50). The user's own ~50 comments
+        # are SKIPPED (their lean author {id,username} has no bio); the ~50 that recompute are comments on
+        # the user's posts — a multi-hop cascade pg_tviews cannot yet column-skip (post summary is
+        # {id,title}, so the recompute is data-preserving). Net ~61 rows; full-embed username is also ~61+50.
         cascade_fan_out = 61
         peak_m1_rps = max(r.rps for r in m1_results)
         peak_row_writes = int(peak_m1_rps * cascade_fan_out)
@@ -3886,8 +3892,9 @@ def format_report(
             "## M1 — Cascade Characteristics",
             "",
             "Each `updateUser` mutation cascades through pg_tviews to three pre-computed tables:",
-            "1 `tb_user` + 1 `tv_user` + ~10 `tv_post` (author embedded) + ~50 `tv_comment` "
-            "(author + post embedded) = **~61 rows per top-level mutation**.",
+            "1 `tb_user` + 1 `tv_user` + ~10 `tv_post` (lean author incl. bio) + ~50 `tv_comment` "
+            "(comments on the user's posts; the user's own comments are skipped by column-aware refresh) "
+            "= **~61 rows per top-level mutation**.",
             "",
             f"At peak throughput of {peak_m1_rps:,.0f} M/s: "
             f"**~{peak_row_writes:,} row writes/second** across four tables.",
