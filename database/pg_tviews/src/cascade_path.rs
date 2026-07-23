@@ -75,7 +75,7 @@ pub struct CascadePath {
     #[serde(default)]
     pub unresolvable: bool,
     /// Columns of `source_table` that the target tview's projection actually
-    /// depends on (derived from PostgreSQL's column-level `pg_depend` records on
+    /// depends on (derived from `PostgreSQL`'s column-level `pg_depend` records on
     /// the backing view `v_<entity>`). Column-aware refresh: an UPDATE that
     /// touches none of these columns cannot change any target tview row, so the
     /// cascade is skipped. Empty = unknown (multi-hop, parse gap, or a

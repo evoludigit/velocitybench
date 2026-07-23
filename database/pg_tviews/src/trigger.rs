@@ -171,12 +171,11 @@ fn pg_tview_trigger_handler<'a>(
             // No early return: a direct TVIEW source can simultaneously be a
             // base-table dependency of other TVIEWs (tb_user feeds tv_user directly
             // AND tv_post/tv_comment, which embed the author inline via a JOIN on
-            // fk_author). That embed is classified a `scalar` dependency, NOT the
-            // nested_object/v_user.data form that #56's commit-time entity
-            // propagation (find_parents_batch) follows — so without falling through
-            // to enqueue_cascade_parents (which walks the base-table cascade paths),
-            // tb_user edits leave tv_post/tv_comment author fields stale. Verified on
-            // beta.14 (2026-07-23): unpatched -> tv_post/tv_comment cascade dropped.
+            // tb_user). That embed is classified a `scalar` dependency, NOT the
+            // nested_object/v_user.data form that commit-time entity propagation
+            // (find_parents_batch) follows — so without falling through to
+            // enqueue_cascade_parents (which walks the base-table cascade paths),
+            // tb_user edits leave tv_post/tv_comment author fields stale.
         }
         Ok(None) => { /* fall through to indirect lookup */ }
         Err(e) => {
@@ -233,12 +232,11 @@ fn enqueue_cascade_parents(trigger: &PgTrigger, table_oid: pg_sys::Oid) {
     let changed = changed_columns(trigger);
 
     for path in &paths {
-        if let Some(ref changed) = changed {
-            if !path.source_columns.is_empty()
-                && !path.source_columns.iter().any(|c| changed.contains(c))
-            {
-                continue;
-            }
+        if let Some(changed) = &changed
+            && !path.source_columns.is_empty()
+            && !path.source_columns.iter().any(|c| changed.contains(c))
+        {
+            continue;
         }
         if let Err(e) = follow_cascade_path(path, &tuple) {
             warning!(
