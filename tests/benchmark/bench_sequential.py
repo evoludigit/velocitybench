@@ -3877,12 +3877,13 @@ def format_report(
     # M1 cascade characteristics note — only when M1 results are present
     m1_results = [r for r in results if r.query_name == "M1" and not r.skipped]
     if m1_results:
-        # M1 = updateUser(bio). Under the lean embed + column-aware refresh, a bio change cascades to
-        # tv_user (1) + tv_post (~10, projects author.bio) + tv_comment (~50). The user's own ~50 comments
-        # are SKIPPED (their lean author {id,username} has no bio); the ~50 that recompute are comments on
-        # the user's posts — a multi-hop cascade pg_tviews cannot yet column-skip (post summary is
-        # {id,title}, so the recompute is data-preserving). Net ~61 rows; full-embed username is also ~61+50.
-        cascade_fan_out = 61
+        # M1 = updateUser(bio). Under the lean embed + multi-hop column-aware refresh, a bio change
+        # cascades to just tv_user (1) + tv_post (~10, the only tviews projecting author.bio). Both the
+        # user's own ~50 comments (lean author {id,username} has no bio) and the ~50 comments on the
+        # user's posts (post summary {id,title} is FK/column-disjoint from the author change) are
+        # skipped. Net ~11 rows. Contrast: updateUser(username) fans out to ~61 (adds the user's own
+        # ~50 comments, which do project username); the full-embed model recomputed ~110 for either.
+        cascade_fan_out = 11
         peak_m1_rps = max(r.rps for r in m1_results)
         peak_row_writes = int(peak_m1_rps * cascade_fan_out)
         lines += [
@@ -3891,13 +3892,15 @@ def format_report(
             "",
             "## M1 — Cascade Characteristics",
             "",
-            "Each `updateUser` mutation cascades through pg_tviews to three pre-computed tables:",
-            "1 `tb_user` + 1 `tv_user` + ~10 `tv_post` (lean author incl. bio) + ~50 `tv_comment` "
-            "(comments on the user's posts; the user's own comments are skipped by column-aware refresh) "
-            "= **~61 rows per top-level mutation**.",
+            "The M1 `updateUser(bio)` mutation cascades through pg_tviews to just "
+            "1 `tb_user` + 1 `tv_user` + ~10 `tv_post` (the only tviews that project `author.bio`) "
+            "= **~11 rows**. Multi-hop column-aware refresh skips both the user's own comments "
+            "(lean author has no bio) and the comments on the user's posts (post summary is "
+            "`{id,title}`, disjoint from the author change). A `username` edit fans out to ~61.",
             "",
             f"At peak throughput of {peak_m1_rps:,.0f} M/s: "
-            f"**~{peak_row_writes:,} row writes/second** across four tables.",
+            f"**~{peak_row_writes:,} row writes/second** across `tb_user`, `tv_user` and `tv_post` "
+            "(`tv_comment` is skipped for a bio edit).",
             "",
             "> **Run-order methodology**: M1 results reflect two distinct operational conditions, "
             "both valid production scenarios:",
