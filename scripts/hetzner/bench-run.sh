@@ -92,8 +92,8 @@ SUT_PRICE="$(price_hour "$SUT_TYPE")"
 LOADGEN_PRICE="$(price_hour "$LOADGEN_TYPE")"
 PAIR_PRICE="$(awk -v a="$SUT_PRICE" -v b="$LOADGEN_PRICE" 'BEGIN{printf "%.4f", a+b}')"
 
-ssh_sut()     { run ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=accept-new "root@${SUT_IP:-<sut-public-ip>}" "$@"; }
-ssh_loadgen() { run ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=accept-new "root@${LOADGEN_IP:-<loadgen-public-ip>}" "$@"; }
+ssh_sut()     { run ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes "root@${SUT_IP:-<sut-public-ip>}" "$@"; }
+ssh_loadgen() { run ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes "root@${LOADGEN_IP:-<loadgen-public-ip>}" "$@"; }
 
 START_EPOCH="$(date +%s)"
 # Fixed once per session: sweep filenames must not drift across midnight
@@ -193,7 +193,7 @@ else
     say "SUT ${SUT_IP} (private ${SUT_PRIVATE_IP}) — loadgen ${LOADGEN_IP}"
     say "waiting for cloud-init (docker install) on both instances..."
     for ip in "$SUT_IP" "$LOADGEN_IP"; do
-        until ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 \
+        until ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes -o ConnectTimeout=5 \
               "root@${ip}" cloud-init status --wait >/dev/null 2>&1; do sleep 10; done
     done
 fi
@@ -209,12 +209,12 @@ for ip_desc in "SUT:${SUT_IP}" "loadgen:${LOADGEN_IP}"; do
         --exclude tests/perf --exclude target --exclude '.gradle' \
         --exclude __pycache__ --exclude '*.pyc' --exclude '.pytest_cache' \
         --exclude '.ruff_cache' --exclude costs/test_venv \
-        -e "ssh -i ${SSH_KEY_FILE} -o StrictHostKeyChecking=accept-new" \
+        -e "ssh -i ${SSH_KEY_FILE} -o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes" \
         "${REPO_ROOT}/" "root@${ip}:${REMOTE_DIR}/"
 done
 # loadgen → SUT ssh identity: DOCKER_HOST=ssh://root@SUT needs a key on the
 # loadgen. The campaign key only opens these two instances and dies with them.
-run rsync -az -e "ssh -i ${SSH_KEY_FILE} -o StrictHostKeyChecking=accept-new" \
+run rsync -az -e "ssh -i ${SSH_KEY_FILE} -o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes" \
     "$SSH_KEY_FILE" "root@${LOADGEN_IP}:/root/.ssh/id_ed25519"
 ssh_loadgen "chmod 600 /root/.ssh/id_ed25519 && printf 'Host ${NETWORK_RANGE%%.0/*}.*\n  User root\n  StrictHostKeyChecking accept-new\n  ControlMaster auto\n  ControlPath /root/.ssh/cm-%%r@%%h\n  ControlPersist 10m\n' > /root/.ssh/config"
 # SUT: postgres up + seeded (logged tviews — the publishable profile).
@@ -245,7 +245,7 @@ trap 'collect_results || true; cost_note' EXIT
 collect_results() {
     say ""
     say "── 5. rsync results back ────────────────────────────────────"
-    run rsync -az -e "ssh -i ${SSH_KEY_FILE} -o StrictHostKeyChecking=accept-new" \
+    run rsync -az -e "ssh -i ${SSH_KEY_FILE} -o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes" \
         "root@${LOADGEN_IP:-<loadgen-public-ip>}:${REMOTE_DIR}/reports/" "${REPO_ROOT}/reports/hetzner-2026-07/"
 }
 
@@ -267,16 +267,16 @@ python3 tests/benchmark/bench_sequential.py \
 echo \$! > ${REMOTE_DIR}/reports/sweep${n}.pid; }"
     if (( ! PLAN )); then
         sleep 20
-        while ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=accept-new "root@${LOADGEN_IP}" \
+        while ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes "root@${LOADGEN_IP}" \
               "kill -0 \$(cat ${REMOTE_DIR}/reports/sweep${n}.pid) 2>/dev/null"; do
-            ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=accept-new "root@${LOADGEN_IP}" \
+            ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes "root@${LOADGEN_IP}" \
                 "tail -1 ${REMOTE_DIR}/reports/sweep${n}.log" 2>/dev/null || true
             sleep 60
         done
-        if ! ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=accept-new "root@${LOADGEN_IP}" \
+        if ! ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes "root@${LOADGEN_IP}" \
              "grep -q 'Report written to' ${REMOTE_DIR}/reports/sweep${n}.log"; then
             say "sweep ${n} FAILED — last log lines:"
-            ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=accept-new "root@${LOADGEN_IP}" \
+            ssh -i "$SSH_KEY_FILE" -o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes "root@${LOADGEN_IP}" \
                 "tail -30 ${REMOTE_DIR}/reports/sweep${n}.log" || true
             exit 1
         fi
