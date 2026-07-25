@@ -18,7 +18,10 @@ WT="$(mktemp -d)"
 cleanup() { git -C "$ROOT" worktree remove --force "$WT" 2>/dev/null || true; rm -rf "$WT"; }
 trap cleanup EXIT
 
-# 1. Build the self-contained site (index.html + data.json + llms.txt + run JSON).
+# 1. Build the self-contained site (index.html + data.json + llms.txt + run JSON)
+#    into a CLEAN dist — build.py writes into the dir without clearing it, so a
+#    prior run's provenance JSON would otherwise ride along into the publish.
+rm -rf "$DIST"
 "${PYTHON:-python3}" "${ROOT}/site/build.py" "$RUN" --out "$DIST"
 
 # 2. Check gh-pages out into an isolated worktree (fresh orphan if it is new).
