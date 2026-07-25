@@ -11,7 +11,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-RUN="${1:-reports/hetzner-2026-07/bench-hetzner-2026-07-07-median.json}"
+RUN="${1:-reports/hetzner-2026-07-22/bench-hetzner-2026-07-25-median.json}"
 DIST="${ROOT}/site/dist"
 BRANCH="gh-pages"
 WT="$(mktemp -d)"

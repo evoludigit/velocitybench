@@ -2,7 +2,7 @@
 
 # The run JSON the site ships. Override to build a different run:
 #   make site-build SITE_RUN=reports/…/other.json
-SITE_RUN ?= reports/hetzner-2026-07/bench-hetzner-2026-07-07-median.json
+SITE_RUN ?= reports/hetzner-2026-07-22/bench-hetzner-2026-07-25-median.json
 SITE_DIST := $(PROJECT_ROOT)site/dist
 
 .PHONY: site-build site-test site-publish

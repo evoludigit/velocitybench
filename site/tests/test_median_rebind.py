@@ -93,10 +93,10 @@ def test_scenario_glossary_defines_every_code(any_run, meta):
         assert f'<code>{sc}</code>' in gloss, f"{sc} missing from the scenario key"
 
 
-def test_median_versions_are_2_11(median_run):
+def test_median_versions_are_2_14(median_run):
     fq = {k: v for k, v in median_run.framework_versions.items()
           if k.startswith("fraiseql")}
-    assert fq and all(v == "2.11.0" for v in fq.values()), fq
+    assert fq and all(v == "2.14.0" for v in fq.values()), fq
 
 
 def test_median_full_grid_no_not_measured(median_grid):

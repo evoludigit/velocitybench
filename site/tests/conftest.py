@@ -14,8 +14,10 @@ TESTS_DIR = Path(__file__).resolve().parent
 SITE_DIR = TESTS_DIR.parent
 REPO_DIR = SITE_DIR.parent
 SWEEP3 = REPO_DIR / "reports/hetzner-2026-07/bench-hetzner-2026-07-05-sweep3.json"
-# The publishable median-of-3 (2026-07-07) — the run the site ships.
-MEDIAN = REPO_DIR / "reports/hetzner-2026-07/bench-hetzner-2026-07-07-median.json"
+# The publishable median-of-3 (2026-07-25 rerun, complete 12-framework grid) — the run the site ships.
+# SWEEP3 stays the earlier partial run on purpose: it is the regression fixture that exercises the
+# not-measured rendering paths (classical engines unmeasured on C3/HC3/APQ), which a complete grid lacks.
+MEDIAN = REPO_DIR / "reports/hetzner-2026-07-22/bench-hetzner-2026-07-25-median.json"
 SCENARIOS = SITE_DIR / "scenarios.json"
 
 # Make `import build` resolve to site/build.py.
