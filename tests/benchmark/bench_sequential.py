@@ -3874,9 +3874,12 @@ def format_report(
                 f"{ratio:.1f}× more cycles/s with half the round trips.",
             ]
 
-    # M1 cascade characteristics note — only when M1 results are present
+    # M1 cascade characteristics note. The pg_tviews cascade is a FraiseQL property — classical
+    # stacks do a plain single-row UPDATE — so scope "peak" to the FraiseQL frameworks that
+    # actually drive the cascade, never the fastest unrelated mutation.
     m1_results = [r for r in results if r.query_name == "M1" and not r.skipped]
-    if m1_results:
+    fraiseql_m1 = [r for r in m1_results if r.framework.startswith("fraiseql")]
+    if fraiseql_m1:
         # M1 = updateUser(bio). Under the lean embed + multi-hop column-aware refresh, a bio change
         # cascades to just tv_user (1) + tv_post (~10, the only tviews projecting author.bio). Both the
         # user's own ~50 comments (lean author {id,username} has no bio) and the ~50 comments on the
@@ -3884,7 +3887,7 @@ def format_report(
         # skipped. Net ~11 rows. Contrast: updateUser(username) fans out to ~61 (adds the user's own
         # ~50 comments, which do project username); the full-embed model recomputed ~110 for either.
         cascade_fan_out = 11
-        peak_m1_rps = max(r.rps for r in m1_results)
+        peak_m1_rps = max(r.rps for r in fraiseql_m1)
         peak_row_writes = int(peak_m1_rps * cascade_fan_out)
         lines += [
             "",
@@ -3898,7 +3901,7 @@ def format_report(
             "(lean author has no bio) and the comments on the user's posts (post summary is "
             "`{id,title}`, disjoint from the author change). A `username` edit fans out to ~61.",
             "",
-            f"At peak throughput of {peak_m1_rps:,.0f} M/s: "
+            f"At FraiseQL's peak cascade throughput of {peak_m1_rps:,.0f} M/s: "
             f"**~{peak_row_writes:,} row writes/second** across `tb_user`, `tv_user` and `tv_post` "
             "(`tv_comment` is skipped for a bio edit).",
             "",
@@ -3908,8 +3911,8 @@ def format_report(
             "> - **Fresh table** (first runner): HOT-update slots available — PostgreSQL updates "
             "rows in-place on the same page. Equivalent to post-deploy or post-maintenance-window "
             "table state.",
-            "> - **Post-cascade fragmentation** (subsequent runners): prior mutation burst "
-            f"(~{peak_m1_rps * cascade_fan_out / 1_000_000:.1f}M cascade writes) scattered row "
+            "> - **Post-cascade fragmentation** (subsequent runners): the prior mutation burst "
+            "(each bio edit fans out to ~11 cascade row-writes) scattered row "
             "versions across pages. VACUUM FULL compacts pages between framework runs; within a "
             "single M1 measurement window the heap accumulates fresh dead tuples as the run "
             "progresses. Equivalent to sustained production load.",

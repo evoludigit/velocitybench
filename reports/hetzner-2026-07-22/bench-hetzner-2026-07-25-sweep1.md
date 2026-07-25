@@ -80,7 +80,7 @@ TV tables (pre-computed JSONB) trade storage for read speed by materializing a l
 
 | Framework | Language | Query | RPS | p50 ms | p95 ms | p99 ms | Requests | Errors |
 |-----------|----------|-------|----:|-------:|-------:|-------:|---------:|--------|
-| fraiseql-tv | Rust | Q1 | 9675 | 4.1 | 5.3 | 5.8 | 290,249 | 0.0% |
+| fraiseql-tv | Rust | Q1 | 9675 | 4.1 | 5.2 | 5.8 | 290,249 | 0.0% |
 | fraiseql-tv-cache | Rust | Q1 | 9866 | 4.0 | 5.1 | 5.7 | 295,973 | 0.0% |
 | fraiseql-v-nocache | Rust | Q1 | 8888 | 4.4 | 5.8 | 6.9 | 266,644 | 0.0% |
 | fraiseql-v-cache | Rust | Q1 | 8855 | 4.5 | 5.8 | 6.6 | 265,641 | 0.0% |
@@ -88,8 +88,8 @@ TV tables (pre-computed JSONB) trade storage for read speed by materializing a l
 | postgraphile | Node.js | Q1 | 3083 | 12.3 | 19.8 | 26.5 | 92,490 | 0.0% |
 | actix-web-rest | Rust | Q1 | 1669 | 23.5 | 27.7 | 29.8 | 50,058 | 0.0% |
 | async-graphql | Rust | Q1 | 1424 | 17.2 | 62.8 | 66.8 | 42,712 | 0.0% |
-| mercurius | Node.js | Q1 | 1465 | 17.8 | 64.1 | 75.1 | 43,951 | 0.0% |
-| apollo-server | Node.js | Q1 | 1570 | 24.7 | 39.7 | 49.1 | 47,094 | 0.0% |
+| mercurius | Node.js | Q1 | 1465 | 17.8 | 64.2 | 75.0 | 43,951 | 0.0% |
+| apollo-server | Node.js | Q1 | 1570 | 24.7 | 39.6 | 49.1 | 47,094 | 0.0% |
 | strawberry | Python | Q1 | 972 | 39.6 | 52.5 | 81.1 | 29,154 | 0.0% |
 
 ## Q2 — `posts(limit: 10) { id title }`
@@ -103,9 +103,9 @@ TV tables (pre-computed JSONB) trade storage for read speed by materializing a l
 | hasura | Haskell | Q2 | 1580 | 24.9 | 33.8 | 41.7 | 47,407 | 0.0% |
 | postgraphile | Node.js | Q2 | 3505 | 10.6 | 18.3 | 26.5 | 105,157 | 0.0% |
 | actix-web-rest | Rust | Q2 | 13475 | 2.9 | 3.7 | 4.6 | 404,250 | 0.0% |
-| async-graphql | Rust | Q2 | 8455 | 4.6 | 6.4 | 7.9 | 253,652 | 0.0% |
+| async-graphql | Rust | Q2 | 8455 | 4.6 | 6.4 | 8.0 | 253,652 | 0.0% |
 | mercurius | Node.js | Q2 | 4474 | 8.2 | 14.8 | 19.4 | 134,234 | 0.0% |
-| apollo-server | Node.js | Q2 | 2907 | 13.1 | 20.6 | 26.3 | 87,196 | 0.0% |
+| apollo-server | Node.js | Q2 | 2907 | 13.2 | 20.6 | 26.4 | 87,196 | 0.0% |
 | strawberry | Python | Q2 | 1395 | 27.2 | 34.0 | 62.6 | 41,864 | 0.0% |
 
 ## Q2b — `posts(limit: 10) { id title author { username fullName } }`
@@ -160,7 +160,7 @@ TV tables (pre-computed JSONB) trade storage for read speed by materializing a l
 
 | Framework | Language | Query | RPS | p50 ms | p95 ms | p99 ms | Requests | Errors |
 |-----------|----------|-------|----:|-------:|-------:|-------:|---------:|--------|
-| fraiseql-tv | Rust | HC3 | 11542 | 3.4 | 4.4 | 4.8 | 346,271 | 0.0% |
+| fraiseql-tv | Rust | HC3 | 11542 | 3.5 | 4.3 | 4.8 | 346,271 | 0.0% |
 | fraiseql-tv-cache | Rust | HC3 | 11564 | 3.4 | 4.3 | 4.8 | 346,922 | 0.0% |
 | fraiseql-v-nocache | Rust | HC3 | 11240 | 3.5 | 4.5 | 4.9 | 337,204 | 0.0% |
 | fraiseql-v-cache | Rust | HC3 | 11236 | 3.5 | 4.5 | 5.0 | 337,074 | 0.0% |
@@ -180,7 +180,7 @@ TV tables (pre-computed JSONB) trade storage for read speed by materializing a l
 | fraiseql-tv-cache | Rust | M1 | 1135 | 20.1 | 90.0 | 186.8 | 34,050 | 0.0% |
 | fraiseql-v-nocache | Rust | M1 | 1133 | 20.0 | 91.5 | 185.8 | 34,001 | 0.0% |
 | fraiseql-v-cache | Rust | M1 | 1125 | 20.1 | 91.1 | 185.7 | 33,742 | 0.0% |
-| fraiseql-tv-audit | Rust | M1 | 1073 | 21.4 | 93.6 | 194.7 | 32,186 | 0.0% |
+| fraiseql-tv-audit | Rust | M1 | 1073 | 21.4 | 93.6 | 194.8 | 32,186 | 0.0% |
 | hasura | Haskell | M1 | 1570 | 19.7 | 51.5 | 60.7 | 47,090 | 0.0% |
 | postgraphile | Node.js | M1 | 2952 | 11.6 | 21.5 | 50.7 | 88,552 | 0.0% |
 | actix-web-rest | Rust | M1 | 2578 | 15.9 | 17.6 | 18.4 | 77,330 | 0.0% |
@@ -209,7 +209,7 @@ TV tables (pre-computed JSONB) trade storage for read speed by materializing a l
 | actix-web-rest | Rust | F1 | 12931 | 3.0 | 3.7 | 4.3 | 387,917 | 0.0% |
 | async-graphql | Rust | F1 | 9642 | 4.1 | 5.1 | 5.7 | 289,263 | 0.0% |
 | mercurius | Node.js | F1 | 4338 | 8.5 | 14.9 | 19.7 | 130,125 | 0.0% |
-| apollo-server | Node.js | F1 | 2978 | 12.9 | 20.2 | 26.2 | 89,332 | 0.0% |
+| apollo-server | Node.js | F1 | 2978 | 12.8 | 20.2 | 26.2 | 89,332 | 0.0% |
 | strawberry | Python | F1 | 1280 | 29.7 | 38.7 | 68.7 | 38,403 | 0.0% |
 
 ## F2 — `posts(published: true, limit: 10) { id title author { ... } }` — published filter + nesting
@@ -220,10 +220,10 @@ TV tables (pre-computed JSONB) trade storage for read speed by materializing a l
 | fraiseql-tv-cache | Rust | F2 | 8708 | 4.6 | 5.8 | 6.4 | 261,251 | 0.0% |
 | fraiseql-v-nocache | Rust | F2 | 4640 | 6.2 | 33.5 | 38.9 | 139,201 | 0.0% |
 | fraiseql-v-cache | Rust | F2 | 4629 | 6.2 | 33.9 | 39.1 | 138,872 | 0.0% |
-| hasura | Haskell | F2 | 1220 | 33.0 | 45.2 | 50.6 | 36,594 | 0.0% |
+| hasura | Haskell | F2 | 1220 | 33.0 | 45.2 | 50.5 | 36,594 | 0.0% |
 | postgraphile | Node.js | F2 | 2560 | 14.4 | 25.3 | 36.8 | 76,796 | 0.0% |
 | actix-web-rest | Rust | F2 | 6211 | 6.3 | 7.3 | 8.3 | 186,322 | 0.0% |
-| async-graphql | Rust | F2 | 6232 | 6.2 | 9.6 | 13.0 | 186,953 | 0.0% |
+| async-graphql | Rust | F2 | 6232 | 6.2 | 9.6 | 13.1 | 186,953 | 0.0% |
 | mercurius | Node.js | F2 | 3090 | 11.9 | 20.8 | 26.5 | 92,698 | 0.0% |
 | apollo-server | Node.js | F2 | 1959 | 19.2 | 31.6 | 39.0 | 58,776 | 0.0% |
 | strawberry | Python | F2 | 932 | 48.1 | 64.7 | 91.8 | 27,962 | 0.0% |
@@ -268,13 +268,13 @@ TV tables (pre-computed JSONB) trade storage for read speed by materializing a l
 | fraiseql-tv-cache | Rust | MC1 | 1132 | 20.1 | 89.4 | 184.6 | 33,956 | 0.0% |
 | fraiseql-v-nocache | Rust | MC1 | 1101 | 20.6 | 92.9 | 193.6 | 33,034 | 0.0% |
 | fraiseql-v-cache | Rust | MC1 | 1123 | 20.6 | 90.9 | 182.7 | 33,681 | 0.0% |
-| hasura | Haskell | MC1 | 503 | 79.7 | 93.0 | 97.1 | 15,086 | 0.0% |
+| hasura | Haskell | MC1 | 503 | 79.8 | 93.0 | 97.2 | 15,086 | 0.0% |
 | postgraphile | Node.js | MC1 | 1313 | 26.0 | 53.7 | 92.3 | 39,400 | 0.0% |
 | actix-web-rest | Rust | MC1 | 1295 | 29.7 | 35.7 | 39.9 | 38,860 | 0.0% |
 | async-graphql | Rust | MC1 | 1263 | 22.7 | 58.3 | 61.7 | 37,890 | 0.0% |
 | mercurius | Node.js | MC1 | 1342 | 27.0 | 46.9 | 54.3 | 40,274 | 0.0% |
 | apollo-server | Node.js | MC1 | 1059 | 37.4 | 47.8 | 55.2 | 31,775 | 0.0% |
-| strawberry | Python | MC1 | 548 | 70.2 | 106.4 | 119.1 | 16,447 | 0.0% |
+| strawberry | Python | MC1 | 548 | 70.2 | 106.4 | 119.0 | 16,447 | 0.0% |
 
 ## Q1_APQ — APQ hash-only Q1 — no query string sent, server resolves by SHA-256 hash. Compare to Q1.
 
@@ -282,7 +282,7 @@ TV tables (pre-computed JSONB) trade storage for read speed by materializing a l
 |-----------|----------|-------|----:|-------:|-------:|-------:|---------:|--------|
 | fraiseql-tv | Rust | Q1_APQ | 9274 | 4.3 | 5.4 | 6.0 | 278,231 | 0.0% |
 | fraiseql-tv-cache | Rust | Q1_APQ | 9328 | 4.3 | 5.4 | 5.9 | 279,852 | 0.0% |
-| fraiseql-v-nocache | Rust | Q1_APQ | 8546 | 4.6 | 6.0 | 6.7 | 256,365 | 0.0% |
+| fraiseql-v-nocache | Rust | Q1_APQ | 8546 | 4.7 | 6.0 | 6.7 | 256,365 | 0.0% |
 | fraiseql-v-cache | Rust | Q1_APQ | 8450 | 4.7 | 6.0 | 6.7 | 253,492 | 0.0% |
 | async-graphql | Rust | Q1_APQ | 1409 | 17.2 | 63.2 | 67.3 | 42,261 | 0.0% |
 | mercurius | Node.js | Q1_APQ | 1473 | 17.9 | 63.4 | 75.0 | 44,203 | 0.0% |
@@ -327,7 +327,7 @@ TV tables (pre-computed JSONB) trade storage for read speed by materializing a l
 | Framework | Language | RPS | p50 ms | p99 ms | Errors |
 |-----------|----------|----:|-------:|-------:|--------|
 | apollo-server | Node.js | 1570 | 24.7 | 49.1 | 0.0% |
-| mercurius | Node.js | 1465 | 17.8 | 75.1 | 0.0% |
+| mercurius | Node.js | 1465 | 17.8 | 75.0 | 0.0% |
 | async-graphql | Rust | 1424 | 17.2 | 66.8 | 0.0% |
 | strawberry | Python | 972 | 39.6 | 81.1 | 0.0% |
 
@@ -365,7 +365,7 @@ TV tables (pre-computed JSONB) trade storage for read speed by materializing a l
 | actix-web-rest | Rust | rest | 1669 | 23.5 | 29.8 |
 | apollo-server | Node.js | graphql | 1570 | 24.7 | 49.1 |
 | hasura | Haskell | graphql-schema-first | 1497 | 26.6 | 43.1 |
-| mercurius | Node.js | graphql | 1465 | 17.8 | 75.1 |
+| mercurius | Node.js | graphql | 1465 | 17.8 | 75.0 |
 | async-graphql | Rust | graphql | 1424 | 17.2 | 66.8 |
 | strawberry | Python | graphql | 972 | 39.6 | 81.1 |
 
@@ -411,7 +411,7 @@ TV tables (pre-computed JSONB) trade storage for read speed by materializing a l
 | actix-web-rest | Rust | 760 | 3.7 | 12 | 5 | 100.2 |
 | apollo-server | Node.js | 758 | 7.5 | 120 | 66 | 116.1 |
 | hasura | Haskell | — | — | — | 135 | 164.5 |
-| mercurius | Node.js | 464 | 8.8 | 104 | 63 | 108.0 |
+| mercurius | Node.js | 464 | 8.8 | 104 | 62 | 108.0 |
 | async-graphql | Rust | 697 | 4.4 | 12 | 12 | 134.0 |
 | strawberry | Python | 1,812 | 12.7 | 136 | 191 | 175.3 |
 | fraiseql-tv-audit | Rust | — | — | 43 | 10 | 20.0 |
@@ -439,11 +439,11 @@ Classical frameworks must fire follow-up queries to invalidate stale cache entri
 
 The M1 `updateUser(bio)` mutation cascades through pg_tviews to just 1 `tb_user` + 1 `tv_user` + ~10 `tv_post` (the only tviews that project `author.bio`) = **~11 rows**. Multi-hop column-aware refresh skips both the user's own comments (lean author has no bio) and the comments on the user's posts (post summary is `{id,title}`, disjoint from the author change). A `username` edit fans out to ~61.
 
-At peak throughput of 9,836 M/s: **~108,193 row writes/second** across `tb_user`, `tv_user` and `tv_post` (`tv_comment` is skipped for a bio edit).
+At FraiseQL's peak cascade throughput of 1,135 M/s: **~12,485 row writes/second** across `tb_user`, `tv_user` and `tv_post` (`tv_comment` is skipped for a bio edit).
 
 > **Run-order methodology**: M1 results reflect two distinct operational conditions, both valid production scenarios:
 > 
 > - **Fresh table** (first runner): HOT-update slots available — PostgreSQL updates rows in-place on the same page. Equivalent to post-deploy or post-maintenance-window table state.
-> - **Post-cascade fragmentation** (subsequent runners): prior mutation burst (~0.1M cascade writes) scattered row versions across pages. VACUUM FULL compacts pages between framework runs; within a single M1 measurement window the heap accumulates fresh dead tuples as the run progresses. Equivalent to sustained production load.
+> - **Post-cascade fragmentation** (subsequent runners): the prior mutation burst (each bio edit fans out to ~11 cascade row-writes) scattered row versions across pages. VACUUM FULL compacts pages between framework runs; within a single M1 measurement window the heap accumulates fresh dead tuples as the run progresses. Equivalent to sustained production load.
 > 
 > The cascade multiplier (11×) is the operative variable: fan-out × throughput = HOT collapse threshold. At this fan-out ratio, the fresh-table vs fragmented-table range characterises the operational envelope, not benchmark noise.
