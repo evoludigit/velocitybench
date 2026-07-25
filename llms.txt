@@ -7,7 +7,7 @@ WHAT THIS IS
   generator refuses two JSON files.
 
 RUN IDENTITY
-  timestamp:            2026-07-07T10:06:53+00:00
+  timestamp:            2026-07-25T11:50:24+00:00
   target_host:          10.7.0.2
   cpu_model:            AMD EPYC-Genoa Processor
   postgres_version:     17.10 (Debian 17.10-1.pgdg13+1)
@@ -16,12 +16,12 @@ RUN IDENTITY
   duration_secs:        30
   tview_mode:           logged
   tview_trigger_scope:  fraiseql-only
-  fraiseql_version:     2.11.0
+  fraiseql_version:     2.14.0
 
 DATA
   Machine copy of this run + metadata:  ./data.json
     { "run": <raw run JSON>, "scenarios": <the scenarios.json contract> }
-  Committed source run JSON (provenance):  bench-hetzner-2026-07-07-median.json
+  Committed source run JSON (provenance):  bench-hetzner-2026-07-25-median.json
 
 RESULT-ROW GLOSSARY  (run.results[])
   framework   engine under test (see FRAMEWORKS below)
@@ -101,12 +101,12 @@ MECHANISM LADDER (S2) — where FraiseQL's read speed comes from   (#s2-mechanis
   SQL; the tv precompute step is the read win, and it grows with nesting depth.
   Absolute RPS per rung; the delta is over the result rung below it.
   Ladder @ Q2b (rung: RPS, delta over the rung below):
-    fraiseql-v-nocache         JOIN views      4,097 RPS
-    fraiseql-v-cache           + result cache  4,126 RPS  (+0.7%)
-    fraiseql-tv                tv precompute   6,260 RPS  (+51.7%)
-    fraiseql-tv-cache          + result cache  6,288 RPS  (+0.5%)
-    +APQ (fraiseql-tv-cache)   + APQ           5,880 RPS  (−6.5%)
-  precompute step (tv rung over the rung below) by depth: Q1 +1.5%, Q2 +28.3%, Q2b +51.7%, Q3 +146.1%, T1 +91.1%
+    fraiseql-v-nocache         JOIN views      5,375 RPS
+    fraiseql-v-cache           + result cache  5,351 RPS  (−0.4%)
+    fraiseql-tv                tv precompute   9,119 RPS  (+70.4%)
+    fraiseql-tv-cache          + result cache  9,063 RPS  (−0.6%)
+    +APQ (fraiseql-tv-cache)   + APQ           8,739 RPS  (−3.6%)
+  precompute step (tv rung over the rung below) by depth: Q1 +10.1%, Q2 +52.4%, Q2b +70.4%, Q3 +110.5%, T1 +71.4%
 
 APQ ISOLATED (S3) — persisted-query hash, before vs after   (#s3-apq)
   Each query/mutation sent as a pre-registered SHA-256 hash instead of full
@@ -114,9 +114,9 @@ APQ ISOLATED (S3) — persisted-query hash, before vs after   (#s3-apq)
   read from the grid, never a hand-kept capability list: a measured _APQ twin ->
   a real (often ~zero or negative) delta; no twin -> APQ-capable-but-not-measured
   in this run (NOT excluded); by-design N/A -> its verbatim exclusion reason.
-   Q1 -> Q1_APQ   measured twins: fraiseql-tv −5.4%, fraiseql-tv-cache −4.9%, fraiseql-v-nocache −3.7%, fraiseql-v-cache −6.4%, async-graphql +0.2%, mercurius ±0.0%, apollo-server −0.6%
-  Q2b -> Q2b_APQ  measured twins: fraiseql-tv −2.6%, fraiseql-tv-cache −6.5%, fraiseql-v-nocache −3.4%, fraiseql-v-cache −2.7%, async-graphql −3.8%, mercurius −1.5%, apollo-server +1.4%
-   M1 -> M1_APQ   measured twins: fraiseql-tv −0.1%, fraiseql-tv-cache +1.2%, fraiseql-v-nocache +3.0%, fraiseql-v-cache +1.9%, async-graphql +4.3%, mercurius −1.7%, apollo-server +3.2%
+   Q1 -> Q1_APQ   measured twins: fraiseql-tv −4.5%, fraiseql-tv-cache −6.5%, fraiseql-v-nocache −5.0%, fraiseql-v-cache −5.9%, async-graphql −0.3%, mercurius −0.4%, apollo-server +0.4%
+  Q2b -> Q2b_APQ  measured twins: fraiseql-tv −3.2%, fraiseql-tv-cache −3.6%, fraiseql-v-nocache −4.0%, fraiseql-v-cache −2.5%, async-graphql +3.5%, mercurius −0.4%, apollo-server +4.2%
+   M1 -> M1_APQ   measured twins: fraiseql-tv −2.2%, fraiseql-tv-cache +1.9%, fraiseql-v-nocache +0.5%, fraiseql-v-cache +1.3%, async-graphql +6.3%, mercurius −3.4%, apollo-server +2.3%
   excluded by design: hasura [4], postgraphile [5], actix-web-rest [6], strawberry [7]
 
 CACHE UNDER FIRE (S4) — hot pool (HC3) vs rotating keys (C3)   (#s4-cache-under-fire)
@@ -126,10 +126,10 @@ CACHE UNDER FIRE (S4) — hot pool (HC3) vs rotating keys (C3)   (#s4-cache-unde
   cache-off rows stayed flat. Delta is HC3 (hit) over C3 (miss); ~zero or
   negative renders as-is.
   C3 (miss) -> HC3 (hit), delta = hit over miss:
-    fraiseql-v-nocache   (cache off)  C3 7,489  HC3 7,526  (+0.5%)
-    fraiseql-v-cache     (cache on)   C3 7,480  HC3 7,412  (−0.9%)
-    fraiseql-tv          (cache off)  C3 7,566  HC3 7,666  (+1.3%)
-    fraiseql-tv-cache    (cache on)   C3 7,628  HC3 7,629  (±0.0%)
+    fraiseql-v-nocache   (cache off)  C3 11,184  HC3 11,249  (+0.6%)
+    fraiseql-v-cache     (cache on)   C3 11,118  HC3 11,154  (+0.3%)
+    fraiseql-tv          (cache off)  C3 11,467  HC3 11,472  (±0.0%)
+    fraiseql-tv-cache    (cache on)   C3 11,604  HC3 11,606  (±0.0%)
 
 FRAMEWORKS (12)
   fraiseql-tv          FraiseQL · tv — precomputed tv_* tables, no result cache (family: fraiseql)
@@ -166,16 +166,16 @@ SCENARIOS (16)
 WORKLOAD SHAPES → WHICH CELLS ANSWER THEM (winner scored on the S7 model)
   Read-heavy → Q1, Q2, Q2b, Q3, T1
       For read-heavy work the precomputed (tv) path wins: it tops the field at Q1, and its edge over FraiseQL's own JOIN-view (v) variants widens with nesting depth — level at Q1, decisive by Q3 — because precompute carries no N+1. Q1 is a strength here, not a soft spot; the cost of the precomputed document is paid on writes, not reads.
-      winner @ ~1000:1 reads:writes → precompute (tv_*) (FraiseQL · tv), ~5,852 req/s
+      winner @ ~1000:1 reads:writes → precompute (tv_*) (FraiseQL · tv), ~9,054 req/s
   Deeply nested → Q2b, Q3, T1
       The deeper the nesting, the wider FraiseQL's lead — no N+1 by construction. The cost of that read advantage is paid on writes, not reads (see the write trade).
-      winner @ ~100:1 reads:writes → REST (Actix (REST)), ~3,250 req/s
+      winner @ ~100:1 reads:writes → precompute (tv_*) (FraiseQL · tv), ~6,881 req/s
   Write-heavy → M1, M1d, MC1
       FraiseQL's delta path (M1d) competes with a classical single UPDATE; the full-cascade recompute (M1) is the price of always-consistent precomputed reads. MC1 needs one round-trip where classical needs two.
-      winner @ ~1:1 reads:writes → resolver + DataLoader (async-graphql), ~5,039 req/s
+      winner @ ~1:1 reads:writes → resolver + DataLoader (async-graphql), ~7,407 req/s
   Hot-key lookups → C3, HC3
       A hot 5-key pool (HC3) is where a result cache should shine; the 20-UUID miss regime (C3) shows what a cache does when it cannot help. In this run both regimes land flat — the single-row read is already too cheap for the cache to matter.
-      winner @ ~1000:1 reads:writes → precompute (tv_*) (FraiseQL · tv), ~6,105 req/s
+      winner @ ~1000:1 reads:writes → precompute (tv_*) (FraiseQL · tv), ~9,696 req/s
 
 FOOTPRINT & COST (S6) — RAM, derived €/1M, the storage trade   (#s6-footprint)
   Steady-state process memory and image size are MEASURED; the € figures are
@@ -183,9 +183,9 @@ FOOTPRINT & COST (S6) — RAM, derived €/1M, the storage trade   (#s6-footprin
   measurement:  € / 1M req = price_month / (Q1 RPS × 2,628,000 s) × 10⁶.
   Ranked honestly — hand-written REST is lighter than FraiseQL and shown so. A
   sub-line is omitted (never faked) when this run did not capture that measure.
-  steady-state RAM (lightest first): actix-web-rest 5 MB, fraiseql-v-nocache 11 MB, async-graphql 12 MB, fraiseql-tv 12 MB, fraiseql-v-cache 12 MB, fraiseql-tv-cache 12 MB, mercurius 56 MB, apollo-server 65 MB, postgraphile 127 MB, hasura 133 MB, strawberry 189 MB
-  €/1M req @ Q1 on ccx33 (derived): fraiseql-tv-cache €0.0080, fraiseql-tv €0.0080, fraiseql-v-cache €0.0082, fraiseql-v-nocache €0.0083, postgraphile €0.0251, actix-web-rest €0.0393, apollo-server €0.0406, mercurius €0.0427, async-graphql €0.0460, hasura €0.0497, strawberry €0.0615
-  storage trade (precompute costs disk): tv_comment 4.4× tb_comment, tv_post 2.1× tb_post, tv_user 1.8× tb_user
+  steady-state RAM (lightest first): actix-web-rest 5 MB, fraiseql-v-nocache 12 MB, async-graphql 12 MB, fraiseql-tv 12 MB, fraiseql-v-cache 12 MB, fraiseql-tv-cache 12 MB, mercurius 55 MB, apollo-server 65 MB, postgraphile 127 MB, hasura 135 MB, strawberry 187 MB
+  €/1M req @ Q1 on ccx33 (derived): fraiseql-tv €0.0054, fraiseql-tv-cache €0.0054, fraiseql-v-cache €0.0059, fraiseql-v-nocache €0.0060, postgraphile €0.0167, actix-web-rest €0.0318, apollo-server €0.0336, hasura €0.0342, mercurius €0.0361, async-graphql €0.0376, strawberry €0.0540
+  storage trade (precompute costs disk): tv_comment 2.8× tb_comment, tv_post 2.0× tb_post, tv_user 1.8× tb_user
 
 AMORTIZATION MODEL (S7) — total load vs the read:write ratio
   A DERIVED model, not a measured cell. Sustainable total requests/second for a
@@ -196,6 +196,6 @@ AMORTIZATION MODEL (S7) — total load vs the read:write ratio
   the winner; SQL round-trip COUNT is structural context, never cost. A derived
   model on the median-of-three inputs; the read:write ratio is your assumption.
   Break-evens at the default read/write (read Q2b, full write mode):
-  FraiseQL · tv overtakes PostGraphile v5 at ~31 reads/write
-  FraiseQL · tv overtakes async-graphql at ~134 reads/write
-  FraiseQL · tv overtakes Actix (REST) at ~149 reads/write
+  FraiseQL · tv overtakes PostGraphile v5 at ~2 reads/write
+  FraiseQL · tv overtakes async-graphql at ~15 reads/write
+  FraiseQL · tv overtakes Actix (REST) at ~7 reads/write
