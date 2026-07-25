@@ -3901,8 +3901,8 @@ def format_report(
             "(lean author has no bio) and the comments on the user's posts (post summary is "
             "`{id,title}`, disjoint from the author change). A `username` edit fans out to ~61.",
             "",
-            f"At FraiseQL's peak cascade throughput of {peak_m1_rps:,.0f} M/s: "
-            f"**~{peak_row_writes:,} row writes/second** across `tb_user`, `tv_user` and `tv_post` "
+            f"At its peak of ~{peak_m1_rps:,.0f} `updateUser(bio)` mutations/second, FraiseQL drives "
+            f"**~{peak_row_writes:,} cascade row-writes/second** across `tb_user`, `tv_user` and `tv_post` "
             "(`tv_comment` is skipped for a bio edit).",
             "",
             "> **Run-order methodology**: M1 results reflect two distinct operational conditions, "
