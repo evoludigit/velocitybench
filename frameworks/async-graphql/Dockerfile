@@ -1,5 +1,8 @@
-# Use Rust nightly Alpine for edition2024 support
-FROM rustlang/rust:nightly-alpine AS builder
+# Stable Rust on Alpine/musl. The crate is edition 2021 with no nightly-only
+# features, so stable suffices — and pinning off the floating `nightly-alpine`
+# tag avoids upstream nightly regressions (e.g. the 2026-07-24 codegen ICE on
+# tokio's multi-thread runtime that broke this build).
+FROM rust:alpine AS builder
 
 # Set TMPDIR to use /data/tmp for builds to avoid /tmp filling up
 ENV TMPDIR=/data/tmp
