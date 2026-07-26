@@ -103,19 +103,6 @@ def test_amort_unmeasured_cascade_count_is_none_not_zero(grid, meta):
     assert ft.sustainable_rps(100) is not None             # cost layer unaffected
 
 
-def test_amort_delta_mode_uses_m1d_and_counts_one(grid, meta):
-    """The delta write mode swaps FraiseQL to its measured jsonb-delta path;
-    then the write is one patch and FraiseQL is fast at every ratio."""
-    a = build.amortize(grid, meta, "Q2b", "delta")
-    ft = series(a, "fraiseql-tv")
-    assert ft.write_scenario == "M1d"
-    assert round(ft.write_rps, 1) == 8641.9
-    assert ft.write_trips == 1
-    assert ft.count(100) == 101                            # 100·1 + 1
-    # fast reads + fast writes: FraiseQL leads the field at a 1:1 mix now
-    assert ft.sustainable_rps(1) > series(a, "async-graphql").sustainable_rps(1)
-
-
 def test_amort_missing_read_cell_degrades(grid, meta):
     """Actix has no Q3 in sweep-3 — its series is present but marked no_read,
     never plotted with a zero."""
@@ -212,12 +199,6 @@ def test_s7_count_omits_unmeasured_cascade_with_note(page):
     assert "cascade fan-out not measured" in count
 
 
-def test_s7_delta_mode_leads_everywhere(page):
-    sent = re.search(r's7-breakeven">(.*?)</p>', panel(page, "Q2b", "delta"),
-                     re.DOTALL).group(1)
-    assert "leads every architecture" in sent
-
-
 def test_s7_provenance_data_attrs_on_lines(page):
     """Every plotted line carries its framework so a reader can trace it to the
     grid cell above (no chart-only, unsourced numbers)."""
@@ -234,11 +215,11 @@ def test_s7_no_js_preset_table(page):
     assert '1:1' in sec and '1000:1' in sec           # preset ratio rows
 
 
-def test_s7_six_panels_default_visible(page):
+def test_s7_three_panels_default_visible(page):
     sec = s7(page)
-    assert sec.count('class="s7-panel"') == 6         # 3 reads × 2 writes
+    assert sec.count('class="s7-panel"') == 3         # 3 reads × 1 write
     # exactly one panel (the default) renders without the hidden attribute
-    assert len(re.findall(r'<div class="s7-panel" hidden', sec)) == 5
+    assert len(re.findall(r'<div class="s7-panel" hidden', sec)) == 2
 
 
 # --------------------------------------------------------------------------

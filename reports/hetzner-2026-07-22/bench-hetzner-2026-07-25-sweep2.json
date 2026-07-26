@@ -146,23 +146,6 @@
     },
     {
       "framework": "fraiseql-tv",
-      "query": "M1d",
-      "pass": 1,
-      "rps": 10095.8,
-      "p50_ms": 3.92,
-      "p95_ms": 5.21,
-      "p99_ms": 6.02,
-      "requests": 302873,
-      "errors": 0,
-      "error_breakdown": {},
-      "rss_steady_mb": 10.3,
-      "rss_max_mb": 10.4,
-      "cold_start_ms": 1083.2,
-      "skipped": false,
-      "skip_reason": ""
-    },
-    {
-      "framework": "fraiseql-tv",
       "query": "F1",
       "pass": 1,
       "rps": 10516.8,
@@ -412,23 +395,6 @@
       "error_breakdown": {},
       "rss_steady_mb": 9.9,
       "rss_max_mb": 10.4,
-      "cold_start_ms": 1039.3,
-      "skipped": false,
-      "skip_reason": ""
-    },
-    {
-      "framework": "fraiseql-tv-cache",
-      "query": "M1d",
-      "pass": 1,
-      "rps": 10172.3,
-      "p50_ms": 3.91,
-      "p95_ms": 5.17,
-      "p99_ms": 5.81,
-      "requests": 305168,
-      "errors": 0,
-      "error_breakdown": {},
-      "rss_steady_mb": 10.6,
-      "rss_max_mb": 10.6,
       "cold_start_ms": 1039.3,
       "skipped": false,
       "skip_reason": ""
@@ -2836,24 +2802,6 @@
       "total_bytes": 2424832,
       "heap_bytes": 2375680,
       "indexes_bytes": 0
-    },
-    {
-      "table": "tvd_post",
-      "total_bytes": 999424,
-      "heap_bytes": 909312,
-      "indexes_bytes": 49152
-    },
-    {
-      "table": "tvd_user",
-      "total_bytes": 565248,
-      "heap_bytes": 491520,
-      "indexes_bytes": 32768
-    },
-    {
-      "table": "tvd_comment",
-      "total_bytes": 81920,
-      "heap_bytes": 8192,
-      "indexes_bytes": 65536
     }
   ]
 }

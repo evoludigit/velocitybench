@@ -195,33 +195,26 @@ this matrix documents it so no gap is ever implicit. ✅ = wired; a dash means
 **excluded by design** with the reason listed below. The APQ trio is
 Q1_APQ + Q2b_APQ + M1_APQ.
 
-| Framework | Q1 Q2 Q2b Q3 | C3 HC3 | F1 F2 F3 | M1 | M1d | T1 | MC1 | APQ trio |
-|-----------|:---:|:---:|:---:|:--:|:---:|:--:|:---:|:---:|
-| fraiseql-tv | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| fraiseql-tv-cache | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| fraiseql-v-nocache | ✅ | ✅ | ✅ | ✅ | — (1) | ✅ | ✅ | ✅ |
-| fraiseql-v-cache | ✅ | ✅ | ✅ | ✅ | — (1) | ✅ | ✅ | ✅ |
-| fraiseql-tv-audit | — (2) | — (2) | — (2) | ✅ | — (2) | — (2) | — (2) | — (2) |
-| hasura | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | — (4) |
-| postgraphile | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | — (5) |
-| actix-web-rest | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | — (6) |
-| async-graphql | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | ✅ |
-| mercurius | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | ✅ |
-| apollo-server | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | ✅ |
-| strawberry | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | — (7) |
+| Framework | Q1 Q2 Q2b Q3 | C3 HC3 | F1 F2 F3 | M1 | T1 | MC1 | APQ trio |
+|-----------|:---:|:---:|:---:|:--:|:--:|:---:|:---:|
+| fraiseql-tv | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| fraiseql-tv-cache | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| fraiseql-v-nocache | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| fraiseql-v-cache | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| fraiseql-tv-audit | — (2) | — (2) | — (2) | ✅ | — (2) | — (2) | — (2) |
+| hasura | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — (4) |
+| postgraphile | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — (5) |
+| actix-web-rest | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — (6) |
+| async-graphql | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| mercurius | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| apollo-server | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| strawberry | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — (7) |
 
 **Exclusion reasons (all by design):**
 
-1. **M1d on v-variants** — `updateUserDelta` patches the `tvd_*` delta tables
-   of the tv pipeline; the v-variants serve on-the-fly JSONB views and have no
-   delta pipeline to contrast (structural, see
-   `frameworks/fraiseql/database/extensions.sql`).
 2. **fraiseql-tv-audit** — audit-overhead appendix row: measures M1 only, to
    isolate the cost of audit logging on the mutation path. Deliberately not a
    full-grid framework; do not expand.
-3. **M1d on non-FraiseQL engines** — the jsonb_delta/tvd_* surgical-patch
-   mutation is FraiseQL infrastructure; no equivalent operation exists to
-   benchmark elsewhere.
 4. **APQ on Hasura** — Hasura CE v2 has no automatic-persisted-query
    handshake (its allow-lists and query caching are different mechanisms /
    Enterprise features). Hand-rolling APQ would benchmark custom code.

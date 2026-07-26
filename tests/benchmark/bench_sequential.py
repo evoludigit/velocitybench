@@ -130,10 +130,6 @@ _FRAISEQL_M1_QUERY = (
     "mutation UpdateUser($id: ID!, $bio: String) { updateUser(id: $id, bio: $bio)"
     " { id identifier email username fullName bio createdAt updatedAt } }"
 )
-_FRAISEQL_M1D_QUERY = (
-    "mutation UpdateUserDelta($id: ID!, $bio: String) { updateUserDelta(id: $id, bio: $bio)"
-    " { id identifier email username fullName bio createdAt updatedAt } }"
-)
 
 # Bio values rotated through every mutation scenario. Every request must be a
 # REAL write: constant values hit no-op short circuits (fn_update_user skips
@@ -290,7 +286,7 @@ def apply_target_host(host: str) -> None:
 
     Central chokepoint for the two-instance topology: the framework table keeps
     localhost URLs (they encode per-framework port + path); the target host is
-    applied once at startup, before any URL is read.  Derived URLs (M1/M1d/C3
+    applied once at startup, before any URL is read.  Derived URLs (M1/C3
     sentinels resolved later from Q1 entries) inherit the substitution.
     """
     if host == "localhost":
@@ -989,8 +985,6 @@ FRAMEWORKS: dict[str, dict] = {
             "HC3": "HC3",
             # Mutation benchmark
             "M1": "M1",
-            # Delta mutation benchmark (jsonb_delta surgical patch on tvd_*)
-            "M1d": "M1d",
             # Filtered query benchmarks
             "F1": ("http://localhost:8817/graphql", _FRAISEQL_F1),
             "F2": ("http://localhost:8817/graphql", _FRAISEQL_F2),
@@ -1028,8 +1022,6 @@ FRAMEWORKS: dict[str, dict] = {
             "C3": "C3",
             "HC3": "HC3",
             "M1": "M1",
-            # Same schema_tv.compiled.json as fraiseql-tv — updateUserDelta served.
-            "M1d": "M1d",
             "F1": ("http://localhost:8816/graphql", _FRAISEQL_F1),
             "F2": ("http://localhost:8816/graphql", _FRAISEQL_F2),
             "F3": ("http://localhost:8816/graphql", _FRAISEQL_F3),
@@ -2105,7 +2097,7 @@ def run_diagnose(fw_name: str, fw_config: dict) -> None:
             print(f"    {query_name}: skipped (None)", flush=True)
             continue
         # Skip unresolved sentinels and composite entries in diagnose mode
-        if isinstance(entry, str) and entry in ("M1", "MC1", "C3", "HC3", "T1", "M1d", "Q1_APQ", "Q2b_APQ", "M1_APQ"):
+        if isinstance(entry, str) and entry in ("M1", "MC1", "C3", "HC3", "T1", "Q1_APQ", "Q2b_APQ", "M1_APQ"):
             print(f"    {query_name}: skipped (unresolved sentinel)", flush=True)
             continue
         if isinstance(entry, dict):
@@ -2326,7 +2318,7 @@ def run_scenario(
         print(f"    warmup {warmup_secs}s...", end=" ", flush=True)
         _run_k6(steps, concurrency, warmup_secs)
         print("done", flush=True)
-        if query_name in ("M1", "M1d", "MC1", "M1_APQ"):
+        if query_name in ("M1", "MC1", "M1_APQ"):
             _reset_postgres_state()
         print(f"    measuring {duration_secs}s...", end=" ", flush=True)
         with RssSampler(fw_config["compose_service"]) as rss:
@@ -2490,7 +2482,7 @@ def run_scenario(
     # warmup writes — the same contamination we prevent between framework runs.
     # Applying _reset_postgres_state() here gives every mutation scenario a clean,
     # pre-warmed starting state regardless of warmup intensity.
-    if query_name in ("M1", "M1d", "MC1", "M1_APQ"):
+    if query_name in ("M1", "MC1", "M1_APQ"):
         _reset_postgres_state()
 
     # Measurement
@@ -2541,8 +2533,8 @@ def detect_tview_persistence() -> str | None:
     """Read the live persistence mode of the pg_tviews tv_* tables.
 
     Returns 'logged', 'unlogged', or 'mixed'; None when postgres is not
-    reachable via docker compose. tvd_* delta tables are excluded — only the
-    pg_tviews-managed tables carry the UNLOGGED durability trade.
+    reachable via docker compose. Only the pg_tviews-managed tv_* tables carry
+    the UNLOGGED durability trade.
     """
     query = (
         "SELECT DISTINCT relpersistence FROM pg_class"
@@ -3384,7 +3376,6 @@ _QUERY_LABELS = {
     "Q2b": "`posts(limit: 10) { id title author { username fullName } }`",
     "Q3": "`comments(limit: 20) { id content author { username } post { title } }`",
     "M1": "`mutation { updateUser(...) { id bio } }` — 20 user UUIDs × 10 bio values, rotating: every request is a real write",
-    "M1d": "`mutation { updateUserDelta(...) { id bio } }` — jsonb_delta surgical patch on tvd_* (rotating bios)",
     # Feature benchmark labels (published filter cross-framework, FraiseQL-specific extras)
     "C3": "`user(id: UUID) { id username fullName }` — single entity, rotating UUIDs",
     "HC3": "`user(id: UUID) { id username fullName }` — hot-key, 5 fixed UUIDs (cache saturation test)",
@@ -4483,42 +4474,6 @@ def main() -> None:
                 else:
                     fw_config["queries"]["M1"] = None
                     print("  M1: could not discover user UUID — skipping", flush=True)
-
-            # M1d: delta mutation — updateUserDelta with rotating bio values.
-            # Rotating bios (bio-0..bio-9 × users) forces actual writes every call,
-            # matching real mutation workload (no pg_tviews delta-skip optimization).
-            if fw_config["queries"].get("M1d") == "M1d":
-                if user_id:
-                    q1_entry = fw_config["queries"].get("Q1")
-                    gql_url = (
-                        q1_entry[0]
-                        if q1_entry is not None
-                        else fw_config.get("graphql_url", "")
-                    )
-                    user_ids = _discover_user_uuids(fw_config)
-                    if not user_ids:
-                        user_ids = [user_id]
-                    # Cycle-based rotation so every call writes different data.
-                    # (The old bios[i % 10] pairing over user_ids * 10 gave each
-                    # user a CONSTANT bio with a 20-user pool — no-ops after the
-                    # first cycle.)
-                    variables_list = [
-                        {"id": uid, "bio": bio}
-                        for uid, bio in _rotating_writes(user_ids, _M1_BIOS)
-                    ]
-                    fw_config["queries"]["M1d"] = (
-                        gql_url,
-                        _FRAISEQL_M1D_QUERY,
-                        variables_list,
-                    )
-                    print(
-                        f"  M1d: resolved {len(user_ids)} user UUIDs × {len(_M1_BIOS)} bio "
-                        f"values (rotating, jsonb_delta variant)",
-                        flush=True,
-                    )
-                else:
-                    fw_config["queries"]["M1d"] = None
-                    print("  M1d: could not discover user UUID — skipping", flush=True)
 
             # C3 / HC3: single-entity lookup. C3 rotates the full discovered UUID
             # pool (cache-miss traffic); HC3 restricts to a 5-UUID hot pool

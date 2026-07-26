@@ -63,9 +63,6 @@ TV tables (pre-computed JSONB) trade storage for read speed by materializing a l
 | `tb_user` | 4.6 MB | 3.1 MB | 7.8 MB |
 | `tb_user_follows` | 2.1 MB | 4.5 MB | 6.6 MB |
 | `bench_bio_snapshot` | 2.3 MB | 0.0 MB | 2.3 MB |
-| `tvd_post` | 0.9 MB | 0.0 MB | 1.0 MB |
-| `tvd_user` | 0.5 MB | 0.0 MB | 0.5 MB |
-| `tvd_comment` | 0.0 MB | 0.1 MB | 0.1 MB |
 
 **TV tables**: 1.34 GB  
 **TB tables (normalized baseline)**: 678.7 MB  
@@ -189,13 +186,6 @@ TV tables (pre-computed JSONB) trade storage for read speed by materializing a l
 | mercurius | Node.js | M1 | 3976 | 9.5 | 16.1 | 22.8 | 119,279 | 0.0% |
 | apollo-server | Node.js | M1 | 2544 | 14.6 | 23.6 | 33.4 | 76,306 | 0.0% |
 | strawberry | Python | M1 | 1268 | 30.5 | 41.7 | 69.0 | 38,045 | 0.0% |
-
-## M1d — `mutation { updateUserDelta(...) { id bio } }` — jsonb_delta surgical patch on tvd_* (rotating bios)
-
-| Framework | Language | Query | RPS | p50 ms | p95 ms | p99 ms | Requests | Errors |
-|-----------|----------|-------|----:|-------:|-------:|-------:|---------:|--------|
-| fraiseql-tv | Rust | M1d | 10179 | 3.9 | 5.2 | 5.8 | 305,375 | 0.0% |
-| fraiseql-tv-cache | Rust | M1d | 9994 | 4.0 | 5.2 | 6.0 | 299,834 | 0.0% |
 
 ## F1 — `posts(published: true, limit: 10) { id title }` — published filter, no nesting
 

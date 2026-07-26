@@ -67,7 +67,7 @@ def test_every_grid_cell_has_its_anchor(tags, meta):
 
 def test_no_framework_scenario_pair_missing(tags, meta):
     n = len(meta["framework_order"]) * len(meta["scenario_order"])
-    assert len(cells_by_id(tags)) == n == 192
+    assert len(cells_by_id(tags)) == n == 180
 
 
 def test_result_cells_carry_microdata(tags):
@@ -79,11 +79,11 @@ def test_result_cells_carry_microdata(tags):
 
 
 def test_excluded_cells_flagged_and_reasoned(tags, meta, index_html):
-    _, cell = cells_by_id(tags)["cell-hasura-M1d"]
+    _, cell = cells_by_id(tags)["cell-hasura-M1_APQ"]
     assert cell.get("data-excluded") == "true"
-    assert cell.get("data-reason-id") == "3"
+    assert cell.get("data-reason-id") == "4"
     # the verbatim reason text is present in the page (exclusion key)
-    reason = meta["exclusion_reasons"]["3"]
+    reason = meta["exclusion_reasons"]["4"]
     assert reason in index_html
 
 
@@ -91,7 +91,7 @@ def test_not_measured_cells_are_distinct_from_excluded(tags):
     _, nm = cells_by_id(tags)["cell-actix-web-rest-Q3"]
     assert nm.get("data-not-measured") == "true"
     assert "data-excluded" not in nm
-    _, ex = cells_by_id(tags)["cell-hasura-M1d"]
+    _, ex = cells_by_id(tags)["cell-hasura-M1_APQ"]
     assert "data-not-measured" not in ex
 
 
@@ -117,7 +117,7 @@ def test_zero_error_badge_count_matches_zero_error_cells(index_html, grid):
     zero_err_cells = sum(1 for c in grid.cells.values() if c.ok)
     # count the class attribute exactly (not the CSS rule token)
     rendered_badges = index_html.count('class="cell zero-err"')
-    assert rendered_badges == zero_err_cells == 118
+    assert rendered_badges == zero_err_cells == 117
 
 
 def test_methodology_block_renders_environment(index_html, sweep3_run):
@@ -167,7 +167,7 @@ def test_llms_txt_describes_structure(built):
     assert "not measured in this run" in txt.lower()
     assert "#cell-" in txt                      # anchor scheme
     assert 'named "query"' in txt or "not \"scenario\"" in txt.lower()
-    assert "M1d" in txt and "jsonb-delta" in txt  # mechanism distinction
+    assert "cascade" in txt.lower() and "vanilla" in txt.lower()  # M1 mechanism distinction
 
 
 def test_dist_is_offline(built):

@@ -79,7 +79,7 @@ def test_load_run_validates_required_keys(tmp_path):
 def test_grid_covers_full_cross_product(grid, meta):
     n_fw = len(meta["framework_order"])
     n_sc = len(meta["scenario_order"])
-    assert len(grid.cells) == n_fw * n_sc == 12 * 16
+    assert len(grid.cells) == n_fw * n_sc == 12 * 15
     for fw in meta["framework_order"]:
         for sc in meta["scenario_order"]:
             assert (fw, sc) in grid.cells, f"missing cell {fw}/{sc}"
@@ -88,9 +88,9 @@ def test_grid_covers_full_cross_product(grid, meta):
 def test_grid_partition_no_silent_gaps(grid):
     statuses = [c.status for c in grid.cells.values()]
     assert set(statuses) <= {"result", "excluded", "not_measured"}
-    assert statuses.count("result") == 118
-    assert statuses.count("excluded") == 36
-    assert statuses.count("not_measured") == 38
+    assert statuses.count("result") == 117
+    assert statuses.count("excluded") == 26
+    assert statuses.count("not_measured") == 37
 
 
 def test_result_cell_carries_metrics(grid):
@@ -102,20 +102,21 @@ def test_result_cell_carries_metrics(grid):
 
 
 def test_excluded_cell_carries_reason(grid):
-    cell = grid.cells[("hasura", "M1d")]
+    cell = grid.cells[("hasura", "M1_APQ")]
     assert cell.status == "excluded"
-    assert cell.reason_id == 3
-    assert "no equivalent operation" in cell.reason
+    assert cell.reason_id == 4
+    assert "automatic-persisted-query" in cell.reason
     # a structurally different reason id resolves to different text
-    apq = grid.cells[("hasura", "Q1_APQ")]
-    assert apq.status == "excluded" and apq.reason_id == 4
+    pg = grid.cells[("postgraphile", "M1_APQ")]
+    assert pg.status == "excluded" and pg.reason_id == 5
 
 
 def test_not_measured_cell_is_explicit(grid):
     cell = grid.cells[("actix-web-rest", "Q3")]
     assert cell.status == "not_measured"
-    # tv-cache M1d is wired-but-unrun in this sweep, NOT excluded by design
-    assert grid.cells[("fraiseql-tv-cache", "M1d")].status == "not_measured"
+    # a classical engine's APQ cell is wired-but-unrun in this sweep, NOT
+    # excluded by design
+    assert grid.cells[("async-graphql", "Q1_APQ")].status == "not_measured"
 
 
 def test_cross_check_exclusions_have_no_result_row(grid, meta):
@@ -139,14 +140,14 @@ def test_contradiction_present_and_excluded_raises(sweep3_run, meta):
     import copy
     run = copy.deepcopy(sweep3_run)
     run.results.append({
-        "framework": "hasura", "query": "M1d", "pass": 1, "rps": 1.0,
+        "framework": "hasura", "query": "M1_APQ", "pass": 1, "rps": 1.0,
         "p50_ms": 1.0, "p95_ms": 1.0, "p99_ms": 1.0, "requests": 1,
         "errors": 0, "error_breakdown": {}, "skipped": False,
         "skip_reason": "",
     })
     with pytest.raises(Exception) as exc:
         build.build_grid(run, meta)
-    assert "hasura" in str(exc.value) and "M1d" in str(exc.value)
+    assert "hasura" in str(exc.value) and "M1_APQ" in str(exc.value)
 
 
 def test_unknown_exclusion_reference_raises(sweep3_run, meta):

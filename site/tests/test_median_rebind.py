@@ -60,15 +60,6 @@ def test_exclusion_reasons_render_verbatim(any_grid, meta):
         assert c.reason == reasons[str(c.reason_id)]
 
 
-def test_m1_and_m1d_adjacent_in_mutation_view(any_run, meta):
-    html = build.render(any_run, meta)["index.html"].decode()
-    i_m1 = html.find("data-scenario=\"M1\"")
-    i_m1d = html.find("data-scenario=\"M1d\"")
-    # Both present and M1 precedes M1d somewhere in the write-trade section.
-    if i_m1 != -1 and i_m1d != -1:
-        assert i_m1 < i_m1d
-
-
 # ── Median-specific: the publishable run's own facts ───────────────────────
 
 def test_provenance_link_is_self_contained(any_run, meta):
@@ -104,8 +95,8 @@ def test_median_full_grid_no_not_measured(median_grid):
     st = Counter(c.status for c in median_grid.cells.values())
     assert st[build.STATUS_NOT_MEASURED] == 0, \
         "the full publishable run should measure every non-excluded cell"
-    assert st[build.STATUS_RESULT] == 156
-    assert st[build.STATUS_EXCLUDED] == 36
+    assert st[build.STATUS_RESULT] == 154
+    assert st[build.STATUS_EXCLUDED] == 26
 
 
 def test_median_no_empty_apq_coverage_block(median_run, meta):

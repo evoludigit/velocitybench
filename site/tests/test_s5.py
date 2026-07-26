@@ -1,9 +1,9 @@
 """S5 write-trade pins + workload-selector mapping.
 
 These pins guard the load-bearing honesty invariants of the whole site:
-M1 and M1d shown adjacent and labelled by mechanism, MC1 flagged as a workflow
-benchmark, M1d exclusions rendered in place, the audit row marked appendix, and
-every workload-shape link resolving to a real anchor.
+FraiseQL's integrated cascade M1 shown at full linear prominence and labelled by
+mechanism, MC1 flagged as a workflow benchmark, the audit row marked appendix,
+and every workload-shape link resolving to a real anchor.
 """
 import re
 import sys
@@ -51,19 +51,16 @@ def all_ids(page):
 # S5 pins
 # --------------------------------------------------------------------------
 
-def test_m1_and_m1d_are_adjacent_in_dom(page):
+def test_m1_write_bar_renders_for_fraiseql(page):
     g = group_html(page, "fraiseql-tv")
-    i_m1 = g.index('data-scenario="M1"')
-    i_m1d = g.index('data-scenario="M1d"')
-    assert 0 <= i_m1 < i_m1d, "M1 must render immediately before M1d"
-    # nothing else between them in the write-trade group
-    between = g[i_m1:i_m1d]
-    assert 'data-scenario="MC1"' not in between
+    assert 'data-scenario="M1"' in g
+    # MC1 is a separate chart, not part of the M1 raw-throughput group
+    assert 'data-scenario="MC1"' not in g
 
 
 def test_each_write_bar_labelled_by_mechanism(page):
     tv = group_html(page, "fraiseql-tv")
-    assert "full-cascade" in tv and "jsonb-delta" in tv
+    assert "full-cascade" in tv
     hasura = group_html(page, "hasura")
     assert "vanilla-update" in hasura
 
@@ -78,32 +75,26 @@ def test_write_axis_starts_at_zero(page):
     assert axis and ">0<" in axis.group(0)
 
 
-def test_m1d_exclusions_render_in_place(page):
-    v = group_html(page, "fraiseql-v-cache")
-    assert 'data-scenario="M1d"' in v and 'data-excluded="true"' in v
-    assert 'data-reason-id="1"' in v
-    hasura = group_html(page, "hasura")
-    assert 'data-reason-id="3"' in hasura
-
-
 def test_audit_row_labelled_appendix(page):
     audit = group_html(page, "fraiseql-tv-audit")
     assert "audit overhead appendix" in audit
-    # audit shows M1 only (no M1d/MC1 bars in its group)
+    # audit shows M1 only (no MC1 bar in its group)
     assert audit.count('data-scenario="') == 1
     assert 'data-scenario="M1"' in audit
 
 
 def test_full_cascade_m1_shown_at_full_prominence(sweep3_run, meta):
-    """FraiseQL M1 must not be truncated or log-scaled away — a real, small
-    linear bar on the same axis as the wins."""
+    """FraiseQL's integrated cascade M1 must not be truncated or log-scaled away
+    — a real, small LINEAR bar on the same axis as the faster classical writes."""
     page = build.render(sweep3_run, meta)["index.html"].decode()
     tv = group_html(page, "fraiseql-tv")
-    m1_bar = re.search(r'wt-bar wt-M1" style="width:([\d.]+)%', tv)
-    m1d_bar = re.search(r'wt-bar wt-M1d" style="width:([\d.]+)%', tv)
-    assert m1_bar and m1d_bar
-    # the delta bar is vastly longer than the cascade bar — the honest trade
-    assert float(m1d_bar.group(1)) > 20 * float(m1_bar.group(1))
+    tv_bar = re.search(r'wt-bar wt-M1" style="width:([\d.]+)%', tv)
+    assert tv_bar and float(tv_bar.group(1)) > 0   # present, not truncated away
+    ag = group_html(page, "async-graphql")
+    ag_bar = re.search(r'wt-bar wt-M1" style="width:([\d.]+)%', ag)
+    assert ag_bar
+    # linear axis: a ~80x faster classical write is a ~80x longer bar — the trade
+    assert float(ag_bar.group(1)) > 20 * float(tv_bar.group(1))
 
 
 # --------------------------------------------------------------------------

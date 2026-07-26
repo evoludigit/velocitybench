@@ -52,7 +52,7 @@ const errorRate     = new Rate('errors');
 const q1Duration    = new Trend('q1_duration_ms',  true);
 const q2Duration    = new Trend('q2_duration_ms',  true);
 const q3Duration    = new Trend('q3_duration_ms',  true);
-const m1Duration    = new Trend('m1_duration_ms',  true);
+const mutationDuration    = new Trend('m1_duration_ms',  true);
 const q1Requests    = new Counter('q1_requests');
 const q2Requests    = new Counter('q2_requests');
 const q3Requests    = new Counter('q3_requests');
@@ -147,7 +147,7 @@ export default function () {
     } else if (rand < 0.95) {
       group('Q3_deep', () => gqlPost(GQL_QUERIES.Q3, q3Duration, q3Requests));
     } else {
-      group('M1_mutation', () => gqlPost(GQL_QUERIES.M1, m1Duration, m1Requests));
+      group('M1_mutation', () => gqlPost(GQL_QUERIES.M1, mutationDuration, m1Requests));
     }
   } else {
     // REST frameworks
@@ -161,7 +161,7 @@ export default function () {
       group('M1_mutation', () => restPatch(
         REST_PATHS.M1,
         { bio: `bench-${Date.now()}` },
-        m1Duration, m1Requests,
+        mutationDuration, m1Requests,
       ));
     }
   }

@@ -63,9 +63,6 @@ TV tables (pre-computed JSONB) trade storage for read speed by materializing a l
 | `tv_comment` | 769.3 MB | 278.1 MB | 1.02 GB |
 | `tv_post` | 210.7 MB | 68.7 MB | 311.1 MB |
 | `tv_user` | 8.0 MB | 5.8 MB | 13.8 MB |
-| `tvd_comment` | 0.0 MB | 0.1 MB | 0.1 MB |
-| `tvd_post` | 0.9 MB | 0.0 MB | 1.0 MB |
-| `tvd_user` | 0.5 MB | 0.0 MB | 0.5 MB |
 
 **TV tables**: 1.34 GB  
 **TB tables (normalized baseline)**: 639.7 MB  
@@ -305,13 +302,6 @@ TV tables (pre-computed JSONB) trade storage for read speed by materializing a l
 | fraiseql-v-cache | Rust | Q2b_APQ | 5219 ±0 | 6.0 | 27.3 | 33.8 | 1 | 0.0% |
 | fraiseql-v-nocache | Rust | Q2b_APQ | 5159 ±0 | 6.0 | 27.9 | 34.1 | 1 | 0.0% |
 | mercurius | Node.js | Q2b_APQ | 3029 ±0 | 12.2 | 21.0 | 26.5 | 1 | 0.0% |
-
-## M1d — `mutation { updateUserDelta(...) { id bio } }` — jsonb_delta surgical patch on tvd_* (rotating bios)
-
-| Framework | Language | Query | Median RPS (±σ) | p50 ms | p95 ms | p99 ms | Passes | Errors |
-|-----------|----------|-------|----------------:|-------:|-------:|-------:|-------:|--------|
-| fraiseql-tv | Rust | M1d | 10128 ±0 | 3.9 | 5.2 | 5.9 | 1 | 0.0% |
-| fraiseql-tv-cache | Rust | M1d | 9994 ±0 | 4.0 | 5.2 | 6.0 | 1 | 0.0% |
 
 ---
 

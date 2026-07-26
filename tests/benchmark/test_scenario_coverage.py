@@ -35,13 +35,13 @@ APQ = {"Q1_APQ", "Q2b_APQ", "M1_APQ"}
 # Wired scenario keys per subset framework. Anything absent here must appear
 # in the docs/scenarios.md exclusion list (see test below).
 EXPECTED: dict[str, set[str]] = {
-    "fraiseql-tv": CORE | APQ | {"M1d"},
-    "fraiseql-tv-cache": CORE | APQ | {"M1d"},
-    "fraiseql-v-nocache": CORE | APQ,  # M1d excluded: tvd_* is tv-pipeline-only
+    "fraiseql-tv": CORE | APQ,
+    "fraiseql-tv-cache": CORE | APQ,
+    "fraiseql-v-nocache": CORE | APQ,
     "fraiseql-v-cache": CORE | APQ,
     "fraiseql-tv-audit": {"M1"},  # audit-overhead appendix row — by design
-    "hasura": CORE,  # no native APQ in CE v2; no M1d
-    "postgraphile": CORE,  # persisted ops are an allowlist, not APQ; no M1d
+    "hasura": CORE,  # no native APQ in CE v2
+    "postgraphile": CORE,  # persisted ops are an allowlist, not APQ
     "actix-web-rest": CORE,  # APQ is a GraphQL protocol — N/A for REST
     "async-graphql": CORE | APQ,  # first-party ApolloPersistedQueries extension
     "mercurius": CORE | APQ,  # first-party persistedQueryDefaults.automatic()
@@ -63,9 +63,7 @@ def test_excluded_cells_are_documented():
     doc = (BENCH_DIR.parent.parent / "docs" / "scenarios.md").read_text()
     assert "Scenario coverage & exclusions" in doc
     for marker in (
-        "M1d on v-variants",
         "fraiseql-tv-audit",
-        "M1d on non-FraiseQL engines",
         "APQ on Hasura",
         "APQ on PostGraphile",
         "APQ on actix-web-rest",

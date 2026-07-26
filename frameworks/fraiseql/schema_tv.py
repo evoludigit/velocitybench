@@ -158,12 +158,6 @@ def postFull(id: ID) -> PostFull | None:
     pass
 
 
-@fraiseql.query(sql_source="v_post_full_delta")
-def postFullDelta(id: ID) -> PostFull | None:
-    """Get a post with comments from tvd_* (delta-managed tables). T1d benchmark variant."""
-    pass
-
-
 # ============================================================================
 # Mutation Definitions — write through tb_* CQRS command tables
 # pg_tviews triggers auto-cascade writes to tv_* pre-computed tables
@@ -173,16 +167,6 @@ def postFullDelta(id: ID) -> PostFull | None:
 @fraiseql.mutation(sql_source="benchmark.fn_update_user", operation="UPDATE")
 def updateUser(id: ID, bio: str | None = None) -> User | None:
     """Update a user's bio. Returns the updated user."""
-    pass
-
-
-@fraiseql.mutation(sql_source="benchmark.fn_update_user_delta", operation="UPDATE")
-def updateUserDelta(id: ID, bio: str | None = None) -> User | None:
-    """Update a user's bio via surgical jsonb_delta patch on tvd_* tables.
-
-    Bypasses pg_tviews cascade — patches tvd_user / tvd_post / tvd_comment
-    in-place using jsonb_smart_patch_nested. M1d benchmark variant.
-    """
     pass
 
 

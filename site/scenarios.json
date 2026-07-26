@@ -26,7 +26,6 @@
     "C3",
     "HC3",
     "M1",
-    "M1d",
     "MC1",
     "Q1_APQ",
     "Q2b_APQ",
@@ -185,16 +184,8 @@
       "doc_ref": "docs/scenarios.md#c3-hc3"
     },
     "M1": {
-      "label": "Update user bio (full recompute)",
+      "label": "Update user bio (integrated cascade write)",
       "category": "write",
-      "pair": "M1d",
-      "units": "RPS",
-      "doc_ref": "docs/scenarios.md#m1-single-field-update"
-    },
-    "M1d": {
-      "label": "Update user bio (delta patch)",
-      "category": "write",
-      "pair": "M1",
       "units": "RPS",
       "doc_ref": "docs/scenarios.md#m1-single-field-update"
     },
@@ -230,9 +221,6 @@
     "M1": {
       "fraiseql": "full-cascade",
       "classical": "vanilla-update"
-    },
-    "M1d": {
-      "fraiseql": "jsonb-delta"
     },
     "M1_APQ": {
       "fraiseql": "full-cascade",
@@ -414,16 +402,10 @@
     "reads": ["Q1", "Q2b", "Q3"],
     "writes": {
       "full": {
-        "label": "Full write",
+        "label": "Integrated write",
         "scenario": {"fraiseql": "M1", "classical": "M1"},
         "trips": {"fraiseql": null, "classical": 1},
-        "note": "FraiseQL pays its full logged cascade (M1); classical engines a single vanilla UPDATE. The cascade fan-out count is not measured in this run, so the structural-count layer marks FraiseQL's write ‘fan-out not measured’ — the cost layer still uses its measured M1 service time."
-      },
-      "delta": {
-        "label": "Delta / fast path",
-        "scenario": {"fraiseql": "M1d", "classical": "M1"},
-        "trips": {"fraiseql": 1, "classical": 1},
-        "note": "Each engine's fast write path: FraiseQL's surgical jsonb-delta (M1d, one patch), classical's single vanilla UPDATE. M1d is measured only for fraiseql-tv in this run."
+        "note": "FraiseQL pays its full logged cascade (M1) to keep the precomputed rows consistent; classical engines a single vanilla UPDATE. The cascade fan-out count is not measured in this run, so the structural-count layer marks FraiseQL's write ‘fan-out not measured’ — the cost layer still uses its measured M1 service time."
       }
     },
     "ratios": [1, 10, 100, 1000],
@@ -441,25 +423,13 @@
     "caveat": "A derived model on the median-of-three inputs, not a measured cell. Aggregation multiplies per-request numbers, so it compounds each cell's run-to-run spread (recorded in the run JSON); the read:write ratio is your assumption, shown across the whole range rather than one flattering point."
   },
   "exclusion_reasons": {
-    "1": "M1d on v-variants — updateUserDelta patches the tvd_* delta tables of the tv pipeline; the v-variants serve on-the-fly JSONB views and have no delta pipeline to contrast (structural, see frameworks/fraiseql/database/extensions.sql).",
     "2": "fraiseql-tv-audit — audit-overhead appendix row: measures M1 only, to isolate the cost of audit logging on the mutation path. Deliberately not a full-grid framework; do not expand.",
-    "3": "M1d on non-FraiseQL engines — the jsonb_delta/tvd_* surgical-patch mutation is FraiseQL infrastructure; no equivalent operation exists to benchmark elsewhere.",
     "4": "APQ on Hasura — Hasura CE v2 has no automatic-persisted-query handshake (its allow-lists and query caching are different mechanisms / Enterprise features). Hand-rolling APQ would benchmark custom code.",
     "5": "APQ on PostGraphile — v5 first-party persisted operations are a build-time allowlist, not the register-on-first-use sha256 handshake the APQ scenarios measure.",
     "6": "APQ on actix-web-rest — APQ is a GraphQL wire-protocol optimization (persisting a query document by hash); REST requests carry no document, so the scenario is not applicable.",
     "7": "APQ on Strawberry — Strawberry GraphQL ships no first-party APQ extension (verified against the installed strawberry/extensions inventory); third-party or hand-rolled implementations would not benchmark the framework."
   },
   "exclusions": [
-    {
-      "framework": "fraiseql-v-nocache",
-      "scenario": "M1d",
-      "reason_id": 1
-    },
-    {
-      "framework": "fraiseql-v-cache",
-      "scenario": "M1d",
-      "reason_id": 1
-    },
     {
       "framework": "fraiseql-tv-audit",
       "scenario": "Q1",
@@ -512,11 +482,6 @@
     },
     {
       "framework": "fraiseql-tv-audit",
-      "scenario": "M1d",
-      "reason_id": 2
-    },
-    {
-      "framework": "fraiseql-tv-audit",
       "scenario": "MC1",
       "reason_id": 2
     },
@@ -537,11 +502,6 @@
     },
     {
       "framework": "hasura",
-      "scenario": "M1d",
-      "reason_id": 3
-    },
-    {
-      "framework": "hasura",
       "scenario": "Q1_APQ",
       "reason_id": 4
     },
@@ -554,11 +514,6 @@
       "framework": "hasura",
       "scenario": "M1_APQ",
       "reason_id": 4
-    },
-    {
-      "framework": "postgraphile",
-      "scenario": "M1d",
-      "reason_id": 3
     },
     {
       "framework": "postgraphile",
@@ -577,11 +532,6 @@
     },
     {
       "framework": "actix-web-rest",
-      "scenario": "M1d",
-      "reason_id": 3
-    },
-    {
-      "framework": "actix-web-rest",
       "scenario": "Q1_APQ",
       "reason_id": 6
     },
@@ -594,26 +544,6 @@
       "framework": "actix-web-rest",
       "scenario": "M1_APQ",
       "reason_id": 6
-    },
-    {
-      "framework": "async-graphql",
-      "scenario": "M1d",
-      "reason_id": 3
-    },
-    {
-      "framework": "mercurius",
-      "scenario": "M1d",
-      "reason_id": 3
-    },
-    {
-      "framework": "apollo-server",
-      "scenario": "M1d",
-      "reason_id": 3
-    },
-    {
-      "framework": "strawberry",
-      "scenario": "M1d",
-      "reason_id": 3
     },
     {
       "framework": "strawberry",
@@ -660,11 +590,10 @@
       "label": "Write-heavy",
       "scenarios": [
         "M1",
-        "M1d",
         "MC1"
       ],
       "section": "s5-write-trade",
-      "blurb": "FraiseQL's delta path (M1d) competes with a classical single UPDATE; the full-cascade recompute (M1) is the price of always-consistent precomputed reads. MC1 needs one round-trip where classical needs two.",
+      "blurb": "FraiseQL's integrated cascade write (M1) is the price of always-consistent precomputed reads — the slowest write here, and where a write-heavy mix costs it. MC1 reaches a consistent state in one round-trip where classical needs two.",
       "score": {"read": "Q2b", "ratio": 1}
     },
     "hot-key": {
@@ -682,11 +611,10 @@
     "same_run": "This page renders exactly one benchmark sweep. No cross-run or cross-hardware mixing — the generator refuses two JSON files. The numbers here are the per-cell median of three warm sweeps on one rented box; the first post-seed sweep is discarded as a warm-up, and each cell's run-to-run spread is in the run JSON.",
     "loadgen_headroom": "The load generator (k6) runs on its own dedicated box and drives the system-under-test over a private network — never co-located, never sharing the SUT's cores. A pre-sweep headroom gate points k6 at a null target on the SUT and requires it to sustain far more than any framework serves (the enforced floor is 30,000 RPS, several times the fastest cell in this grid), so these numbers are server-bound, not load-generator-bound. The exact measured headroom and full topology are in the reproduction doc.",
     "logged_durability": "The tv_* precomputed tables run LOGGED here — crash-durable, and the conservative choice for a published number. pg_tviews can run them UNLOGGED for more write throughput, but an unclean shutdown then truncates them; this run does not take that trade, so nothing here is inflated by dropping durability. The disk cost of precompute is shown honestly in S6.",
-    "q1_toast": "FraiseQL leads Q1 — its precomputed tv variants top the field here, not mid-pack. Each tv_user read still detoasts a full precomputed JSONB document, so the read-side cost is real; but in this run it is too small to surface — the tv variants sit level with their JOIN-view (v) siblings at Q1. The precompute trade is paid on writes (M1 → M1d), not on Q1 reads, and FraiseQL's read edge over its own v variants only widens as nesting deepens (Q2b → Q3).",
+    "q1_toast": "FraiseQL leads Q1 — its precomputed tv variants top the field here, not mid-pack. Each tv_user read still detoasts a full precomputed JSONB document, so the read-side cost is real; but in this run it is too small to surface — the tv variants sit level with their JOIN-view (v) siblings at Q1. The precompute trade is paid on writes (the integrated M1 cascade), not on Q1 reads, and FraiseQL's read edge over its own v variants only widens as nesting deepens (Q2b → Q3).",
     "tview_scope": "pg_tviews cascade triggers fire only while a FraiseQL framework is under test (tview_trigger_scope = fraiseql-only). Classical stacks run against a vanilla table with the triggers disabled, then tv_* rows are resynced before the next FraiseQL run.",
     "mc1_workflow": "MC1 is a workflow benchmark, not raw server speed: it counts the client round-trips needed to reach a consistent state after a write. FraiseQL = 1 request/cycle (the mutation response carries the cascade); classical GraphQL and REST = 2 requests/cycle (mutation + serial re-fetch).",
-    "m1_full_cascade": "Under logged tviews, M1 triggers a full cascade recompute across the affected precomputed rows (61-row fan-out here) — the maintenance price of always-consistent precomputed reads.",
-    "m1_delta": "M1d measures the raw speed of FraiseQL's jsonb_delta patch step in isolation: the ecosystem's machinery patches only the changed fields of dedicated delta tables (tvd_*) in place, instead of recomputing — fast, and part of the tooling, not something you hand-write. Read it as the delta mechanism's speed, not a full integrated write: in this run M1d patches the tvd_* tables (the read that consumes them is postFullDelta), while the base row and the tv_* projection the main reads use are maintained on the M1 path — the full-cascade recompute. Bounds also: only this single-field update is exercised (inserts, deletes out of scope here), and at this throughput the write is server-bound, so M1d ties the quickest resolver engine rather than lapping it (the classical REST write measured also looks under-tuned, so that ceiling is soft).",
+    "m1_full_cascade": "Under logged tviews, M1 is FraiseQL's real write: the integrated column-aware cascade that recomputes the affected precomputed rows so reads stay consistent — the maintenance price of always-consistent precomputed reads, and the slowest write measured here.",
     "m1_vanilla": "Classical M1 is a single UPDATE on a vanilla table with no derived state to maintain.",
     "tv_audit": "fraiseql-tv-audit measures M1 only — an audit-overhead appendix row isolating the cost of audit logging on the mutation path. It is never a full-grid framework.",
     "not_measured": "Cells marked “not measured in this run” are wired in the benchmark but were not executed in the run shown. They are distinct from “excluded by design” and are neither slow nor missing on purpose. This publishable run measured the full grid, so no cell carries this status."

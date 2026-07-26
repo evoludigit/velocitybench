@@ -54,14 +54,14 @@ CITING A CELL
     excluded     data-excluded="true", data-reason-id="<N>"
     not measured data-not-measured="true"
 
-M1 vs M1d — READ THE MECHANISM, NOT JUST THE NUMBER
-  M1   full-cascade write. FraiseQL: a logged tview recompute (61-row fan-out
-       here) — the maintenance price of always-consistent precomputed reads.
+M1 — READ THE MECHANISM, NOT JUST THE NUMBER
+  M1   FraiseQL's real write: an integrated, column-aware cascade that recomputes
+       the affected precomputed rows (logged tview maintenance) so reads stay
+       consistent — the slowest write measured here, and the price of
+       always-consistent precomputed reads.
        Classical: a vanilla single UPDATE with no derived state.
-  M1d  jsonb-delta surgical patch — a FraiseQL-only fast write path, present on
-       the tv variants only.
-  They measure DIFFERENT mechanisms and are ALWAYS shown side by side. FraiseQL
-  losing on full-cascade M1 is a real, prominent result, not an artifact.
+  FraiseQL losing on the integrated M1 write is a real, prominent result, not an
+  artifact — the write-heavy workload shape names a resolver engine, not FraiseQL.
   $mc1_workflow
 
 REQUEST ANATOMY — QUERY STRATEGIES (S0)

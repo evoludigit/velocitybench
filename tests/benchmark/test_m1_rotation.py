@@ -5,11 +5,11 @@ Finding 2026-07-04 (phase-artifacts/finding-m1-design-invalid-2026-07-04.md):
   21k "mutations"/s that never wrote;
 - classical M1 baked ONE user UUID → 40 workers serialized on a single row's
   ~30 ms tview cascade (~45 RPS for every framework, actix included);
-- M1d's pairing (bios[i % 10] over users*10 with 20 users) gave each user a
+- a naive bios[i % 10] pairing over users*10 with 20 users gave each user a
   CONSTANT bio — no-ops after the first cycle.
 
 The fix: cycle-based rotation (each full pass over the user pool advances the
-bio), applied to M1, M1d, MC1, and M1_APQ for every framework; pg_tviews
+bio), applied to M1, MC1, and M1_APQ for every framework; pg_tviews
 triggers scoped to the FraiseQL stacks; and a live write-effect probe per
 framework at sweep time.
 """
@@ -37,8 +37,9 @@ def test_rotating_writes_covers_full_grid():
 
 
 def test_rotating_writes_consecutive_visits_change_bio():
-    """The M1d regression: same user's consecutive visits must differ in bio,
-    even when len(users) is a multiple of len(bios)."""
+    """A same user's consecutive visits must differ in bio, even when
+    len(users) is a multiple of len(bios) — otherwise the write no-ops after
+    the first cycle."""
     users = [f"u{i}" for i in range(20)]
     bios = [f"bio-{i}" for i in range(10)]
     pairs = bench._rotating_writes(users, bios)

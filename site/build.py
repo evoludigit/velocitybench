@@ -323,7 +323,7 @@ def ladder_series(grid: Grid, ladder: str = "nesting") -> list:
 # Write-trade extraction (S5)
 # --------------------------------------------------------------------------
 
-WRITE_SCENARIOS = ("M1", "M1d", "MC1")
+WRITE_SCENARIOS = ("M1", "MC1")
 
 
 @dataclass
@@ -350,10 +350,11 @@ def write_mechanism(framework: str, scenario: str, meta: dict) -> str | None:
 
 
 def write_trade(grid: Grid) -> list:
-    """Per-framework M1/M1d/MC1 cells (or their exclusion/not-measured records),
+    """Per-framework M1/MC1 cells (or their exclusion/not-measured records),
     with mutation mechanisms resolved from scenarios.json. The load-bearing
-    honesty section: FraiseQL's full-cascade M1 and its delta M1d side by side
-    with classical vanilla writes."""
+    honesty section: FraiseQL's integrated full-cascade M1 — the slowest write
+    here — shown next to classical vanilla writes, plus the MC1 consistency
+    cycle."""
     meta = grid.meta
     out = []
     for fw in meta["framework_order"]:
@@ -734,7 +735,7 @@ class AmortSeries:
     architecture: str
     read_rps: float | None
     write_rps: float | None
-    write_scenario: str            # the write cell used (M1 / M1d)
+    write_scenario: str            # the write cell used (M1)
     read_trips: int | None         # SQL round-trips per read (S0 hop model)
     write_trips: int | None        # per write; None = cascade fan-out unmeasured
     status: str                    # "ok" | "no_read" | "no_write"
@@ -768,7 +769,7 @@ class Breakeven:
 @dataclass
 class Amortization:
     read: str
-    write: str                     # write-mode key ("full" / "delta")
+    write: str                     # write-mode key ("full" — integrated M1)
     series: list                   # AmortSeries, ok first
     breakevens: list               # Breakeven, anchor vs each other ok series
 
@@ -961,8 +962,7 @@ NOTE_ORDER = [
     ("q1_toast", "Q1 and the TOAST read-cost"),
     ("tview_scope", "tview trigger scoping"),
     ("mc1_workflow", "MC1 is a workflow benchmark"),
-    ("m1_full_cascade", "M1 under tviews — full cascade"),
-    ("m1_delta", "M1d — surgical delta patch"),
+    ("m1_full_cascade", "M1 under tviews — integrated cascade"),
     ("m1_vanilla", "Classical M1 — vanilla update"),
     ("tv_audit", "The audit-overhead appendix row"),
     ("not_measured", "“Not measured” ≠ excluded ≠ slow"),
@@ -2058,9 +2058,9 @@ def _s5_section(grid: Grid, meta: dict) -> str:
     main = [g for g in groups if not g.appendix]
     audit = [g for g in groups if g.appendix]
 
-    # M1 / M1d share one linear req/s axis (same unit, adjacency preserved)
-    mm_vals = [g.rows[sc].rps for g in groups for sc in ("M1", "M1d")
-               if g.rows[sc].status == STATUS_RESULT and g.rows[sc].rps]
+    # M1 (integrated cascade write) on one linear req/s axis
+    mm_vals = [g.rows["M1"].rps for g in groups
+               if g.rows["M1"].status == STATUS_RESULT and g.rows["M1"].rps]
     mm_max = svg.nice_axis(max(mm_vals, default=1.0), 5)[0]
     mc_vals = [g.rows["MC1"].rps for g in groups
                if g.rows["MC1"].status == STATUS_RESULT and g.rows["MC1"].rps]
@@ -2071,11 +2071,10 @@ def _s5_section(grid: Grid, meta: dict) -> str:
         f'{esc_text(notes.get(key, ""))}</div>'
         for tag, cls, key in [
             ("M1 — FraiseQL", "M1", "m1_full_cascade"),
-            ("M1d — delta", "M1d", "m1_delta"),
             ("M1 — classical", "M1", "m1_vanilla")])
 
     mm_groups = "".join(
-        _wt_group(g, meta, ["M1", "M1d"], mm_max, "req/s") for g in main)
+        _wt_group(g, meta, ["M1"], mm_max, "req/s") for g in main)
     audit_html = "".join(
         _wt_group(g, meta, ["M1"], mm_max, "req/s") for g in audit)
     mc_groups = "".join(
@@ -2085,9 +2084,7 @@ def _s5_section(grid: Grid, meta: dict) -> str:
     legend = (
         '<div class="state-legend">'
         '<span><span class="swatch" style="background:var(--wt-c-M1)"></span>'
-        'M1 — full write</span>'
-        '<span><span class="swatch" style="background:var(--wt-c-M1d)"></span>'
-        'M1d — delta patch</span>'
+        'M1 — integrated write</span>'
         '<span><span class="swatch" style="background:var(--wt-c-MC1)"></span>'
         'MC1 — workflow</span></div>')
 
@@ -2095,13 +2092,14 @@ def _s5_section(grid: Grid, meta: dict) -> str:
         '<section id="s5-write-trade" aria-labelledby="s5-h">'
         '<h2 id="s5-h">The write trade &mdash; what precompute costs</h2>'
         '<p class="lede">FraiseQL’s precomputed '
-        'reads are paid for on writes: its full-cascade <strong>M1</strong> is '
-        'the slowest write here, shown at full linear prominence next to its '
-        'own delta path <strong>M1d</strong> and classical vanilla updates. '
-        'M1 and M1d sit adjacent, each labelled by mechanism.</p>'
+        'reads are paid for on writes: its integrated full-cascade '
+        '<strong>M1</strong> is the slowest write here, shown at full linear '
+        'prominence next to the classical vanilla updates. This is FraiseQL’s '
+        'real write cost — the cascade that keeps every precomputed row '
+        'consistent — labelled by mechanism.</p>'
         f'<div class="wt-explainer">{explainer}</div>'
         + legend +
-        '<h3>Raw write throughput — M1 vs M1d '
+        '<h3>Raw write throughput — M1, the integrated cascade write '
         '<span class="wt-unit">requests / second, linear from 0</span></h3>'
         + _wt_axis(mm_max, "req/s")
         + f'<div class="wt-chart">{mm_groups}</div>'
@@ -2496,8 +2494,9 @@ def _s7_section(grid: Grid, meta: dict) -> str:
     cfg = meta["amortization"]
     default_read, default_write = cfg["default_read"], cfg["default_write"]
     reads = [(r, r) for r in cfg["reads"]]
-    writes = [(k, w["label"]) for k, w in cfg["writes"].items()]
     default_amort = amortize(grid, meta, default_read, default_write)
+    # One write mode only (the integrated M1 cascade), so the write dimension is
+    # a constant — no switcher, just the read rung and the cost/count layer.
     panels = "".join(
         _s7_panel(grid, meta, cfg, r, w,
                   default=(r == default_read and w == default_write))
@@ -2505,7 +2504,6 @@ def _s7_section(grid: Grid, meta: dict) -> str:
     controls = (
         '<div class="s7-controls" hidden>'
         + _s7_btn_group("read", reads, default_read, "Read")
-        + _s7_btn_group("write", writes, default_write, "Write")
         + _s7_btn_group("layer", [("cost", "Cost-weighted"),
                                   ("count", "Query count")], "cost", "Layer")
         + '</div>')
@@ -2701,8 +2699,8 @@ function vbSwitcher(o) {
                panelScope: stage, panelSel: '.s2-variant', stateEl: stage });
 })();
 (function () {
-  // S7 amortization — a 3-dimension switcher (read rung / write mode / layer)
-  // over pre-rendered panels. Progressive enhancement only: without this the
+  // S7 amortization — a switcher (read rung / cost-count layer) over
+  // pre-rendered panels. Progressive enhancement only: without this the
   // default panel (Q2b, full, cost layer) + the preset-ratio table are the
   // whole story; the controls stay hidden and nothing recomputes in the browser.
   var s7 = document.getElementById('s7-amortization');
@@ -2749,7 +2747,7 @@ _GLOSSARY_GROUPS = [
     ("Reads — each one nests deeper", ["Q1", "Q2", "Q2b", "Q3", "T1"]),
     ("Filtered lists", ["F1", "F2", "F3"]),
     ("Single-row lookup (cache miss vs hit)", ["C3", "HC3"]),
-    ("Writes", ["M1", "M1d", "MC1"]),
+    ("Writes", ["M1", "MC1"]),
     ("Query-by-hash — APQ", ["Q1_APQ", "Q2b_APQ", "M1_APQ"]),
 ]
 
@@ -2798,11 +2796,10 @@ def _intro(grid: Grid, meta: dict) -> str:
     rivals = [r for r in (rps("postgraphile", "Q3"), rps("hasura", "Q3")) if r]
     read_x = (tv_q3 / max(rivals)) if tv_q3 and rivals else None
     rf = f"about {read_x:.0f}× faster" if read_x else "several times faster"
-    # FraiseQL's real write path is the surgical delta patch (jsonb_delta / M1d),
-    # not the full-cascade recompute (M1). At this throughput the write is
-    # server-bound, so the delta write only ties the quickest engines — the
-    # write-trade section spells out exactly what it does and does not measure.
-    wf = "as fast as the quickest writes here"
+    # FraiseQL's real write is the integrated M1 cascade — on every write it
+    # recomputes the affected precomputed rows so reads stay consistent. That
+    # is the slowest write measured here; the write-trade section shows the cost
+    # honestly, and the workload matcher sends write-heavy mixes elsewhere.
 
     return (
         '<section id="start" class="intro" aria-labelledby="intro-h">'
@@ -2814,11 +2811,10 @@ def _intro(grid: Grid, meta: dict) -> str:
         'server that answers a query by reading <em>one pre-computed JSON '
         'row</em> from PostgreSQL instead of assembling the answer '
         'field-by-field at request time. Pre-computing the row makes nested '
-        f'reads {rf}. Writes stay fast too: FraiseQL patches only the rows that '
-        f'changed &mdash; its <code>jsonb_delta</code> path is {wf} &mdash; and '
-        'the one slow write is the full recompute that rebuilds every affected '
-        'row to keep reads always consistent. Measured below, including where '
-        'FraiseQL loses.</p>'
+        f'reads {rf}. Writes pay for that: on every write FraiseQL runs an '
+        'integrated cascade that recomputes the affected precomputed rows to '
+        'keep reads always consistent &mdash; the slowest write measured here. '
+        'Measured below, including where FraiseQL loses.</p>'
         '<div class="intro-cards">'
         '<div class="intro-card">'
         '<h3>Which should you use?</h3>'
@@ -2826,11 +2822,11 @@ def _intro(grid: Grid, meta: dict) -> str:
         '<li><strong>Mostly reads, especially nested?</strong> FraiseQL &mdash; '
         'the pre-computed row is already the shape you asked for, and its lead '
         'grows with nesting depth.</li>'
-        '<li><strong>Mostly writes?</strong> Not the deal-breaker it first '
-        'looks: FraiseQL&rsquo;s delta write (<code>jsonb_delta</code>) '
-        '<em>keeps pace with the quickest engines here</em>. Only its '
-        'always-consistent full recompute is slow &mdash; the matcher below '
-        'weighs your exact mix.</li>'
+        '<li><strong>Mostly writes?</strong> Probably not FraiseQL &mdash; its '
+        'integrated cascade write is the <em>slowest here</em>, the price of '
+        'always-consistent precomputed reads. The matcher below weighs your '
+        'exact mix, and a write-heavy one names a resolver engine, not '
+        'FraiseQL.</li>'
         '<li><strong>A mix, or not sure?</strong> Use the matcher just below '
         '&mdash; it scores every shape from this run, and the winner is not '
         'always FraiseQL.</li>'
@@ -2842,13 +2838,13 @@ def _intro(grid: Grid, meta: dict) -> str:
         '<h3>&ldquo;Isn&rsquo;t this just a materialized view?&rdquo;</h3>'
         '<p>Fair question &mdash; that is the first thing most backend '
         'developers think. The difference: on an update FraiseQL keeps the '
-        'pre-computed rows correct by patching only the fields that changed '
-        '(what this run measures), and serves them through a typed GraphQL '
-        'API you never hand-write. A plain materialized view is stale until you '
-        'refresh the whole thing; FraiseQL&rsquo;s delta patch keeps its rows '
-        'correct without that full refresh, and only a total recompute &mdash; '
-        'for the strictest consistency &mdash; costs real write speed. See '
-        '<a href="#s5-write-trade">the write trade</a>.</p>'
+        'pre-computed rows correct with an integrated, column-aware cascade '
+        'that recomputes only the affected rows (what this run measures as '
+        '<code>M1</code>), and serves them through a typed GraphQL API you '
+        'never hand-write. A plain materialized view is stale until you '
+        'REFRESH the whole thing; FraiseQL updates incrementally on every '
+        'write &mdash; and that always-on consistency is exactly what costs '
+        'write speed. See <a href="#s5-write-trade">the write trade</a>.</p>'
         '</div>'
         '</div>'
         '<p class="intro-byline">Built by the author of FraiseQL &mdash; who has '

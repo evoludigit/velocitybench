@@ -1,7 +1,7 @@
 # Run-to-Run Delta Report
 
-**Run A**: reports/hetzner-2026-07/bench-hetzner-2026-07-25-sweep3.json  
-**Run B**: reports/hetzner-2026-07/bench-hetzner-2026-07-25-sweep4.json  
+**Run A**: reports/hetzner-2026-07-22/bench-hetzner-2026-07-25-sweep3.json  
+**Run B**: reports/hetzner-2026-07-22/bench-hetzner-2026-07-25-sweep4.json  
 **Cell threshold**: ±5%  
 
 | Framework | Query | Metric | A | B | Δ% | |
@@ -153,9 +153,6 @@
 | fraiseql-tv | M1_APQ | rps | 1119.6 | 1086.0 | -3.0 |  |
 | fraiseql-tv | M1_APQ | p50_ms | 20.5 | 20.9 | +2.1 |  |
 | fraiseql-tv | M1_APQ | p99_ms | 190.9 | 197.2 | +3.3 |  |
-| fraiseql-tv | M1d | rps | 10127.7 | 10179.2 | +0.5 |  |
-| fraiseql-tv | M1d | p50_ms | 3.9 | 3.9 | +0.3 |  |
-| fraiseql-tv | M1d | p99_ms | 5.9 | 5.8 | -1.5 |  |
 | fraiseql-tv | MC1 | rps | 1103.1 | 1104.8 | +0.2 |  |
 | fraiseql-tv | MC1 | p50_ms | 20.9 | 21.0 | +0.2 |  |
 | fraiseql-tv | MC1 | p99_ms | 192.1 | 187.5 | -2.4 |  |
@@ -204,9 +201,6 @@
 | fraiseql-tv-cache | M1_APQ | rps | 1074.7 | 1123.5 | +4.5 |  |
 | fraiseql-tv-cache | M1_APQ | p50_ms | 20.9 | 20.3 | -2.9 |  |
 | fraiseql-tv-cache | M1_APQ | p99_ms | 204.1 | 190.2 | -6.8 | ⚠ |
-| fraiseql-tv-cache | M1d | rps | 9869.6 | 9994.5 | +1.3 |  |
-| fraiseql-tv-cache | M1d | p50_ms | 4.0 | 4.0 | -1.2 |  |
-| fraiseql-tv-cache | M1d | p99_ms | 6.0 | 6.0 | -0.7 |  |
 | fraiseql-tv-cache | MC1 | rps | 1069.5 | 1101.7 | +3.0 |  |
 | fraiseql-tv-cache | MC1 | p50_ms | 21.4 | 21.2 | -0.7 |  |
 | fraiseql-tv-cache | MC1 | p99_ms | 200.1 | 187.5 | -6.3 | ⚠ |
@@ -475,4 +469,4 @@
 | strawberry | T1 | p50_ms | 58.6 | 59.9 | +2.3 |  |
 | strawberry | T1 | p99_ms | 105.1 | 106.2 | +1.1 |  |
 
-**Summary**: 70/468 cells flagged (15.0%) — gate limit 25% → **PASS**
+**Summary**: 70/462 cells flagged (15.2%) — gate limit 25% → **PASS**

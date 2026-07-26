@@ -4103,89 +4103,6 @@
     },
     {
       "framework": "fraiseql-tv",
-      "query": "M1d",
-      "pass": 1,
-      "samples": 3,
-      "rps": 10127.7,
-      "p50_ms": 3.91,
-      "p95_ms": 5.18,
-      "p99_ms": 5.92,
-      "requests": 303832,
-      "errors": 0,
-      "rss_steady_mb": 10.3,
-      "rss_max_mb": 10.4,
-      "cold_start_ms": 1083.2,
-      "error_breakdown": {},
-      "skipped": false,
-      "skip_reason": null,
-      "spread": {
-        "rps": {
-          "n": 3,
-          "min": 10095.8,
-          "max": 10179.2,
-          "stddev": 42.082,
-          "rel_pct": 0.8
-        },
-        "p50_ms": {
-          "n": 3,
-          "min": 3.9,
-          "max": 3.92,
-          "stddev": 0.01,
-          "rel_pct": 0.5
-        },
-        "p95_ms": {
-          "n": 3,
-          "min": 5.18,
-          "max": 5.21,
-          "stddev": 0.017,
-          "rel_pct": 0.6
-        },
-        "p99_ms": {
-          "n": 3,
-          "min": 5.83,
-          "max": 6.02,
-          "stddev": 0.095,
-          "rel_pct": 3.2
-        },
-        "requests": {
-          "n": 3,
-          "min": 302873,
-          "max": 305375,
-          "stddev": 1262.308,
-          "rel_pct": 0.8
-        },
-        "errors": {
-          "n": 3,
-          "min": 0,
-          "max": 0,
-          "stddev": 0.0,
-          "rel_pct": 0.0
-        },
-        "rss_steady_mb": {
-          "n": 3,
-          "min": 10.3,
-          "max": 10.5,
-          "stddev": 0.115,
-          "rel_pct": 1.9
-        },
-        "rss_max_mb": {
-          "n": 3,
-          "min": 10.4,
-          "max": 10.6,
-          "stddev": 0.115,
-          "rel_pct": 1.9
-        },
-        "cold_start_ms": {
-          "n": 3,
-          "min": 1068.4,
-          "max": 1087.1,
-          "stddev": 9.865,
-          "rel_pct": 1.7
-        }
-      }
-    },
-    {
-      "framework": "fraiseql-tv",
       "query": "MC1",
       "pass": 1,
       "samples": 3,
@@ -5495,89 +5412,6 @@
           "max": 11.9,
           "stddev": 0.404,
           "rel_pct": 5.9
-        },
-        "cold_start_ms": {
-          "n": 3,
-          "min": 1039.3,
-          "max": 1080.3,
-          "stddev": 20.504,
-          "rel_pct": 3.9
-        }
-      }
-    },
-    {
-      "framework": "fraiseql-tv-cache",
-      "query": "M1d",
-      "pass": 1,
-      "samples": 3,
-      "rps": 9994.5,
-      "p50_ms": 3.96,
-      "p95_ms": 5.24,
-      "p99_ms": 6.01,
-      "requests": 299834,
-      "errors": 0,
-      "rss_steady_mb": 11.0,
-      "rss_max_mb": 11.0,
-      "cold_start_ms": 1059.1,
-      "error_breakdown": {},
-      "skipped": false,
-      "skip_reason": null,
-      "spread": {
-        "rps": {
-          "n": 3,
-          "min": 9869.6,
-          "max": 10172.3,
-          "stddev": 152.118,
-          "rel_pct": 3.0
-        },
-        "p50_ms": {
-          "n": 3,
-          "min": 3.91,
-          "max": 4.01,
-          "stddev": 0.05,
-          "rel_pct": 2.5
-        },
-        "p95_ms": {
-          "n": 3,
-          "min": 5.17,
-          "max": 5.32,
-          "stddev": 0.075,
-          "rel_pct": 2.9
-        },
-        "p99_ms": {
-          "n": 3,
-          "min": 5.81,
-          "max": 6.05,
-          "stddev": 0.129,
-          "rel_pct": 4.0
-        },
-        "requests": {
-          "n": 3,
-          "min": 296088,
-          "max": 305168,
-          "stddev": 4563.085,
-          "rel_pct": 3.0
-        },
-        "errors": {
-          "n": 3,
-          "min": 0,
-          "max": 0,
-          "stddev": 0.0,
-          "rel_pct": 0.0
-        },
-        "rss_steady_mb": {
-          "n": 3,
-          "min": 10.6,
-          "max": 11.3,
-          "stddev": 0.351,
-          "rel_pct": 6.4
-        },
-        "rss_max_mb": {
-          "n": 3,
-          "min": 10.6,
-          "max": 11.4,
-          "stddev": 0.4,
-          "rel_pct": 7.3
         },
         "cold_start_ms": {
           "n": 3,
@@ -13134,24 +12968,6 @@
       "total_bytes": 14491648,
       "heap_bytes": 8388608,
       "indexes_bytes": 6094848
-    },
-    {
-      "table": "tvd_comment",
-      "total_bytes": 81920,
-      "heap_bytes": 8192,
-      "indexes_bytes": 65536
-    },
-    {
-      "table": "tvd_post",
-      "total_bytes": 999424,
-      "heap_bytes": 909312,
-      "indexes_bytes": 49152
-    },
-    {
-      "table": "tvd_user",
-      "total_bytes": 565248,
-      "heap_bytes": 491520,
-      "indexes_bytes": 32768
     }
   ]
 }
