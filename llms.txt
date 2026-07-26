@@ -54,14 +54,14 @@ CITING A CELL
     excluded     data-excluded="true", data-reason-id="<N>"
     not measured data-not-measured="true"
 
-M1 vs M1d — READ THE MECHANISM, NOT JUST THE NUMBER
-  M1   full-cascade write. FraiseQL: a logged tview recompute (61-row fan-out
-       here) — the maintenance price of always-consistent precomputed reads.
+M1 — READ THE MECHANISM, NOT JUST THE NUMBER
+  M1   FraiseQL's real write: an integrated, column-aware cascade that recomputes
+       the affected precomputed rows (logged tview maintenance) so reads stay
+       consistent — the slowest write measured here, and the price of
+       always-consistent precomputed reads.
        Classical: a vanilla single UPDATE with no derived state.
-  M1d  jsonb-delta surgical patch — a FraiseQL-only fast write path, present on
-       the tv variants only.
-  They measure DIFFERENT mechanisms and are ALWAYS shown side by side. FraiseQL
-  losing on full-cascade M1 is a real, prominent result, not an artifact.
+  FraiseQL losing on the integrated M1 write is a real, prominent result, not an
+  artifact — the write-heavy workload shape names a resolver engine, not FraiseQL.
   MC1 is a workflow benchmark, not raw server speed: it counts the client round-trips needed to reach a consistent state after a write. FraiseQL = 1 request/cycle (the mutation response carries the cascade); classical GraphQL and REST = 2 requests/cycle (mutation + serial re-fetch).
 
 REQUEST ANATOMY — QUERY STRATEGIES (S0)
@@ -145,7 +145,7 @@ FRAMEWORKS (12)
   apollo-server        Apollo Server — Node per-level resolvers with DataLoader batching (family: classical)
   strawberry           Strawberry — Python per-level resolvers with DataLoader batching (family: classical)
 
-SCENARIOS (16)
+SCENARIOS (15)
   Q1         Flat user list (20 rows) [read, RPS]
   Q2         Flat post list (10 rows) [read, RPS]
   Q2b        Posts + author (1-level nest) [read, RPS]
@@ -156,8 +156,7 @@ SCENARIOS (16)
   T1         Full blog page (multi-root) [read, RPS]
   C3         Single-row lookup, 20 rotating UUIDs (cache-miss) [read, RPS]
   HC3        Single-row lookup, 5-UUID hot pool (cache-hit) [read, RPS]
-  M1         Update user bio (full recompute) [write, RPS]
-  M1d        Update user bio (delta patch) [write, RPS]
+  M1         Update user bio (integrated cascade write) [write, RPS]
   MC1        Mutation → consistent state (workflow) [workflow, cycles/s]
   Q1_APQ     Q1 with APQ (persisted query) [read, RPS]
   Q2b_APQ    Q2b with APQ (persisted query) [read, RPS]
@@ -170,8 +169,8 @@ WORKLOAD SHAPES → WHICH CELLS ANSWER THEM (winner scored on the S7 model)
   Deeply nested → Q2b, Q3, T1
       The deeper the nesting, the wider FraiseQL's lead — no N+1 by construction. The cost of that read advantage is paid on writes, not reads (see the write trade).
       winner @ ~100:1 reads:writes → precompute (tv_*) (FraiseQL · tv), ~6,881 req/s
-  Write-heavy → M1, M1d, MC1
-      FraiseQL's delta path (M1d) competes with a classical single UPDATE; the full-cascade recompute (M1) is the price of always-consistent precomputed reads. MC1 needs one round-trip where classical needs two.
+  Write-heavy → M1, MC1
+      FraiseQL's integrated cascade write (M1) is the price of always-consistent precomputed reads — the slowest write here, and where a write-heavy mix costs it. MC1 reaches a consistent state in one round-trip where classical needs two.
       winner @ ~1:1 reads:writes → resolver + DataLoader (async-graphql), ~7,407 req/s
   Hot-key lookups → C3, HC3
       A hot 5-key pool (HC3) is where a result cache should shine; the 20-UUID miss regime (C3) shows what a cache does when it cannot help. In this run both regimes land flat — the single-row read is already too cheap for the cache to matter.
@@ -195,7 +194,7 @@ AMORTIZATION MODEL (S7) — total load vs the read:write ratio
   it needs enough reads per write to amortize the write. The cost layer decides
   the winner; SQL round-trip COUNT is structural context, never cost. A derived
   model on the median-of-three inputs; the read:write ratio is your assumption.
-  Break-evens at the default read/write (read Q2b, full write mode):
+  Break-evens at the default read/write (read Q2b, integrated write mode):
   FraiseQL · tv overtakes PostGraphile v5 at ~2 reads/write
   FraiseQL · tv overtakes async-graphql at ~15 reads/write
   FraiseQL · tv overtakes Actix (REST) at ~7 reads/write
