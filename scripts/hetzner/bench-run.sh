@@ -147,6 +147,29 @@ destroy_all() {
     fi
 }
 
+
+# Set by collect_results so the abort path does not rsync a second time.
+RESULTS_COLLECTED=0
+
+# Abort path: a sweep died, a command failed under `set -e`, or the operator
+# interrupted. The pair bills by the hour, so the instances go away without an
+# interactive confirm — the prompt inside destroy_all exists for the deliberate
+# end-of-session teardown, not for an abort nobody may be watching. Armed before
+# provisioning, disarmed only once the planned destroy has run.
+on_abort() {
+    local rc=$?
+    trap - EXIT
+    say ""
+    say "── ABORT (exit ${rc}) — tearing down so the pair stops billing ──"
+    if (( ! RESULTS_COLLECTED )) && declare -F collect_results >/dev/null; then
+        collect_results || true
+    fi
+    YES=1
+    destroy_all || say "  ⚠ TEARDOWN FAILED — check: hcloud server list -l ${CAMPAIGN_LABEL}"
+    cost_note
+    exit "$rc"
+}
+
 # ── Preflight ───────────────────────────────────────────────────────────────
 say "VelocityBench Hetzner session — SUT ${SUT_TYPE} + loadgen ${LOADGEN_TYPE}"
 say "Campaign label: ${CAMPAIGN_LABEL}   location: ${LOCATION}   image: ${IMAGE}"
@@ -160,6 +183,9 @@ if (( ! PLAN )); then
     hcloud server list >/dev/null || { echo "hcloud not authenticated (set HCLOUD_TOKEN or context)" >&2; exit 1; }
     [[ -f "$SSH_KEY_FILE" ]] || run ssh-keygen -t ed25519 -N "" -f "$SSH_KEY_FILE"
 fi
+
+# Armed before the first billable resource exists.
+trap on_abort EXIT
 
 # ── 1. Create network, firewall, SSH key, instances (idempotent) ───────────
 say "── 1. Provision network + instances ─────────────────────────"
@@ -239,14 +265,15 @@ ssh_loadgen "cd ${REMOTE_DIR} && DOCKER_HOST=ssh://root@${SUT_PRIVATE_IP} \
 python3 tests/benchmark/loadgen_headroom.py --host ${SUT_PRIVATE_IP} --min-rps 30000"
 
 # ── 4. Sweeps (sequential, same box) ────────────────────────────────────────
-# Results are collected even if a sweep dies mid-run — the hours are paid for.
-trap 'collect_results || true; cost_note' EXIT
+# Results are collected even if a sweep dies mid-run — the hours are paid for;
+# the on_abort trap armed above does that and then destroys.
 
 collect_results() {
     say ""
     say "── 5. rsync results back ────────────────────────────────────"
     run rsync -az -e "ssh -i ${SSH_KEY_FILE} -o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes" \
         "root@${LOADGEN_IP:-<loadgen-public-ip>}:${REMOTE_DIR}/reports/" "${REPO_ROOT}/reports/hetzner-2026-07/"
+    RESULTS_COLLECTED=1
 }
 
 for n in $(seq 1 "$SWEEPS"); do
@@ -285,7 +312,6 @@ echo \$! > ${REMOTE_DIR}/reports/sweep${n}.pid; }"
 done
 
 collect_results
-trap 'cost_note' EXIT
 
 if (( SWEEPS >= 2 )); then
     # Compare the last two sweeps — both warm (sweep 1 on a fresh seed is the
