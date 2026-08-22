@@ -46,9 +46,11 @@ REMOTE_DIR="/root/velocitybench"
 
 # The publishable subset — keep in sync with
 # .phases/2026-07-publishable-benchmark/phase-04-local-smoke.md
-FRAMEWORKS="fraiseql-tv fraiseql-tv-cache fraiseql-v-nocache fraiseql-v-cache \
+# Overridable so a targeted campaign (e.g. a version A/B) can narrow the set
+# without editing this file: FRAMEWORKS="a b c" scripts/hetzner/bench-run.sh
+FRAMEWORKS="${FRAMEWORKS:-fraiseql-tv fraiseql-tv-cache fraiseql-v-nocache fraiseql-v-cache \
 fraiseql-tv-audit hasura postgraphile actix-web-rest async-graphql mercurius \
-apollo-server strawberry"
+apollo-server strawberry}"
 SWEEP_ARGS="--duration 30 --warmup 10 --cooldown 5 --tview-mode logged"
 
 # ── Flags ───────────────────────────────────────────────────────────────────

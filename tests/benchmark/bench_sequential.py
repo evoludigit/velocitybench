@@ -1002,6 +1002,48 @@ FRAMEWORKS: dict[str, dict] = {
         "t1_template": "fraiseql_multi_root",
         "c3_template": _FRAISEQL_C3_TMPL,
     },
+    "fraiseql215-tv": {
+        "tview_triggers": True,  # FraiseQL deploys pg_tviews; its mutations keep the cascade cost
+        "compose_service": "fraiseql215-tv-nocache",
+        "type": "graphql",
+        "language": "Rust",
+        "category": "graphql-precomputed",
+        "no_build": True,  # fraiseql copies local binaries; rebuild only when explicitly updating
+        # Application-level code: Python schema (type + query definitions) + PL/pgSQL mutation
+        # functions. Equivalent to resolvers in other frameworks. Infrastructure SQL excluded.
+        "loc_extra_files": [
+            "frameworks/fraiseql/schema_tv.py",
+            "database/fraiseql_mutations.sql",
+        ],
+        "queries": {
+            # Standard query suite
+            "Q1": ("http://localhost:8827/graphql", _GQL_Q1),
+            "Q2": ("http://localhost:8827/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:8827/graphql", _GQL_Q2b),
+            "Q3": ("http://localhost:8827/graphql", _GQL_Q3),
+            # C3: single-entity lookup — rotating UUIDs, cache miss every time (no cache)
+            "C3": "C3",
+            # HC3: hot-key lookup — 5 fixed UUIDs, measures sustained throughput without cache
+            "HC3": "HC3",
+            # Mutation benchmark
+            "M1": "M1",
+            # Filtered query benchmarks
+            "F1": ("http://localhost:8827/graphql", _FRAISEQL_F1),
+            "F2": ("http://localhost:8827/graphql", _FRAISEQL_F2),
+            "F3": ("http://localhost:8827/graphql", _FRAISEQL_F3),
+            "T1": "T1",
+            # MC1: mutation-to-consistent-state cycle (cascade: 1 request replaces M1+Q1+C3)
+            "MC1": "MC1",
+            "Q1_APQ": "Q1_APQ",
+            "Q2b_APQ": "Q2b_APQ",
+            "M1_APQ": "M1_APQ",
+        },
+        "health_url": "http://localhost:8827/health",
+        "warmup_secs": 30,
+        "m1_template": "fraiseql",
+        "t1_template": "fraiseql_multi_root",
+        "c3_template": _FRAISEQL_C3_TMPL,
+    },
     # fraiseql-tv-cache: TV tables, cache enabled — post-cascade fragmentation M1 condition
     "fraiseql-tv-cache": {
         "tview_triggers": True,  # FraiseQL deploys pg_tviews; its mutations keep the cascade cost
@@ -1032,6 +1074,40 @@ FRAMEWORKS: dict[str, dict] = {
             "M1_APQ": "M1_APQ",
         },
         "health_url": "http://localhost:8816/health",
+        "warmup_secs": 30,
+        "m1_template": "fraiseql",
+        "t1_template": "fraiseql_multi_root",
+        "c3_template": _FRAISEQL_C3_TMPL,
+    },
+    "fraiseql215-tv-cache": {
+        "tview_triggers": True,  # FraiseQL deploys pg_tviews; its mutations keep the cascade cost
+        "compose_service": "fraiseql215-tv",
+        "type": "graphql",
+        "language": "Rust",
+        "category": "graphql-precomputed",
+        "no_build": True,
+        "loc_extra_files": [
+            "frameworks/fraiseql/schema_tv.py",
+            "database/fraiseql_mutations.sql",
+        ],
+        "queries": {
+            "Q1": ("http://localhost:8826/graphql", _GQL_Q1),
+            "Q2": ("http://localhost:8826/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:8826/graphql", _GQL_Q2b),
+            "Q3": ("http://localhost:8826/graphql", _GQL_Q3),
+            "C3": "C3",
+            "HC3": "HC3",
+            "M1": "M1",
+            "F1": ("http://localhost:8826/graphql", _FRAISEQL_F1),
+            "F2": ("http://localhost:8826/graphql", _FRAISEQL_F2),
+            "F3": ("http://localhost:8826/graphql", _FRAISEQL_F3),
+            "T1": "T1",
+            "MC1": "MC1",
+            "Q1_APQ": "Q1_APQ",
+            "Q2b_APQ": "Q2b_APQ",
+            "M1_APQ": "M1_APQ",
+        },
+        "health_url": "http://localhost:8826/health",
         "warmup_secs": 30,
         "m1_template": "fraiseql",
         "t1_template": "fraiseql_multi_root",
@@ -1074,6 +1150,42 @@ FRAMEWORKS: dict[str, dict] = {
         "t1_template": "fraiseql_multi_root",
         "c3_template": _FRAISEQL_C3_TMPL,
     },
+    "fraiseql215-v-nocache": {
+        "tview_triggers": True,  # FraiseQL deploys pg_tviews; its mutations keep the cascade cost
+        "compose_service": "fraiseql215-v-nocache",
+        "type": "graphql",
+        "language": "Rust",
+        "category": "graphql-precomputed",
+        "no_build": True,
+        # V variant: schema + SQL view definitions (the views ARE the resolvers) + mutations
+        "loc_extra_files": [
+            "frameworks/fraiseql/schema.py",
+            "frameworks/fraiseql/database/extensions.sql",
+            "database/fraiseql_mutations.sql",
+        ],
+        "queries": {
+            "Q1": ("http://localhost:8829/graphql", _GQL_Q1),
+            "Q2": ("http://localhost:8829/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:8829/graphql", _GQL_Q2b),
+            "Q3": ("http://localhost:8829/graphql", _GQL_Q3),
+            "C3": "C3",
+            "HC3": "HC3",
+            "M1": "M1",
+            "F1": ("http://localhost:8829/graphql", _FRAISEQL_F1),
+            "F2": ("http://localhost:8829/graphql", _FRAISEQL_F2),
+            "F3": ("http://localhost:8829/graphql", _FRAISEQL_F3),
+            "T1": "T1",
+            "MC1": "MC1",
+            "Q1_APQ": "Q1_APQ",
+            "Q2b_APQ": "Q2b_APQ",
+            "M1_APQ": "M1_APQ",
+        },
+        "health_url": "http://localhost:8829/health",
+        "warmup_secs": 5,
+        "m1_template": "fraiseql",
+        "t1_template": "fraiseql_multi_root",
+        "c3_template": _FRAISEQL_C3_TMPL,
+    },
     # fraiseql-v-cache: v_* on-the-fly JSONB views, cache enabled — where cache earns its keep
     "fraiseql-v-cache": {
         "tview_triggers": True,  # FraiseQL deploys pg_tviews; its mutations keep the cascade cost
@@ -1105,6 +1217,42 @@ FRAMEWORKS: dict[str, dict] = {
             "M1_APQ": "M1_APQ",
         },
         "health_url": "http://localhost:8815/health",
+        # Cache needs 30s warmup to fill before measuring sustained cache-hit throughput.
+        "warmup_secs": 30,
+        "m1_template": "fraiseql",
+        "t1_template": "fraiseql_multi_root",
+        "c3_template": _FRAISEQL_C3_TMPL,
+    },
+    "fraiseql215-v-cache": {
+        "tview_triggers": True,  # FraiseQL deploys pg_tviews; its mutations keep the cascade cost
+        "compose_service": "fraiseql215",
+        "type": "graphql",
+        "language": "Rust",
+        "category": "graphql-precomputed",
+        "no_build": True,
+        "loc_extra_files": [
+            "frameworks/fraiseql/schema.py",
+            "frameworks/fraiseql/database/extensions.sql",
+            "database/fraiseql_mutations.sql",
+        ],
+        "queries": {
+            "Q1": ("http://localhost:8825/graphql", _GQL_Q1),
+            "Q2": ("http://localhost:8825/graphql", _GQL_Q2),
+            "Q2b": ("http://localhost:8825/graphql", _GQL_Q2b),
+            "Q3": ("http://localhost:8825/graphql", _GQL_Q3),
+            "C3": "C3",
+            "HC3": "HC3",
+            "M1": "M1",
+            "F1": ("http://localhost:8825/graphql", _FRAISEQL_F1),
+            "F2": ("http://localhost:8825/graphql", _FRAISEQL_F2),
+            "F3": ("http://localhost:8825/graphql", _FRAISEQL_F3),
+            "T1": "T1",
+            "MC1": "MC1",
+            "Q1_APQ": "Q1_APQ",
+            "Q2b_APQ": "Q2b_APQ",
+            "M1_APQ": "M1_APQ",
+        },
+        "health_url": "http://localhost:8825/health",
         # Cache needs 30s warmup to fill before measuring sustained cache-hit throughput.
         "warmup_secs": 30,
         "m1_template": "fraiseql",
@@ -1184,6 +1332,11 @@ DEFAULT_FRAMEWORK_ORDER = [
     "fraiseql-v-cache",      # v_* views, cache on  — where cache earns its keep
     "fraiseql-tv-cache",     # TV tables, cache on  — post-cascade fragmentation (optional)
     "fraiseql-tv-audit",     # TV tables, audit logging
+    # FraiseQL 2.15.0 A/B twins — same schema source, same box, interleaved by run order.
+    "fraiseql215-tv",        # 2.15: TV tables, no cache
+    "fraiseql215-v-nocache", # 2.15: v_* views, no cache
+    "fraiseql215-v-cache",   # 2.15: v_* views, cache on
+    "fraiseql215-tv-cache",  # 2.15: TV tables, cache on
 ]
 
 REPORTS_DIR = Path(__file__).parent.parent.parent / "reports"
@@ -3026,6 +3179,10 @@ _FW_DIR_OVERRIDE: dict[str, str] = {
     "fraiseql-v-nocache": "fraiseql",
     "fraiseql-v-cache": "fraiseql",
     "fraiseql-tv-audit": "fraiseql",
+    "fraiseql215-tv": "fraiseql",
+    "fraiseql215-tv-cache": "fraiseql",
+    "fraiseql215-v-nocache": "fraiseql",
+    "fraiseql215-v-cache": "fraiseql",
 }
 
 _LANG_EXTENSIONS: dict[str, list[str]] = {

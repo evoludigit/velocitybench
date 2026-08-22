@@ -135,3 +135,7 @@ frameworks/fraiseql/fraiseql-server
 # VelocityBench site — generated output (rebuilt from run JSON)
 site/dist/
 site/tests/junit.xml
+
+# A/B benchmark binaries (built from source, shipped to the SUT by rsync)
+frameworks/fraiseql/fraiseql-cli-2.*
+frameworks/fraiseql/fraiseql-server-2.*

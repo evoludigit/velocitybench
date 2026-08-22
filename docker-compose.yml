@@ -69,6 +69,9 @@ services:
     build:
       context: ./frameworks/fraiseql
       args:
+        FRAISEQL_VERSION: 2.14.0
+        CLI_BIN: fraiseql-cli-2.14.0
+        SERVER_BIN: fraiseql-server-2.14.0
         SCHEMA_FILE: schema.py
     ports:
       - "8815:8815"
@@ -103,11 +106,56 @@ services:
     networks:
       - velocitybench-benchmark
 
+  fraiseql215:
+    # FraiseQL 2.15.0 (A/B twin) — Variant A: v_* on-the-fly JSONB views
+    build:
+      context: ./frameworks/fraiseql
+      args:
+        FRAISEQL_VERSION: 2.15.0
+        CLI_BIN: fraiseql-cli-2.15.0
+        SERVER_BIN: fraiseql-server-2.15.0
+        SCHEMA_FILE: schema.py
+    ports:
+      - "8825:8815"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./frameworks/fraiseql/fraiseql.toml:/app/fraiseql.toml
+      - ./frameworks/fraiseql/schema_v-215.compiled.json:/app/schema.compiled.json
+    environment:
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
+      - RUST_LOG=info
+      - FRAISEQL_CONFIG=fraiseql.toml
+      - FRAISEQL_ENV=development
+      # Change-spine outbox off: no competitor writes an audit row per mutation;
+      # audit overhead is measured separately by the fraiseql-tv-audit variant.
+      - FRAISEQL_CHANGELOG_ENABLED=false
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8815/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '2.0'
+    profiles:
+      - benchmark
+      - fraiseql
+    networks:
+      - velocitybench-benchmark
+
   fraiseql-v-nocache:
     # FraiseQL — Variant A (v_* views), cache disabled — raw JOIN baseline
     build:
       context: ./frameworks/fraiseql
       args:
+        FRAISEQL_VERSION: 2.14.0
+        CLI_BIN: fraiseql-cli-2.14.0
+        SERVER_BIN: fraiseql-server-2.14.0
         SCHEMA_FILE: schema.py
     ports:
       - "8819:8815"
@@ -142,11 +190,56 @@ services:
     networks:
       - velocitybench-benchmark
 
+  fraiseql215-v-nocache:
+    # FraiseQL 2.15.0 (A/B twin) — Variant A (v_* views), cache disabled — raw JOIN baseline
+    build:
+      context: ./frameworks/fraiseql
+      args:
+        FRAISEQL_VERSION: 2.15.0
+        CLI_BIN: fraiseql-cli-2.15.0
+        SERVER_BIN: fraiseql-server-2.15.0
+        SCHEMA_FILE: schema.py
+    ports:
+      - "8829:8815"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./frameworks/fraiseql/fraiseql-nocache.toml:/app/fraiseql-nocache.toml
+      - ./frameworks/fraiseql/schema_v-215.compiled.json:/app/schema.compiled.json
+    environment:
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
+      - RUST_LOG=info
+      - FRAISEQL_CONFIG=fraiseql-nocache.toml
+      - FRAISEQL_ENV=development
+      # Change-spine outbox off: no competitor writes an audit row per mutation;
+      # audit overhead is measured separately by the fraiseql-tv-audit variant.
+      - FRAISEQL_CHANGELOG_ENABLED=false
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8815/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '2.0'
+    profiles:
+      - benchmark
+      - fraiseql
+    networks:
+      - velocitybench-benchmark
+
   fraiseql-tv:
     # FraiseQL — Variant B: tv_* pre-computed JSONB tables
     build:
       context: ./frameworks/fraiseql
       args:
+        FRAISEQL_VERSION: 2.14.0
+        CLI_BIN: fraiseql-cli-2.14.0
+        SERVER_BIN: fraiseql-server-2.14.0
         SCHEMA_FILE: schema_tv.py
         BUILD_TOML: fraiseql-build-tv.toml
     ports:
@@ -186,11 +279,61 @@ services:
     networks:
       - velocitybench-benchmark
 
+  fraiseql215-tv:
+    # FraiseQL 2.15.0 (A/B twin) — Variant B: tv_* pre-computed JSONB tables
+    build:
+      context: ./frameworks/fraiseql
+      args:
+        FRAISEQL_VERSION: 2.15.0
+        CLI_BIN: fraiseql-cli-2.15.0
+        SERVER_BIN: fraiseql-server-2.15.0
+        SCHEMA_FILE: schema_tv.py
+        BUILD_TOML: fraiseql-build-tv.toml
+    ports:
+      - "8826:8815"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./frameworks/fraiseql/fraiseql-tv.toml:/app/fraiseql-tv.toml
+      - ./frameworks/fraiseql/schema_tv-215.compiled.json:/app/schema.compiled.json
+    environment:
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
+      - RUST_LOG=info
+      - FRAISEQL_CONFIG=fraiseql-tv.toml
+      - FRAISEQL_ENV=development
+      # Change-spine outbox off: no competitor writes an audit row per mutation;
+      # audit overhead is measured separately by the fraiseql-tv-audit variant.
+      - FRAISEQL_CHANGELOG_ENABLED=false
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8815/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '2.0'
+    profiles:
+      - benchmark
+      - fraiseql
+    networks:
+      - velocitybench-benchmark
+
   fraiseql-tv-nocache:
     # FraiseQL — Variant B (tv_*), cache disabled — cold-read baseline
     build:
       context: ./frameworks/fraiseql
       args:
+        FRAISEQL_VERSION: 2.14.0
+        CLI_BIN: fraiseql-cli-2.14.0
+        SERVER_BIN: fraiseql-server-2.14.0
         SCHEMA_FILE: schema_tv.py
         BUILD_TOML: fraiseql-build-tv.toml
     ports:
@@ -201,6 +344,49 @@ services:
     volumes:
       - ./frameworks/fraiseql/fraiseql-tv-nocache.toml:/app/fraiseql-tv-nocache.toml
       - ./frameworks/fraiseql/schema_tv.compiled.json:/app/schema.compiled.json
+    environment:
+      - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
+      - RUST_LOG=info
+      - FRAISEQL_CONFIG=fraiseql-tv-nocache.toml
+      - FRAISEQL_ENV=development
+      # Change-spine outbox off: no competitor writes an audit row per mutation;
+      # audit overhead is measured separately by the fraiseql-tv-audit variant.
+      - FRAISEQL_CHANGELOG_ENABLED=false
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8815/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '2.0'
+    profiles:
+      - benchmark
+      - fraiseql
+    networks:
+      - velocitybench-benchmark
+
+  fraiseql215-tv-nocache:
+    # FraiseQL 2.15.0 (A/B twin) — Variant B (tv_*), cache disabled — cold-read baseline
+    build:
+      context: ./frameworks/fraiseql
+      args:
+        FRAISEQL_VERSION: 2.15.0
+        CLI_BIN: fraiseql-cli-2.15.0
+        SERVER_BIN: fraiseql-server-2.15.0
+        SCHEMA_FILE: schema_tv.py
+        BUILD_TOML: fraiseql-build-tv.toml
+    ports:
+      - "8827:8815"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./frameworks/fraiseql/fraiseql-tv-nocache.toml:/app/fraiseql-tv-nocache.toml
+      - ./frameworks/fraiseql/schema_tv-215.compiled.json:/app/schema.compiled.json
     environment:
       - DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark
       - RUST_LOG=info

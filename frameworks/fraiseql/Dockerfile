@@ -20,6 +20,11 @@ ARG BUILD_TOML=fraiseql-build.toml
 # Build argument: server runtime config (copied into final image).
 ARG SERVER_TOML=fraiseql.toml
 
+# Build argument: which binaries to copy from the build context. Lets a second
+# FraiseQL version live in the same context for an A/B without touching the pin.
+ARG CLI_BIN=fraiseql-cli
+ARG SERVER_BIN=fraiseql-server
+
 # ============================================================================
 # Stage 1: Python -- generate schema.json from the selected schema variant
 # ============================================================================
@@ -49,7 +54,8 @@ FROM debian:trixie-slim AS builder
 
 ARG FRAISEQL_VERSION
 
-COPY fraiseql-cli /usr/local/bin/fraiseql-cli
+ARG CLI_BIN
+COPY ${CLI_BIN} /usr/local/bin/fraiseql-cli
 RUN chmod +x /usr/local/bin/fraiseql-cli && \
     fraiseql-cli --version | grep -F "${FRAISEQL_VERSION}"
 
@@ -63,7 +69,8 @@ COPY ${BUILD_TOML} ./fraiseql.toml
 # Compile schema: legacy JSON workflow (types/queries/mutations in schema.json)
 RUN fraiseql-cli compile schema.json --output schema.compiled.json
 
-COPY fraiseql-server /usr/local/bin/fraiseql-server
+ARG SERVER_BIN
+COPY ${SERVER_BIN} /usr/local/bin/fraiseql-server
 RUN chmod +x /usr/local/bin/fraiseql-server && \
     fraiseql-server --version | grep -F "${FRAISEQL_VERSION}"
 
