@@ -1,0 +1,271 @@
+{
+  "generated_at": "2026-09-26T20:02:36.640302+00:00",
+  "dataset": {
+    "tb_user": 10005,
+    "tb_post": 100005,
+    "tb_comment": 500005,
+    "tv_user": 10005,
+    "tv_post": 100005,
+    "tv_comment": 500005
+  },
+  "args": {
+    "mutations": 400,
+    "concurrency": 1,
+    "driver": "sql",
+    "endpoint": null,
+    "function": "benchmark.fn_update_user",
+    "cascade": "on",
+    "fsync": "on",
+    "matrix": true,
+    "matrix_concurrency": 40,
+    "container": null,
+    "dsn": null,
+    "out": "reports/write-path/canonical-archbox-2026-09-26.json"
+  },
+  "cells": [
+    {
+      "label": "cascade=on fsync=on c=1 driver=sql",
+      "cascade": "on",
+      "fsync": "on",
+      "concurrency": 1,
+      "driver": "sql",
+      "function": "benchmark.fn_update_user",
+      "endpoint": null,
+      "wall_seconds": 0.7347825290635228,
+      "throughput_rps": 544.3787572219474,
+      "wal_timing_available": true,
+      "stats_quiesced": true,
+      "stats_flush": "quiesced",
+      "rows_verified_written": 20,
+      "settings": {
+        "fsync": "on",
+        "wal_level": "replica",
+        "autovacuum": "on",
+        "track_io_timing": "off",
+        "wal_compression": "off",
+        "full_page_writes": "on",
+        "synchronous_commit": "on",
+        "track_wal_io_timing": "on"
+      },
+      "mutations": 400,
+      "wal_bytes_total": 11414884.0,
+      "wal_bytes_per_mutation": 28537.21,
+      "wal_records_per_mutation": 99.1125,
+      "wal_fpi_total": 55.0,
+      "wal_sync_count": 401.0,
+      "wal_sync_time_ms_total": 99.31500000000005,
+      "wal_sync_ms_per_mutation": 0.24828750000000013,
+      "rows_written_total": 4800.0,
+      "rows_written_per_mutation": 12.0,
+      "rows_written_by_table": {
+        "tb_user": 400.0,
+        "tv_post": 4000.0,
+        "tv_user": 400.0
+      },
+      "hot_ratio": 0.08333333333333333,
+      "hot_by_table": {
+        "tb_user": {
+          "hot_upd": 400.0,
+          "upd": 400.0
+        },
+        "tv_post": {
+          "hot_upd": 0.0,
+          "upd": 4000.0
+        },
+        "tv_user": {
+          "hot_upd": 0.0,
+          "upd": 400.0
+        }
+      },
+      "toast_blocks_touched": 2178.0,
+      "index_blocks_touched": 132251.0,
+      "commits": 411.0,
+      "latency_ms_p50": 1.563,
+      "latency_ms_p95": 1.841,
+      "latency_ms_mean": 1.6769275
+    },
+    {
+      "label": "cascade=on fsync=on c=40 driver=sql",
+      "cascade": "on",
+      "fsync": "on",
+      "concurrency": 40,
+      "driver": "sql",
+      "function": "benchmark.fn_update_user",
+      "endpoint": null,
+      "wall_seconds": 1.4849296770989895,
+      "throughput_rps": 269.3730256515945,
+      "wal_timing_available": true,
+      "stats_quiesced": true,
+      "stats_flush": "quiesced",
+      "rows_verified_written": 20,
+      "settings": {
+        "fsync": "on",
+        "wal_level": "replica",
+        "autovacuum": "on",
+        "track_io_timing": "off",
+        "wal_compression": "off",
+        "full_page_writes": "on",
+        "synchronous_commit": "on",
+        "track_wal_io_timing": "on"
+      },
+      "mutations": 400,
+      "wal_bytes_total": 12467560.0,
+      "wal_bytes_per_mutation": 31168.9,
+      "wal_records_per_mutation": 96.325,
+      "wal_fpi_total": 153.0,
+      "wal_sync_count": 201.0,
+      "wal_sync_time_ms_total": 442.4409999999999,
+      "wal_sync_ms_per_mutation": 1.1061024999999998,
+      "rows_written_total": 4800.0,
+      "rows_written_per_mutation": 12.0,
+      "rows_written_by_table": {
+        "tb_user": 400.0,
+        "tv_post": 4000.0,
+        "tv_user": 400.0
+      },
+      "hot_ratio": 0.08145833333333333,
+      "hot_by_table": {
+        "tb_user": {
+          "hot_upd": 391.0,
+          "upd": 400.0
+        },
+        "tv_post": {
+          "hot_upd": 0.0,
+          "upd": 4000.0
+        },
+        "tv_user": {
+          "hot_upd": 0.0,
+          "upd": 400.0
+        }
+      },
+      "toast_blocks_touched": 2225.0,
+      "index_blocks_touched": 134521.0,
+      "commits": 450.0,
+      "latency_ms_p50": 90.077,
+      "latency_ms_p95": 187.63,
+      "latency_ms_mean": 65.7304675
+    },
+    {
+      "label": "cascade=off fsync=on c=1 driver=sql",
+      "cascade": "off",
+      "fsync": "on",
+      "concurrency": 1,
+      "driver": "sql",
+      "function": "benchmark.fn_update_user",
+      "endpoint": null,
+      "wall_seconds": 0.27653180435299873,
+      "throughput_rps": 1446.488229214284,
+      "wal_timing_available": true,
+      "stats_quiesced": true,
+      "stats_flush": "quiesced",
+      "rows_verified_written": 20,
+      "settings": {
+        "fsync": "on",
+        "wal_level": "replica",
+        "autovacuum": "on",
+        "track_io_timing": "off",
+        "wal_compression": "off",
+        "full_page_writes": "on",
+        "synchronous_commit": "on",
+        "track_wal_io_timing": "on"
+      },
+      "mutations": 400,
+      "wal_bytes_total": 78180.0,
+      "wal_bytes_per_mutation": 195.45,
+      "wal_records_per_mutation": 2.95,
+      "wal_fpi_total": 0.0,
+      "wal_sync_count": 400.0,
+      "wal_sync_time_ms_total": 118.06400000000008,
+      "wal_sync_ms_per_mutation": 0.2951600000000002,
+      "rows_written_total": 400.0,
+      "rows_written_per_mutation": 1.0,
+      "rows_written_by_table": {
+        "tb_user": 400.0
+      },
+      "hot_ratio": 1.0,
+      "hot_by_table": {
+        "tb_user": {
+          "hot_upd": 400.0,
+          "upd": 400.0
+        }
+      },
+      "toast_blocks_touched": 0.0,
+      "index_blocks_touched": 3218.0,
+      "commits": 411.0,
+      "latency_ms_p50": 0.479,
+      "latency_ms_p95": 0.661,
+      "latency_ms_mean": 0.5015999999999999
+    },
+    {
+      "label": "cascade=on fsync=off c=1 driver=sql",
+      "cascade": "on",
+      "fsync": "off",
+      "concurrency": 1,
+      "driver": "sql",
+      "function": "benchmark.fn_update_user",
+      "endpoint": null,
+      "wall_seconds": 0.6123519875109196,
+      "throughput_rps": 653.2190768677258,
+      "wal_timing_available": true,
+      "stats_quiesced": true,
+      "stats_flush": "quiesced",
+      "rows_verified_written": 20,
+      "settings": {
+        "fsync": "off",
+        "wal_level": "replica",
+        "autovacuum": "on",
+        "track_io_timing": "off",
+        "wal_compression": "off",
+        "full_page_writes": "on",
+        "synchronous_commit": "on",
+        "track_wal_io_timing": "on"
+      },
+      "mutations": 400,
+      "wal_bytes_total": 10489076.0,
+      "wal_bytes_per_mutation": 26222.69,
+      "wal_records_per_mutation": 94.95,
+      "wal_fpi_total": 4.0,
+      "wal_sync_count": 0.0,
+      "wal_sync_time_ms_total": 0.0,
+      "wal_sync_ms_per_mutation": 0.0,
+      "rows_written_total": 4800.0,
+      "rows_written_per_mutation": 12.0,
+      "rows_written_by_table": {
+        "tb_user": 400.0,
+        "tv_post": 4000.0,
+        "tv_user": 400.0
+      },
+      "hot_ratio": 0.08333333333333333,
+      "hot_by_table": {
+        "tb_user": {
+          "hot_upd": 400.0,
+          "upd": 400.0
+        },
+        "tv_post": {
+          "hot_upd": 0.0,
+          "upd": 4000.0
+        },
+        "tv_user": {
+          "hot_upd": 0.0,
+          "upd": 400.0
+        }
+      },
+      "toast_blocks_touched": 2177.0,
+      "index_blocks_touched": 126905.0,
+      "commits": 411.0,
+      "latency_ms_p50": 1.312,
+      "latency_ms_p95": 1.909,
+      "latency_ms_mean": 1.386915
+    }
+  ],
+  "guard_failures": [],
+  "classification": [
+    "intrinsic work: one mutation costs 1.7 ms at concurrency 1 (544 rps serial); at concurrency 40 throughput scales 0.49x",
+    "  => CONTENTION-BOUND: added concurrency buys almost nothing, so the limit is serialisation (M1 rotates 20 rows), not per-mutation work",
+    "cascade share: disabling pg_tviews changes throughput 2.66x and removes 27.7 KiB WAL/mutation (12.0 -> 1.0 rows/mutation)",
+    "  => PROJECTION-MAINTENANCE-BOUND: the cascade dominates the write path",
+    "durability share: fsync=off changes throughput 1.20x",
+    "  => NOT fsync-bound: no amount of NVMe/SLOG/ZIL tuning addresses this workload",
+    "     direct check: 0.25 ms of wal_sync_time per mutation out of 1.7 ms total"
+  ]
+}

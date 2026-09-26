@@ -60,3 +60,33 @@ variance concentrated in p99 tails.
 A single warm sweep takes ≈ 2 h 05 (12 frameworks × full scenario set at
 30 s measure / 10 s warmup, cold-start restarts included). Nothing runs
 overnight: the script destroys the instances at the end of the session.
+
+## Write-path attribution
+
+The published sweep answers *how fast*. It does not answer *why* M1 is 89 rps:
+every FraiseQL variant shares one database, one `benchmark.fn_update_user` and one
+set of pg_tviews triggers, so the sweep contains no cascade-free control and
+cannot separate projection maintenance from row-lock contention, durability, and
+the runtime's own cost. `docs/write-path-attribution.md` explains the four-cell
+design; this is how to run it on the SUT.
+
+```bash
+scripts/hetzner/bench-run.sh --write-path          # sweeps, then the probe
+scripts/hetzner/bench-run.sh --plan --write-path   # print the commands only
+```
+
+It adds roughly three minutes to a session and writes
+`reports/write-path/matrix-<date>.json` plus
+`reports/write-path/runtime-share-<date>.json`, rsynced back with the rest.
+
+Three properties of the step matter:
+
+- **It runs on the SUT, not the loadgen.** This measures the database host; a network round trip per mutation would be counted as per-mutation work. The sweeps are the opposite — they must cross the private network.
+- **It runs after the last sweep, never beside one.** It toggles `fsync` and the pg_tviews triggers server-wide, which would corrupt a sweep in flight. It restores both on exit and resyncs `tv_*` after the cascade-off cell.
+- **Its numbers are a property of this hardware.** `fsync` cost belongs to the device and the concurrency result to the core count, so archbox figures do not transfer to a CCX33 and vice versa. Each run JSON stamps the dataset sizes and the live server settings it observed.
+
+Because the probe follows the warm sweeps, it measures a **fragmented** heap
+rather than a freshly seeded one — which is the state a long-lived deployment is
+actually in, and the state in which the April fresh-vs-post-cascade effect
+appeared. To measure the fresh side instead, run it before the first sweep and
+label it accordingly.

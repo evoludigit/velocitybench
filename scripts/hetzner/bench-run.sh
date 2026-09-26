@@ -5,9 +5,14 @@
 #
 # Usage:
 #   scripts/hetzner/bench-run.sh [--plan] [--keep] [--yes] [--single-sweep] [--sweeps=N]
+#                                [--write-path]
 #
 #   --plan          Print every action without calling the hcloud API.
 #   --keep          Skip destruction (debugging); instances keep billing!
+#   --write-path    After the sweeps, run the write-path attribution probe ON THE
+#                   SUT (docs/write-path-attribution.md). Adds ~3 min. It toggles
+#                   fsync and the pg_tviews triggers, so it runs only after the
+#                   last sweep has finished -- never alongside one.
 #   --yes           No confirmation prompt before destruction.
 #   --single-sweep  One sweep only (default is two sequential sweeps, whose
 #                   bench-delta report is the run-to-run variance baseline).
@@ -54,11 +59,12 @@ apollo-server strawberry}"
 SWEEP_ARGS="--duration 30 --warmup 10 --cooldown 5 --tview-mode logged"
 
 # ── Flags ───────────────────────────────────────────────────────────────────
-PLAN=0 KEEP=0 YES=0 SWEEPS=2
+PLAN=0 KEEP=0 YES=0 SWEEPS=2 WRITE_PATH=0
 for arg in "$@"; do
     case "$arg" in
         --plan) PLAN=1 ;;
         --keep) KEEP=1 ;;
+        --write-path) WRITE_PATH=1 ;;
         --yes) YES=1 ;;
         --single-sweep) SWEEPS=1 ;;
         --sweeps=*) SWEEPS="${arg#*=}" ;;
@@ -272,6 +278,29 @@ python3 tests/benchmark/loadgen_headroom.py --host ${SUT_PRIVATE_IP} --min-rps 3
 
 collect_results() {
     say ""
+    if (( WRITE_PATH )); then
+        say ""
+        say "── 4.w Write-path attribution (on the SUT) ──────────────────"
+        # Runs on the SUT, not the loadgen: this measures the database host, and a
+        # network round trip per mutation would be counted as work. The probe
+        # restores fsync and the trigger state itself, and resyncs tv_* after the
+        # cascade-off cell.
+        ssh_sut "cd ${REMOTE_DIR} && python3 tests/benchmark/write_path_probe.py \
+--matrix --mutations 400 --matrix-concurrency 40 \
+--out ${REMOTE_DIR}/reports/write-path/matrix-${SESSION_DATE}.json \
+2>&1 | tail -30"
+        # The runtime's share: the same function via SQL and through fraiseql-tv
+        # (host port 8816 -> container 8815).
+        ssh_sut "cd ${REMOTE_DIR} && python3 tests/benchmark/write_path_probe.py \
+--driver both --mutations 400 --endpoint http://localhost:8816/graphql \
+--out ${REMOTE_DIR}/reports/write-path/runtime-share-${SESSION_DATE}.json \
+2>&1 | tail -20"
+        # The probe lives on the SUT; the rsync-back below pulls from the loadgen.
+        run rsync -az -e "ssh -i ${SSH_KEY_FILE} -o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes" \
+            "root@${SUT_IP:-<sut-public-ip>}:${REMOTE_DIR}/reports/write-path/" \
+            "${REPO_ROOT}/reports/write-path/"
+    fi
+
     say "── 5. rsync results back ────────────────────────────────────"
     run rsync -az -e "ssh -i ${SSH_KEY_FILE} -o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes" \
         "root@${LOADGEN_IP:-<loadgen-public-ip>}:${REMOTE_DIR}/reports/" "${REPO_ROOT}/reports/hetzner-2026-07/"
