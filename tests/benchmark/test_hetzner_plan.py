@@ -84,3 +84,35 @@ def test_keep_flag_skips_destruction():
 def test_prices_yaml_still_has_expected_shape():
     text = PRICES_YAML.read_text()
     assert "ccx33" in text and "ccx23" in text and "price_hour" in text
+
+
+def _write_path_section(out: str) -> str:
+    return out.split("Write-path attribution", 1)[1].split("── 5.", 1)[0]
+
+
+def test_write_path_runs_the_matrix_three_times_by_default():
+    """WAL bytes/mutation ranged 25-63 KiB on archbox: one matrix is not a number."""
+    section = _write_path_section(_plan("--write-path").stdout)
+    for n in (1, 2, 3):
+        assert "matrix-2" in section and f"-run{n}.json" in section, f"matrix run {n} missing"
+    assert "-run4.json" not in section
+
+
+def test_write_path_runs_flag_overrides_the_repeat_count():
+    section = _write_path_section(_plan("--write-path", "--write-path-runs=5").stdout)
+    assert "-run5.json" in section
+
+
+def test_write_path_starts_the_graphql_target_before_the_runtime_share():
+    """The sweep stops every service it measured; the runtime cell needs one up."""
+    section = _write_path_section(_plan("--write-path").stdout)
+    up = section.find("compose start fraiseql-tv")
+    share = section.find("--driver both")
+    assert up != -1, "fraiseql-tv is never started for the runtime share"
+    assert share != -1 and up < share
+
+
+def test_write_path_records_the_sweep_m1_population():
+    """Fan-out is a property of the row: record which users M1 actually rotates."""
+    section = _write_path_section(_plan("--write-path").stdout)
+    assert "--population-of" in section

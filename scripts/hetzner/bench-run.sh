@@ -5,7 +5,7 @@
 #
 # Usage:
 #   scripts/hetzner/bench-run.sh [--plan] [--keep] [--yes] [--single-sweep] [--sweeps=N]
-#                                [--write-path]
+#                                [--write-path] [--write-path-runs=N]
 #
 #   --plan          Print every action without calling the hcloud API.
 #   --keep          Skip destruction (debugging); instances keep billing!
@@ -13,6 +13,9 @@
 #                   SUT (docs/write-path-attribution.md). Adds ~3 min. It toggles
 #                   fsync and the pg_tviews triggers, so it runs only after the
 #                   last sweep has finished -- never alongside one.
+#   --write-path-runs=N  Repeat the matrix and the runtime share N times
+#                   (default 3). WAL bytes/mutation follows checkpoint timing
+#                   (25-63 KiB observed on one host), so one run is not a number.
 #   --yes           No confirmation prompt before destruction.
 #   --single-sweep  One sweep only (default is two sequential sweeps, whose
 #                   bench-delta report is the run-to-run variance baseline).
@@ -59,12 +62,13 @@ apollo-server strawberry}"
 SWEEP_ARGS="--duration 30 --warmup 10 --cooldown 5 --tview-mode logged"
 
 # ── Flags ───────────────────────────────────────────────────────────────────
-PLAN=0 KEEP=0 YES=0 SWEEPS=2 WRITE_PATH=0
+PLAN=0 KEEP=0 YES=0 SWEEPS=2 WRITE_PATH=0 WRITE_PATH_RUNS=3
 for arg in "$@"; do
     case "$arg" in
         --plan) PLAN=1 ;;
         --keep) KEEP=1 ;;
         --write-path) WRITE_PATH=1 ;;
+        --write-path-runs=*) WRITE_PATH_RUNS="${arg#*=}" ;;
         --yes) YES=1 ;;
         --single-sweep) SWEEPS=1 ;;
         --sweeps=*) SWEEPS="${arg#*=}" ;;
@@ -72,6 +76,7 @@ for arg in "$@"; do
     esac
 done
 [[ "$SWEEPS" =~ ^[1-9][0-9]*$ ]] || { echo "--sweeps must be a positive integer (got: $SWEEPS)" >&2; exit 2; }
+[[ "$WRITE_PATH_RUNS" =~ ^[1-9][0-9]*$ ]] || { echo "--write-path-runs must be a positive integer (got: $WRITE_PATH_RUNS)" >&2; exit 2; }
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 say() { printf '%s\n' "$*"; }
@@ -285,16 +290,37 @@ collect_results() {
         # network round trip per mutation would be counted as work. The probe
         # restores fsync and the trigger state itself, and resyncs tv_* after the
         # cascade-off cell.
-        ssh_sut "cd ${REMOTE_DIR} && python3 tests/benchmark/write_path_probe.py \
+        local wp="${REMOTE_DIR}/reports/write-path" run_n
+        for run_n in $(seq 1 "$WRITE_PATH_RUNS"); do
+            ssh_sut "cd ${REMOTE_DIR} && python3 tests/benchmark/write_path_probe.py \
 --matrix --mutations 400 --matrix-concurrency 40 \
---out ${REMOTE_DIR}/reports/write-path/matrix-${SESSION_DATE}.json \
-2>&1 | tail -30"
-        # The runtime's share: the same function via SQL and through fraiseql-tv
-        # (host port 8816 -> container 8815).
-        ssh_sut "cd ${REMOTE_DIR} && python3 tests/benchmark/write_path_probe.py \
+--out ${wp}/matrix-${SESSION_DATE}-run${run_n}.json 2>&1 | tail -30"
+        done
+        # The runtime's share goes through fraiseql-tv (host 8816 -> container
+        # 8815), which the sweep stopped when it finished measuring it. `start`
+        # reuses the sweep's container as-is; `up` could recreate postgres.
+        # Non-fatal from here: a failure must not trip the abort trap into
+        # re-running the matrices already measured.
+        if ssh_sut "cd ${REMOTE_DIR} && docker compose start fraiseql-tv && \
+for i in \$(seq 1 60); do curl -sf http://localhost:8816/health >/dev/null && exit 0; sleep 2; done; \
+echo 'fraiseql-tv did not become healthy' >&2; exit 1"; then
+            # The users the sweep's M1 actually rotates are whatever this Q1 returns:
+            # record their fan-out, since rows/mutation is a property of the row.
+            ssh_sut "cd ${REMOTE_DIR} && mkdir -p ${wp} && curl -sf http://localhost:8816/graphql \
+-H 'Content-Type: application/json' -d '{\"query\": \"{ users(limit: 20) { id username fullName } }\"}' \
+> ${wp}/sweep-m1-q1-${SESSION_DATE}.json && python3 tests/benchmark/write_path_probe.py \
+--population-of ${wp}/sweep-m1-q1-${SESSION_DATE}.json \
+--out ${wp}/population-sweep-m1-${SESSION_DATE}.json > /dev/null" \
+                || say "  ⚠ sweep M1 population not recorded"
+            for run_n in $(seq 1 "$WRITE_PATH_RUNS"); do
+                ssh_sut "cd ${REMOTE_DIR} && python3 tests/benchmark/write_path_probe.py \
 --driver both --mutations 400 --endpoint http://localhost:8816/graphql \
---out ${REMOTE_DIR}/reports/write-path/runtime-share-${SESSION_DATE}.json \
-2>&1 | tail -20"
+--out ${wp}/runtime-share-${SESSION_DATE}-run${run_n}.json 2>&1 | tail -20" || true
+            done
+        else
+            say "  ⚠ fraiseql-tv did not start: population + runtime share skipped"
+        fi
+        ssh_sut "cd ${REMOTE_DIR} && docker compose stop fraiseql-tv" || true
         # The probe lives on the SUT; the rsync-back below pulls from the loadgen.
         run rsync -az -e "ssh -i ${SSH_KEY_FILE} -o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes" \
             "root@${SUT_IP:-<sut-public-ip>}:${REMOTE_DIR}/reports/write-path/" \

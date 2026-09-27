@@ -469,6 +469,49 @@ def m1_user_ids(pg: Postgres, count: int = M1_USER_COUNT) -> list[str]:
     return ids
 
 
+def m1_population(pg: Postgres, ids: list[str]) -> dict:
+    """What each rotated user fans out to, in the caller's order.
+
+    Cascade fan-out is a property of the row, not of the architecture: archbox's
+    first 20 users by id wrote 12 rows per mutation where the published report
+    says ~61. A bio change re-renders the user's tv_user row and every tv_post
+    embedding them as author; the comment counts bound what a username change
+    would touch. Recorded so a rows/mutation figure always names its population.
+    """
+    literal = ",".join(f"'{uid}'" for uid in ids)
+    rows = pg.sql(
+        f"SELECT u.id,"
+        f" (SELECT count(*) FROM {SCHEMA}.tb_post p WHERE p.fk_author = u.pk_user),"
+        f" (SELECT count(*) FROM {SCHEMA}.tb_comment c WHERE c.fk_author = u.pk_user),"
+        f" (SELECT count(*) FROM {SCHEMA}.tb_comment c JOIN {SCHEMA}.tb_post p"
+        f"    ON p.pk_post = c.fk_post WHERE p.fk_author = u.pk_user)"
+        f" FROM unnest(ARRAY[{literal}]::uuid[]) WITH ORDINALITY AS ids(id, ord)"
+        f" JOIN {SCHEMA}.tb_user u ON u.id = ids.id ORDER BY ids.ord"
+    )
+    users = []
+    for line in rows.splitlines():
+        uid, posts, authored, on_posts = line.split("|")
+        users.append({"id": uid, "posts": int(posts), "comments_authored": int(authored),
+                      "comments_on_posts": int(on_posts)})
+    missing = [uid for uid in ids if uid not in {u["id"] for u in users}]
+    if missing:
+        raise GuardFailure(f"population users not found in tb_user: {missing}")
+    return {
+        "users": users,
+        "mean_posts": statistics.fmean(u["posts"] for u in users),
+        "mean_comments_authored": statistics.fmean(u["comments_authored"] for u in users),
+        "mean_comments_on_posts": statistics.fmean(u["comments_on_posts"] for u in users),
+    }
+
+
+def ids_from_file(path: Path) -> list[str]:
+    """A plain JSON list of ids, or a GraphQL Q1 response (data.users[].id)."""
+    doc = json.loads(path.read_text())
+    if isinstance(doc, dict):
+        doc = [u["id"] for u in doc["data"]["users"]]
+    return [str(uid) for uid in doc]
+
+
 TIMING_RE = re.compile(r"^Time:\s+([0-9.]+)\s+ms", re.MULTILINE)
 
 
@@ -524,8 +567,11 @@ def drive_graphql(endpoint: str, ids: list[str], bios: list[str], mutations: int
             endpoint, data=body, headers={"Content-Type": "application/json"}
         )
         t0 = time.perf_counter()
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            payload = json.loads(resp.read())
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                payload = json.loads(resp.read())
+        except (urllib.error.URLError, ConnectionError) as exc:
+            raise GuardFailure(f"GraphQL endpoint {endpoint} unreachable: {exc}") from exc
         elapsed = (time.perf_counter() - t0) * 1000.0
         if "errors" in payload:
             raise GuardFailure(f"GraphQL error: {str(payload['errors'])[:200]}")
@@ -776,9 +822,21 @@ def main() -> int:
     p.add_argument("--container", help="postgres container (default: compose service)")
     p.add_argument("--dsn", help="connect with this DSN instead of docker exec")
     p.add_argument("--out", help="write the run JSON here")
+    p.add_argument("--population-of", type=Path, metavar="FILE",
+                   help="only record the fan-out population of these users (a JSON id "
+                        "list or a Q1 response) and exit; writes nothing to the database")
     args = p.parse_args()
 
     pg = Postgres(container=args.container, dsn=args.dsn)
+    if args.population_of:
+        pop = m1_population(pg, ids_from_file(args.population_of))
+        text = json.dumps({"generated_at": datetime.now(timezone.utc).isoformat(),
+                           "source": str(args.population_of), "population": pop}, indent=2)
+        if args.out:
+            Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.out).write_text(text)
+        print(text)
+        return 0
     original_fsync = pg.sql("SHOW fsync")
     original_triggers = tview_trigger_state(pg)
     wal_timing = ensure_wal_timing(pg)
@@ -860,7 +918,8 @@ def main() -> int:
             k: int(pg.sql(f"SELECT count(*) FROM {SCHEMA}.{k}"))
             for k in ("tb_user", "tb_post", "tb_comment", "tv_user", "tv_post", "tv_comment")
         },
-        "args": vars(args),
+        "args": {k: (str(v) if isinstance(v, Path) else v) for k, v in vars(args).items()},
+        "m1_population": m1_population(pg, m1_user_ids(pg)),
         "cells": rows,
         "guard_failures": failures,
         "classification": classify(rows) if rows else [],
