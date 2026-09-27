@@ -297,11 +297,11 @@ collect_results() {
 --out ${wp}/matrix-${SESSION_DATE}-run${run_n}.json 2>&1 | tail -30"
         done
         # The runtime's share goes through fraiseql-tv (host 8816 -> container
-        # 8815), which the sweep stopped when it finished measuring it. `start`
-        # reuses the sweep's container as-is; `up` could recreate postgres.
+        # 8815). The sweep removed its container and pruned its image when it
+        # finished measuring it, so rebuild; --no-deps leaves postgres untouched.
         # Non-fatal from here: a failure must not trip the abort trap into
         # re-running the matrices already measured.
-        if ssh_sut "cd ${REMOTE_DIR} && docker compose start fraiseql-tv && \
+        if ssh_sut "cd ${REMOTE_DIR} && TVIEW_PERSISTENCE=logged docker compose up -d --no-deps --build fraiseql-tv && \
 for i in \$(seq 1 60); do curl -sf http://localhost:8816/health >/dev/null && exit 0; sleep 2; done; \
 echo 'fraiseql-tv did not become healthy' >&2; exit 1"; then
             # The users the sweep's M1 actually rotates are whatever this Q1 returns:

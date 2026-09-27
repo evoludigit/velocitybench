@@ -104,9 +104,11 @@ def test_write_path_runs_flag_overrides_the_repeat_count():
 
 
 def test_write_path_starts_the_graphql_target_before_the_runtime_share():
-    """The sweep stops every service it measured; the runtime cell needs one up."""
+    """The sweep removes every service it measured and prunes its image, so the
+    runtime cell must rebuild it -- `compose start` finds no container -- and must
+    not touch postgres (--no-deps), which holds the measured state."""
     section = _write_path_section(_plan("--write-path").stdout)
-    up = section.find("compose start fraiseql-tv")
+    up = section.find("up -d --no-deps --build fraiseql-tv")
     share = section.find("--driver both")
     assert up != -1, "fraiseql-tv is never started for the runtime share"
     assert share != -1 and up < share
