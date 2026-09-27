@@ -1,0 +1,281 @@
+{
+  "generated_at": "2026-09-27T13:57:06.622401+00:00",
+  "dataset": {
+    "tb_user": 10005,
+    "tb_post": 100005,
+    "tb_comment": 500005,
+    "tv_user": 10005,
+    "tv_post": 100005,
+    "tv_comment": 500005
+  },
+  "args": {
+    "mutations": 400,
+    "concurrency": 1,
+    "driver": "both",
+    "endpoint": "http://localhost:8816/graphql",
+    "function": "benchmark.fn_update_user",
+    "cascade": "on",
+    "fsync": "on",
+    "matrix": false,
+    "matrix_concurrency": 40,
+    "container": null,
+    "dsn": null,
+    "out": "/root/velocitybench/reports/write-path/runtime-share-2026-09-27-run3.json",
+    "population_of": null
+  },
+  "m1_population": {
+    "users": [
+      {
+        "id": "00000001-1111-1111-1111-111111111111",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "00000002-1111-1111-1111-111111111111",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "00000003-1111-1111-1111-111111111111",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "00000004-1111-1111-1111-111111111111",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "00000005-1111-1111-1111-111111111111",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "00000006-1111-1111-1111-111111111111",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "00000007-1111-1111-1111-111111111111",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "00000008-1111-1111-1111-111111111111",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "00000009-1111-1111-1111-111111111111",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "00000010-1111-1111-1111-111111111111",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "00000011-1111-1111-1111-111111111111",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "00000012-1111-1111-1111-111111111111",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "00000013-1111-1111-1111-111111111111",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "00000014-1111-1111-1111-111111111111",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "00000015-1111-1111-1111-111111111111",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "00000016-1111-1111-1111-111111111111",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "00000017-1111-1111-1111-111111111111",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "00000018-1111-1111-1111-111111111111",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "00000019-1111-1111-1111-111111111111",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "00000020-1111-1111-1111-111111111111",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      }
+    ],
+    "mean_posts": 10.0,
+    "mean_comments_authored": 50.0,
+    "mean_comments_on_posts": 50.0
+  },
+  "cells": [
+    {
+      "label": "cascade=on fsync=on c=1 driver=sql",
+      "cascade": "on",
+      "fsync": "on",
+      "concurrency": 1,
+      "driver": "sql",
+      "function": "benchmark.fn_update_user",
+      "endpoint": null,
+      "wall_seconds": 1.011284323001746,
+      "throughput_rps": 395.53663683097494,
+      "wal_timing_available": true,
+      "stats_quiesced": true,
+      "stats_flush": "quiesced",
+      "rows_verified_written": 20,
+      "settings": {
+        "fsync": "on",
+        "wal_level": "replica",
+        "autovacuum": "on",
+        "track_io_timing": "off",
+        "wal_compression": "off",
+        "full_page_writes": "on",
+        "synchronous_commit": "on",
+        "track_wal_io_timing": "on"
+      },
+      "mutations": 400,
+      "wal_bytes_total": 10778498.0,
+      "wal_bytes_per_mutation": 26946.245,
+      "wal_records_per_mutation": 96.4475,
+      "wal_fpi_total": 3.0,
+      "wal_sync_count": 405.0,
+      "wal_sync_time_ms_total": 82.58800000000019,
+      "wal_sync_ms_per_mutation": 0.2064700000000005,
+      "rows_written_total": 4800.0,
+      "rows_written_per_mutation": 12.0,
+      "rows_written_by_table": {
+        "tb_user": 400.0,
+        "tv_post": 4000.0,
+        "tv_user": 400.0
+      },
+      "hot_ratio": 0.08333333333333333,
+      "hot_by_table": {
+        "tb_user": {
+          "hot_upd": 400.0,
+          "upd": 400.0
+        },
+        "tv_post": {
+          "hot_upd": 0.0,
+          "upd": 4000.0
+        },
+        "tv_user": {
+          "hot_upd": 0.0,
+          "upd": 400.0
+        }
+      },
+      "toast_blocks_touched": 3985.0,
+      "index_blocks_touched": 114112.0,
+      "commits": 411.0,
+      "latency_ms_p50": 2.271,
+      "latency_ms_p95": 2.539,
+      "latency_ms_mean": 2.3117275
+    },
+    {
+      "label": "cascade=on fsync=on c=1 driver=graphql",
+      "cascade": "on",
+      "fsync": "on",
+      "concurrency": 1,
+      "driver": "graphql",
+      "function": null,
+      "endpoint": "http://localhost:8816/graphql",
+      "wall_seconds": 1.5275390520000656,
+      "throughput_rps": 261.8590991020915,
+      "wal_timing_available": true,
+      "stats_quiesced": true,
+      "stats_flush": "flushed-by-timeout",
+      "rows_verified_written": 20,
+      "settings": {
+        "fsync": "on",
+        "wal_level": "replica",
+        "autovacuum": "on",
+        "track_io_timing": "off",
+        "wal_compression": "off",
+        "full_page_writes": "on",
+        "synchronous_commit": "on",
+        "track_wal_io_timing": "on"
+      },
+      "mutations": 400,
+      "wal_bytes_total": 11594506.0,
+      "wal_bytes_per_mutation": 28986.265,
+      "wal_records_per_mutation": 100.1275,
+      "wal_fpi_total": 54.0,
+      "wal_sync_count": 404.0,
+      "wal_sync_time_ms_total": 93.84799999999996,
+      "wal_sync_ms_per_mutation": 0.23461999999999988,
+      "rows_written_total": 4800.0,
+      "rows_written_per_mutation": 12.0,
+      "rows_written_by_table": {
+        "tb_user": 400.0,
+        "tv_post": 4000.0,
+        "tv_user": 400.0
+      },
+      "hot_ratio": 0.08333333333333333,
+      "hot_by_table": {
+        "tb_user": {
+          "hot_upd": 400.0,
+          "upd": 400.0
+        },
+        "tv_post": {
+          "hot_upd": 0.0,
+          "upd": 4000.0
+        },
+        "tv_user": {
+          "hot_upd": 0.0,
+          "upd": 400.0
+        }
+      },
+      "toast_blocks_touched": 3974.0,
+      "index_blocks_touched": 119358.0,
+      "commits": 431.0,
+      "latency_ms_p50": 3.544316001352854,
+      "latency_ms_p95": 4.460234998987289,
+      "latency_ms_mean": 3.781144195036177
+    }
+  ],
+  "guard_failures": [],
+  "classification": [
+    "runtime share: 1.5 ms per mutation above the SQL-only path (2.3 ms SQL vs 3.8 ms GraphQL)"
+  ]
+}

@@ -1,0 +1,131 @@
+{
+  "generated_at": "2026-09-27T13:55:45.516736+00:00",
+  "source": "reports/write-path/sweep-m1-q1-2026-09-27.json",
+  "population": {
+    "users": [
+      {
+        "id": "23ce7305-1b55-4230-b83c-9049ef247369",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "9bdf5fb5-42e6-4f8f-b4c3-d2acee895431",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "dc05542d-1325-42bb-b69d-e149f45416f7",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "1d94710a-de7a-4b7d-8518-03d92f341047",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "31753c8a-4e6a-47fc-8895-9785859ae7b2",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "a2ff712b-67ac-4c16-95b9-3ab4048ab712",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "e894218a-65f0-4706-b5c7-daca2b51af6e",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "4f022701-7541-48f4-b761-87ac22985fe9",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "d5a6942a-de8e-40aa-85c4-731248fe429b",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "14a65873-d105-498a-add7-c42db813b435",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "bffc245d-4743-473e-882f-a82be263fca7",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "ef49f1e0-184e-4e37-b52e-462768a10552",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "6c02ee46-b94e-4a4d-ac32-48fcfa13ea28",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "18a621a1-c420-4f71-aaba-606c3e2e9584",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "5234038b-85a9-47fa-b884-bc439bfc4a7b",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "d7741f51-e55f-4be4-b945-c33b6b96a948",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "13ce3de5-b4d7-48e2-81d0-2ed4cf326538",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "d38a8046-7f9a-4f56-86ed-be0ead9ea737",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "bdb8c03f-2b03-426a-a474-203b4a7aa89c",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      },
+      {
+        "id": "b83e398d-d963-47eb-85e4-7202050d2aad",
+        "posts": 10,
+        "comments_authored": 50,
+        "comments_on_posts": 50
+      }
+    ],
+    "mean_posts": 10.0,
+    "mean_comments_authored": 50.0,
+    "mean_comments_on_posts": 50.0
+  }
+}
