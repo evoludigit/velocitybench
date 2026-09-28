@@ -58,16 +58,19 @@ serving `tv_*` rows that disagree with `tb_user`.
 | cell | rps | rows/mut | HOT | WAL KiB/mut | sync ms/mut | p50 ms |
 |---|---:|---:|---:|---:|---:|---:|
 | cascade on, fsync on, c=1 | 544 | 12.0 | 8% | 27.9 | 0.25 | 1.7 |
-| cascade on, fsync on, c=40 | 269 | 12.0 | 8% | 30.4 | 1.11 | 90.1 |
+| cascade on, fsync on, c=40 | ~~269~~ 565 † | 12.0 | 8% | 30.4 | 1.11 | 90.1 |
 | cascade off, fsync on, c=1 | 1 446 | 1.0 | 100% | 0.2 | 0.30 | 0.5 |
 | cascade on, fsync off, c=1 | 653 | 12.0 | 8% | 25.6 | 0.00 | 1.3 |
 
 Read together:
 
-- **Concurrency is negative.** 40 workers deliver **0.49×** the throughput of one
-  (269 vs 544 rps) and p50 goes 1.7 → 90.1 ms. The limit at load is
-  serialisation on the 20 rotating rows, not per-mutation work. A single serial
-  SQL client already beats the sweep's 40-worker figure by ~6×.
+- **Concurrency is flat, not negative.** † The 269 above timed the cell from the
+  client, so it counted starting 40 `docker exec psql` sessions as work (trap 4).
+  Re-timed from a database-side barrier (2026-09-28, 3 runs, medians), c=1 is
+  548 rps and c=40 is **565** at 400 mutations (range 504–676), or 671 at 4 000:
+  **~1.0–1.2×**, while p50 goes 1.6 → 80 ms. On this host, 40 workers buy
+  almost nothing over one: the extra throughput is lost to waiting on the 20
+  rotating rows. `reports/write-path/archbox-2026-09-28-*.json`.
 - **The cascade is the per-mutation cost.** It accounts for 11 of 12 rows written,
   27.7 of 27.9 KiB of WAL, and it collapses HOT from 100% to **8%** — which is the
   mechanism behind the April fresh-vs-fragmented effect, now measured rather than
@@ -87,7 +90,7 @@ post and comment counts, so it is a property of the row, not of the architecture
 full-page images depend on checkpoint timing. Take medians of ≥3 runs before
 quoting it, as the sweep does for RPS.
 
-## Three traps this probe hit, and now guards against
+## Four traps this probe hit, and now guards against
 
 1. **`fn_update_user` skips no-op writes.** It guards its UPDATE with
    `bio IS DISTINCT FROM p_bio`. The first version of the probe paired 20 users
@@ -111,12 +114,27 @@ quoting it, as the sweep does for RPS.
    `tv_*` writes while a cascade-off cell must observe **zero**. That last pair is
    deliberate: a cascade that is enabled and does nothing is exactly the beta.11
    early-return that invalidated the 2026-07-04 mutation numbers.
+4. **Timing the client instead of the work.** The SQL driver opens one
+   `docker exec psql` per worker, and 40 of them take 0.86 s to start on a CCX33.
+   Timed from the client, that start-up landed inside the window and read c=40 as
+   269 rps (archbox) and 269 rps (CCX33), where the database was doing ~565 and
+   ~790+. Every worker now connects, then sleeps until one instant chosen by the
+   database (`pg_sleep_until`), and the window runs from that instant to the last
+   worker's finish on the database clock. A worker that connects after the
+   barrier fails the cell, since it would have run with fewer peers than the
+   label claims. Each cell records `timing` (`db-barrier` or `client-wall`) and
+   both `window_seconds` and `wall_seconds`.
 
 ## On Hetzner
 
 The numbers above are archbox (i7-13700K, mdadm RAID1 NVMe). They do not transfer:
 `fsync` cost is a property of the device, and the concurrency result is a property
 of the core count. Re-measure on the SUT.
+
+Measured on a CCX33 (EPYC-Milan) on 2026-09-27:
+`reports/write-path/ccx33-2026-09-27.md`. Cascade-bound (5.68×), fsync 1.11×,
+runtime +1.45 ms, and c=40 ~1.9× c=1, so concurrency scales there and does
+not on archbox. That is the core-count caveat above, measured.
 
 See `docs/reproducing-on-hetzner.md` § "Write-path attribution" for the procedure.
 The probe discovers the compose `postgres` service automatically, or takes

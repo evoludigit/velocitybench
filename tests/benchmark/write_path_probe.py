@@ -515,8 +515,21 @@ def ids_from_file(path: Path) -> list[str]:
 TIMING_RE = re.compile(r"^Time:\s+([0-9.]+)\s+ms", re.MULTILINE)
 
 
+MARKER_RE = re.compile(r"^wp_(ready|done) ([0-9.]+)$", re.MULTILINE)
+
+
+def barrier_lead_seconds(concurrency: int) -> float:
+    """Time for every worker's psql to connect before the barrier releases.
+
+    Measured on the CCX33: one `docker exec psql` starts in 0.07 s and 40 at once
+    in 0.86 s. The lead is set well above that, and a worker that still arrives
+    late fails the cell instead of quietly running at lower concurrency.
+    """
+    return 1.0 + 0.05 * concurrency
+
+
 def drive_sql(pg: Postgres, ids: list[str], bios: list[str], mutations: int,
-              concurrency: int, function: str) -> list[float]:
+              concurrency: int, function: str) -> tuple[list[float], float]:
     """One statement per transaction, straight to the mutation function.
 
     This is the DB-only cost: no GraphQL parse, no runtime, no HTTP. Comparing it
@@ -526,32 +539,55 @@ def drive_sql(pg: Postgres, ids: list[str], bios: list[str], mutations: int,
     psql's own `\\timing`, not from wall-clock around the process. A first version
     spawned `docker exec psql` per mutation and reported 78.5 ms p50 for work that
     is a fraction of that -- the spawn was most of the measurement.
+
+    Throughput is timed by the database, not the client: every worker connects,
+    then sleeps until one shared instant, and the window runs from that instant
+    to the last worker's finish. Timing from the client counted process start-up
+    as work -- 40 sessions took 0.86 s to start, which read c=40 as 269 rps when
+    the database was doing ~790+.
+
+    Returns the per-statement latencies and the window in seconds.
     """
     work = rotating_writes(ids, bios, mutations)
+    barrier = float(pg.sql(
+        "SELECT extract(epoch FROM clock_timestamp()) + "
+        f"{barrier_lead_seconds(concurrency)}"
+    ))
 
-    def run_batch(batch: list[tuple[str, str]]) -> list[float]:
-        if not batch:
-            return []
-        script = "\\timing on\n" + "".join(
-            f"SELECT {function}('{uid}', '{bio}');\n" for uid, bio in batch
+    def run_batch(batch: list[tuple[str, str]]) -> tuple[list[float], float]:
+        script = (
+            "SELECT 'wp_ready ' || extract(epoch FROM clock_timestamp());\n"
+            f"SELECT pg_sleep_until(to_timestamp({barrier}));\n"
+            "\\timing on\n"
+            + "".join(f"SELECT {function}('{uid}', '{bio}');\n" for uid, bio in batch)
+            + "\\timing off\n"
+            "SELECT 'wp_done ' || extract(epoch FROM clock_timestamp());\n"
         )
         out = pg.script(script)
+        markers = dict(MARKER_RE.findall(out))
+        if "ready" not in markers or "done" not in markers:
+            raise GuardFailure("a SQL worker did not report its barrier markers")
+        if float(markers["ready"]) > barrier:
+            raise GuardFailure(
+                f"a SQL worker connected {float(markers['ready']) - barrier:.2f} s after "
+                "the barrier -- it ran with fewer peers than this cell claims"
+            )
         times = [float(m) for m in TIMING_RE.findall(out)]
         if len(times) != len(batch):
             raise GuardFailure(
                 f"psql reported {len(times)} timings for {len(batch)} statements -- "
                 "the SQL driver cannot account for every mutation it claims to have run"
             )
-        return times
+        return times, float(markers["done"])
 
-    if concurrency <= 1:
-        return run_batch(work)
-
-    chunks: list[list[tuple[str, str]]] = [[] for _ in range(concurrency)]
+    chunks: list[list[tuple[str, str]]] = [[] for _ in range(max(concurrency, 1))]
     for i, job in enumerate(work):
-        chunks[i % concurrency].append(job)
-    with ThreadPoolExecutor(max_workers=concurrency) as pool:
-        return [t for batch in pool.map(run_batch, chunks) for t in batch]
+        chunks[i % len(chunks)].append(job)
+    chunks = [c for c in chunks if c]
+    with ThreadPoolExecutor(max_workers=len(chunks)) as pool:
+        results = list(pool.map(run_batch, chunks))
+    latencies = [t for times, _ in results for t in times]
+    return latencies, max(done for _, done in results) - barrier
 
 
 def drive_graphql(endpoint: str, ids: list[str], bios: list[str], mutations: int,
@@ -668,12 +704,16 @@ def run_cell(pg: Postgres, *, cascade: bool, fsync: str, concurrency: int, mutat
     before = snapshot(pg)
     t0 = time.perf_counter()
     if driver == "sql":
-        latencies = drive_sql(pg, ids, bios, mutations, concurrency, function)
+        latencies, window = drive_sql(pg, ids, bios, mutations, concurrency, function)
+        timing = "db-barrier"
     else:
         if not endpoint:
             raise GuardFailure("--driver graphql needs --endpoint")
         latencies = drive_graphql(endpoint, ids, bios, mutations, concurrency)
+        timing = "client-wall"
     wall = time.perf_counter() - t0
+    if driver != "sql":
+        window = wall
     quiesced = wait_for_stats_quiescence(pg)
     flush_note = "quiesced" if quiesced else "not-quiesced"
     if driver != "sql":
@@ -700,8 +740,10 @@ def run_cell(pg: Postgres, *, cascade: bool, fsync: str, concurrency: int, mutat
         "driver": driver,
         "function": function if driver == "sql" else None,
         "endpoint": endpoint if driver == "graphql" else None,
+        "timing": timing,
         "wall_seconds": wall,
-        "throughput_rps": mutations / wall if wall else None,
+        "window_seconds": window,
+        "throughput_rps": mutations / window if window else None,
         "wal_timing_available": wal_timing,
         "stats_quiesced": quiesced,
         "stats_flush": flush_note,

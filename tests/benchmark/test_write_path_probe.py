@@ -58,3 +58,61 @@ def test_population_refuses_a_user_that_does_not_exist():
     pg = FakePg("u1|1|0|0")
     with pytest.raises(probe.GuardFailure, match="u2"):
         probe.m1_population(pg, ["u1", "u2"])
+
+
+class BarrierPg:
+    """Fakes psql for the SQL driver: a DB clock, and one output per worker."""
+
+    BARRIER = 1000.0
+    FUNCTION = "benchmark.fn_update_user"
+
+    def __init__(self, *, ready: float = 999.5, per_statement_s: float = 0.002):
+        self.ready = ready
+        self.per_statement_s = per_statement_s
+        self.scripts: list[str] = []
+
+    def sql(self, statement: str, *, check: bool = True) -> str:
+        return str(self.BARRIER)
+
+    def script(self, body: str) -> str:
+        self.scripts.append(body)
+        n = sum(1 for line in body.splitlines() if line.startswith(f"SELECT {self.FUNCTION}("))
+        done = self.BARRIER + n * self.per_statement_s
+        timings = "".join(f"\nTime: {self.per_statement_s * 1000:.3f} ms" for _ in range(n))
+        return f"wp_ready {self.ready}\n{timings}\nwp_done {done}\n"
+
+
+def _drive(pg: BarrierPg, mutations: int, concurrency: int):
+    ids = [f"u{i}" for i in range(20)]
+    return probe.drive_sql(pg, ids, probe.cell_bios("t"), mutations, concurrency,
+                           BarrierPg.FUNCTION)
+
+
+def test_sql_window_runs_from_the_barrier_to_the_last_worker():
+    """Starting 40 `docker exec psql` took 0.86 s on the CCX33 and landed inside
+    the timed window, so c=40 read 269 rps where the database did ~790+."""
+    latencies, window = _drive(BarrierPg(), mutations=400, concurrency=40)
+    assert len(latencies) == 400
+    assert window == pytest.approx(10 * 0.002)
+
+
+def test_every_worker_waits_on_the_same_barrier():
+    pg = BarrierPg()
+    _drive(pg, mutations=40, concurrency=4)
+    assert len(pg.scripts) == 4
+    assert all(f"pg_sleep_until(to_timestamp({BarrierPg.BARRIER}))" in s for s in pg.scripts)
+
+
+def test_markers_are_outside_the_timed_statements():
+    pg = BarrierPg()
+    _drive(pg, mutations=10, concurrency=1)
+    body = pg.scripts[0]
+    assert body.index("wp_ready") < body.index("pg_sleep_until") < body.index("\\timing on")
+    assert body.index("\\timing off") < body.index("wp_done")
+
+
+def test_a_worker_that_misses_the_barrier_is_a_guard_failure():
+    """A worker that arrives late runs with fewer peers, which is a lower
+    concurrency than the label claims."""
+    with pytest.raises(probe.GuardFailure, match="barrier"):
+        _drive(BarrierPg(ready=BarrierPg.BARRIER + 0.2), mutations=40, concurrency=4)
