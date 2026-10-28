@@ -42,6 +42,7 @@ import subprocess
 import sys
 import threading
 import time
+import tomllib
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -112,6 +113,51 @@ _PG_C3_TMPL = (
 # F3 ORDER BY baseline — identical document to the FraiseQL F3 baseline
 # (users(limit: 20), no orderBy yet; see _FRAISEQL_F3).
 _PG_F3 = "{ allTbUsers(first: 20) { nodes { id: rowId username fullName } } }"
+
+# Read-path lever scenarios (#222). Q1-Q3 read the first heap pages, unordered, and
+# cannot show what offset paging over fat documents or an ordered, filtered read
+# costs. L1 and L2 can, but only engines that already take offset/order arguments
+# answer them identically, so they run on those engines only and never enter a
+# cross-stack ranking. Every document states its order: created_at DESC.
+#
+# L1: a page of fat post documents at an offset.
+_FRAISEQL_L1 = (
+    "{ posts(limit: 20, offset: 1000, orderBy: {createdAt: DESC})"
+    " { id title author { username fullName } } }"
+)
+# async-graphql's posts resolver orders by created_at DESC itself.
+_ASYNC_GQL_L1 = "{ posts(limit: 20, offset: 1000) { id title author { username fullName } } }"
+_HASURA_L1 = (
+    "{ posts(limit: 20, offset: 1000, order_by: {createdAt: desc})"
+    " { id title author { username fullName } } }"
+)
+_PG_L1 = (
+    "{ allTbPosts(first: 20, offset: 1000, orderBy: CREATED_AT_DESC)"
+    " { nodes { id: rowId title tbUserByFkAuthor { username fullName } } } }"
+)
+# L2: the 3 latest comments of one post (filter + sort). The medium dataset gives
+# each post 5 comments, so the limit truncates and the order decides which rows
+# come back.
+_L2_TEMPLATES = {
+    "fraiseql": (
+        '{{ comments(postId: "{post_id}", limit: 3, orderBy: {{createdAt: DESC}})'
+        " {{ id content author {{ username }} }} }}"
+    ),
+    # commentsByPost orders by created_at DESC itself.
+    "async-graphql": (
+        '{{ comments: commentsByPost(postId: "{post_id}", limit: 3)'
+        " {{ id content author {{ username }} }} }}"
+    ),
+    "hasura": (
+        '{{ comments(where: {{post: {{id: {{_eq: "{post_id}"}}}}}},'
+        " order_by: {{createdAt: desc}}, limit: 3) {{ id content author {{ username }} }} }}"
+    ),
+    "postgraphile": (
+        '{{ tbPostByRowId(rowId: "{post_id}") {{ tbCommentsByFkPost(first: 3,'
+        " orderBy: CREATED_AT_DESC) {{ nodes {{ id: rowId content"
+        " tbUserByFkAuthor {{ username }} }} }} }} }}"
+    ),
+}
 _GQL_M1_TMPL = (
     'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "{bio}" }}) {{ id bio }} }}'
 )
@@ -352,6 +398,8 @@ FRAMEWORKS: dict[str, dict] = {
             "F1": ("http://localhost:8016/graphql", _GQL_F1),
             "F2": ("http://localhost:8016/graphql", _GQL_F2),
             "F3": ("http://localhost:8016/graphql", _FRAISEQL_F3),
+            "L1": ("http://localhost:8016/graphql", _ASYNC_GQL_L1),
+            "L2": "L2",
             "T1": "T1",
             "MC1": "MC1",
             # First-party APQ: built-in ApolloPersistedQueries extension
@@ -360,6 +408,7 @@ FRAMEWORKS: dict[str, dict] = {
             "Q2b_APQ": "Q2b_APQ",
             "M1_APQ": "M1_APQ",
         },
+        "l2_template": "async-graphql",
         "health_url": "http://localhost:8016/health",
         "m1_template": 'mutation {{ updateUser(id: "{user_id}", input: {{ bio: "{bio}" }}) {{ id bio }} }}',
     },
@@ -896,10 +945,13 @@ FRAMEWORKS: dict[str, dict] = {
             "F1": ("http://localhost:4014/graphql", _PG_F1),
             "F2": ("http://localhost:4014/graphql", _PG_F2),
             "F3": ("http://localhost:4014/graphql", _PG_F3),
+            "L1": ("http://localhost:4014/graphql", _PG_L1),
+            "L2": "L2",
             "M1": "M1",
             "T1": "T1",
             "MC1": "MC1",
         },
+        "l2_template": "postgraphile",
         "health_url": "http://localhost:4014/health",
         "m1_template": _PG_M1_TMPL,
         "t1_template": "postgraphile",
@@ -924,6 +976,8 @@ FRAMEWORKS: dict[str, dict] = {
             "F1": ("http://localhost:4000/v1/graphql", _HASURA_F1),
             "F2": ("http://localhost:4000/v1/graphql", _HASURA_F2),
             "F3": ("http://localhost:4000/v1/graphql", _FRAISEQL_F3),
+            "L1": ("http://localhost:4000/v1/graphql", _HASURA_L1),
+            "L2": "L2",
             "M1": "M1",
             "T1": "T1",
             "MC1": "MC1",
@@ -931,6 +985,7 @@ FRAMEWORKS: dict[str, dict] = {
         # strict=true fails while metadata is inconsistent — the warmup window
         # must not open before the config is fully applied. /healthz is plain
         # text; version comes from the JSON /v1/version endpoint.
+        "l2_template": "hasura",
         "health_url": "http://localhost:4000/healthz?strict=true",
         "version_url": "http://localhost:4000/v1/version",
         # Metadata reconciliation makes cold boots slower than a plain app server —
@@ -995,6 +1050,8 @@ FRAMEWORKS: dict[str, dict] = {
             "F1": ("http://localhost:8817/graphql", _FRAISEQL_F1),
             "F2": ("http://localhost:8817/graphql", _FRAISEQL_F2),
             "F3": ("http://localhost:8817/graphql", _FRAISEQL_F3),
+            "L1": ("http://localhost:8817/graphql", _FRAISEQL_L1),
+            "L2": "L2",
             "T1": "T1",
             # MC1: mutation-to-consistent-state cycle (cascade: 1 request replaces M1+Q1+C3)
             "MC1": "MC1",
@@ -1002,6 +1059,7 @@ FRAMEWORKS: dict[str, dict] = {
             "Q2b_APQ": "Q2b_APQ",
             "M1_APQ": "M1_APQ",
         },
+        "l2_template": "fraiseql",
         "health_url": "http://localhost:8817/health",
         "warmup_secs": 30,
         "m1_template": "fraiseql",
@@ -1033,12 +1091,15 @@ FRAMEWORKS: dict[str, dict] = {
             "F1": ("http://localhost:8816/graphql", _FRAISEQL_F1),
             "F2": ("http://localhost:8816/graphql", _FRAISEQL_F2),
             "F3": ("http://localhost:8816/graphql", _FRAISEQL_F3),
+            "L1": ("http://localhost:8816/graphql", _FRAISEQL_L1),
+            "L2": "L2",
             "T1": "T1",
             "MC1": "MC1",
             "Q1_APQ": "Q1_APQ",
             "Q2b_APQ": "Q2b_APQ",
             "M1_APQ": "M1_APQ",
         },
+        "l2_template": "fraiseql",
         "health_url": "http://localhost:8816/health",
         "warmup_secs": 30,
         "m1_template": "fraiseql",
@@ -1070,12 +1131,15 @@ FRAMEWORKS: dict[str, dict] = {
             "F1": ("http://localhost:8819/graphql", _FRAISEQL_F1),
             "F2": ("http://localhost:8819/graphql", _FRAISEQL_F2),
             "F3": ("http://localhost:8819/graphql", _FRAISEQL_F3),
+            "L1": ("http://localhost:8819/graphql", _FRAISEQL_L1),
+            "L2": "L2",
             "T1": "T1",
             "MC1": "MC1",
             "Q1_APQ": "Q1_APQ",
             "Q2b_APQ": "Q2b_APQ",
             "M1_APQ": "M1_APQ",
         },
+        "l2_template": "fraiseql",
         "health_url": "http://localhost:8819/health",
         "warmup_secs": 5,
         "m1_template": "fraiseql",
@@ -1106,12 +1170,15 @@ FRAMEWORKS: dict[str, dict] = {
             "F1": ("http://localhost:8815/graphql", _FRAISEQL_F1),
             "F2": ("http://localhost:8815/graphql", _FRAISEQL_F2),
             "F3": ("http://localhost:8815/graphql", _FRAISEQL_F3),
+            "L1": ("http://localhost:8815/graphql", _FRAISEQL_L1),
+            "L2": "L2",
             "T1": "T1",
             "MC1": "MC1",
             "Q1_APQ": "Q1_APQ",
             "Q2b_APQ": "Q2b_APQ",
             "M1_APQ": "M1_APQ",
         },
+        "l2_template": "fraiseql",
         "health_url": "http://localhost:8815/health",
         # Cache needs 30s warmup to fill before measuring sustained cache-hit throughput.
         "warmup_secs": 30,
@@ -1233,6 +1300,11 @@ class BenchResult:
     # (None when the SUT container is not locally visible, e.g. --target-host).
     rss_steady_mb: float | None = None
     rss_max_mb: float | None = None
+    # Median cores used inside the measurement window by the framework's container
+    # and by PostgreSQL's (docker stats CPU% / 100). Server-bound rows show the server
+    # near its CPU limit while the database idles.
+    cpu_server_cores: float | None = None
+    cpu_db_cores: float | None = None
     # Median container-restart → first correct Q1 response (ms), measured once
     # per framework after its scenarios and stamped on every row.
     cold_start_ms: float | None = None
@@ -1625,6 +1697,45 @@ def _discover_user_uuids(fw_config: dict) -> list[str]:
     except (urllib.error.URLError, OSError, json.JSONDecodeError, KeyError, IndexError):
         pass
     return []
+
+
+# Comments with equal timestamps have no defined order, so only a post whose
+# comments are all distinct in created_at can give every engine the same rows.
+_BUSIEST_POST_SQL = (
+    "SELECT p.id FROM benchmark.tb_post p"
+    " JOIN benchmark.tb_comment c ON c.fk_post = p.pk_post"
+    " GROUP BY p.pk_post, p.id"
+    " HAVING count(*) = count(DISTINCT c.created_at)"
+    " ORDER BY count(*) DESC, p.id LIMIT 1;"
+)
+_busiest_post: list[str] = []
+
+
+def _busiest_post_uuid() -> str | None:
+    """The post with the most comments whose timestamps are all distinct (ties
+    broken by id), read once from the database so every engine's L2 asks for the
+    same post."""
+    if not _busiest_post:
+        result = _compose(
+            "exec", "-T", "postgres",
+            "psql", "-U", "benchmark", "-d", "velocitybench_benchmark",
+            "--tuples-only", "--no-align", "-c", _BUSIEST_POST_SQL,
+            check=False,
+        )
+        post_id = result.stdout.strip() if result.returncode == 0 else ""
+        if not post_id:
+            return None
+        _busiest_post.append(post_id)
+    return _busiest_post[0]
+
+
+def _resolve_l2(fw_config: dict, post_id: str | None) -> tuple[str, str] | None:
+    """L2's (url, document) for this engine, or None when it cannot be built."""
+    template = _L2_TEMPLATES.get(fw_config.get("l2_template", ""))
+    entry = fw_config["queries"].get("L1")
+    if not (post_id and template and isinstance(entry, tuple)):
+        return None
+    return entry[0], template.format(post_id=post_id)
 
 
 def _discover_post_uuid(fw_config: dict) -> tuple[str, str] | None:
@@ -2333,6 +2444,8 @@ def run_scenario(
             ok_cycles, errors, pct = _run_k6(steps, concurrency, duration_secs)
         result.rss_steady_mb = rss.median_mb
         result.rss_max_mb = rss.max_mb
+        result.cpu_server_cores = rss.cpu_server_cores
+        result.cpu_db_cores = rss.cpu_db_cores
         result.ext_requests = ok_cycles
         result.ext_p50_ms = pct["p50"]
         result.ext_p95_ms = pct["p95"]
@@ -2499,6 +2612,8 @@ def run_scenario(
         lats, errs, breakdown, samples = _run_workers(duration_secs)
     result.rss_steady_mb = rss.median_mb
     result.rss_max_mb = rss.max_mb
+    result.cpu_server_cores = rss.cpu_server_cores
+    result.cpu_db_cores = rss.cpu_db_cores
     result.latencies_ms = lats
     result.errors = errs
     result.error_breakdown = breakdown
@@ -3294,13 +3409,36 @@ class ResourceMonitor:
             self._cpu_samples.append(cpu_pct)
 
 
+DB_CONTAINER = "velocitybench-postgres-1"
+
+
+def _parse_window_stats(
+    stdout: str, sut_container: str, db_container: str
+) -> tuple[float | None, float | None, float | None]:
+    """Parse `docker stats` lines ("name<TAB>mem<TAB>cpu%") into
+    (SUT memory MiB, SUT CPU%, DB CPU%), None for a container with no line."""
+    mem = server = db = None
+    for line in stdout.strip().splitlines():
+        parts = line.split("\t")
+        if len(parts) < 3:
+            continue
+        name, cpu = parts[0].strip(), _parse_cpu_pct(parts[2])
+        if name == sut_container:
+            ram_mb = _parse_mem_mb(parts[1])
+            mem = ram_mb if ram_mb > 0 else None
+            server = cpu if cpu >= 0 else None
+        elif name == db_container:
+            db = cpu if cpu >= 0 else None
+    return mem, server, db
+
+
 class RssSampler:
-    """Samples container RSS strictly inside a scenario's measurement window.
+    """Samples container RSS and CPU strictly inside a scenario's measurement window.
 
     Context manager so sampling cannot start outside the window or outlive it.
-    One capture path for every framework (docker stats on the SUT container —
-    same cgroup source, same cadence). When the container is not locally
-    visible (e.g. remote SUT via --target-host, or a stopped service) the
+    One capture path for every framework (docker stats on the SUT container and on
+    PostgreSQL's — same cgroup source, same cadence). When a container is not
+    locally visible (e.g. remote SUT via --target-host, or a stopped service) its
     medians are None rather than zero: absent, not wrong.
 
     JVM caveat (documented for the report): JVM RSS reflects the heap ceiling
@@ -3314,6 +3452,8 @@ class RssSampler:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._samples_mb: list[float] = []
+        self._server_cpu: list[float] = []
+        self._db_cpu: list[float] = []
 
     def __enter__(self) -> "RssSampler":
         self._stop.clear()
@@ -3334,17 +3474,149 @@ class RssSampler:
     def max_mb(self) -> float | None:
         return round(max(self._samples_mb), 1) if self._samples_mb else None
 
+    @property
+    def cpu_server_cores(self) -> float | None:
+        return _median_cores(self._server_cpu)
+
+    @property
+    def cpu_db_cores(self) -> float | None:
+        return _median_cores(self._db_cpu)
+
+    def _record(self, mem: float | None, server: float | None, db: float | None) -> None:
+        if mem is not None:
+            self._samples_mb.append(mem)
+        if server is not None:
+            self._server_cpu.append(server)
+        if db is not None:
+            self._db_cpu.append(db)
+
     def _run(self) -> None:
         while not self._stop.is_set():
-            result = subprocess.run(
-                ["docker", "stats", "--no-stream", "--format", "{{.MemUsage}}", self._container],
-                capture_output=True, text=True, check=False,
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                ram_mb = _parse_mem_mb(result.stdout.strip().split("\n")[0])
-                if ram_mb > 0:
-                    self._samples_mb.append(ram_mb)
+            # One call per container: docker stats prints nothing at all when any
+            # container it is given is missing.
+            stdout = ""
+            for container in (self._container, DB_CONTAINER):
+                result = subprocess.run(
+                    ["docker", "stats", "--no-stream",
+                     "--format", "{{.Name}}\t{{.MemUsage}}\t{{.CPUPerc}}", container],
+                    capture_output=True, text=True, check=False,
+                )
+                if result.returncode == 0:
+                    stdout += result.stdout
+            self._record(*_parse_window_stats(stdout, self._container, DB_CONTAINER))
             self._stop.wait(self._interval)
+
+
+def _median_cores(cpu_pcts: list[float]) -> float | None:
+    """docker stats CPU% sums over cores: 197% is 1.97 cores."""
+    return round(statistics.median(cpu_pcts) / 100, 2) if cpu_pcts else None
+
+
+# ---------------------------------------------------------------------------
+# FraiseQL cache configuration
+# ---------------------------------------------------------------------------
+
+
+def fraiseql_cache_config(config_toml: str, compiled_schema: str) -> dict:
+    """What a FraiseQL server may cache, from its runtime config and compiled schema.
+
+    The server caches a query's results only when `cache_enabled` is set and the
+    query carries a `cache_ttl_seconds` (0 means no time-based expiry: the entry
+    lives until a mutation invalidates it). A query without one always bypasses
+    the cache, so an enabled cache with no TTL anywhere stores nothing.
+    """
+    enabled = bool(tomllib.loads(config_toml).get("cache_enabled", False))
+    cached = {
+        q["name"]: q["cache_ttl_seconds"]
+        for q in json.loads(compiled_schema).get("queries", [])
+        if q.get("cache_ttl_seconds") is not None
+    }
+    return {"cache_enabled": enabled, "cached_queries": cached}
+
+
+def describe_cache_config(cfg: dict) -> str:
+    if not cfg.get("cache_enabled"):
+        return "disabled"
+    cached = cfg.get("cached_queries") or {}
+    if not cached:
+        return "enabled, but no query has a cache_ttl_seconds: it caches nothing"
+    ttls = ", ".join(
+        f"{name} ({'until invalidated' if ttl == 0 else f'{ttl}s'})"
+        for name, ttl in sorted(cached.items())
+    )
+    return f"enabled for {ttls}"
+
+
+def probe_fraiseql_cache_config(service: str) -> dict | None:
+    """Read the running FraiseQL container's config and compiled schema, or None."""
+    container = f"velocitybench-{service}-1"
+    files = []
+    for command in ('cat "$FRAISEQL_CONFIG"', "cat schema.compiled.json"):
+        result = subprocess.run(
+            ["docker", "exec", container, "sh", "-c", command],
+            capture_output=True, text=True, check=False,
+        )
+        if result.returncode != 0:
+            return None
+        files.append(result.stdout)
+    try:
+        return fraiseql_cache_config(*files)
+    except (ValueError, tomllib.TOMLDecodeError):
+        return None
+
+
+def format_cache_section(framework_config: dict[str, dict]) -> list[str]:
+    if not framework_config:
+        return []
+    lines = [
+        "",
+        "---",
+        "",
+        "## FraiseQL Cache Configuration",
+        "",
+        "Read from each variant's running container (runtime config + compiled schema). "
+        "A variant caches only the queries listed here.",
+        "",
+        "| Variant | Result cache |",
+        "|---------|--------------|",
+    ]
+    lines += [
+        f"| {fw} | {describe_cache_config(cfg)} |"
+        for fw, cfg in sorted(framework_config.items())
+    ]
+    return lines
+
+
+def format_cpu_section(results: list["BenchResult"]) -> list[str]:
+    rows = [
+        r for r in results
+        if not r.skipped and (r.cpu_server_cores is not None or r.cpu_db_cores is not None)
+    ]
+    if not rows:
+        return []
+    lines = [
+        "",
+        "---",
+        "",
+        "## CPU per Process",
+        "",
+        "Median cores used inside each measurement window, by the framework's container "
+        "and by PostgreSQL's. A row whose server sits at its CPU limit while the database "
+        "has headroom is server-bound.",
+        "",
+        "| Framework | Query | RPS | Server cores | PostgreSQL cores |",
+        "|-----------|-------|----:|-------------:|-----------------:|",
+    ]
+
+    def _cores(v: float | None) -> str:
+        return "—" if v is None else f"{v:.2f}"
+
+    lines += [
+        f"| {r.framework} | {r.query_name} | {r.rps:.0f} "
+        f"| {_cores(r.cpu_server_cores)} | {_cores(r.cpu_db_cores)} |"
+        for r in rows
+    ]
+    return lines
 
 
 # ---------------------------------------------------------------------------
@@ -3396,6 +3668,8 @@ _QUERY_LABELS = {
     "Q1_APQ": "APQ hash-only Q1 — no query string sent, server resolves by SHA-256 hash. Compare to Q1.",
     "Q2b_APQ": "APQ hash-only Q2b — nested posts+author query via hash lookup. Compare to Q2b.",
     "M1_APQ": "APQ mutation — hash + variables only (FraiseQL) or hash-only (classical). Compare to M1.",
+    "L1": "Read-path lever — `posts(limit: 20, offset: 1000)` ordered by createdAt DESC, with author: a page of fat documents at an offset. Engines that take offset/order arguments only; not a cross-stack ranking.",
+    "L2": "Read-path lever — the 3 latest comments of one post (the one with the most comments, all with distinct timestamps), ordered by createdAt DESC: a filtered, sorted read. Engines that take a post filter and an order only; not a cross-stack ranking.",
 }
 
 
@@ -3569,6 +3843,7 @@ def format_report(
     db_footprint: list[DbTableSize] | None = None,
     environment: dict | None = None,
     framework_versions: dict[str, str] | None = None,
+    framework_config: dict[str, dict] | None = None,
 ) -> str:
     detailed = getattr(args, "detailed_errors", False)
     passes = getattr(args, "passes", 1)
@@ -3791,6 +4066,9 @@ def format_report(
             f"| {rps_col} | {a.representative.p50_ms:.1f} | {a.representative.p99_ms:.1f} |"
         )
 
+    lines += format_cpu_section(results)
+    lines += format_cache_section(framework_config or {})
+
     cost_section = format_cost_section(results)
     if cost_section:
         lines += ["", "---", "", cost_section]
@@ -3917,6 +4195,63 @@ def format_report(
 # ---------------------------------------------------------------------------
 
 
+def _result_row(r: BenchResult) -> dict:
+    """One results row of the run JSON."""
+    return {
+        "framework": r.framework,
+        "query": r.query_name,
+        "pass": r.pass_num,
+        "rps": round(r.rps, 1),
+        "p50_ms": round(r.p50_ms, 2),
+        "p95_ms": round(r.p95_ms, 2),
+        "p99_ms": round(r.p99_ms, 2),
+        "requests": r.requests_sent,
+        "errors": r.errors,
+        "error_breakdown": r.error_breakdown,
+        "rss_steady_mb": r.rss_steady_mb,
+        "rss_max_mb": r.rss_max_mb,
+        "cpu_server_cores": r.cpu_server_cores,
+        "cpu_db_cores": r.cpu_db_cores,
+        "cold_start_ms": r.cold_start_ms,
+        "skipped": r.skipped,
+        "skip_reason": r.skip_reason,
+    }
+
+
+def _result_from_row(row: dict, env: dict) -> BenchResult:
+    """Rebuild a BenchResult from one run-JSON row (inverse of _result_row)."""
+
+    def _row_duration() -> float:
+        # Pre-July JSONs lack the environment block; rps must survive the
+        # round trip, so derive the duration the recorded rps implies.
+        duration = env.get("duration_secs", 0)
+        if duration:
+            return duration
+        rps, requests = row.get("rps") or 0, row.get("requests") or 0
+        return requests / rps if rps else 0
+
+    return BenchResult(
+        framework=row["framework"],
+        query_name=row["query"],
+        duration_secs=_row_duration(),
+        concurrency=env.get("concurrency", 0),
+        pass_num=row.get("pass", 1),
+        errors=row.get("errors", 0),
+        error_breakdown=row.get("error_breakdown") or {},
+        skipped=row.get("skipped", False),
+        skip_reason=row.get("skip_reason") or "",
+        ext_requests=row.get("requests"),
+        ext_p50_ms=row.get("p50_ms"),
+        ext_p95_ms=row.get("p95_ms"),
+        ext_p99_ms=row.get("p99_ms"),
+        rss_steady_mb=row.get("rss_steady_mb"),
+        rss_max_mb=row.get("rss_max_mb"),
+        cpu_server_cores=row.get("cpu_server_cores"),
+        cpu_db_cores=row.get("cpu_db_cores"),
+        cold_start_ms=row.get("cold_start_ms"),
+    )
+
+
 def regenerate_report_from_json(json_path: Path) -> str:
     """Rebuild the full markdown report from a run JSON — zero hand-editing.
 
@@ -3936,36 +4271,7 @@ def regenerate_report_from_json(json_path: Path) -> str:
         detailed_errors=False,
     )
 
-    def _row_duration(row: dict) -> float:
-        # Pre-July JSONs lack the environment block; rps must survive the
-        # round trip, so derive the duration the recorded rps implies.
-        duration = env.get("duration_secs", 0)
-        if duration:
-            return duration
-        rps, requests = row.get("rps") or 0, row.get("requests") or 0
-        return requests / rps if rps else 0
-
-    results = [
-        BenchResult(
-            framework=row["framework"],
-            query_name=row["query"],
-            duration_secs=_row_duration(row),
-            concurrency=env.get("concurrency", 0),
-            pass_num=row.get("pass", 1),
-            errors=row.get("errors", 0),
-            error_breakdown=row.get("error_breakdown") or {},
-            skipped=row.get("skipped", False),
-            skip_reason=row.get("skip_reason") or "",
-            ext_requests=row.get("requests"),
-            ext_p50_ms=row.get("p50_ms"),
-            ext_p95_ms=row.get("p95_ms"),
-            ext_p99_ms=row.get("p99_ms"),
-            rss_steady_mb=row.get("rss_steady_mb"),
-            rss_max_mb=row.get("rss_max_mb"),
-            cold_start_ms=row.get("cold_start_ms"),
-        )
-        for row in doc.get("results", [])
-    ]
+    results = [_result_from_row(row, env) for row in doc.get("results", [])]
 
     resource_metrics = {
         m["framework"]: FrameworkResourceMetrics(
@@ -3998,6 +4304,7 @@ def regenerate_report_from_json(json_path: Path) -> str:
         db_footprint=db_footprint or None,
         environment=env,
         framework_versions=doc.get("framework_versions") or None,
+        framework_config=doc.get("framework_config") or None,
     )
 
 
@@ -4218,6 +4525,7 @@ def main() -> None:
     all_results: list[BenchResult] = []
     all_resource_metrics: dict[str, FrameworkResourceMetrics] = {}
     framework_versions: dict[str, str] = {}
+    framework_config: dict[str, dict] = {}
 
     # Collect database footprint once — before any framework runs so mutation workloads
     # don't inflate sizes.  Best-effort: returns [] if postgres is not yet up.
@@ -4342,6 +4650,11 @@ def main() -> None:
             )
             if fw_version:
                 framework_versions[fw_name] = fw_version
+
+        if fw_name.startswith("fraiseql") and fw_name not in framework_config:
+            cache_cfg = probe_fraiseql_cache_config(fw_config["compose_service"])
+            if cache_cfg is not None:
+                framework_config[fw_name] = cache_cfg
 
         if args.diagnose:
             run_diagnose(fw_name, fw_config)
@@ -4647,6 +4960,14 @@ def main() -> None:
                     else:
                         fw_config["queries"]["MC1"] = None
                         print("  MC1: could not discover user UUID — skipping", flush=True)
+
+        # Resolve the L2 lever sentinel: the same post (most comments) for every engine.
+        if fw_config["queries"].get("L2") == "L2":
+            fw_config["queries"]["L2"] = _resolve_l2(fw_config, _busiest_post_uuid())
+            if fw_config["queries"]["L2"]:
+                print(f"  L2: resolved busiest post {_busiest_post[0][:8]}...", flush=True)
+            else:
+                print("  L2: could not resolve the busiest post — skipping", flush=True)
 
         # Resolve T1 "total scenario" sentinel — needs a real post UUID + author UUID
         if fw_config["queries"].get("T1") == "T1":
@@ -4967,6 +5288,7 @@ def main() -> None:
         db_footprint=db_footprint if db_footprint else None,
         environment=run_environment,
         framework_versions=framework_versions or None,
+        framework_config=framework_config or None,
     )
 
     output_path = (
@@ -4981,29 +5303,11 @@ def main() -> None:
 
     # Also write JSON for programmatic use
     json_path = output_path.with_suffix(".json")
-    json_data = [
-        {
-            "framework": r.framework,
-            "query": r.query_name,
-            "pass": r.pass_num,
-            "rps": round(r.rps, 1),
-            "p50_ms": round(r.p50_ms, 2),
-            "p95_ms": round(r.p95_ms, 2),
-            "p99_ms": round(r.p99_ms, 2),
-            "requests": r.requests_sent,
-            "errors": r.errors,
-            "error_breakdown": r.error_breakdown,
-            "rss_steady_mb": r.rss_steady_mb,
-            "rss_max_mb": r.rss_max_mb,
-            "cold_start_ms": r.cold_start_ms,
-            "skipped": r.skipped,
-            "skip_reason": r.skip_reason,
-        }
-        for r in all_results
-    ]
+    json_data = [_result_row(r) for r in all_results]
     json_data_out: dict = {
         "environment": run_environment,
         "framework_versions": framework_versions,
+        "framework_config": framework_config,
         "results": json_data,
     }
     # For multi-pass runs, also emit per-(framework, query) aggregates

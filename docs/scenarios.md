@@ -135,6 +135,87 @@ T1 is a fixed-id lookup, so the parity gate also checks exact values
 (id/title/content) and that all engines return the same comment count for
 that post.
 
+## Read-path lever scenarios (L1, L2)
+
+Q1–Q3 read the first heap pages, unordered, at offset 0. Their rows are lean, and
+most stacks are server-bound on them, so they cannot show what offset paging over
+fat documents or an ordered, filtered read costs. L1 and L2 can. They run only on
+the engines that take offset and order arguments and answer them with the same
+rows in the same order: FraiseQL, Hasura, PostGraphile and async-graphql (see
+exclusion 8). They show where FraiseQL's read-path levers pay off; **they are
+never part of a cross-stack ranking.**
+
+Both state their order (`created_at DESC`). The parity gate checks the id
+sequence, not only count and shape, so an engine that returned other rows or
+the same rows in another order fails it.
+
+### L1 — a page of fat documents at an offset (20 rows)
+
+```graphql
+# FraiseQL
+{ posts(limit: 20, offset: 1000, orderBy: {createdAt: DESC})
+  { id title author { username fullName } } }
+
+# async-graphql (its posts resolver orders by created_at DESC)
+{ posts(limit: 20, offset: 1000) { id title author { username fullName } } }
+
+# Hasura
+{ posts(limit: 20, offset: 1000, order_by: {createdAt: desc})
+  { id title author { username fullName } } }
+
+# PostGraphile
+{ allTbPosts(first: 20, offset: 1000, orderBy: CREATED_AT_DESC)
+  { nodes { id: rowId title tbUserByFkAuthor { username fullName } } } }
+```
+
+FraiseQL sorts a `DateTime` field of the document as
+`(data->>'created_at')::timestamptz`. That cast is not IMMUTABLE, so no index
+can serve it, and every request sorts all of `tv_post`. The other engines sort
+`tb_post.created_at`, a native column. FraiseQL's answer is a native
+`timestamptz` column on the TVIEW (`fraiseql compile --database` advises it);
+velocitybench's `tv_post` does not have one yet.
+
+### L2 — an ordered, filtered read (3 rows)
+
+The 3 latest comments of one post. The post is the one with the most comments
+whose timestamps are all distinct (ties broken by id), read once from the
+database, so every engine asks for the same post and the order is total. The
+medium dataset gives each post 5 comments, so the limit truncates and the order
+decides which rows come back.
+
+```graphql
+# FraiseQL
+{ comments(postId: "<post-uuid>", limit: 3, orderBy: {createdAt: DESC})
+  { id content author { username } } }
+
+# async-graphql (commentsByPost orders by created_at DESC)
+{ comments: commentsByPost(postId: "<post-uuid>", limit: 3)
+  { id content author { username } } }
+
+# Hasura
+{ comments(where: {post: {id: {_eq: "<post-uuid>"}}},
+           order_by: {createdAt: desc}, limit: 3)
+  { id content author { username } } }
+
+# PostGraphile
+{ tbPostByRowId(rowId: "<post-uuid>") {
+    tbCommentsByFkPost(first: 3, orderBy: CREATED_AT_DESC)
+    { nodes { id: rowId content tbUserByFkAuthor { username } } } } }
+```
+
+## What every run records next to the numbers
+
+- **CPU per process.** Each row carries the median cores used inside its
+  measurement window by the framework's container and by PostgreSQL's
+  (`cpu_server_cores`, `cpu_db_cores`; report section "CPU per Process"). A
+  server near its CPU limit while PostgreSQL has headroom is server-bound.
+- **FraiseQL's cache configuration.** For each FraiseQL variant the run reads
+  the running container's config and compiled schema, and records whether the
+  result cache is on and which queries it may store (`framework_config`; report
+  section "FraiseQL Cache Configuration"). FraiseQL caches a query only when the
+  cache is enabled *and* the query carries a `cache_ttl_seconds` (0 means no
+  expiry, invalidation only), so an enabled cache with no TTL stores nothing.
+
 ## Mutation scenarios (excluded from the shape audit — workflow-defined)
 
 ### M1 — single-field update (rotating real writes)
@@ -195,20 +276,20 @@ this matrix documents it so no gap is ever implicit. ✅ = wired; a dash means
 **excluded by design** with the reason listed below. The APQ trio is
 Q1_APQ + Q2b_APQ + M1_APQ.
 
-| Framework | Q1 Q2 Q2b Q3 | C3 HC3 | F1 F2 F3 | M1 | M1d | T1 | MC1 | APQ trio |
-|-----------|:---:|:---:|:---:|:--:|:---:|:--:|:---:|:---:|
-| fraiseql-tv | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| fraiseql-tv-cache | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| fraiseql-v-nocache | ✅ | ✅ | ✅ | ✅ | — (1) | ✅ | ✅ | ✅ |
-| fraiseql-v-cache | ✅ | ✅ | ✅ | ✅ | — (1) | ✅ | ✅ | ✅ |
-| fraiseql-tv-audit | — (2) | — (2) | — (2) | ✅ | — (2) | — (2) | — (2) | — (2) |
-| hasura | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | — (4) |
-| postgraphile | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | — (5) |
-| actix-web-rest | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | — (6) |
-| async-graphql | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | ✅ |
-| mercurius | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | ✅ |
-| apollo-server | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | ✅ |
-| strawberry | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | — (7) |
+| Framework | Q1 Q2 Q2b Q3 | C3 HC3 | F1 F2 F3 | M1 | M1d | T1 | MC1 | APQ trio | L1 L2 |
+|-----------|:---:|:---:|:---:|:--:|:---:|:--:|:---:|:---:|:---:|
+| fraiseql-tv | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| fraiseql-tv-cache | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| fraiseql-v-nocache | ✅ | ✅ | ✅ | ✅ | — (1) | ✅ | ✅ | ✅ | ✅ |
+| fraiseql-v-cache | ✅ | ✅ | ✅ | ✅ | — (1) | ✅ | ✅ | ✅ | ✅ |
+| fraiseql-tv-audit | — (2) | — (2) | — (2) | ✅ | — (2) | — (2) | — (2) | — (2) | — (2) |
+| hasura | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | — (4) | ✅ |
+| postgraphile | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | — (5) | ✅ |
+| actix-web-rest | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | — (6) | — (8) |
+| async-graphql | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | ✅ | ✅ |
+| mercurius | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | ✅ | — (8) |
+| apollo-server | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | ✅ | — (8) |
+| strawberry | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | — (7) | — (8) |
 
 **Exclusion reasons (all by design):**
 
@@ -235,6 +316,13 @@ Q1_APQ + Q2b_APQ + M1_APQ.
    extension (verified against the installed `strawberry/extensions`
    inventory); third-party or hand-rolled implementations would not
    benchmark the framework.
+8. **Read-path levers on engines without offset/order arguments** — L1 and L2
+   need an offset on `posts`, and comments filtered by post in a stated order.
+   Only FraiseQL, Hasura, PostGraphile and async-graphql answer both with the
+   same rows in the same order (created_at DESC). Elsewhere it would take new
+   resolvers, and their default orders differ (created_at DESC, ASC, or primary
+   key), so the cell would measure custom code. L1/L2 show where FraiseQL's
+   read-path levers pay off; they are never part of a cross-stack ranking.
 
 APQ on async-graphql uses the built-in `ApolloPersistedQueries` extension
 (first-party, `apollo_persisted_queries` cargo feature); on mercurius the

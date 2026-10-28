@@ -24,11 +24,17 @@ import bench_sequential as bench
 
 REFERENCE = "fraiseql-tv"
 AUDITED = ("hasura", "postgraphile")
+# async-graphql answers the read-path lever scenarios too; it is audited on those.
+LEVER_AUDITED = ("async-graphql",)
 
 # Read scenarios under audit. Mutations (M1/MC1) are deliberately excluded:
 # their cross-engine definition is workflow-based (see _QUERY_LABELS["MC1"])
 # and their response shape is engine-native by design.
-SCENARIOS = ("Q1", "Q2", "Q2b", "Q3", "F1", "F2", "F3", "T1")
+SCENARIOS = ("Q1", "Q2", "Q2b", "Q3", "F1", "F2", "F3", "T1", "L1", "L2")
+
+# The read-path lever scenarios state their order (created_at DESC), so every engine
+# must return the same rows in the same order, not only the same count and shape.
+ORDERED = ("L1", "L2")
 
 EXPECTED_COUNTS = {
     "Q1": 20,
@@ -38,6 +44,8 @@ EXPECTED_COUNTS = {
     "F1": 10,
     "F2": 10,
     "F3": 20,
+    "L1": 20,
+    "L2": 3,
 }
 
 # Relation/collection fields renamed to the cross-framework shape before
@@ -102,12 +110,18 @@ def _shape(value):
 
 
 def _rows(data, aliases: dict):
-    """Unwrap the single-root entity list from a normalized response."""
+    """Unwrap the single-root entity list from a normalized response.
+
+    A root object holding exactly one list (PostGraphile's L2: a post and its
+    comment connection) unwraps to that list.
+    """
     norm = _normalize(data, aliases)
     values = list(norm.values())
     if len(values) != 1:
         raise ParityError(f"expected one root field, got {sorted(norm)}")
     rows = values[0]
+    if isinstance(rows, dict) and len(rows) == 1:
+        rows = next(iter(rows.values()))
     if not isinstance(rows, list):
         raise ParityError(f"root field is not a list: {type(rows).__name__}")
     return rows
@@ -148,6 +162,10 @@ def _resolve_t1_query(fw_name: str, fw_config: dict, post_id: str):
     return bench._GQL_T1_TMPL.format(post_id=post_id), None
 
 
+def _ids(rows: list) -> list:
+    return [r.get("id") for r in rows if isinstance(r, dict)]
+
+
 def _graphql_url(fw_config: dict) -> str:
     for key in ("Q1", "Q2", "Q2b"):
         entry = fw_config["queries"].get(key)
@@ -158,6 +176,8 @@ def _graphql_url(fw_config: dict) -> str:
 
 def _scenario_document(fw_config: dict, scenario: str):
     entry = fw_config["queries"].get(scenario)
+    if entry == "L2":
+        entry = bench._resolve_l2(fw_config, bench._busiest_post_uuid())
     if not isinstance(entry, tuple):
         raise ParityError(f"scenario {scenario} not wired as a static document")
     return entry[0], entry[1]
@@ -199,10 +219,14 @@ def run_audit(
         except (ParityError, urllib.error.URLError, OSError) as exc:
             return [f"{REFERENCE}/{scenario}: reference unavailable — {exc}"]
 
-    for fw_name in audited:
+    lever_only = [fw for fw in LEVER_AUDITED if fw not in audited]
+    for fw_name in [*audited, *lever_only]:
         fw_config = bench.FRAMEWORKS[fw_name]
         aliases = _ALIASES.get(fw_name, {})
-        for scenario in scenarios:
+        fw_scenarios = scenarios if fw_name in audited else [
+            s for s in scenarios if s in ORDERED
+        ]
+        for scenario in fw_scenarios:
             try:
                 if scenario == "T1":
                     query, variables = _resolve_t1_query(fw_name, fw_config, post_id)
@@ -242,6 +266,11 @@ def run_audit(
                         failures.append(
                             f"{fw_name}/{scenario}: field shape {_shape(got_rows)} != "
                             f"reference {_shape(ref_rows)}"
+                        )
+                    if scenario in ORDERED and _ids(got_rows) != _ids(ref_rows):
+                        failures.append(
+                            f"{fw_name}/{scenario}: rows or their order differ from the "
+                            f"reference (first ids {_ids(got_rows)[:3]} vs {_ids(ref_rows)[:3]})"
                         )
             except (ParityError, urllib.error.URLError, OSError) as exc:
                 failures.append(f"{fw_name}/{scenario}: {exc}")
