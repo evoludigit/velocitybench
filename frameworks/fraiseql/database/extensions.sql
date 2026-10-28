@@ -68,7 +68,9 @@ SELECT
     ) AS data,
     p.pk_post      AS _pk,
     p.fk_author    AS _author_pk,
-    p.published    AS _published
+    p.published    AS _published,
+    -- posts(authorId:) filters on this column.
+    u.id           AS author_id
 FROM benchmark.tb_post p
 LEFT JOIN benchmark.tb_user u ON u.pk_user = p.fk_author;
 
@@ -116,7 +118,9 @@ SELECT
     c.pk_comment   AS _pk,
     c.fk_author    AS _author_pk,
     c.fk_post      AS _post_pk,
-    p.id           AS post_id
+    p.id           AS post_id,
+    -- comments(authorId:) filters on this column.
+    u.id           AS author_id
 FROM benchmark.tb_comment c
 LEFT JOIN benchmark.tb_user u  ON u.pk_user   = c.fk_author
 LEFT JOIN benchmark.tb_post p  ON p.pk_post   = c.fk_post
