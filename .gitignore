@@ -40,6 +40,9 @@ yarn-error.log*
 .DS_Store
 dist/
 bin/
+# The vendored pgrx extensions keep their SQL-generation entry point in src/bin/;
+# without it `cargo pgrx install` cannot build them from a clean checkout.
+!database/*/src/bin/
 frameworks/go-graphql-go/server
 
 # C# / .NET
