@@ -156,10 +156,16 @@ SELECT
         '{comments}',
         COALESCE(
             (
-                SELECT jsonb_agg((c.data - 'post') ORDER BY (c.data->>'created_at') DESC)
-                FROM benchmark.tv_comment c
-                WHERE c.fk_post = p.pk_post
-                LIMIT 10
+                -- LIMIT before aggregating: on the aggregate it limits jsonb_agg's
+                -- single row, and every comment of the post is embedded.
+                SELECT jsonb_agg(latest.comment ORDER BY latest.created_at DESC)
+                FROM (
+                    SELECT c.data - 'post' AS comment, c.data->>'created_at' AS created_at
+                    FROM benchmark.tv_comment c
+                    WHERE c.fk_post = p.pk_post
+                    ORDER BY c.data->>'created_at' DESC
+                    LIMIT 10
+                ) latest
             ),
             '[]'::jsonb
         )
@@ -292,10 +298,16 @@ SELECT
         '{comments}',
         COALESCE(
             (
-                SELECT jsonb_agg((c.data - 'post') ORDER BY (c.data->>'created_at') DESC)
-                FROM benchmark.tvd_comment c
-                WHERE c.fk_post = p.pk_post
-                LIMIT 10
+                -- LIMIT before aggregating: on the aggregate it limits jsonb_agg's
+                -- single row, and every comment of the post is embedded.
+                SELECT jsonb_agg(latest.comment ORDER BY latest.created_at DESC)
+                FROM (
+                    SELECT c.data - 'post' AS comment, c.data->>'created_at' AS created_at
+                    FROM benchmark.tvd_comment c
+                    WHERE c.fk_post = p.pk_post
+                    ORDER BY c.data->>'created_at' DESC
+                    LIMIT 10
+                ) latest
             ),
             '[]'::jsonb
         )
