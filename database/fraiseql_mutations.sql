@@ -42,22 +42,26 @@ DECLARE
     v_data    JSONB;
     v_changed BOOLEAN;
 BEGIN
-    SELECT pk_user, id INTO v_pk, v_uuid
-    FROM benchmark.tb_user
-    WHERE id = p_id::UUID;
+    -- One statement for a write. pg_tviews refreshes nothing for an UPDATE that leaves
+    -- a TVIEW's source values unchanged, so the no-op guard lives in the WHERE clause,
+    -- not in a separate read.
+    UPDATE benchmark.tb_user
+    SET bio = p_bio, updated_at = NOW()
+    WHERE id = p_id::UUID AND bio IS DISTINCT FROM p_bio
+    RETURNING pk_user, id INTO v_pk, v_uuid;
 
-    IF v_pk IS NULL THEN
-        RETURN QUERY SELECT * FROM fraiseql.mutation_err('not_found', 'User not found');
-        RETURN;
-    END IF;
+    v_changed := FOUND;
 
-    v_changed := (SELECT bio FROM benchmark.tb_user WHERE pk_user = v_pk)
-                 IS DISTINCT FROM p_bio;
+    -- No row came back: the user is missing, or its bio already is p_bio.
+    IF NOT v_changed THEN
+        SELECT pk_user, id INTO v_pk, v_uuid
+        FROM benchmark.tb_user
+        WHERE id = p_id::UUID;
 
-    IF v_changed THEN
-        UPDATE benchmark.tb_user
-        SET bio = p_bio, updated_at = NOW()
-        WHERE pk_user = v_pk;
+        IF v_pk IS NULL THEN
+            RETURN QUERY SELECT * FROM fraiseql.mutation_err('not_found', 'User not found');
+            RETURN;
+        END IF;
     END IF;
 
     SELECT vu.data INTO v_data FROM benchmark.fv_user vu WHERE vu._pk = v_pk;
