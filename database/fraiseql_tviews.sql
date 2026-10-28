@@ -15,7 +15,7 @@
 SET search_path TO benchmark, public;
 
 -- tv_user
-SELECT pg_tviews_create('tv_user', $TVIEW_SQL$
+SELECT tviews.pg_tviews_create('tv_user', $TVIEW_SQL$
     SELECT
         u.pk_user     AS pk_user,
         u.id          AS id,
@@ -31,10 +31,10 @@ SELECT pg_tviews_create('tv_user', $TVIEW_SQL$
             'updated_at', u.updated_at
         )             AS data
     FROM benchmark.tb_user u
-$TVIEW_SQL$);
+$TVIEW_SQL$, COALESCE(NULLIF(current_setting('velocitybench.tview_options', true), ''), '{}')::jsonb);
 
 -- tv_post — author embedded via JOIN
-SELECT pg_tviews_create('tv_post', $TVIEW_SQL$
+SELECT tviews.pg_tviews_create('tv_post', $TVIEW_SQL$
     SELECT
         p.pk_post     AS pk_post,
         p.id          AS id,
@@ -63,14 +63,14 @@ SELECT pg_tviews_create('tv_post', $TVIEW_SQL$
         )             AS data
     FROM benchmark.tb_post p
     JOIN benchmark.tb_user u ON u.pk_user = p.fk_author
-$TVIEW_SQL$);
+$TVIEW_SQL$, COALESCE(NULLIF(current_setting('velocitybench.tview_options', true), ''), '{}')::jsonb);
 
 -- pg_tviews infers TEXT for generic expressions; cast _published to BOOLEAN so
 -- FraiseQL can filter directly with boolean params instead of JSONB extraction.
 ALTER TABLE benchmark.tv_post ALTER COLUMN _published TYPE boolean USING _published::boolean;
 
 -- tv_comment — author + post (with its author) embedded via JOINs
-SELECT pg_tviews_create('tv_comment', $TVIEW_SQL$
+SELECT tviews.pg_tviews_create('tv_comment', $TVIEW_SQL$
     SELECT
         c.pk_comment  AS pk_comment,
         c.id          AS id,
@@ -119,7 +119,7 @@ SELECT pg_tviews_create('tv_comment', $TVIEW_SQL$
     JOIN benchmark.tb_user u  ON u.pk_user  = c.fk_author
     JOIN benchmark.tb_post  p ON p.pk_post  = c.fk_post
     JOIN benchmark.tb_user pu ON pu.pk_user = p.fk_author
-$TVIEW_SQL$);
+$TVIEW_SQL$, COALESCE(NULLIF(current_setting('velocitybench.tview_options', true), ''), '{}')::jsonb);
 
 COMMENT ON TABLE benchmark.tv_user    IS 'Query side: TVIEW managed by pg_tviews — pre-computed user JSONB';
 COMMENT ON TABLE benchmark.tv_post    IS 'Query side: TVIEW managed by pg_tviews — pre-computed post JSONB with embedded author';

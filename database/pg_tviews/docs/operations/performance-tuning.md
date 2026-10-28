@@ -2,8 +2,6 @@
 
 Advanced performance optimization strategies for pg_tviews in production.
 
-**Version**: 0.1.0-beta.1 • **Last Updated**: December 11, 2025
-
 ## Overview
 
 This guide covers advanced performance tuning for pg_tviews. While pg_tviews provides excellent out-of-the-box performance, proper tuning can achieve even better results for high-throughput applications.
@@ -151,7 +149,7 @@ Optimize disk I/O for TVIEW workloads:
 
 ```sql
 -- Checkpoint tuning
-ALTER SYSTEM SET checkpoint_segments = 32;
+ALTER SYSTEM SET max_wal_size = '4GB';
 ALTER SYSTEM SET checkpoint_completion_target = 0.9;
 
 -- Autovacuum tuning for TVIEWs
@@ -167,17 +165,16 @@ ALTER SYSTEM SET wal_compression = on;
 
 ### Statement-Level Triggers
 
-Enable for maximum bulk performance:
+Bulk statements are handled by the statement-level trigger every TVIEW has:
 
 ```sql
--- Install statement-level triggers
-SELECT pg_tviews_install_stmt_triggers();
+-- Every TVIEW has a statement-level trigger: a bulk statement refreshes once
 
 -- Performance impact:
 -- - Single operations: Same performance (~1-2ms)
 -- - Bulk operations: 100-500× faster (10ms vs 5 seconds for 1000 rows)
 -- - Memory usage: Slightly higher
--- - Compatibility: PostgreSQL 13+
+-- - Compatibility: PostgreSQL 16–18
 ```
 
 ### Index Optimization
@@ -185,9 +182,8 @@ SELECT pg_tviews_install_stmt_triggers();
 Strategic indexing for TVIEW query patterns:
 
 ```sql
--- Primary lookup indexes
-CREATE UNIQUE INDEX CONCURRENTLY idx_tv_post_id ON tv_post(id);
-CREATE INDEX CONCURRENTLY idx_tv_post_user_id ON tv_post(user_id);
+-- Primary lookup indexes (id, UUID FKs such as user_id) come with the TVIEW:
+-- tviews.registry.managed_indexes lists them, and their names are pg_tviews'.
 
 -- JSONB field indexes for common queries
 CREATE INDEX CONCURRENTLY idx_tv_post_created_at ON tv_post USING gin((data->'created_at'));
@@ -353,25 +349,13 @@ class TviewCache {
 Pre-populate caches for frequently accessed data:
 
 ```sql
--- Cache warming query
-CREATE OR REPLACE FUNCTION warm_tview_cache()
-RETURNS void AS $$
-DECLARE
-    rec record;
-BEGIN
-    -- Warm up frequently accessed posts
-    FOR rec IN
-        SELECT id FROM tv_post
-        WHERE (data->>'view_count')::int > 1000
-        ORDER BY (data->>'last_viewed')::timestamptz DESC
-        LIMIT 1000
-    LOOP
-        -- Touch each record to warm caches
-        PERFORM pg_tviews_cascade('tv_post'::regclass::oid,
-                                (SELECT pk_post FROM tv_post WHERE id = rec.id));
-    END LOOP;
-END;
-$$ LANGUAGE plpgsql;
+-- Cache warming: read the hot rows once
+SELECT count(*) FROM (
+    SELECT data FROM tv_post
+    WHERE (data->>'view_count')::int > 1000
+    ORDER BY (data->>'last_viewed')::timestamptz DESC
+    LIMIT 1000
+) hot;
 ```
 
 ## Load Testing

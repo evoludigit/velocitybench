@@ -114,15 +114,17 @@ INSERT INTO benchmark.tb_comment (id, content, fk_post, fk_author) VALUES
 ('55555555-5555-5555-5555-555555555555', 'Well written and informative.', 3, 5);
 
 -- ============================================================================
--- QUERY SIDE SETUP: Create TVIEWs via pg_tviews_create()
--- Must run BEFORE extensions.sql — pg_tviews creates its own backing v_* views
--- which extensions.sql then replaces with our custom JSONB shape.
+-- QUERY SIDE SETUP: Create TVIEWs via tviews.pg_tviews_create()
+-- pg_tviews keeps each TVIEW's backing view in its own schema
+-- (tviews.benchmark__tv_<entity>); the benchmark schema holds only our objects.
+-- The options (persistence) come from velocitybench.tview_options, set by
+-- 01z-tview-persistence.sh.
 -- ============================================================================
 
 SET search_path TO benchmark, public;
 
 -- tv_user
-SELECT pg_tviews_create('tv_user', $TVIEW_SQL$
+SELECT tviews.pg_tviews_create('tv_user', $TVIEW_SQL$
     SELECT
         u.pk_user     AS pk_user,
         u.id          AS id,
@@ -138,11 +140,11 @@ SELECT pg_tviews_create('tv_user', $TVIEW_SQL$
             'updated_at', u.updated_at
         )             AS data
     FROM benchmark.tb_user u
-$TVIEW_SQL$);
+$TVIEW_SQL$, COALESCE(NULLIF(current_setting('velocitybench.tview_options', true), ''), '{}')::jsonb);
 ALTER TABLE benchmark.tv_user SET (fillfactor=70);
 
 -- tv_post — author embedded via JOIN
-SELECT pg_tviews_create('tv_post', $TVIEW_SQL$
+SELECT tviews.pg_tviews_create('tv_post', $TVIEW_SQL$
     SELECT
         p.pk_post     AS pk_post,
         p.id          AS id,
@@ -171,7 +173,7 @@ SELECT pg_tviews_create('tv_post', $TVIEW_SQL$
         )             AS data
     FROM benchmark.tb_post p
     JOIN benchmark.tb_user u ON u.pk_user = p.fk_author
-$TVIEW_SQL$);
+$TVIEW_SQL$, COALESCE(NULLIF(current_setting('velocitybench.tview_options', true), ''), '{}')::jsonb);
 
 -- pg_tviews infers TEXT for generic expressions; cast _published to BOOLEAN so
 -- FraiseQL can filter directly with boolean params instead of JSONB extraction.
@@ -179,7 +181,7 @@ ALTER TABLE benchmark.tv_post ALTER COLUMN _published TYPE boolean USING _publis
 ALTER TABLE benchmark.tv_post SET (fillfactor=70);
 
 -- tv_comment — author + post (with its author) embedded via JOINs
-SELECT pg_tviews_create('tv_comment', $TVIEW_SQL$
+SELECT tviews.pg_tviews_create('tv_comment', $TVIEW_SQL$
     SELECT
         c.pk_comment  AS pk_comment,
         c.id          AS id,
@@ -228,7 +230,7 @@ SELECT pg_tviews_create('tv_comment', $TVIEW_SQL$
     JOIN benchmark.tb_user u  ON u.pk_user  = c.fk_author
     JOIN benchmark.tb_post  p ON p.pk_post  = c.fk_post
     JOIN benchmark.tb_user pu ON pu.pk_user = p.fk_author
-$TVIEW_SQL$);
+$TVIEW_SQL$, COALESCE(NULLIF(current_setting('velocitybench.tview_options', true), ''), '{}')::jsonb);
 ALTER TABLE benchmark.tv_comment SET (fillfactor=70);
 
 -- ============================================================================

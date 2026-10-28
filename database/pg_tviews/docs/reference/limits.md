@@ -1,8 +1,5 @@
 # Resource Limits and Recommendations
 
-**Version**: 0.1.0-beta.1
-**Last Updated**: December 11, 2025
-
 ## Overview
 
 This document outlines tested resource limits, PostgreSQL configuration recommendations, and capacity planning guidelines for pg_tviews deployments.
@@ -24,8 +21,8 @@ Based on benchmark testing and production experience:
 
 ### Small Deployments (<100K rows per TVIEW)
 
-```sql
--- postgresql.conf
+```ini
+# postgresql.conf
 work_mem = 64MB
 shared_buffers = 256MB
 effective_cache_size = 1GB
@@ -34,7 +31,7 @@ maintenance_work_mem = 128MB
 
 ### Medium Deployments (100K-1M rows)
 
-```sql
+```ini
 work_mem = 128MB
 shared_buffers = 1GB
 effective_cache_size = 4GB
@@ -44,20 +41,20 @@ max_parallel_workers_per_gather = 4
 
 ### Large Deployments (>1M rows)
 
-```sql
+```ini
 work_mem = 256MB
 shared_buffers = 4GB
 effective_cache_size = 16GB
 maintenance_work_mem = 2GB
 max_parallel_workers_per_gather = 8
-random_page_cost = 1.1  -- For SSD storage
+random_page_cost = 1.1  # For SSD storage
 ```
 
 ## Capacity Planning
 
 ### Estimating TVIEW Size
 
-```sql
+```sql fragment
 -- Current size
 -- Trinity pattern: tv_your_entity has pk_your_entity (int), id (UUID), data (JSONB)
 SELECT pg_size_pretty(pg_relation_size('tv_your_entity'));
@@ -92,43 +89,20 @@ Example: 1000 rows ≈ 505ms
 - **More CPU**: Increase max_parallel_workers for concurrent operations
 - **Faster Storage**: Reduce random_page_cost for SSD deployments
 
-### Partitioning Strategy
+### Partitioning
 
-For TVIEWs >5M rows:
+A TVIEW's table is a plain table pg_tviews creates and maintains; it cannot be
+partitioned. Base tables can be: a write to a partition is mapped to the keys of
+the TVIEWs that read its partitioned table.
 
-```sql
--- Partition by date (for time-series data)
--- Note: Use singular names (tv_event, not tv_events)
-CREATE TABLE tv_event_y2025_m01 PARTITION OF tv_event
-FOR VALUES FROM ('2025-01-01') TO ('2025-02-01');
+## Performance
 
--- Partition by hash (for general data)
--- Note: Use singular names (tv_user, not tv_users)
-CREATE TABLE tv_user_0 PARTITION OF tv_user
-FOR VALUES WITH (MODULUS 10, REMAINDER 0);
-
-CREATE TABLE tv_user_1 PARTITION OF tv_user
-FOR VALUES WITH (MODULUS 10, REMAINDER 1);
-```
-
-## Performance Benchmarks
-
-### Single TVIEW Operations
-
-| Operation | 1K rows | 10K rows | 100K rows | 1M rows |
-|-----------|---------|----------|-----------|---------|
-| TVIEW Creation | <1s | <5s | <30s | <5min |
-| Single-row Update | <10ms | <10ms | <50ms | <100ms |
-| Batch Update (100) | <100ms | <500ms | <2s | <10s |
-| Full Scan | <100ms | <1s | <10s | <2min |
-
-### Cascade Performance
-
-| Cascade Depth | 1 Level | 3 Levels | 5 Levels |
-|---------------|---------|----------|----------|
-| 100 rows | <200ms | <500ms | <1s |
-| 1K rows | <2s | <5s | <10s |
-| 10K rows | <20s | <50s | <2min |
+Cost depends on the definition and the host: measure yours with
+`test/sql/real_benchmark` ([README](../../test/sql/real_benchmark/README.md)). On
+the reference host (PostgreSQL 18, product catalogue of 10K products and 50K
+reviews, 2026-10), a single-row write refreshing its TVIEW row takes about 1.7 ms
+with or without `jsonb_delta`, and an update of 100 rows about 36 ms. A cascade
+costs one row refresh per parent row reached.
 
 ## Memory Requirements
 
@@ -144,13 +118,9 @@ Cascade state: 1-5MB per active cascade
 ### Total Memory Calculation
 
 ```sql
--- Estimate total memory usage
-SELECT
-  (SELECT count(*) FROM pg_stat_activity WHERE state = 'active') * 5 as base_mb,
-  current_setting('work_mem')::int / 1024 as work_mem_mb,
-  (SELECT count(*) FROM pg_tview_meta) * 2 as cascade_overhead_mb
-FROM pg_settings
-WHERE name = 'work_mem';
+-- What one sort or hash may use, and the sessions running now
+SELECT current_setting('work_mem') AS work_mem,
+       (SELECT count(*) FROM pg_stat_activity WHERE state = 'active') AS active_sessions;
 ```
 
 ## Monitoring Thresholds
@@ -166,19 +136,9 @@ WHERE name = 'work_mem';
 ### Health Check Queries
 
 ```sql
--- Quick health assessment
-SELECT
-    CASE WHEN queue_size > 100 THEN 'WARNING' ELSE 'OK' END as queue_status,
-    CASE WHEN memory_usage > 0.8 THEN 'WARNING' ELSE 'OK' END as memory_status,
-    CASE WHEN error_count > 0 THEN 'ERROR' ELSE 'OK' END as error_status
-FROM (
-    SELECT
-        (SELECT queue_size FROM pg_tviews_queue_realtime LIMIT 1) as queue_size,
-        (SELECT sum(total_bytes) / (SELECT setting::bigint * 1024 * 1024
-                                   FROM pg_settings WHERE name = 'shared_buffers')
-         FROM pg_backend_memory_contexts) as memory_usage,
-        (SELECT count(*) FROM pg_log WHERE message LIKE '%ERROR%' AND log_time > now() - interval '1 hour') as error_count
-) checks;
+-- What pg_tviews' own checks found (extension, catalog, plans, triggers)
+CREATE EXTENSION IF NOT EXISTS pg_tviews;
+SELECT status, component, message FROM tviews.pg_tviews_health_check() WHERE status <> 'OK';
 ```
 
 ## Backup and Recovery
@@ -187,7 +147,7 @@ FROM (
 
 ```bash
 # Metadata-only backup (fast, small)
-pg_dump -t pg_tview_meta -t pg_tview_helpers > tview_metadata.sql
+pg_dump -t tviews.pg_tview_meta -t tviews.pg_tview_helpers > tview_metadata.sql
 
 # Full database backup
 pg_dump dbname > full_backup.sql
@@ -222,16 +182,12 @@ LIMIT 10;
 ### Memory Issues
 
 ```sql
--- Check memory usage by connection
-SELECT
-    pg_stat_activity.pid,
-    pg_stat_activity.usename,
-    pg_stat_activity.client_addr,
-    pg_size_pretty(pg_backend_memory_contexts.total_bytes) as memory_used,
-    pg_backend_memory_contexts.name as context_name
-FROM pg_stat_activity
-JOIN LATERAL pg_backend_memory_contexts ON true
-ORDER BY pg_backend_memory_contexts.total_bytes DESC;
+-- The largest memory contexts of this session (another session's:
+-- SELECT pg_log_backend_memory_contexts(<pid>), written to the server log)
+SELECT name, pg_size_pretty(total_bytes) AS memory_used
+FROM pg_backend_memory_contexts
+ORDER BY total_bytes DESC
+LIMIT 10;
 ```
 
 ### Disk I/O Issues
@@ -240,7 +196,7 @@ ORDER BY pg_backend_memory_contexts.total_bytes DESC;
 -- Monitor I/O statistics
 SELECT
     schemaname,
-    tablename,
+    relname,
     seq_scan,
     seq_tup_read,
     idx_scan,

@@ -18,6 +18,10 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source ~/.cargo/env
 ```
 
+The toolchain is pinned in `rust-toolchain.toml` (rustup installs it on first
+`cargo` call). Local runs and CI use the same compiler; bump the pin in a
+dedicated PR.
+
 ### 2. Install PostgreSQL
 
 **Ubuntu/Debian:**
@@ -56,7 +60,7 @@ cargo pgrx init --pg17 /usr/lib/postgresql/17/bin/pg_config
 
 ```bash
 # Clone and build jsonb_delta
-git clone https://github.com/fraiseql/jsonb_delta.git
+git clone https://github.com/evoludigit/jsonb_delta.git
 cd jsonb_delta
 make && sudo make install
 ```
@@ -139,107 +143,16 @@ cargo pgrx install --release
 # Run all tests for PostgreSQL 17
 cargo pgrx test pg17
 
-# Run tests for multiple versions
-cargo pgrx test pg15
+# Run tests for every supported version (16, 17, 18)
 cargo pgrx test pg16
 cargo pgrx test pg17
+cargo pgrx test pg18
 ```
 
 ## Testing
 
-### Test Types
-
-1. **Rust Unit Tests**: Test individual functions without PostgreSQL
-2. **pgrx Integration Tests**: Test with PostgreSQL using `#[pg_test]`
-3. **SQL Integration Tests**: Test complete workflows with SQL files
-
-### Running Tests
-
-```bash
-# Run only Rust unit tests (no PostgreSQL required)
-cargo test --lib
-
-# Run pgrx integration tests (requires PostgreSQL)
-cargo pgrx test pg17
-
-# Run specific test
-cargo pgrx test pg17 -- --test test_metadata_tables_creation
-
-# Run SQL integration tests manually
-psql -d test_db -f test/sql/00_extension_loading.sql
-```
-
-### Writing Tests
-
-#### Rust Unit Tests
-
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_my_function() {
-        assert_eq!(my_function(2), 4);
-    }
-}
-```
-
-#### pgrx Integration Tests
-
-```rust
-#[cfg(any(test, feature = "pg_test"))]
-#[pg_schema]
-mod tests {
-    use pgrx::prelude::*;
-
-    #[pg_test]
-    fn test_with_postgres() {
-        let result = Spi::get_one::<i32>("SELECT 1 + 1");
-        assert_eq!(result, Ok(Some(2)));
-    }
-}
-```
-
-#### SQL Integration Tests
-
-Create files in `test/sql/` with SQL commands and expected output.
-
-#### Test Feature Configuration
-
-**Important**: All `#[pg_test]` functions must be conditional on the `pg_test` feature:
-
-```rust
-#[cfg(any(test, feature = "pg_test"))]
-#[pg_test]
-fn test_my_function() {
-    // Test code here
-}
-```
-
-This allows the code to compile with `--no-default-features` for CI/CD pipelines that don't need PostgreSQL integration tests.
-
-```bash
-# Compile without PostgreSQL integration tests
-cargo check --no-default-features --features pg17
-
-# Run with full test suite
-cargo pgrx test pg17
-```
-
-### Test Database Setup
-
-```bash
-# Create test database
-createdb pg_tviews_test
-
-# Enable required extensions
-psql -d pg_tviews_test -c "CREATE EXTENSION jsonb_delta;"
-
-# Install pg_tviews
-cargo pgrx install --release
-psql -d pg_tviews_test -c "CREATE EXTENSION pg_tviews;"
-```
+[docs/development/testing.md](development/testing.md) describes the suites, how
+to run them and how to write a test.
 
 ## Debugging
 
@@ -285,17 +198,22 @@ info!("Query result: {:?}", result);
 
 ```
 src/
-├── lib.rs              # Extension entry point and exports
-├── error/              # Error types and testing utilities
-├── metadata.rs         # Metadata table management
-├── catalog.rs          # PostgreSQL catalog queries
-├── trigger.rs          # Trigger installation logic
-├── refresh.rs          # Incremental refresh implementation
-├── propagate.rs        # Cascade propagation logic
-└── utils.rs            # Shared utility functions
+├── lib.rs              # Extension entry point
+├── install_sql.rs      # Install SQL: catalog tables, views, triggers
+├── catalog/            # pg_tview_meta rows and their propagation plan (plan.rs)
+├── lineage/            # Analysis of a backing view's query tree (walk/ reads the nodes)
+├── ddl/                # pg_tviews_create / create_or_replace / drop / rename
+├── trigger.rs, delta.rs  # Row and statement triggers: writes to TVIEW keys
+├── queue/              # The transaction's pending refresh work
+├── flush/              # Applies it: dependency order, patches, propagation
+├── refresh/            # Row and bulk refreshes, direct and fan-out patches
+├── hooks/              # ProcessUtility hook: tv_* DDL, COMMIT flush, follow-ups
+├── cache/              # Per-backend caches and their invalidation
+└── utils/              # SPI helpers and shared utilities
 
 test/
-└── sql/                # SQL integration tests
+├── sql/                # Regression and integration suites
+└── upgrade/            # Upgrade-path check
 
 .github/
 └── workflows/          # CI/CD configuration

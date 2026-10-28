@@ -93,6 +93,46 @@ CREATE TABLE tb_post (
 
 ---
 
+### Large documents with small, frequently changing fields
+
+A refresh writes a whole new `data` value. Once a document is stored out of line (TOAST,
+above about 2 KB after compression), changing one small field writes the whole document
+again: new TOAST chunks, their index entries and, on a LOGGED TVIEW, their WAL. The cost
+grows with the document, not with the change. PostgreSQL has no partial update of a
+TOASTed `jsonb`, so no pg_tviews setting avoids it (measurements and reasoning:
+[ADR 0094](../adr/0094-large-document-refresh.md)).
+
+- **Split large, rarely changing sub-documents out of the hot TVIEW.** Give a post's
+  `content` or a product's `description` its own TVIEW on the same primary key and compose
+  the two at read time. The frequently refreshed `data` then stays small and inline, and the
+  large value is only rewritten when it actually changes.
+- **Most JSON is not affected.** Realistic, compressible documents usually compress below
+  the TOAST threshold. The cost shows up with incompressible content (embedded base64,
+  hashes, already-compressed data).
+- **Storage knobs rarely help.** `ALTER TABLE tv_x ALTER COLUMN data SET STORAGE MAIN`
+  keeps a 2–8 KB value inline and cuts WAL by about a third on a LOGGED TVIEW, at the cost of
+  a larger heap. Beyond one page it changes nothing.
+- **UNLOGGED TVIEWs** (`logged: false`; TVIEWs are LOGGED by default) write no WAL for
+  the rewrite, but see [replication](replication.md) before relying on them.
+
+### Bulk changes: rebuild instead of refreshing row by row
+
+Refresh cost grows with the number of changed rows (about 0.02–0.035 ms each), while a
+full rebuild of a TVIEW costs a fixed amount (about 1 s per 200 000 rows of ~1 KB). Past
+roughly 15% of a TVIEW's rows, rebuilding once is faster
+([ADR 0077](../adr/0077-refresh-strategy-selection.md)):
+
+```sql
+BEGIN;
+SELECT pg_tviews_suspend_triggers();   -- this transaction only
+UPDATE tb_post SET … ;                 -- the bulk change, recorded, not refreshed
+SELECT pg_tviews_resume_triggers();    -- rebuilds every affected TVIEW once
+COMMIT;
+```
+
+The rebuild uses `TRUNCATE`, which blocks readers of that TVIEW until the transaction
+commits, so keep it for maintenance windows, migrations and backfills.
+
 ## Index Strategy
 
 ### ✅ DO: Index All Foreign Keys
@@ -110,23 +150,25 @@ CREATE INDEX idx_tv_notification_fk_user ON tv_notification(fk_user);
 
 ### ✅ DO: Index UUID Columns for API Queries
 
-```sql
--- Trinity pattern: id is UUID, pk_* is integer
-CREATE INDEX idx_tv_post_id ON tv_post(id);
-CREATE INDEX idx_tv_user_id ON tv_user(id);
-```
+pg_tviews creates `idx_<tv>_id` on `id`, and one on each UUID FK column, with every
+TVIEW: nothing to do.
 
 **Impact**: 50-500× faster GraphQL/API lookups
 
-**When**: Always for API-exposed entities
+### ✅ DO: Use GIN Indexes for JSONB Queries (only where queries use them)
 
-### ✅ DO: Use GIN Indexes for JSONB Queries
+> Any index on `data` costs HOT on every refresh of that TVIEW, which is why new
+> TVIEWs get none by default (option `data_gin_index`). Check `idx_scan` before
+> keeping one. See [HOT Updates and TVIEW Storage](hot-updates.md).
 
 ```sql
--- For containment queries (@>, ?, ?&, ?|)
-CREATE INDEX idx_tv_post_data_gin ON tv_post USING GIN(data);
+-- For containment queries (@>, ?, ?&, ?|): pg_tviews' own GIN, through the option
+-- (the options passed are the whole declaration: start from the current ones)
+SELECT tviews.pg_tviews_create_or_replace(format('%I.%I', schema, name), query,
+    options || '{"data_gin_index": true}')
+FROM tviews.registry WHERE entity = 'post';
 
--- For specific path queries (more selective)
+-- For specific path queries (more selective): your own, under a name of yours
 CREATE INDEX idx_tv_post_status ON tv_post USING GIN((data -> 'status'));
 ```
 
@@ -137,16 +179,11 @@ CREATE INDEX idx_tv_post_status ON tv_post USING GIN((data -> 'status'));
 ### ❌ DON'T: Over-Index Small Tables
 
 ```sql
--- ❌ BAD: 5 indexes on 1000-row table
-CREATE INDEX idx_tv_tag_fk_category ON tv_tag(fk_category);
-CREATE INDEX idx_tv_tag_id ON tv_tag(id);
-CREATE INDEX idx_tv_tag_data_gin ON tv_tag USING GIN(data);
-CREATE INDEX idx_tv_tag_name ON tv_tag((data->>'name'));
-CREATE INDEX idx_tv_tag_created ON tv_tag((data->>'created_at'));
+-- ❌ BAD: path indexes on a 1000-row table, over the ones pg_tviews creates
+CREATE INDEX tv_tag_name ON tv_tag((data->>'name'));
+CREATE INDEX tv_tag_created ON tv_tag((data->>'created_at'));
 
--- ✅ GOOD: Minimal indexes for small table
-CREATE INDEX idx_tv_tag_fk_category ON tv_tag(fk_category);  -- For cascades
-CREATE INDEX idx_tv_tag_id ON tv_tag(id);  -- For API lookups
+-- ✅ GOOD: only the indexes pg_tviews creates (fk_* propagation, id)
 -- That's it! Table scan is fast for 1000 rows
 ```
 
@@ -239,24 +276,25 @@ UPDATE tb_post SET title = tb_post.title || ' [updated]';  -- Huge cascade!
 
 **Target**: 1000-10000 rows per batch
 
-### ✅ DO: Disable Triggers for Bulk Loading
+### ✅ DO: Suspend Refreshes for Bulk Loading
 
 ```sql
 -- For initial data load only
 BEGIN;
 
-ALTER TABLE tb_post DISABLE TRIGGER ALL;
+SELECT tviews.pg_tviews_suspend_triggers();   -- until the end of this transaction
 
 COPY tb_post FROM '/data/posts.csv' CSV;
 
-ALTER TABLE tb_post ENABLE TRIGGER ALL;
-
--- Rebuild TVIEWs after load
-TRUNCATE tv_post;
-INSERT INTO tv_post SELECT * FROM v_post;
+-- Resuming rebuilds the TVIEWs the load changed, and those that embed them, once
+SELECT tviews.pg_tviews_resume_triggers();
 
 COMMIT;
 ```
+
+Don't `DISABLE TRIGGER` pg_tviews' triggers by hand: the TVIEWs then go stale
+without a trace, and a hand-written `INSERT … SELECT *` into a TVIEW depends on its
+column order.
 
 **Impact**: 5-10× faster bulk loading
 
@@ -345,12 +383,12 @@ ANALYZE tv_post;
 -- For all TVIEWs
 DO $$
 DECLARE
-    tview_name TEXT;
+    tv_table TEXT;
 BEGIN
-    FOR tview_name IN
+    FOR tv_table IN
         SELECT 'tv_' || entity FROM pg_tview_meta
     LOOP
-        EXECUTE 'ANALYZE ' || tview_name;
+        EXECUTE 'ANALYZE ' || tv_table;
     END LOOP;
 END $$;
 ```
@@ -571,5 +609,5 @@ random_page_cost = 1.1  # For SSD
 - [Index Optimization](index-optimization.md) - Detailed indexing strategies
 - [Performance Analysis](performance-analysis.md) - Tools and diagnostics
 - [Resource Limits](../reference/limits.md) - Capacity planning
-- [Monitoring](../../MONITORING.md) - Production monitoring setup
+- [Monitoring](monitoring.md) - Production monitoring setup
 - [Troubleshooting](troubleshooting.md) - Debug performance issues

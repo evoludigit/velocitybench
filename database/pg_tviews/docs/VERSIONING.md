@@ -83,20 +83,20 @@ Version format: `MAJOR.MINOR.PATCH[-PRERELEASE]`
 
 **Step 1**: Announce deprecation (current version)
 ```
-Release Notes: "pg_tviews_legacy_func() deprecated, use pg_tviews_new_func() instead"
+Release Notes: "pg_tviews_<old>() deprecated, use pg_tviews_<new>() instead"
 ```
 
 **Step 2**: Add deprecation warnings (next version)
 ```sql
 -- v1.1.0
-SELECT pg_tviews_legacy_func();
--- WARNING: pg_tviews_legacy_func() is deprecated
+SELECT pg_tviews_<old>();
+-- WARNING: pg_tviews_<old>() is deprecated
 -- See: docs/migration/v1.1-upgrade-guide.md
 ```
 
 **Step 3**: Remove in next major version (major version only)
 ```
-v2.0.0: pg_tviews_legacy_func() removed
+v2.0.0: pg_tviews_<old>() removed
 ```
 
 ### Timeline Requirement
@@ -107,7 +107,7 @@ v2.0.0: pg_tviews_legacy_func() removed
 
 **Example**:
 ```
-v0.2.0 (Aug 2025): Deprecate pg_tviews_legacy_func()
+v0.2.0 (Aug 2025): Deprecate pg_tviews_<old>()
 v0.3.0 (Oct 2025): Add deprecation warning
 v1.0.0 (Apr 2026): Safe to remove (6+ months)
 ```
@@ -137,22 +137,18 @@ v1.0.6 (security patch, same day if possible)
 | 1.5.x | Future | TBD |
 | 1.4.x | Future | 1 year after 1.5 release |
 | 1.3.x | Future | 1 year after 1.4 release |
-| 1.0.x | Apr 2026 | 2 years (Apr 2028) |
+| 1.0.x | Future | 2 years after its release |
 | 0.9.x | TBD | 6 months after 1.0 release |
 | 0.1.x | Current | 6 months after 1.0 release |
 
 ## PostgreSQL Version Support by pg_tviews Version
 
-| pg_tviews | pg13 | pg14 | pg15 | pg16 | pg17 | pg18 |
-|-----------|------|------|------|------|------|------|
-| 0.1.x | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 1.0.x | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 1.5.x | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 2.0.x | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ |
+| pg_tviews | pg13–pg15 | pg16 | pg17 | pg18 |
+|-----------|-----------|------|------|------|
+| 0.1.x | ❌ | ✅ | ✅ | ✅ |
 
-- **✅**: Fully supported and tested
-- **⚠️**: May work but not tested
-- **❌**: Not supported, upgrade required
+- **✅**: Supported, built and tested in CI (clippy, regression and integration suites)
+- **❌**: Not supported: `CREATE EXTENSION pg_tviews` refuses to install
 
 ## Version Checking in Code
 
@@ -160,10 +156,10 @@ v1.0.6 (security patch, same day if possible)
 ```sql
 -- Check version
 SELECT pg_tviews_version();
--- Result: "0.1.0-beta.1"
+-- Result: "0.1.0-beta.21"
 
--- Programmatic check
-SELECT current_setting('pg_tviews.version')::semver >= '0.2.0'::semver;
+-- Programmatic check (major.minor.patch, pre-release suffix ignored)
+SELECT string_to_array(split_part(pg_tviews_version(), '-', 1), '.')::int[] >= ARRAY[0, 2, 0];
 ```
 
 ### Rust

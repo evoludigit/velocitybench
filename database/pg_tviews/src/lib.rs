@@ -23,191 +23,82 @@ between base tables and derived views through trigger-based change tracking.
 
 ## Safety
 
-- No panics in FFI callbacks (all wrapped in `catch_unwind`)
-- Transaction rollback on refresh failures
-- Memory safety through Rust's ownership system
+- Every callback `PostgreSQL` calls carries `#[pg_guard]`; previous hooks are
+  called across `pg_guard_ffi_boundary` (`scripts/check-ffi-guards.sh` checks it).
+- A refresh that fails fails the write; refresh work still queued fails the commit.
+- `unsafe` is confined to FFI with `PostgreSQL`, each block with its `SAFETY:` reason.
 */
 
 use pgrx::prelude::*;
 
 // Core modules
+mod api;
 mod audit;
-mod cascade_path;
+mod cache;
 mod catalog;
-mod event_trigger;
+mod concurrency;
+mod delta;
+mod executor;
+mod flush;
 mod hooks;
+mod internal_ddl;
+mod lineage;
 mod metrics;
+mod owner;
 mod propagate;
+mod publish;
 mod queue;
+mod rebuild_worker;
 mod refresh;
-mod sql_parser;
+mod replication;
+mod report;
+mod revision;
+mod stats;
 mod trigger;
 mod utils;
 
 // Feature modules
 mod admin;
-mod cascade;
 mod health;
 mod lifecycle;
+mod suspend;
 
-// Public API modules
-pub mod config;
-pub mod ddl;
-pub mod dependency;
-pub mod error;
-pub mod metadata;
-pub mod parser;
-pub mod schema;
-pub mod validation;
+mod config;
+mod ddl;
+mod dependency;
+mod error;
+mod install_sql;
+mod jsonb_delta;
+mod validation;
 
-// Public re-exports
-pub use catalog::entity_for_table;
-pub use error::{TViewError, TViewResult};
-pub use lifecycle::check_jsonb_delta_available;
-pub use queue::RefreshKey;
+use error::{TViewError, TViewResult};
 
 pg_module_magic!();
 
-#[cfg(any(test, feature = "pg_test"))]
-pub mod pg_test {
-    pub fn setup(_options: Vec<&str>) {}
+/// Initialize the extension
+/// Installs the `ProcessUtility` hook to intercept CREATE TABLE `tv_*` commands
+///
+/// Safety: Only installs hooks when running in a proper `PostgreSQL` backend,
+/// not during initdb or other bootstrap contexts.
+#[pg_guard]
+pub extern "C-unwind" fn _PG_init() {
+    crate::config::register_gucs();
+    crate::stats::init();
+    crate::cache::register_relcache_callback();
+    crate::rebuild_worker::register();
 
-    #[must_use]
-    #[allow(clippy::missing_const_for_fn)] // Vec allocation is not const-stable
-    pub fn postgresql_conf_options() -> Vec<&'static str> {
-        vec![]
-    }
-}
-
-#[cfg(any(test, feature = "pg_test"))]
-#[pg_schema]
-mod tests {
-    use crate::error::TViewError;
-    use pgrx::prelude::*;
-
-    #[pg_test]
-    fn sanity_check() {
-        let two: i32 = 2;
-        assert_eq!(two, 1 + 1);
+    // SAFETY: _PG_init runs in PostgreSQL backend context. Installing hooks and
+    // registering callbacks is valid in this context.
+    unsafe {
+        crate::hooks::ensure_hook_installed();
     }
 
-    #[pg_test]
-    fn test_version_function() {
-        let version = Spi::get_one::<String>("SELECT pg_tviews_version()")
-            .unwrap()
-            .unwrap();
-        assert!(version.starts_with("0.1.0"));
-    }
-
-    #[pg_test]
-    fn test_version_callable_from_sql() {
-        let result = crate::utils::spi_get_string("SELECT pg_tviews_version()");
-        assert!(result.is_ok());
-        let version = result.unwrap();
-        assert!(version.is_some());
-        assert!(version.unwrap().starts_with("0.1.0"));
-    }
-
-    #[pg_test]
-    #[should_panic(expected = "TVIEW metadata not found")]
-    fn test_error_propagates_to_postgres() {
-        panic!(
-            "{:?}",
-            TViewError::MetadataNotFound {
-                entity: "test".to_string(),
-            }
-        );
-    }
-
-    #[pg_test]
-    fn test_jsonb_delta_check_function_exists() {
-        let result = Spi::get_one::<bool>("SELECT pg_tviews_check_jsonb_delta()");
-        assert!(
-            result.is_ok(),
-            "pg_tviews_check_jsonb_delta() function should exist"
-        );
-    }
-
-    #[pg_test]
-    fn test_check_jsonb_delta_available_function() {
-        let _result = crate::check_jsonb_delta_available();
-    }
-
-    #[pg_test]
-    fn test_pg_tviews_works_without_jsonb_delta() {
-        Spi::run("DROP EXTENSION IF EXISTS jsonb_delta CASCADE").ok();
-
-        Spi::run("CREATE TABLE tb_demo (pk_demo INT PRIMARY KEY, name TEXT)").unwrap();
-        Spi::run("INSERT INTO tb_demo VALUES (1, 'Demo')").unwrap();
-
-        let result = Spi::get_one::<bool>(
-            "SELECT pg_tviews_create('demo', 'SELECT pk_demo, jsonb_build_object(''name'', name) AS data FROM tb_demo') IS NOT NULL",
-        );
-
-        assert!(
-            result.unwrap().unwrap_or(false),
-            "pg_tviews should work without jsonb_delta"
-        );
-    }
-
-    #[pg_test]
-    fn test_pg_tviews_refresh_no_column_mismatch() {
-        Spi::run("CREATE TABLE tb_note (pk_note BIGSERIAL PRIMARY KEY, body TEXT)").unwrap();
-        Spi::run("INSERT INTO tb_note VALUES (1, 'hello'), (2, 'world')").unwrap();
-
-        Spi::run(
-            "SELECT pg_tviews_create('note', $$
-            SELECT pk_note, jsonb_build_object('body', body) AS data
-            FROM tb_note
-        $$)",
-        )
-        .unwrap();
-
-        let result = Spi::run("SELECT pg_tviews_refresh('note')");
-        assert!(
-            result.is_ok(),
-            "pg_tviews_refresh failed: {:?}",
-            result.err()
-        );
-
-        let count = Spi::get_one::<i64>("SELECT COUNT(*) FROM tv_note")
-            .unwrap()
-            .unwrap_or(0);
-        assert_eq!(count, 2, "all rows should survive the full refresh");
-    }
-
-    #[pg_test]
-    fn test_pg_tviews_refresh_repopulates_data() {
-        Spi::run("CREATE TABLE tb_tag (pk_tag BIGSERIAL PRIMARY KEY, name TEXT)").unwrap();
-        Spi::run("INSERT INTO tb_tag VALUES (1, 'rust')").unwrap();
-
-        Spi::run(
-            "SELECT pg_tviews_create('tag', $$
-            SELECT pk_tag, jsonb_build_object('name', name) AS data
-            FROM tb_tag
-        $$)",
-        )
-        .unwrap();
-
-        Spi::run("UPDATE tv_tag SET data = '{}'::jsonb WHERE pk_tag = 1").unwrap();
-
-        let stale = Spi::get_one::<pgrx::JsonB>("SELECT data FROM tv_tag WHERE pk_tag = 1")
-            .unwrap()
-            .unwrap();
-        assert_eq!(
-            stale.0,
-            serde_json::json!({}),
-            "data should be corrupted before refresh"
-        );
-
-        Spi::run("SELECT pg_tviews_refresh('tag')").unwrap();
-
-        let restored = Spi::get_one::<pgrx::JsonB>("SELECT data FROM tv_tag WHERE pk_tag = 1")
-            .unwrap()
-            .unwrap();
-        assert_eq!(
-            restored.0["name"], "rust",
-            "refresh should restore data from the backing view"
-        );
+    // Register transaction callbacks once at startup.
+    // PostgreSQL's RegisterXactCallback appends to a persistent linked list,
+    // so registering per-transaction would accumulate N copies after N transactions.
+    // SAFETY: Transaction callbacks are registered in backend initialization context.
+    unsafe {
+        crate::flush::register_xact_callback();
+        crate::flush::register_subxact_callback();
     }
 }

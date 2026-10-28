@@ -1,6 +1,6 @@
 [package]
 name = "pg_tviews"
-version = "0.1.0-beta.11"
+version = "0.1.0-beta.34"
 edition = "2024"
 authors = ["Lionel Hamayon <lionel.hamayon@evolution-digitale.fr>"]
 description = "Transactional materialized views with incremental refresh for PostgreSQL"
@@ -8,8 +8,10 @@ license = "MIT"
 repository = "https://github.com/fraiseql/pg_tviews"
 homepage = "https://github.com/fraiseql/pg_tviews"
 documentation = "https://github.com/fraiseql/pg_tviews"
+readme = "README.md"
 keywords = ["postgresql", "materialized-views", "incremental-refresh", "database", "pgrx"]
 categories = ["database"]
+exclude = [".phases/", "test/", ".github/", "scripts/", "sbom/"]
 
 [lib]
 crate-type = ["cdylib", "lib"]
@@ -22,24 +24,13 @@ path = "./src/bin/pgrx_embed.rs"
 pgrx = "=0.17.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-regex = "1.0"
-bincode = "1.3"
-flate2 = "1.0"
-chrono = { version = "0.4", features = ["serde"] }
-sqlparser = "0.50"
-
-[dev-dependencies]
-pgrx-tests = "=0.17.0"
+sqlparser = "0.63"
 
 [features]
 default = ["pg18"]
-pg13 = ["pgrx/pg13", "pgrx-tests/pg13"]
-pg14 = ["pgrx/pg14", "pgrx-tests/pg14"]
-pg15 = ["pgrx/pg15", "pgrx-tests/pg15"]
-pg16 = ["pgrx/pg16", "pgrx-tests/pg16"]
-pg17 = ["pgrx/pg17", "pgrx-tests/pg17"]
-pg18 = ["pgrx/pg18", "pgrx-tests/pg18"]
-pg_test = []
+pg16 = ["pgrx/pg16"]
+pg17 = ["pgrx/pg17"]
+pg18 = ["pgrx/pg18"]
 
 [profile.dev]
 panic = "unwind"
@@ -50,9 +41,26 @@ panic = "unwind"
  lto = "fat"
  codegen-units = 1
 
- [lints.clippy]
- all = { level = "deny", priority = -1 }
- # Disable specific lints that conflict with PostgreSQL FFI
- missing_errors_doc = "allow"  # FFI functions often can't document all Postgres errors
- module_name_repetitions = "allow"  # pg_tviews_ prefix is intentional
+ [lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_docs = "warn"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+cargo = { level = "deny", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+undocumented_unsafe_blocks = "deny"
+# The project's reviewed exceptions, each with its reason. Anything narrower is
+# allowed on the item, with a `// Reason:` comment.
+missing_errors_doc = "allow"  # an extern's errors are the SQLSTATEs in docs/error-reference.md
+missing_panics_doc = "allow"  # internal invariants; most "panics" are pgrx error!() conversions
+similar_names = "allow"  # pk/fk/oid/tv/tb domain names are intentionally similar
+struct_field_names = "allow"  # catalog structs mirror PostgreSQL column names
+manual_let_else = "allow"  # explicit match reads clearer in FFI null-check paths
+match_same_arms = "allow"  # XactEvent / NodeTag arms kept explicit for clarity
+result_large_err = "allow"  # pgrx keeps an extern's SQLSTATE only for Result<_, ErrorReport>, a large type
+multiple_crate_versions = "allow"  # pgrx's build dependencies pull two hashbrown versions; not ours to unify
+redundant_pub_crate = "allow"  # pub(crate) marks what other modules use, inside private modules too
+option_if_let_else = "allow"  # if let / else over side-effecting branches reads clearer than map_or_else closures
 

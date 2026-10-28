@@ -10,13 +10,14 @@ CREATE EXTENSION IF NOT EXISTS "pg_stat_statements";
 CREATE EXTENSION IF NOT EXISTS "pg_buffercache";
 CREATE EXTENSION IF NOT EXISTS "pg_prewarm";
 
--- pg_tviews: automatic JSONB TVIEW materialization with trigger-based cascade sync
--- Provides pg_tviews_create(), pg_tviews_refresh(), and DDL event triggers for tv_* tables
-CREATE EXTENSION IF NOT EXISTS pg_tviews;
-
 -- pg_jsonb_delta: efficient JSONB merge, patch, and array operations (Rust, pgrx 0.16.1)
 -- Provides jsonb_merge_shallow(), jsonb_smart_patch_nested(), jsonb_array_update_where(), etc.
+-- Created before pg_tviews, which patches documents with it when it is installed.
 CREATE EXTENSION IF NOT EXISTS jsonb_delta;
+
+-- pg_tviews: automatic JSONB TVIEW materialization with trigger-based cascade sync
+-- Provides tviews.pg_tviews_create(), tviews.pg_tviews_refresh(), and DDL event triggers
+CREATE EXTENSION IF NOT EXISTS pg_tviews;
 
 -- ltree: Tree-like data structure support (required by pg_treekey)
 CREATE EXTENSION IF NOT EXISTS ltree;

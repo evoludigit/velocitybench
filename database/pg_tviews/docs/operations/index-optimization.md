@@ -9,11 +9,22 @@
 
 ## Automatic Indexes
 
-pg_tviews automatically creates:
-- **PRIMARY KEY index** on `pk_<entity>` column (B-tree, INTEGER)
-- No other indexes are created automatically
+pg_tviews automatically creates, on every new TVIEW:
+- **PRIMARY KEY** on `pk_<entity>`
+- a B-tree on `id` and on each UUID FK column
+- a **required** `(fk_<x>, pk_<entity>)` B-tree per integer FK column: cascade
+  propagation looks parent rows up by it (don't drop these; add missing ones to
+  older TVIEWs with `pg_tviews_ensure_propagation_indexes()`)
 
-**Rationale**: pg_tviews doesn't know your query patterns, so manual index creation gives you full control.
+None of them is on a column that refreshes rewrite, so refreshes stay HOT. There is
+**no** index on `data` unless the `data_gin_index` option is on. See
+[HOT Updates and TVIEW Storage](hot-updates.md) before adding any index on `data`.
+
+These indexes are pg_tviews': `tviews.registry.managed_indexes` lists them, and their
+names (`idx_<tv>_id`, `idx_<tv>_<fk>_<pk>`, `idx_<tv>_data_gin`…) are reserved, so a
+`CREATE INDEX` of your own under one of them is refused (`42939`). Any other index you
+add is yours: `pg_tviews_create_or_replace()` carries it over when it rebuilds the
+TVIEW, and never drops it.
 
 ---
 
@@ -21,32 +32,29 @@ pg_tviews automatically creates:
 
 ### 1. Foreign Key Indexes
 
-**Why**: Speed up cascade updates and JOIN operations
+Created automatically (see above). Nothing to do unless the TVIEW predates them:
 
 ```sql
--- For each fk_* column in tv_* tables
--- Trinity pattern: fk_* columns are always integers
-CREATE INDEX idx_tv_post_fk_user ON tv_post(fk_user);
-CREATE INDEX idx_tv_comment_fk_post ON tv_comment(fk_post);
-CREATE INDEX idx_tv_order_fk_customer ON tv_order(fk_customer);
+SELECT * FROM pg_tviews_ensure_propagation_indexes();
 ```
 
-**When to Create**: Always create for fk_* columns used in cascades
-
-**Performance Impact**:
-- Cascade update speedup: 10-100×
-- Creation time (1M rows): ~30 seconds
-- Size overhead: +15%
-
 ### 2. JSONB GIN Indexes
+
+> **HOT cost**: any index on `data` (GIN or expression) makes **every** refresh of
+> that TVIEW a non-HOT update: every index gets a new entry and a dead tuple is left
+> for VACUUM. Add one only for queries that measurably use it
+> (`pg_stat_user_indexes.idx_scan`). See [HOT Updates and TVIEW Storage](hot-updates.md).
 
 **Why**: Enable fast JSONB queries (`WHERE data @> '{}'`)
 
 ```sql
--- GIN index for JSONB containment queries
-CREATE INDEX idx_tv_post_data_gin ON tv_post USING GIN(data);
+-- GIN index for JSONB containment queries: pg_tviews' own, through the option
+-- (the options passed are the whole declaration: start from the current ones)
+SELECT tviews.pg_tviews_create_or_replace(format('%I.%I', schema, name), query,
+    options || '{"data_gin_index": true}')
+FROM tviews.registry WHERE entity = 'post';
 
--- Specific JSONB path index (PostgreSQL 14+)
+-- Specific JSONB path index (PostgreSQL 14+): your own, under a name of yours
 -- Trinity pattern: JSONB keys use snake_case (FraiseQL auto-converts to camelCase)
 CREATE INDEX idx_tv_post_data_title
 ON tv_post USING GIN((data -> 'title'));
@@ -81,15 +89,8 @@ WHERE data->>'status' = 'published';
 
 **Why**: Speed up GraphQL queries by UUID
 
-```sql
--- Index on id (UUID) column for GraphQL queries
--- Trinity pattern: id is UUID, pk_post is integer
-CREATE INDEX idx_tv_post_id ON tv_post(id);
-CREATE INDEX idx_tv_user_id ON tv_user(id);
-CREATE INDEX idx_tv_comment_id ON tv_comment(id);
-```
-
-**When to Create**: Always for GraphQL/API integration
+Created with every TVIEW: `idx_<tv>_id` on `id`, and one on each UUID FK column
+(see [Automatic Indexes](#automatic-indexes)). Nothing to do.
 
 **Performance Impact**:
 - UUID lookup speedup: 50-500×
@@ -147,13 +148,8 @@ ON tv_order(fk_customer, (data->>'created_at'));
 - GIN index on data column
 - UUID id column
 
-**Creation Script**:
-```sql
--- Trinity pattern: tb_post -> tv_post (pk_post INT, id UUID, data JSONB)
-CREATE INDEX idx_tv_post_fk_user ON tv_post(fk_user);
-CREATE INDEX idx_tv_post_id ON tv_post(id);
-CREATE INDEX idx_tv_post_data_gin ON tv_post USING GIN(data);
-```
+The PRIMARY KEY, `fk_*` and `id` indexes are created with the TVIEW; the GIN index
+on `data` is the `data_gin_index` option (above).
 
 ### Large TVIEWs (>1M rows)
 
@@ -165,13 +161,9 @@ CREATE INDEX idx_tv_post_data_gin ON tv_post USING GIN(data);
 - Specific JSONB path indexes for frequent queries
 - Consider partitioning (see [limits.md](../reference/limits.md))
 
-**Creation Script**:
+**Creation Script** (the PRIMARY KEY, `fk_*`, `id` and, with `data_gin_index`, GIN
+indexes come with the TVIEW):
 ```sql
--- Trinity pattern: All entities use singular names
-CREATE INDEX idx_tv_order_fk_customer ON tv_order(fk_customer);
-CREATE INDEX idx_tv_order_id ON tv_order(id);
-CREATE INDEX idx_tv_order_data_gin ON tv_order USING GIN(data);
-
 -- Specific path indexes for hot queries
 -- Trinity pattern: JSONB keys use snake_case (FraiseQL auto-converts to camelCase)
 CREATE INDEX idx_tv_order_data_status
@@ -240,15 +232,15 @@ REINDEX TABLE tv_your_entity;
 -- Reindex all TVIEWs concurrently (PostgreSQL 12+)
 DO $$
 DECLARE
-    tview_name TEXT;
+    tv_table TEXT;
 BEGIN
-    FOR tview_name IN
+    FOR tv_table IN
         SELECT pg_class.relname
         FROM pg_class
         WHERE pg_class.relname LIKE 'tv_%'
           AND pg_class.relkind = 'r'
     LOOP
-        EXECUTE format('REINDEX TABLE CONCURRENTLY %I', tview_name);
+        EXECUTE format('REINDEX TABLE CONCURRENTLY %I', tv_table);
     END LOOP;
 END $$;
 ```
@@ -278,34 +270,34 @@ Use this function to get index suggestions for your TVIEWs:
 
 ```sql
 -- Trinity pattern: All TVIEWs have pk_{entity} (INT PK), id (UUID), data (JSONB)
-CREATE OR REPLACE FUNCTION pg_tviews_suggest_indexes(entity_name TEXT)
+CREATE OR REPLACE FUNCTION suggest_tview_indexes(p_ent TEXT)
 RETURNS TABLE(index_suggestion TEXT, reason TEXT, estimated_benefit TEXT) AS $$
 BEGIN
     -- Check for missing fk_* indexes (foreign keys are integers)
     RETURN QUERY
     SELECT
-        'CREATE INDEX idx_tv_' || entity_name || '_' ||
+        'CREATE INDEX idx_tv_' || p_ent || '_' ||
         information_schema.columns.column_name ||
-        ' ON tv_' || entity_name || '(' ||
+        ' ON tv_' || p_ent || '(' ||
         information_schema.columns.column_name || ')' as index_suggestion,
         'Foreign key column without index (cascade performance)' as reason,
         '10-100× speedup for cascade updates' as estimated_benefit
     FROM information_schema.columns
-    WHERE information_schema.columns.table_name = 'tv_' || entity_name
+    WHERE information_schema.columns.table_name = 'tv_' || p_ent
       AND information_schema.columns.column_name LIKE 'fk_%'
       AND information_schema.columns.column_name NOT IN (
         SELECT pg_attribute.attname
         FROM pg_index
         JOIN pg_attribute ON pg_attribute.attrelid = pg_index.indrelid
           AND pg_attribute.attnum = ANY(pg_index.indkey)
-        WHERE pg_index.indrelid = ('tv_' || entity_name)::regclass
+        WHERE pg_index.indrelid = ('tv_' || p_ent)::regclass
       );
 
     -- Suggest UUID index if missing
     RETURN QUERY
     SELECT
-        'CREATE INDEX idx_tv_' || entity_name || '_id ON tv_' ||
-        entity_name || '(id)' as index_suggestion,
+        'CREATE INDEX idx_tv_' || p_ent || '_id ON tv_' ||
+        p_ent || '(id)' as index_suggestion,
         'UUID column without index (GraphQL/API queries)' as reason,
         '50-500× speedup for ID lookups' as estimated_benefit
     WHERE NOT EXISTS (
@@ -313,24 +305,24 @@ BEGIN
         FROM pg_index
         JOIN pg_attribute ON pg_attribute.attrelid = pg_index.indrelid
           AND pg_attribute.attnum = ANY(pg_index.indkey)
-        WHERE pg_index.indrelid = ('tv_' || entity_name)::regclass
+        WHERE pg_index.indrelid = ('tv_' || p_ent)::regclass
           AND pg_attribute.attname = 'id'
     );
 
     -- Suggest GIN index for large TVIEWs
     RETURN QUERY
     SELECT
-        'CREATE INDEX idx_tv_' || entity_name || '_data_gin ON tv_' ||
-        entity_name || ' USING GIN(data)' as index_suggestion,
+        'CREATE INDEX tv_' || p_ent || '_data_containment ON tv_' ||
+        p_ent || ' USING GIN(data)' as index_suggestion,
         'Large TVIEW without JSONB index (JSONB queries)' as reason,
         '10-100× speedup for JSONB containment queries' as estimated_benefit
-    WHERE pg_relation_size(('tv_' || entity_name)::regclass) > 1024 * 1024 * 10  -- >10MB
+    WHERE pg_relation_size(('tv_' || p_ent)::regclass) > 1024 * 1024 * 10  -- >10MB
       AND NOT EXISTS (
         SELECT 1
         FROM pg_index
         JOIN pg_attribute ON pg_attribute.attrelid = pg_index.indrelid
           AND pg_attribute.attnum = ANY(pg_index.indkey)
-        WHERE pg_index.indrelid = ('tv_' || entity_name)::regclass
+        WHERE pg_index.indrelid = ('tv_' || p_ent)::regclass
           AND pg_attribute.attname = 'data'
       );
 END;
@@ -340,14 +332,14 @@ $$ LANGUAGE plpgsql;
 **Usage**:
 ```sql
 -- Get index suggestions for a specific TVIEW
-SELECT * FROM pg_tviews_suggest_indexes('post');
+SELECT * FROM suggest_tview_indexes('post');
 
 -- Get suggestions for all TVIEWs
 SELECT
     pg_tview_meta.entity,
     suggestions.*
 FROM pg_tview_meta
-CROSS JOIN LATERAL pg_tviews_suggest_indexes(pg_tview_meta.entity) as suggestions;
+CROSS JOIN LATERAL suggest_tview_indexes(pg_tview_meta.entity) as suggestions;
 ```
 
 ---
@@ -373,10 +365,8 @@ INSERT INTO tb_post SELECT * FROM external_data;
 -- 2. Create TVIEW (without indexes)
 CREATE TABLE tv_post AS SELECT ...;
 
--- 3. Create indexes on tv_post
-CREATE INDEX CONCURRENTLY idx_tv_post_fk_user ON tv_post(fk_user);
-CREATE INDEX CONCURRENTLY idx_tv_post_id ON tv_post(id);
-CREATE INDEX CONCURRENTLY idx_tv_post_data_gin ON tv_post USING GIN(data);
+-- 3. Create your own indexes on tv_post
+CREATE INDEX CONCURRENTLY tv_post_data_title ON tv_post USING GIN((data -> 'title'));
 ```
 
 **Benefit**: 2-3× faster than creating indexes first
@@ -464,4 +454,4 @@ ORDER BY COUNT(*) DESC;
 
 - [Resource Limits](../reference/limits.md) - Capacity planning and scaling
 - [Troubleshooting](troubleshooting.md) - Performance debugging
-- [Monitoring](../../MONITORING.md) - Track index performance
+- [Monitoring](monitoring.md) - Track index performance
