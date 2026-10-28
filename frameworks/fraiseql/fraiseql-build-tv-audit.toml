@@ -12,13 +12,9 @@ output_file = "schema_tv_audit.compiled.json"
 
 [fraiseql.security.audit_logging]
 enabled = true
-log_level = "info"
-include_sensitive_data = false
-async_logging = true
 
 [fraiseql.security.error_sanitization]
 enabled = true
-generic_messages = true
 
 [fraiseql.security.rate_limiting]
 enabled = false
