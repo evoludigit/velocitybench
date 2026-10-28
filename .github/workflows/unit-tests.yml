@@ -10,6 +10,10 @@ env:
   PYTHON_VERSION: '3.11'
   NODE_VERSION: '20'
   JAVA_VERSION: '17'
+  # Maven is pinned so a runner-image update can't change it under an untouched tree:
+  # the image's move to Maven 3.10 turned a duplicated dependency into a build error.
+  MAVEN_VERSION: '3.10.0'
+  MAVEN_SHA512: 908b1501bfb420bf7c8affb855534a9c407fd6099367bfb9f2f2dcb8e9799102bffb84518cde74c679bd76870247c6528683abdd620581bffa90f95d92d175aa
 
 jobs:
   # Python frameworks: Strawberry, Graphene, FastAPI, Flask, Ariadne, ASGI-GraphQL
@@ -147,6 +151,18 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
+      - name: Install Maven (pinned)
+        run: |
+          dir="$RUNNER_TEMP/maven"
+          tarball="apache-maven-${MAVEN_VERSION}-bin.tar.gz"
+          mkdir -p "$dir"
+          curl -fsSL -o "$dir/$tarball" \
+            "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/$tarball"
+          echo "${MAVEN_SHA512}  $dir/$tarball" | sha512sum -c -
+          tar -xzf "$dir/$tarball" -C "$dir" --strip-components=1
+          echo "$dir/bin" >> "$GITHUB_PATH"
+          "$dir/bin/mvn" --version
+
       - name: Run tests with Maven
         working-directory: frameworks/${{ matrix.framework }}
         run: mvn clean test || exit 1
@@ -185,6 +201,19 @@ jobs:
           java-version: ${{ matrix.java-version }}
           distribution: 'temurin'
           cache: ${{ matrix.build-tool }}
+
+      - name: Install Maven (pinned)
+        if: matrix.build-tool == 'maven'
+        run: |
+          dir="$RUNNER_TEMP/maven"
+          tarball="apache-maven-${MAVEN_VERSION}-bin.tar.gz"
+          mkdir -p "$dir"
+          curl -fsSL -o "$dir/$tarball" \
+            "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/$tarball"
+          echo "${MAVEN_SHA512}  $dir/$tarball" | sha512sum -c -
+          tar -xzf "$dir/$tarball" -C "$dir" --strip-components=1
+          echo "$dir/bin" >> "$GITHUB_PATH"
+          "$dir/bin/mvn" --version
 
       - name: Install sbt (for Play framework)
         if: matrix.build-tool == 'sbt'

@@ -5,7 +5,6 @@ and sweep-3 (permanent regression net) via the `any_run`/`any_grid` fixtures.
 Median-specific assertions (versions, full-grid collapse, the Q1 reframe) pin
 the publishable run itself.
 """
-import json
 
 import build
 
