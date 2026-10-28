@@ -31,19 +31,20 @@ SUBSET = [
 
 CORE = {"Q1", "Q2", "Q2b", "Q3", "C3", "HC3", "F1", "F2", "F3", "M1", "T1", "MC1"}
 APQ = {"Q1_APQ", "Q2b_APQ", "M1_APQ"}
+LEVERS = {"L1", "L2"}  # read-path lever scenarios, offset/order-capable engines only
 
 # Wired scenario keys per subset framework. Anything absent here must appear
 # in the docs/scenarios.md exclusion list (see test below).
 EXPECTED: dict[str, set[str]] = {
-    "fraiseql-tv": CORE | APQ | {"M1d"},
-    "fraiseql-tv-cache": CORE | APQ | {"M1d"},
-    "fraiseql-v-nocache": CORE | APQ,  # M1d excluded: tvd_* is tv-pipeline-only
-    "fraiseql-v-cache": CORE | APQ,
+    "fraiseql-tv": CORE | APQ | LEVERS | {"M1d"},
+    "fraiseql-tv-cache": CORE | APQ | LEVERS | {"M1d"},
+    "fraiseql-v-nocache": CORE | APQ | LEVERS,  # M1d excluded: tvd_* is tv-pipeline-only
+    "fraiseql-v-cache": CORE | APQ | LEVERS,
     "fraiseql-tv-audit": {"M1"},  # audit-overhead appendix row — by design
-    "hasura": CORE,  # no native APQ in CE v2; no M1d
-    "postgraphile": CORE,  # persisted ops are an allowlist, not APQ; no M1d
+    "hasura": CORE | LEVERS,  # no native APQ in CE v2; no M1d
+    "postgraphile": CORE | LEVERS,  # persisted ops are an allowlist, not APQ; no M1d
     "actix-web-rest": CORE,  # APQ is a GraphQL protocol — N/A for REST
-    "async-graphql": CORE | APQ,  # first-party ApolloPersistedQueries extension
+    "async-graphql": CORE | APQ | LEVERS,  # first-party ApolloPersistedQueries extension
     "mercurius": CORE | APQ,  # first-party persistedQueryDefaults.automatic()
     "apollo-server": CORE | APQ,  # APQ native, on by default
     "strawberry": CORE,  # no first-party APQ extension exists
@@ -70,6 +71,7 @@ def test_excluded_cells_are_documented():
         "APQ on PostGraphile",
         "APQ on actix-web-rest",
         "APQ on Strawberry",
+        "Read-path levers on engines without offset/order arguments",
     ):
         assert marker in doc, f"exclusion '{marker}' missing from docs/scenarios.md"
 
