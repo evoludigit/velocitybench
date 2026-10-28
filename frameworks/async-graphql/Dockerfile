@@ -1,5 +1,5 @@
 # Use Rust nightly Alpine for edition2024 support
-FROM rustlang/rust:nightly-alpine AS builder
+FROM rust:1.99-alpine AS builder
 
 # Set TMPDIR to use /data/tmp for builds to avoid /tmp filling up
 ENV TMPDIR=/data/tmp
@@ -11,8 +11,8 @@ RUN apk add --no-cache musl-dev pkgconfig openssl-dev
 # Create app directory
 WORKDIR /app
 
-# Copy Cargo files (Cargo.lock may not exist initially)
-COPY Cargo.toml* Cargo.lock* ./
+# Copy Cargo files
+COPY Cargo.toml Cargo.lock ./
 
 # Create dummy src/main.rs and module files to cache dependencies
 RUN mkdir src && \
@@ -21,13 +21,13 @@ RUN mkdir src && \
     touch src/db.rs src/models.rs src/schema.rs
 
 # Build dependencies only (for caching)
-RUN cargo build --release && rm -rf src/
+RUN cargo build --release --locked && rm -rf src/
 
 # Copy source code
 COPY src/ src/
 
 # Build the actual application
-RUN touch src/main.rs && cargo build --release
+RUN touch src/main.rs && cargo build --release --locked
 
 # Runtime stage
 FROM alpine:3.19

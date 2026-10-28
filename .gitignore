@@ -61,6 +61,9 @@ target/
 # Rust
 target/
 Cargo.lock
+# A benchmarked framework builds from its lockfile: an unlocked build resolves new
+# dependency versions on every image build and can break an untouched tree.
+!frameworks/*/Cargo.lock
 **/*.rs.bk
 
 # IDE

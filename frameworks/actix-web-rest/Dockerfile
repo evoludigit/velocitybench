@@ -1,5 +1,5 @@
 # Stage 1: Builder
-FROM rustlang/rust:nightly-alpine AS builder
+FROM rust:1.99-alpine AS builder
 
 # Set TMPDIR to use /data/tmp for builds to avoid /tmp filling up
 ENV TMPDIR=/data/tmp
@@ -10,7 +10,7 @@ COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 
 # Build the application
-RUN cargo build --release
+RUN cargo build --release --locked
 
 # Stage 2: Runtime
 FROM alpine:3.19
