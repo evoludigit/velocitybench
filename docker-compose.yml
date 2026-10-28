@@ -17,7 +17,9 @@ services:
     ports:
       - "${POSTGRES_PORT:-5434}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      # postgres:18 keeps its data under /var/lib/postgresql/18/docker and refuses a
+      # volume at the pre-18 /var/lib/postgresql/data path.
+      - postgres_data:/var/lib/postgresql
       - ./database/01-extensions.sql:/docker-entrypoint-initdb.d/01-extensions.sql
       - ./database/01z-tview-persistence.sh:/docker-entrypoint-initdb.d/01z-tview-persistence.sh
       - ./database/fraiseql_cqrs_schema.sql:/docker-entrypoint-initdb.d/02-fraiseql-cqrs.sql
@@ -69,6 +71,8 @@ services:
     build:
       context: ./frameworks/fraiseql
       args:
+        # The release the injected fraiseql-cli and fraiseql-server must report.
+        FRAISEQL_VERSION: ${FRAISEQL_VERSION:-2.11.0}
         SCHEMA_FILE: schema.py
     ports:
       - "8815:8815"
@@ -108,6 +112,8 @@ services:
     build:
       context: ./frameworks/fraiseql
       args:
+        # The release the injected fraiseql-cli and fraiseql-server must report.
+        FRAISEQL_VERSION: ${FRAISEQL_VERSION:-2.11.0}
         SCHEMA_FILE: schema.py
     ports:
       - "8819:8815"
@@ -147,6 +153,8 @@ services:
     build:
       context: ./frameworks/fraiseql
       args:
+        # The release the injected fraiseql-cli and fraiseql-server must report.
+        FRAISEQL_VERSION: ${FRAISEQL_VERSION:-2.11.0}
         SCHEMA_FILE: schema_tv.py
         BUILD_TOML: fraiseql-build-tv.toml
     ports:
@@ -191,6 +199,8 @@ services:
     build:
       context: ./frameworks/fraiseql
       args:
+        # The release the injected fraiseql-cli and fraiseql-server must report.
+        FRAISEQL_VERSION: ${FRAISEQL_VERSION:-2.11.0}
         SCHEMA_FILE: schema_tv.py
         BUILD_TOML: fraiseql-build-tv.toml
     ports:
@@ -231,6 +241,8 @@ services:
     build:
       context: ./frameworks/fraiseql
       args:
+        # The release the injected fraiseql-cli and fraiseql-server must report.
+        FRAISEQL_VERSION: ${FRAISEQL_VERSION:-2.11.0}
         SCHEMA_FILE: schema_tv_audit.py
         BUILD_TOML: fraiseql-build-tv-audit.toml
     ports:
