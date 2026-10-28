@@ -26,7 +26,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install ruff pylint bandit
+          # Ruff is pinned so a new release's rules can't redden an untouched tree.
+          pip install ruff==0.17.3 pylint bandit
 
       - name: Run Ruff linter
         id: ruff

@@ -6,7 +6,6 @@ Compares current performance against baseline and detects significant regression
 """
 
 import json
-import subprocess
 import sys
 import time
 from dataclasses import dataclass

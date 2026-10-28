@@ -7,7 +7,6 @@ import psycopg
 import sys
 from datetime import datetime
 from typing import List, Dict, Any
-import json
 
 DB_NAME = "pg_tviews_benchmark"
 
