@@ -44,7 +44,7 @@
           - updated_at
         filter: {}
   update_permissions:
-    # M1 / MC1 mutation scenario: updateUser(where: {id: ...}, _set: {bio: ...})
+    # M1 mutation scenario: updateUser(where: {id: ...}, _set: {bio: ...})
     - role: public
       permission:
         columns:
@@ -96,6 +96,7 @@
   configuration:
     custom_root_fields:
       select: comments
+      insert_one: createComment
     column_config:
       created_at:
         custom_name: createdAt
@@ -118,3 +119,14 @@
           - created_at
           - updated_at
         filter: {}
+  insert_permissions:
+    # MC1: createComment(object: {id, content, fk_post, fk_author}). The
+    # harness generates the id, so it deletes exactly the comments it inserted.
+    - role: public
+      permission:
+        columns:
+          - id
+          - content
+          - fk_post
+          - fk_author
+        check: {}
