@@ -1,8 +1,9 @@
 """FraiseQL version gate.
 
-The publishable benchmark must run against current FraiseQL (v2.10.x).
-These binaries are COPY'd verbatim into the container image, so the binary
-version is the container version.
+The FraiseQL image runs one published release: frameworks/fraiseql/Dockerfile
+downloads it (FRAISEQL_VERSION) and checks the asset's digest (FRAISEQL_SHA256),
+unless binaries were injected into the Docker context, which must then report
+the same version.
 """
 
 import re
@@ -13,29 +14,39 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FRAISEQL_DIR = REPO_ROOT / "frameworks" / "fraiseql"
+DOCKERFILE = (FRAISEQL_DIR / "Dockerfile").read_text()
 
-REQUIRED_MAJOR_MINOR = (2, 10)
+
+def dockerfile_arg(name: str) -> str:
+    match = re.search(rf"^ARG {name}=(\S+)$", DOCKERFILE, re.MULTILINE)
+    assert match, f"Dockerfile declares no default for {name}"
+    return match[1]
 
 
-def binary_version(binary: Path) -> tuple[int, int, int]:
-    out = subprocess.run(
-        [str(binary), "--version"], capture_output=True, text=True, check=True
-    ).stdout
-    match = re.search(r"(\d+)\.(\d+)\.(\d+)", out)
-    assert match, f"no semver in {binary.name} --version output: {out!r}"
-    return (int(match[1]), int(match[2]), int(match[3]))
+def test_the_dockerfile_pins_a_release_and_its_digest():
+    assert re.fullmatch(r"\d+\.\d+\.\d+", dockerfile_arg("FRAISEQL_VERSION"))
+    assert re.fullmatch(r"[0-9a-f]{64}", dockerfile_arg("FRAISEQL_SHA256"))
+    assert 'sha256sum -c -' in DOCKERFILE
+
+
+def test_compose_builds_the_version_the_dockerfile_pins():
+    compose = (REPO_ROOT / "docker-compose.yml").read_text()
+    defaults = set(re.findall(r"FRAISEQL_VERSION: \$\{FRAISEQL_VERSION:-([^}]+)\}", compose))
+    assert defaults == {dockerfile_arg("FRAISEQL_VERSION")}, defaults
+
+
+def test_no_fraiseql_binary_is_tracked():
+    tracked = subprocess.run(
+        ["git", "ls-files", "frameworks/fraiseql/fraiseql-cli", "frameworks/fraiseql/fraiseql-server"],
+        cwd=REPO_ROOT, capture_output=True, text=True, check=True,
+    ).stdout.split()
+    assert tracked == [], tracked
 
 
 @pytest.mark.parametrize("name", ["fraiseql-server", "fraiseql-cli"])
-def test_fraiseql_binary_is_current(name):
-    version = binary_version(FRAISEQL_DIR / name)
-    assert version[:2] == REQUIRED_MAJOR_MINOR, (
-        f"{name} is v{'.'.join(map(str, version))}, "
-        f"campaign requires v{REQUIRED_MAJOR_MINOR[0]}.{REQUIRED_MAJOR_MINOR[1]}.x"
-    )
-
-
-def test_dockerfile_matches_required_version():
-    dockerfile = (FRAISEQL_DIR / "Dockerfile").read_text()
-    stale = re.findall(r"v2\.[0-9]\.[0-9]+", dockerfile)
-    assert not stale, f"Dockerfile still references stale versions: {stale}"
+def test_an_injected_binary_reports_the_pinned_version(name):
+    binary = FRAISEQL_DIR / name
+    if not binary.exists():
+        pytest.skip(f"no {name} injected: the image downloads the release")
+    out = subprocess.run([str(binary), "--version"], capture_output=True, text=True, check=True).stdout
+    assert dockerfile_arg("FRAISEQL_VERSION") in out, out
