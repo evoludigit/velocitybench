@@ -250,13 +250,17 @@ def build_grid(run: Run, meta: dict) -> Grid:
     for fw in fw_order:
         for sc in sc_order:
             key = (fw, sc)
-            has_result = key in result_index
+            # A row of a redefined scenario measured its older definition: it
+            # cannot contradict an exclusion the current definition declares.
+            redefined = sc in invalid and invalid[sc].get("redefined", False)
+            has_result = key in result_index and not (redefined and key in excl_index)
+            has_invalid = has_result and sc in invalid
             is_excluded = key in excl_index
             if has_result and is_excluded:
                 raise ValueError(
                     f"contradiction: {fw}/{sc} has a measured result AND is "
                     f"declared excluded by design — the matrix has drifted")
-            if has_result and sc in invalid:
+            if has_invalid:
                 cells[key] = Cell(
                     framework=fw, scenario=sc, status=STATUS_INVALID,
                     reason=invalid[sc]["reason"], issue=invalid[sc]["issue"])
@@ -2064,7 +2068,7 @@ def _wt_row(row: WriteRow, axis_max: float, unit: str) -> str:
             f'<span class="wt-tag">{esc(tag)}</span>'
             f'<span class="wt-mech">invalid · #{esc(row.issue)}</span>'
             f'<span class="wt-track"></span>'
-            f'<span class="wt-val excl">measured a no-op — see #{esc(row.issue)}'
+            f'<span class="wt-val excl">invalid result — see #{esc(row.issue)}'
             f'</span></div>')
     return (
         f'<div class="wt-row not-measured" data-scenario="{esc(tag)}" '

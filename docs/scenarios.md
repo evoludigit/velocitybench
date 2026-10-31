@@ -254,20 +254,53 @@ numbers include that maintenance cost. Classical stacks never deploy pg_tviews
 then re-enabled with drifted `tv_user` rows resynced before the next FraiseQL
 framework. The run JSON records `tview_trigger_scope: fraiseql-only`.
 
-### MC1 — mutation-to-consistent-state cycle (deliberately asymmetric)
+### MC1 — comment to a consistent post view (deliberately asymmetric)
 
-MC1 is a **workflow benchmark, not raw server speed**: it measures the client
-round trips needed to reach consistent state after a write.
+MC1 is a **workflow benchmark, not raw server speed**: it measures what a client
+pays to hold a consistent view after a write that changes a list. Each cycle
+adds a comment to one of 1,000 posts (the same posts for every engine) and
+ends with the client holding that post's latest 10 comments as the server now
+has them.
 
-| Engine family | Requests per cycle | Definition |
-|---------------|-------------------:|------------|
-| FraiseQL | **1** | mutation response carries the cascade (all affected entities) |
-| Classical GraphQL (Hasura, PostGraphile, all resolver frameworks) | **2** | M1 mutation + serial Q1 re-fetch |
-| REST (actix-web-rest) | **2** | `PUT /users/{id}` + serial `GET /users?limit=20` re-fetch |
+The write is a list-membership change on purpose. A normalized client cache
+keys entities by type and id, so after a write that only changes an entity
+(a bio update, the old MC1) the mutation's own payload already updates every
+place that entity appears: there is nothing for a cascade to add. A new
+comment changes *which* comments the post lists, and no lookup of the comment
+by id can show that. That is the case a cascade is for.
 
-This definition is embedded in the runner's scenario table
-(`_QUERY_LABELS["MC1"]`) and is generated into every report automatically.
-The mutation half rotates url/body pairs exactly like M1 (real writes).
+| Engine | Scenario | Requests per cycle | Definition |
+|--------|----------|-------------------:|------------|
+| FraiseQL | MC1 | **1** | `createCommentCascade`: the comment, and in its `cascade` the comment (CREATED) and the post with its latest 10 comments (`PostFull`, UPDATED) |
+| FraiseQL | MC1c | **2** | `createComment`, then `postFull(id)`: the same engine with the cascade off |
+| Hasura, PostGraphile | MC1 | **2** | the generated comment insert, then the post's latest 10 comments |
+
+MC1 against MC1c on the same FraiseQL variant is the measurement of the
+cascade; Hasura and PostGraphile give the cross-engine context. The report sets
+round trips, p50 and CPU per cycle side by side and never ranks a 1-request
+cycle against a 2-request one by cycles/second.
+
+The cascade is assembled by the mutation function with the builders FraiseQL
+ships (`fraiseql.build_cascade`, `fraiseql.cascade_entity`, vendored in
+`database/fraiseql_cascade_helpers.sql`). pg_tviews refreshes `tv_*` when the
+transaction commits, so inside the function the post is read from
+`fv_post_full`, which builds `v_post_full`'s document from the command tables.
+
+- **Checked before every run.** Cycles on one post, one at a time, until its
+  list must truncate: each cycle's write names the new comment, the cascade
+  reports it CREATED, and the post's list has the new comment first and exactly
+  as many comments as it should (10 once the post has more). A failed check
+  records the cell as failed and measures nothing.
+- **Real, unique writes.** The harness generates each comment id under a
+  48-bit prefix that no comment had before the scenario.
+- **Cleanup outside the timed window.** After the warmup and after the
+  measurement, the harness deletes the comments under the scenario's prefix
+  (exactly the ones it inserted), then runs `VACUUM ANALYZE` on `tb_comment`
+  and `tv_comment`.
+- **pg_tviews scoping.** The `tb_comment` tview triggers follow the same rule
+  as `tb_user`'s: off while a classical stack runs.
+
+Engines whose schema has no comment insert have no MC1 (exclusion 9).
 
 ## Scenario coverage & exclusions — publishable subset (2026-07)
 
@@ -276,20 +309,20 @@ this matrix documents it so no gap is ever implicit. ✅ = wired; a dash means
 **excluded by design** with the reason listed below. The APQ trio is
 Q1_APQ + Q2b_APQ + M1_APQ.
 
-| Framework | Q1 Q2 Q2b Q3 | C3 HC3 | F1 F2 F3 | M1 | M1d | T1 | MC1 | APQ trio | L1 L2 |
-|-----------|:---:|:---:|:---:|:--:|:---:|:--:|:---:|:---:|:---:|
-| fraiseql-tv | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| fraiseql-tv-cache | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| fraiseql-v-nocache | ✅ | ✅ | ✅ | ✅ | — (1) | ✅ | ✅ | ✅ | ✅ |
-| fraiseql-v-cache | ✅ | ✅ | ✅ | ✅ | — (1) | ✅ | ✅ | ✅ | ✅ |
-| fraiseql-tv-audit | — (2) | — (2) | — (2) | ✅ | — (2) | — (2) | — (2) | — (2) | — (2) |
-| hasura | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | — (4) | ✅ |
-| postgraphile | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | — (5) | ✅ |
-| actix-web-rest | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | — (6) | — (8) |
-| async-graphql | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | ✅ | ✅ |
-| mercurius | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | ✅ | — (8) |
-| apollo-server | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | ✅ | — (8) |
-| strawberry | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | — (7) | — (8) |
+| Framework | Q1 Q2 Q2b Q3 | C3 HC3 | F1 F2 F3 | M1 | M1d | T1 | MC1 | MC1c | APQ trio | L1 L2 |
+|-----------|:---:|:---:|:---:|:--:|:---:|:--:|:---:|:---:|:---:|:---:|
+| fraiseql-tv | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| fraiseql-tv-cache | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| fraiseql-v-nocache | ✅ | ✅ | ✅ | ✅ | — (1) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| fraiseql-v-cache | ✅ | ✅ | ✅ | ✅ | — (1) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| fraiseql-tv-audit | — (2) | — (2) | — (2) | ✅ | — (2) | — (2) | — (2) | — (2) | — (2) | — (2) |
+| hasura | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | — (10) | — (4) | ✅ |
+| postgraphile | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | ✅ | — (10) | — (5) | ✅ |
+| actix-web-rest | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | — (9) | — (10) | — (6) | — (8) |
+| async-graphql | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | — (9) | — (10) | ✅ | ✅ |
+| mercurius | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | — (9) | — (10) | ✅ | — (8) |
+| apollo-server | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | — (9) | — (10) | ✅ | — (8) |
+| strawberry | ✅ | ✅ | ✅ | ✅ | — (3) | ✅ | — (9) | — (10) | — (7) | — (8) |
 
 **Exclusion reasons (all by design):**
 
@@ -323,6 +356,12 @@ Q1_APQ + Q2b_APQ + M1_APQ.
    resolvers, and their default orders differ (created_at DESC, ASC, or primary
    key), so the cell would measure custom code. L1/L2 show where FraiseQL's
    read-path levers pay off; they are never part of a cross-stack ranking.
+9. **MC1 on engines without a comment insert** — the hand-written servers
+   (actix-web-rest, async-graphql, mercurius, apollo-server, strawberry)
+   expose only `updateUser`. MC1 needs a write that changes a list; adding a
+   comment insert to each would measure new custom code.
+10. **MC1c outside FraiseQL** — MC1c is FraiseQL with its cascade turned off.
+    Every other engine's MC1 already is the insert-then-re-fetch cycle.
 
 APQ on async-graphql uses the built-in `ApolloPersistedQueries` extension
 (first-party, `apollo_persisted_queries` cargo feature); on mercurius the

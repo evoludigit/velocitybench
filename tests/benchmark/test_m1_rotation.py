@@ -1,4 +1,4 @@
-"""M1/MC1 redesign: every mutation request must perform a real write.
+"""M1 redesign: every mutation request must perform a real write.
 
 Finding 2026-07-04 (phase-artifacts/finding-m1-design-invalid-2026-07-04.md):
 - fraiseql M1 sent a constant bio → fn_update_user's no-op short circuit made
@@ -9,7 +9,7 @@ Finding 2026-07-04 (phase-artifacts/finding-m1-design-invalid-2026-07-04.md):
   CONSTANT bio — no-ops after the first cycle.
 
 The fix: cycle-based rotation (each full pass over the user pool advances the
-bio), applied to M1, M1d, MC1, and M1_APQ for every framework; pg_tviews
+bio), applied to M1, M1d and M1_APQ for every framework; pg_tviews
 triggers scoped to the FraiseQL stacks; and a live write-effect probe per
 framework at sweep time.
 """
@@ -81,16 +81,6 @@ def test_k6_rest_rotating_mode():
     assert steps[0]["urls"] == entry["urls"]
     assert steps[0]["bodies"] == entry["bodies"]
     assert steps[0]["method"] == "PUT"
-
-
-def test_k6_mc1_classical_rotates_mutation_bodies():
-    entry = {"mode": "mc1_classical", "url": "http://x/graphql",
-             "m1_payloads": [b'{"query":"m1"}', b'{"query":"m2"}'],
-             "q1_payload": b'{"query":"q"}'}
-    steps = bench._entry_to_k6_steps(entry, "graphql", "MC1")
-    assert len(steps) == 2
-    assert steps[0]["bodies"] == ['{"query":"m1"}', '{"query":"m2"}']
-    assert steps[1]["body"] == '{"query":"q"}'
 
 
 def test_k6_script_supports_url_rotation():

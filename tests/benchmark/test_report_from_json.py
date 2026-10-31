@@ -144,7 +144,7 @@ def test_regenerated_report_contains_honesty_note(run_json):
 def test_regenerated_report_contains_mc1_workflow_label(run_json):
     md = bench.regenerate_report_from_json(run_json)
     assert "cycles/second" in md or "cycles/s" in md
-    assert "mutation-to-consistent-state" in md
+    assert "Comment to a consistent post view" in md
 
 
 def test_regeneration_is_byte_stable(run_json):

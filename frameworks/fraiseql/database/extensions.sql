@@ -183,6 +183,42 @@ FROM benchmark.tv_post p;
 GRANT SELECT ON benchmark.v_post_full TO PUBLIC;
 
 -- ============================================================================
+-- fv_post_full: v_post_full read from the command tables
+-- MC1's cascade lists the commented post as a PostFull entity. pg_tviews
+-- refreshes tv_* when the transaction commits, so inside the mutation function
+-- v_post_full does not yet show the new comment. This view builds the same
+-- document (fv_post = tv_post, fv_comment = tv_comment) from tb_*, with the
+-- same order and limit, so the cascade carries what postFull returns after
+-- the commit.
+-- ============================================================================
+
+DROP VIEW IF EXISTS benchmark.fv_post_full;
+
+CREATE VIEW benchmark.fv_post_full AS
+SELECT
+    p.id,
+    jsonb_set(
+        p.data,
+        '{comments}',
+        COALESCE(
+            (
+                SELECT jsonb_agg(latest.comment ORDER BY latest.created_at DESC)
+                FROM (
+                    SELECT c.data - 'post' AS comment, c.data->>'created_at' AS created_at
+                    FROM benchmark.fv_comment c
+                    WHERE c._post_pk = p._pk
+                    ORDER BY c.data->>'created_at' DESC
+                    LIMIT 10
+                ) latest
+            ),
+            '[]'::jsonb
+        )
+    ) AS data
+FROM benchmark.fv_post p;
+
+GRANT SELECT ON benchmark.fv_post_full TO PUBLIC;
+
+-- ============================================================================
 -- Indexes on underlying tables (views are not directly indexed)
 -- ============================================================================
 

@@ -16,7 +16,8 @@
 //      "bodies": ["{…}", …],    // rotated per iteration (row-lock spreading)
 //      "validate": "graphql"    // graphql | rest
 //     }
-//   ]
+//   ],
+//   "mc1": {"base": "…", "run": 2, "slot": "__MC1_ID__"}  // optional, MC1 only
 // }
 
 import http from 'k6/http';
@@ -49,6 +50,18 @@ function stepUrl(step) {
   return step.url;
 }
 
+function hex(n, width) {
+  return n.toString(16).padStart(width, '0');
+}
+
+// MC1: one comment id per iteration, the same layout as bench_sequential's
+// _mc1_id(): unique across VUs and runs, under the scenario's prefix.
+function mc1Id() {
+  const b = cfg.mc1.base;
+  return `${b.slice(0, 8)}-${b.slice(8, 12)}-${hex(cfg.mc1.run, 4)}-` +
+    `${hex(exec.vu.idInTest, 4)}-${hex(exec.vu.iterationInInstance, 12)}`;
+}
+
 const validators = {
   graphql: (r) =>
     r.status === 200 &&
@@ -59,12 +72,17 @@ const validators = {
 };
 
 export default function () {
+  const id = cfg.mc1 ? mc1Id() : null;
   for (const step of cfg.steps) {
     const url = stepUrl(step);
+    let body = stepBody(step);
+    if (id && body) {
+      body = body.split(cfg.mc1.slot).join(id);
+    }
     const res =
       step.method === 'GET'
         ? http.get(url)
-        : http.request(step.method, url, stepBody(step), { headers: JSON_HEADERS });
+        : http.request(step.method, url, body, { headers: JSON_HEADERS });
     check(res, { ok: validators[step.validate || 'rest'] });
   }
 }

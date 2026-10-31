@@ -3,7 +3,7 @@
 Every (framework, scenario) cell in the 2026-07 subset is either wired in
 FRAMEWORKS or listed as a by-design exclusion in docs/scenarios.md. This test
 pins the wired side of that matrix, plus the load-generator lockstep for the
-two scenario modes added for REST workflows (C3/HC3 lookups, REST MC1).
+REST C3/HC3 lookup mode.
 """
 
 import sys
@@ -29,20 +29,22 @@ SUBSET = [
     "strawberry",
 ]
 
-CORE = {"Q1", "Q2", "Q2b", "Q3", "C3", "HC3", "F1", "F2", "F3", "M1", "T1", "MC1"}
+CORE = {"Q1", "Q2", "Q2b", "Q3", "C3", "HC3", "F1", "F2", "F3", "M1", "T1"}
 APQ = {"Q1_APQ", "Q2b_APQ", "M1_APQ"}
 LEVERS = {"L1", "L2"}  # read-path lever scenarios, offset/order-capable engines only
+MC1 = {"MC1"}  # engines with a comment insert
+MC1C = {"MC1c"}  # FraiseQL with its cascade off
 
 # Wired scenario keys per subset framework. Anything absent here must appear
 # in the docs/scenarios.md exclusion list (see test below).
 EXPECTED: dict[str, set[str]] = {
-    "fraiseql-tv": CORE | APQ | LEVERS | {"M1d"},
-    "fraiseql-tv-cache": CORE | APQ | LEVERS | {"M1d"},
-    "fraiseql-v-nocache": CORE | APQ | LEVERS,  # M1d excluded: tvd_* is tv-pipeline-only
-    "fraiseql-v-cache": CORE | APQ | LEVERS,
+    "fraiseql-tv": CORE | APQ | LEVERS | MC1 | MC1C | {"M1d"},
+    "fraiseql-tv-cache": CORE | APQ | LEVERS | MC1 | MC1C | {"M1d"},
+    "fraiseql-v-nocache": CORE | APQ | LEVERS | MC1 | MC1C,  # M1d excluded: tvd_* is tv-pipeline-only
+    "fraiseql-v-cache": CORE | APQ | LEVERS | MC1 | MC1C,
     "fraiseql-tv-audit": {"M1"},  # audit-overhead appendix row — by design
-    "hasura": CORE | LEVERS,  # no native APQ in CE v2; no M1d
-    "postgraphile": CORE | LEVERS,  # persisted ops are an allowlist, not APQ; no M1d
+    "hasura": CORE | LEVERS | MC1,  # no native APQ in CE v2; no M1d
+    "postgraphile": CORE | LEVERS | MC1,  # persisted ops are an allowlist, not APQ; no M1d
     "actix-web-rest": CORE,  # APQ is a GraphQL protocol — N/A for REST
     "async-graphql": CORE | APQ | LEVERS,  # first-party ApolloPersistedQueries extension
     "mercurius": CORE | APQ,  # first-party persistedQueryDefaults.automatic()
@@ -72,6 +74,8 @@ def test_excluded_cells_are_documented():
         "APQ on actix-web-rest",
         "APQ on Strawberry",
         "Read-path levers on engines without offset/order arguments",
+        "MC1 on engines without a comment insert",
+        "MC1c outside FraiseQL",
     ):
         assert marker in doc, f"exclusion '{marker}' missing from docs/scenarios.md"
 
@@ -83,7 +87,7 @@ def test_single_lookup_templates_exist_for_schema_engines():
     assert "tbUserByRowId" in bench._PG_C3_TMPL
 
 
-# ── k6 lockstep for the new REST scenario modes ─────────────────────────────
+# ── k6 lockstep for the REST lookup mode ─────────────────────────────
 
 def test_k6_rest_get_rotating_mode():
     entry = {
@@ -97,25 +101,5 @@ def test_k6_rest_get_rotating_mode():
     assert steps[0]["validate"] == "rest"
 
 
-def test_k6_mc1_rest_is_two_step_cycle():
-    entry = {
-        "mode": "mc1_rest",
-        "put_urls": ["http://x/users/1", "http://x/users/2"],
-        "put_bodies": ['{"bio":"bio-0"}', '{"bio":"bio-1"}'],
-        "q1_url": "http://x/users?limit=20",
-    }
-    steps = bench._entry_to_k6_steps(entry, "rest", "MC1")
-    assert len(steps) == 2
-    assert steps[0]["method"] == "PUT"
-    assert steps[0]["urls"] == entry["put_urls"]
-    assert steps[0]["bodies"] == entry["put_bodies"]
-    assert steps[1] == {
-        "method": "GET",
-        "url": entry["q1_url"],
-        "validate": "rest",
-    }
-
-
 def test_python_workers_exist_for_new_modes():
     assert callable(bench._worker_rest_get_rotating)
-    assert callable(bench._worker_mc1_rest)

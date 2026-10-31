@@ -104,9 +104,10 @@ def test_median_full_grid_no_not_measured(median_grid):
     st = Counter(c.status for c in median_grid.cells.values())
     assert st[build.STATUS_NOT_MEASURED] == 0, \
         "the full publishable run should measure every non-excluded cell"
-    assert st[build.STATUS_RESULT] == 154
-    assert st[build.STATUS_INVALID] == 2            # both tv M1d cells (#247)
-    assert st[build.STATUS_EXCLUDED] == 36
+    assert st[build.STATUS_RESULT] == 143
+    # both tv M1d cells (#247) + the six old-definition MC1 cells (#224)
+    assert st[build.STATUS_INVALID] == 8
+    assert st[build.STATUS_EXCLUDED] == 41
 
 
 def test_median_no_empty_apq_coverage_block(median_run, meta):

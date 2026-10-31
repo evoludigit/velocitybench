@@ -32,6 +32,10 @@ def test_other_cells_of_the_same_run_stay_results(median_grid):
 def test_a_run_after_the_fix_keeps_its_m1d_result(median_run, meta):
     raw = copy.deepcopy(median_run.raw)
     raw["environment"]["timestamp"] = "2027-01-01T00:00:00+00:00"
+    # a post-redesign run carries no MC1 for the engines MC1 now excludes
+    excluded = {(e["framework"], e["scenario"]) for e in meta["exclusions"]}
+    raw["results"] = [r for r in raw["results"]
+                      if (r["framework"], r["query"]) not in excluded]
     run = build.Run(
         environment=raw["environment"],
         framework_versions=raw["framework_versions"],
@@ -73,3 +77,14 @@ def test_delta_mode_says_the_anchor_has_no_valid_write(median_run, meta):
     sent = build._s7_breakeven_sentence(amort, meta)
     assert "trails" not in sent and "leads" not in sent
     assert "no valid M1d measurement" in sent
+
+
+def test_pre_redesign_mc1_is_invalid_or_excluded_never_a_result(median_grid):
+    """MC1 before #224 sent the bio mutation with no cascade: a different
+    scenario. Engines MC1 now excludes by design show the exclusion; the rest
+    show the invalid reason. Neither keeps the old number."""
+    assert median_grid.cell("async-graphql", "MC1").status == "excluded"
+    for fw in ("fraiseql-tv", "hasura", "postgraphile"):
+        cell = median_grid.cell(fw, "MC1")
+        assert cell.status == "invalid", fw
+        assert cell.issue == 224 and cell.rps is None

@@ -201,6 +201,22 @@ def createPost(
     pass
 
 
+@fraiseql.mutation(sql_source="benchmark.fn_create_comment", operation="CREATE")
+def createComment(id: ID, post_id: ID, author_id: ID, content: str) -> Comment:
+    """Add a comment to a post. Returns the comment. MC1 classical cycle."""
+    pass
+
+
+@fraiseql.mutation(
+    sql_source="benchmark.fn_create_comment_cascade", operation="CREATE", cascade=True
+)
+def createCommentCascade(id: ID, post_id: ID, author_id: ID, content: str) -> Comment:
+    """Add a comment to a post. Returns the comment and the cascade: the comment
+    (CREATED) and the post with its latest 10 comments (PostFull, UPDATED). MC1.
+    """
+    pass
+
+
 # ============================================================================
 # Schema Export
 # ============================================================================

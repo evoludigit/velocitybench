@@ -214,6 +214,260 @@ def _apq_hash(query: str) -> str:
     return hashlib.sha256(query.encode()).hexdigest()
 
 
+# MC1: add a comment to a post, and end the cycle holding the post's latest
+# comments as the server now has them. The write changes a list's membership,
+# which no lookup of the comment by id can show a client: that is what a
+# cascade is for. A bio write (MC1 before #224) cannot show one, since the
+# written User is the whole change and its own payload already carries it.
+#
+# FraiseQL's MC1 is one request: createCommentCascade returns the comment and,
+# in its cascade, the post with its latest 10 comments. MC1c (FraiseQL with the
+# cascade off) and every other engine's MC1 are two: the insert, then a
+# re-fetch of the same list. Engines whose schema has no comment insert
+# (hand-written servers with only updateUser) have no MC1.
+#
+# Comment ids come from the harness: _MC1_ID_SLOT in each body is replaced per
+# cycle by _mc1_id(), under a prefix no comment had before the scenario, so
+# the comments the scenario inserted are exactly those under its prefix.
+_MC1_ID_SLOT = "__MC1_ID__"
+_MC1_LIST_LIMIT = 10
+_MC1_POOL_SIZE = 1000
+_MC1_CONTENT = "mc1"
+
+_FRAISEQL_MC1_ARGS = "$id: ID!, $postId: ID!, $authorId: ID!, $content: String!"
+_FRAISEQL_MC1_VALUES = "id: $id, postId: $postId, authorId: $authorId, content: $content"
+_FRAISEQL_MC1_CASCADE = (
+    f"mutation MC1({_FRAISEQL_MC1_ARGS}) {{ createCommentCascade({_FRAISEQL_MC1_VALUES})"
+    " { entity { id } cascade { updated { operation entity { __typename"
+    " ... on Comment { id content createdAt author { id username } }"
+    " ... on PostFull { id comments { id content createdAt author { username } } }"
+    " } } } } }"
+)
+_FRAISEQL_MC1_CREATE = (
+    f"mutation MC1c({_FRAISEQL_MC1_ARGS}) {{ createComment({_FRAISEQL_MC1_VALUES})"
+    " { id content createdAt author { id username } } }"
+)
+_FRAISEQL_MC1_REFETCH = (
+    "query MC1r($id: ID!) { postFull(id: $id)"
+    " { id comments { id content createdAt author { username } } } }"
+)
+
+# Classical engines address the post and author by the integer keys their
+# generated schemas expose. {comment_id} is filled with _MC1_ID_SLOT.
+_MC1_TEMPLATES = {
+    "hasura": (
+        'mutation {{ createComment(object: {{id: "{comment_id}", content: "{content}",'
+        " fk_post: {post_pk}, fk_author: {author_pk}}})"
+        " {{ id content createdAt author {{ id username }} }} }}",
+        '{{ posts(where: {{id: {{_eq: "{post_id}"}}}}) {{ id comments(order_by:'
+        " {{createdAt: desc}}, limit: 10) {{ id content createdAt author {{ username }} }} }} }}",
+    ),
+    "postgraphile": (
+        'mutation {{ createTbComment(input: {{tbComment: {{rowId: "{comment_id}",'
+        ' content: "{content}", fkPost: {post_pk}, fkAuthor: {author_pk}}}}})'
+        " {{ tbComment {{ id: rowId content createdAt"
+        " author: tbUserByFkAuthor {{ id: rowId username }} }} }} }}",
+        '{{ tbPostByRowId(rowId: "{post_id}") {{ id: rowId comments: tbCommentsByFkPost('
+        "first: 10, orderBy: CREATED_AT_DESC) {{ nodes {{ id: rowId content createdAt"
+        " author: tbUserByFkAuthor {{ username }} }} }} }} }}",
+    ),
+}
+
+
+def _mc1_pool(size: int = _MC1_POOL_SIZE) -> list[tuple[str, int, str, int]]:
+    """(post id, post pk, author id, author pk) rows, the same for every engine.
+
+    The author comments on their own post. md5 order spreads the pool over the
+    table and keeps it stable across runs.
+    """
+    rows = _psql(
+        "SELECT p.id, p.pk_post, u.id, u.pk_user FROM benchmark.tb_post p"
+        " JOIN benchmark.tb_user u ON u.pk_user = p.fk_author"
+        f" ORDER BY md5(p.id::text) LIMIT {int(size)}"
+    )
+    return [(r[0], int(r[1]), r[2], int(r[3])) for r in rows if len(r) == 4]
+
+
+def _mc1_id(base: str, run: int, worker: int, n: int) -> str:
+    """Comment id n of a worker in a run (0 probe, 1 warmup, 2 measurement)."""
+    return f"{base[:8]}-{base[8:12]}-{run:04x}-{worker:04x}-{n:012x}"
+
+
+def _mc1_id_range(base: str) -> tuple[str, str]:
+    return (f"{base[:8]}-{base[8:12]}-0000-0000-000000000000",
+            f"{base[:8]}-{base[8:12]}-ffff-ffff-ffffffffffff")
+
+
+def _mc1_new_base() -> str:
+    """A 48-bit id prefix that no comment has: proven, not assumed."""
+    import secrets
+
+    for _ in range(8):
+        base = secrets.token_hex(6)
+        lo, hi = _mc1_id_range(base)
+        rows = _psql(
+            f"SELECT count(*) FROM benchmark.tb_comment WHERE id BETWEEN '{lo}' AND '{hi}'"
+        )
+        if rows and rows[0][0] == "0":
+            return base
+    raise RuntimeError("MC1: no unused comment id prefix in 8 draws")
+
+
+def _mc1_delete_inserted(base: str) -> int:
+    """Delete the comments under base, then VACUUM ANALYZE what they touched.
+
+    No comment was under base before the scenario (_mc1_new_base), so these
+    are the comments the scenario inserted and no other row.
+    """
+    lo, hi = _mc1_id_range(base)
+    rows = _psql(
+        "WITH gone AS (DELETE FROM benchmark.tb_comment"
+        f" WHERE id BETWEEN '{lo}' AND '{hi}' RETURNING 1) SELECT count(*) FROM gone"
+    )
+    _psql("VACUUM ANALYZE benchmark.tb_comment, benchmark.tv_comment")
+    return int(rows[0][0]) if rows and rows[0][0] else 0
+
+
+def _resolve_mc1(
+    fw_config: dict, query_name: str, pool: list[tuple[str, int, str, int]]
+) -> dict | None:
+    """The mc1_cycle entry: one body list per request of the cycle, row i = post i."""
+    template = fw_config.get("mc1_template")
+    q1_entry = fw_config["queries"].get("Q1")
+    url = q1_entry[0] if isinstance(q1_entry, tuple) else fw_config.get("graphql_url")
+    if not (pool and url) or (template != "fraiseql" and template not in _MC1_TEMPLATES):
+        return None
+
+    def body(query: str, variables: dict | None = None) -> bytes:
+        doc = {"query": query} if variables is None else {"query": query, "variables": variables}
+        return json.dumps(doc).encode()
+
+    if template == "fraiseql":
+        def write(post_id, author_id):
+            return body(
+                _FRAISEQL_MC1_CASCADE if query_name == "MC1" else _FRAISEQL_MC1_CREATE,
+                {"id": _MC1_ID_SLOT, "postId": post_id, "authorId": author_id,
+                 "content": _MC1_CONTENT},
+            )
+        steps = [[write(post_id, author_id) for post_id, _pp, author_id, _ap in pool]]
+        if query_name == "MC1c":
+            steps.append([body(_FRAISEQL_MC1_REFETCH, {"id": post_id})
+                          for post_id, *_ in pool])
+    else:
+        create, refetch = _MC1_TEMPLATES[template]
+        steps = [
+            [body(create.format(comment_id=_MC1_ID_SLOT, content=_MC1_CONTENT,
+                                post_pk=post_pk, author_pk=author_pk))
+             for _pid, post_pk, _aid, author_pk in pool],
+            [body(refetch.format(post_id=post_id)) for post_id, *_ in pool],
+        ]
+    return {
+        "mode": "mc1_cycle",
+        "url": url,
+        "steps": steps,
+        "probe_post_pk": pool[0][1],
+        "ids": {"base": _mc1_new_base()},
+    }
+
+
+def _is_mc1(entry) -> bool:
+    return isinstance(entry, dict) and entry.get("mode") == "mc1_cycle"
+
+
+def _mc1_run(entry, run: int) -> dict | None:
+    return {"base": entry["ids"]["base"], "run": run} if _is_mc1(entry) else None
+
+
+def _mc1_listed_ids(doc) -> list[str] | None:
+    """Ids of the first comment list in a response (a list, or a connection's nodes)."""
+    if isinstance(doc, dict):
+        listed = doc.get("comments")
+        if isinstance(listed, dict):
+            listed = listed.get("nodes")
+        if isinstance(listed, list):
+            return [str(c.get("id")) for c in listed if isinstance(c, dict)]
+        for value in doc.values():
+            found = _mc1_listed_ids(value)
+            if found is not None:
+                return found
+    elif isinstance(doc, list):
+        for value in doc:
+            found = _mc1_listed_ids(value)
+            if found is not None:
+                return found
+    return None
+
+
+def _mc1_created_ids(doc) -> list[str]:
+    """Ids of the cascade entries reported CREATED."""
+    found: list[str] = []
+    if isinstance(doc, dict):
+        if doc.get("operation") == "CREATED" and isinstance(doc.get("entity"), dict):
+            found.append(str(doc["entity"].get("id")))
+        for value in doc.values():
+            found += _mc1_created_ids(value)
+    elif isinstance(doc, list):
+        for value in doc:
+            found += _mc1_created_ids(value)
+    return found
+
+
+def _mc1_check_cycle(responses: list, cid: str, expect_len: int, cascade: bool) -> str | None:
+    """What is wrong with one cycle's responses, or None.
+
+    The write's own response names the new comment; the last response lists the
+    post's comments with the new one first and exactly expect_len of them, so a
+    list that appends without truncating fails; a cascade also reports the
+    comment CREATED.
+    """
+    for r in responses:
+        if not isinstance(r, dict) or r.get("errors") or not r.get("data"):
+            return f"response with errors: {json.dumps(r)[:300]}"
+    if cid not in json.dumps(responses[0]):
+        return "the write's response does not name the new comment"
+    if cascade and cid not in _mc1_created_ids(responses[0]):
+        return "the cascade does not report the new comment CREATED"
+    ids = _mc1_listed_ids(responses[-1])
+    if not ids or ids[0] != cid:
+        return f"the new comment is not first in the post's comments ({(ids or [])[:2]})"
+    if len(ids) != expect_len:
+        return f"{len(ids)} comments listed, expected {expect_len}"
+    return None
+
+
+def _mc1_probe(entry: dict) -> str | None:
+    """Run MC1 cycles one at a time on one post, until its list must truncate.
+
+    Returns what is wrong, or None. The probe's comments are under the
+    scenario's id prefix (run 0) and are deleted with the rest.
+    """
+    post_pk = entry["probe_post_pk"]
+    rows = _psql(f"SELECT count(*) FROM benchmark.tb_comment WHERE fk_post = {post_pk}")
+    before = int(rows[0][0])
+    cascade = len(entry["steps"]) == 1
+    for n in range(max(2, _MC1_LIST_LIMIT - before + 1)):
+        cid = _mc1_id(entry["ids"]["base"], 0, 0, n)
+        responses = []
+        for step in entry["steps"]:
+            req = urllib.request.Request(
+                entry["url"],
+                data=step[0].replace(_MC1_ID_SLOT.encode(), cid.encode()),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    responses.append(json.loads(resp.read()))
+            except (urllib.error.URLError, OSError, json.JSONDecodeError) as exc:
+                return f"cycle {n + 1}: {exc}"
+        problem = _mc1_check_cycle(
+            responses, cid, min(before + n + 1, _MC1_LIST_LIMIT), cascade
+        )
+        if problem:
+            return f"cycle {n + 1}: {problem}"
+    return None
+
+
 def _apq_payload_static(sha256: str) -> bytes:
     """Hash-only APQ payload for queries without variables."""
     return json.dumps(
@@ -378,7 +632,6 @@ FRAMEWORKS: dict[str, dict] = {
             # (the endpoint already sorts by created_at DESC, like every list).
             "F3": "http://localhost:8015/users?limit=20",
             "T1": "T1",
-            "MC1": "MC1",  # REST workflow cycle: PUT /users/{id} + GET /users re-fetch
         },
         "health_url": "http://localhost:8015/health",
     },
@@ -401,7 +654,6 @@ FRAMEWORKS: dict[str, dict] = {
             "L1": ("http://localhost:8016/graphql", _ASYNC_GQL_L1),
             "L2": "L2",
             "T1": "T1",
-            "MC1": "MC1",
             # First-party APQ: built-in ApolloPersistedQueries extension
             # (apollo_persisted_queries feature, enabled in the app).
             "Q1_APQ": "Q1_APQ",
@@ -525,7 +777,6 @@ FRAMEWORKS: dict[str, dict] = {
             "F2": ("http://localhost:4002/graphql", _GQL_F2),
             "F3": ("http://localhost:4002/graphql", _FRAISEQL_F3),
             "T1": "T1",
-            "MC1": "MC1",
             # Apollo Server 4 ships APQ natively (on by default, bounded LRU).
             "Q1_APQ": "Q1_APQ",
             "Q2b_APQ": "Q2b_APQ",
@@ -609,7 +860,6 @@ FRAMEWORKS: dict[str, dict] = {
             "F1": ("http://localhost:4012/graphql", _GQL_F1),
             "F2": ("http://localhost:4012/graphql", _GQL_F2),
             "T1": "T1",
-            "MC1": "MC1",
         },
         "health_url": "http://localhost:4012/health",
         "m1_template": _GQL_M1_FLAT_TMPL,
@@ -631,7 +881,6 @@ FRAMEWORKS: dict[str, dict] = {
             "F2": ("http://localhost:4008/graphql", _GQL_F2),
             "F3": ("http://localhost:4008/graphql", _FRAISEQL_F3),
             "T1": "T1",
-            "MC1": "MC1",
             # First-party APQ: mercurius.persistedQueryDefaults.automatic()
             # (enabled in the app — core mercurius feature, no custom code).
             "Q1_APQ": "Q1_APQ",
@@ -661,7 +910,6 @@ FRAMEWORKS: dict[str, dict] = {
             "F2": ("http://localhost:8011/graphql", _GQL_F2),
             "F3": ("http://localhost:8011/graphql", _FRAISEQL_F3),
             "T1": "T1",
-            "MC1": "MC1",
         },
         "health_url": "http://localhost:8011/health",
         "m1_template": _GQL_M1_FLAT_TMPL,
@@ -956,6 +1204,7 @@ FRAMEWORKS: dict[str, dict] = {
         "m1_template": _PG_M1_TMPL,
         "t1_template": "postgraphile",
         "c3_template": _PG_C3_TMPL,
+        "mc1_template": "postgraphile",
     },
     # ------------------------------------------------------------------
     # Schema-to-API engines (no resolver code — API generated from the DB)
@@ -994,6 +1243,7 @@ FRAMEWORKS: dict[str, dict] = {
         "m1_template": _HASURA_M1_TMPL,
         "t1_template": "hasura",
         "c3_template": _HASURA_C3_TMPL,
+        "mc1_template": "hasura",
     },
     # ------------------------------------------------------------------
     # C# / .NET frameworks
@@ -1053,8 +1303,10 @@ FRAMEWORKS: dict[str, dict] = {
             "L1": ("http://localhost:8817/graphql", _FRAISEQL_L1),
             "L2": "L2",
             "T1": "T1",
-            # MC1: mutation-to-consistent-state cycle (cascade: 1 request replaces M1+Q1+C3)
+            # MC1: comment → the post's latest comments, cascade (1 request);
+            # MC1c: the same with the cascade off (insert, then postFull).
             "MC1": "MC1",
+            "MC1c": "MC1c",
             "Q1_APQ": "Q1_APQ",
             "Q2b_APQ": "Q2b_APQ",
             "M1_APQ": "M1_APQ",
@@ -1065,6 +1317,7 @@ FRAMEWORKS: dict[str, dict] = {
         "m1_template": "fraiseql",
         "t1_template": "fraiseql_multi_root",
         "c3_template": _FRAISEQL_C3_TMPL,
+        "mc1_template": "fraiseql",
     },
     # fraiseql-tv-cache: TV tables, cache enabled — post-cascade fragmentation M1 condition
     "fraiseql-tv-cache": {
@@ -1094,7 +1347,10 @@ FRAMEWORKS: dict[str, dict] = {
             "L1": ("http://localhost:8816/graphql", _FRAISEQL_L1),
             "L2": "L2",
             "T1": "T1",
+            # MC1: comment → the post's latest comments, cascade (1 request);
+            # MC1c: the same with the cascade off (insert, then postFull).
             "MC1": "MC1",
+            "MC1c": "MC1c",
             "Q1_APQ": "Q1_APQ",
             "Q2b_APQ": "Q2b_APQ",
             "M1_APQ": "M1_APQ",
@@ -1105,6 +1361,7 @@ FRAMEWORKS: dict[str, dict] = {
         "m1_template": "fraiseql",
         "t1_template": "fraiseql_multi_root",
         "c3_template": _FRAISEQL_C3_TMPL,
+        "mc1_template": "fraiseql",
     },
     # fraiseql-v-nocache: v_* on-the-fly JSONB views, cache disabled — raw JOIN cost baseline
     "fraiseql-v-nocache": {
@@ -1134,7 +1391,10 @@ FRAMEWORKS: dict[str, dict] = {
             "L1": ("http://localhost:8819/graphql", _FRAISEQL_L1),
             "L2": "L2",
             "T1": "T1",
+            # MC1: comment → the post's latest comments, cascade (1 request);
+            # MC1c: the same with the cascade off (insert, then postFull).
             "MC1": "MC1",
+            "MC1c": "MC1c",
             "Q1_APQ": "Q1_APQ",
             "Q2b_APQ": "Q2b_APQ",
             "M1_APQ": "M1_APQ",
@@ -1145,6 +1405,7 @@ FRAMEWORKS: dict[str, dict] = {
         "m1_template": "fraiseql",
         "t1_template": "fraiseql_multi_root",
         "c3_template": _FRAISEQL_C3_TMPL,
+        "mc1_template": "fraiseql",
     },
     # fraiseql-v-cache: v_* on-the-fly JSONB views, cache enabled — where cache earns its keep
     "fraiseql-v-cache": {
@@ -1173,7 +1434,10 @@ FRAMEWORKS: dict[str, dict] = {
             "L1": ("http://localhost:8815/graphql", _FRAISEQL_L1),
             "L2": "L2",
             "T1": "T1",
+            # MC1: comment → the post's latest comments, cascade (1 request);
+            # MC1c: the same with the cascade off (insert, then postFull).
             "MC1": "MC1",
+            "MC1c": "MC1c",
             "Q1_APQ": "Q1_APQ",
             "Q2b_APQ": "Q2b_APQ",
             "M1_APQ": "M1_APQ",
@@ -1185,6 +1449,7 @@ FRAMEWORKS: dict[str, dict] = {
         "m1_template": "fraiseql",
         "t1_template": "fraiseql_multi_root",
         "c3_template": _FRAISEQL_C3_TMPL,
+        "mc1_template": "fraiseql",
     },
     # Phase 5: Observer overhead — fraiseql-tv with audit logging enabled
     "fraiseql-tv-audit": {
@@ -2074,43 +2339,6 @@ def _worker_rest_get_rotating(urls: list[str], end_time: float) -> _WorkerResult
     return latencies, errors, breakdown, samples
 
 
-def _worker_mc1_rest(
-    put_urls: list[str], put_bodies: list[bytes], q1_url: str, end_time: float
-) -> _WorkerResult:
-    """MC1 REST cycle: PUT mutation + GET Q1 re-fetch (2 serial requests).
-
-    REST twin of _worker_mc1_classical — the minimum client work to reach
-    consistent state after a write on a classical REST API. Latency = total
-    wall-clock for the pair; RPS = cycles/second. The mutation url/body pair
-    rotates (write spreading — same reason as M1).
-    """
-    import random
-
-    latencies: list[float] = []
-    errors = 0
-    breakdown: dict[str, int] = {}
-    samples: list[tuple[str, str]] = []
-    conn = _PersistentConn(q1_url)
-    put_paths = [urlparse(u).path for u in put_urls]
-    parsed_q1 = urlparse(q1_url)
-    q1_path = parsed_q1.path + ("?" + parsed_q1.query if parsed_q1.query else "")
-    n = len(put_paths)
-    while time.monotonic() < end_time:
-        t0 = time.monotonic()
-        i = random.randrange(n)  # noqa: S311
-        ok, _lat, cat, detail = conn.put(put_bodies[i], path=put_paths[i])
-        if ok:
-            ok, _lat, cat, detail = conn.get(path=q1_path)
-        if ok:
-            latencies.append((time.monotonic() - t0) * 1000)
-        else:
-            errors += 1
-            breakdown[cat] = breakdown.get(cat, 0) + 1
-            if len(samples) < _MAX_ERROR_SAMPLES:
-                samples.append((cat, detail))
-    return latencies, errors, breakdown, samples
-
-
 def _worker_graphql_composite(url: str, payloads: list[bytes], end_time: float) -> _WorkerResult:
     """Worker for T1 total scenario with multiple sequential GraphQL POSTs.
 
@@ -2169,15 +2397,13 @@ def _worker_rest_composite(urls: list[str], end_time: float) -> _WorkerResult:
     return latencies, errors, breakdown, samples
 
 
-def _worker_mc1_classical(
-    url: str, m1_payloads: list[bytes], q1_payload: bytes, end_time: float
+def _worker_mc1_cycle(
+    url: str, steps: list[list[bytes]], ids: dict, worker: int, end_time: float
 ) -> _WorkerResult:
-    """Worker for MC1 classical cycle: M1 mutation + Q1 re-fetch (2 serial requests).
+    """MC1 cycle: every step of one pool row in order, under a fresh comment id.
 
-    Each cycle represents the minimum client work to reach consistent state after a
-    mutation on a classical GraphQL framework. Latency = total wall-clock for the pair.
-    RPS = mutation-to-consistent-state cycles per second. The mutation payload
-    rotates (write spreading — same reason as M1).
+    The id replaces _MC1_ID_SLOT in each step's body. Latency = total wall-clock
+    for the cycle; RPS = cycles/second.
     """
     import random
 
@@ -2186,11 +2412,16 @@ def _worker_mc1_classical(
     breakdown: dict[str, int] = {}
     samples: list[tuple[str, str]] = []
     conn = _PersistentConn(url)
+    slot = _MC1_ID_SLOT.encode()
+    n = 0
     while time.monotonic() < end_time:
         t0 = time.monotonic()
+        i = random.randrange(len(steps[0]))  # noqa: S311
+        cid = _mc1_id(ids["base"], ids["run"], worker, n).encode()
+        n += 1
         failed = False
-        for payload in (random.choice(m1_payloads), q1_payload):  # noqa: S311
-            ok, _lat, cat, detail = conn.post_graphql(payload)
+        for step in steps:
+            ok, _lat, cat, detail = conn.post_graphql(step[i].replace(slot, cid))
             if not ok:
                 failed = True
                 errors += 1
@@ -2216,7 +2447,7 @@ def run_diagnose(fw_name: str, fw_config: dict) -> None:
             print(f"    {query_name}: skipped (None)", flush=True)
             continue
         # Skip unresolved sentinels and composite entries in diagnose mode
-        if isinstance(entry, str) and entry in ("M1", "MC1", "C3", "HC3", "T1", "M1d", "Q1_APQ", "Q2b_APQ", "M1_APQ"):
+        if isinstance(entry, str) and entry in ("M1", "MC1", "MC1c", "C3", "HC3", "T1", "M1d", "Q1_APQ", "Q2b_APQ", "M1_APQ"):
             print(f"    {query_name}: skipped (unresolved sentinel)", flush=True)
             continue
         if isinstance(entry, dict):
@@ -2299,41 +2530,17 @@ def _entry_to_k6_steps(entry, fw_type: str, query_name: str) -> list[dict]:
         if mode == "rest_get_rotating":
             # Single-entity REST lookups; urls rotate per iteration
             return [{"method": "GET", "urls": entry["urls"], "validate": "rest"}]
-        if mode == "mc1_rest":
-            # REST MC1 cycle: rotating PUT + fixed GET re-fetch (2 steps/iteration)
-            return [
-                {
-                    "method": "PUT",
-                    "urls": entry["put_urls"],
-                    "bodies": entry["put_bodies"],
-                    "validate": "rest",
-                },
-                {"method": "GET", "url": entry["q1_url"], "validate": "rest"},
-            ]
         if mode == "graphql_composite":
             return [gql(entry["url"], p.decode()) for p in entry["payloads"]]
         if mode == "composite":
             return [{"method": "GET", "url": u, "validate": "rest"} for u in entry["urls"]]
-        if mode == "mc1_cascade":
-            return [{
-                "method": "POST", "url": entry["url"],
-                "bodies": [
-                    json.dumps({"query": entry["query"], "variables": v})
-                    for v in entry["variables"]
-                ],
-                "validate": "graphql",
-            }]
-        if mode == "mc1_classical":
-            m1_step = (
-                {
-                    "method": "POST", "url": entry["url"],
-                    "bodies": [p.decode() for p in entry["m1_payloads"]],
-                    "validate": "graphql",
-                }
-                if "m1_payloads" in entry
-                else gql(entry["url"], entry["m1_payload"].decode())
-            )
-            return [m1_step, gql(entry["url"], entry["q1_payload"].decode())]
+        if mode == "mc1_cycle":
+            # One step per request of the cycle; k6 fills _MC1_ID_SLOT per iteration
+            return [
+                {"method": "POST", "url": entry["url"], "bodies": [b.decode() for b in bodies],
+                 "validate": "graphql"}
+                for bodies in entry["steps"]
+            ]
         raise ValueError(f"unknown scenario mode for k6: {mode!r}")
     if fw_type == "graphql":
         if len(entry) == 3:
@@ -2352,9 +2559,12 @@ def _entry_to_k6_steps(entry, fw_type: str, query_name: str) -> list[dict]:
 
 
 def _run_k6(
-    steps: list[dict], concurrency: int, secs: int,
+    steps: list[dict], concurrency: int, secs: int, mc1_ids: dict | None = None,
 ) -> tuple[int, int, dict[str, float]]:
     """Run one k6 pass. Returns (ok_cycles, error_count, latency_ms_percentiles).
+
+    mc1_ids ({"base", "run"}) makes k6 fill _MC1_ID_SLOT with a fresh comment id
+    per iteration (see _mc1_id).
 
     Raises RuntimeError when k6 itself fails — a broken load generator must
     abort the sweep, not degrade into silent zeros.
@@ -2368,6 +2578,7 @@ def _run_k6(
             "concurrency": concurrency,
             "duration_secs": secs,
             "steps": steps,
+            **({"mc1": {**mc1_ids, "slot": _MC1_ID_SLOT}} if mc1_ids else {}),
         }))
         proc = subprocess.run(
             [
@@ -2414,6 +2625,45 @@ def run_scenario(
     warmup_secs: int,
     loadgen: str = "python",
 ) -> BenchResult:
+    """Run one (framework, query) pair; MC1 is checked first and cleaned up after."""
+    entry = fw_config["queries"][query_name]
+    if not _is_mc1(entry):
+        return _run_scenario(
+            fw_name, fw_config, query_name, concurrency, duration_secs, warmup_secs, loadgen
+        )
+    print("    MC1 check:", end=" ", flush=True)
+    problem = _mc1_probe(entry)
+    _mc1_delete_inserted(entry["ids"]["base"])
+    if problem:
+        print(f"FAILED ✗ {problem}", flush=True)
+        result = BenchResult(
+            framework=fw_name, query_name=query_name,
+            duration_secs=duration_secs, concurrency=concurrency,
+        )
+        result.skipped = True
+        result.skip_reason = f"MC1 check failed: {problem}"
+        result.errors = 1
+        result.error_breakdown = {"mc1_check": 1}
+        return result
+    print("new comment first, list capped ✓", flush=True)
+    try:
+        return _run_scenario(
+            fw_name, fw_config, query_name, concurrency, duration_secs, warmup_secs, loadgen
+        )
+    finally:
+        removed = _mc1_delete_inserted(entry["ids"]["base"])
+        print(f"    MC1: deleted the {removed} comments it inserted (untimed)", flush=True)
+
+
+def _run_scenario(
+    fw_name: str,
+    fw_config: dict,
+    query_name: str,
+    concurrency: int,
+    duration_secs: int,
+    warmup_secs: int,
+    loadgen: str,
+) -> BenchResult:
     # Per-framework warmup override (e.g. cache-enabled fraiseql needs 30s to fill LRU).
     warmup_secs = fw_config.get("warmup_secs", warmup_secs)
     """Run warmup then measurement for one (framework, query) pair."""
@@ -2435,13 +2685,17 @@ def run_scenario(
     if loadgen == "k6":
         steps = _entry_to_k6_steps(entry, fw_type, query_name)
         print(f"    warmup {warmup_secs}s...", end=" ", flush=True)
-        _run_k6(steps, concurrency, warmup_secs)
+        _run_k6(steps, concurrency, warmup_secs, _mc1_run(entry, 1))
         print("done", flush=True)
-        if query_name in ("M1", "M1d", "MC1", "M1_APQ"):
+        if _is_mc1(entry):
+            _mc1_delete_inserted(entry["ids"]["base"])
+        if query_name in ("M1", "M1d", "MC1", "MC1c", "M1_APQ"):
             _reset_postgres_state()
         print(f"    measuring {duration_secs}s...", end=" ", flush=True)
         with RssSampler(fw_config["compose_service"]) as rss:
-            ok_cycles, errors, pct = _run_k6(steps, concurrency, duration_secs)
+            ok_cycles, errors, pct = _run_k6(
+                steps, concurrency, duration_secs, _mc1_run(entry, 2)
+            )
         result.rss_steady_mb = rss.median_mb
         result.rss_max_mb = rss.max_mb
         result.cpu_server_cores = rss.cpu_server_cores
@@ -2464,7 +2718,7 @@ def run_scenario(
         return result
 
     def _run_workers(
-        secs: int,
+        secs: int, run: int,
     ) -> tuple[list[float], int, dict[str, int], list[tuple[str, str]]]:
         end_time = time.monotonic() + secs
         all_lats: list[float] = []
@@ -2511,16 +2765,14 @@ def run_scenario(
                     pool.submit(_worker_rest_get_rotating, urls, end_time)
                     for _ in range(concurrency)
                 ]
-            elif isinstance(entry, dict) and entry.get("mode") == "mc1_rest":
-                # REST MC1: PUT mutation + GET Q1 re-fetch — 2 requests per cycle
-                put_urls = entry["put_urls"]
-                put_bodies = [
-                    b.encode() if isinstance(b, str) else b for b in entry["put_bodies"]
-                ]
-                q1_url = entry["q1_url"]
+            elif _is_mc1(entry):
+                # MC1: every step of a pool row per cycle, under a fresh comment id
                 futures = [
-                    pool.submit(_worker_mc1_rest, put_urls, put_bodies, q1_url, end_time)
-                    for _ in range(concurrency)
+                    pool.submit(
+                        _worker_mc1_cycle, entry["url"], entry["steps"],
+                        _mc1_run(entry, run), w, end_time,
+                    )
+                    for w in range(concurrency)
                 ]
             elif isinstance(entry, dict) and entry.get("mode") == "graphql_composite":
                 # FraiseQL T1: chain multiple GraphQL POSTs per iteration
@@ -2535,24 +2787,6 @@ def run_scenario(
                 urls = entry["urls"]
                 futures = [
                     pool.submit(_worker_rest_composite, urls, end_time)
-                    for _ in range(concurrency)
-                ]
-            elif isinstance(entry, dict) and entry.get("mode") == "mc1_cascade":
-                # FraiseQL MC1: single mutation returns cascade — 1 request per cycle
-                url = entry["url"]
-                query = entry["query"]
-                variables = entry["variables"]
-                futures = [
-                    pool.submit(_worker_graphql_with_vars, url, query, variables, end_time)
-                    for _ in range(concurrency)
-                ]
-            elif isinstance(entry, dict) and entry.get("mode") == "mc1_classical":
-                # Classical MC1: M1 mutation + Q1 re-fetch — 2 requests per cycle
-                url = entry["url"]
-                m1_ps = entry.get("m1_payloads") or [entry["m1_payload"]]
-                q1_p = entry["q1_payload"]
-                futures = [
-                    pool.submit(_worker_mc1_classical, url, m1_ps, q1_p, end_time)
                     for _ in range(concurrency)
                 ]
             elif fw_type == "graphql":
@@ -2592,8 +2826,10 @@ def run_scenario(
 
     # Warmup (discard results)
     print(f"    warmup {warmup_secs}s...", end=" ", flush=True)
-    _run_workers(warmup_secs)
+    _run_workers(warmup_secs, 1)
     print("done", flush=True)
+    if _is_mc1(entry):
+        _mc1_delete_inserted(entry["ids"]["base"])
 
     # For mutation scenarios: VACUUM between warmup and measurement.
     #
@@ -2603,13 +2839,13 @@ def run_scenario(
     # warmup writes — the same contamination we prevent between framework runs.
     # Applying _reset_postgres_state() here gives every mutation scenario a clean,
     # pre-warmed starting state regardless of warmup intensity.
-    if query_name in ("M1", "M1d", "MC1", "M1_APQ"):
+    if query_name in ("M1", "M1d", "MC1", "MC1c", "M1_APQ"):
         _reset_postgres_state()
 
     # Measurement
     print(f"    measuring {duration_secs}s...", end=" ", flush=True)
     with RssSampler(fw_config["compose_service"]) as rss:
-        lats, errs, breakdown, samples = _run_workers(duration_secs)
+        lats, errs, breakdown, samples = _run_workers(duration_secs, 2)
     result.rss_steady_mb = rss.median_mb
     result.rss_max_mb = rss.max_mb
     result.cpu_server_cores = rss.cpu_server_cores
@@ -2953,23 +3189,25 @@ def _psql(sql: str) -> list[list[str]]:
 
 
 def set_tview_triggers(enable: bool) -> None:
-    """Enable/disable the pg_tviews triggers on benchmark.tb_user.
+    """Enable/disable the pg_tviews triggers on the tables the scenarios write.
 
     Parity scoping: classical stacks never deploy pg_tviews, so their
     mutations must not pay its cascade. Triggers stay enabled for the
     FraiseQL frameworks (``tview_triggers: True``), whose numbers include
-    their consistency infrastructure's maintenance cost. Scoped to tb_user —
-    the only table the mutation scenarios write.
+    their consistency infrastructure's maintenance cost. Scoped to tb_user
+    (M1) and tb_comment (MC1), the tables the mutation scenarios write. MC1
+    deletes its comments before the triggers come back, so tv_comment never
+    sees them.
     """
     rows = _psql(
-        "SELECT tgname FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid "
+        "SELECT c.relname, tgname FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid "
         "JOIN pg_namespace n ON n.oid = c.relnamespace "
-        "WHERE n.nspname = 'benchmark' AND c.relname = 'tb_user' "
+        "WHERE n.nspname = 'benchmark' AND c.relname IN ('tb_user', 'tb_comment') "
         "AND NOT t.tgisinternal AND t.tgname LIKE 'trg_tview_%'"
     )
     action = "ENABLE" if enable else "DISABLE"
     stmts = "; ".join(
-        f"ALTER TABLE benchmark.tb_user {action} TRIGGER {r[0]}" for r in rows if r[0]
+        f"ALTER TABLE benchmark.{r[0]} {action} TRIGGER {r[1]}" for r in rows if len(r) == 2
     )
     if stmts:
         _psql(stmts)
@@ -3595,6 +3833,78 @@ def format_cache_section(framework_config: dict[str, dict]) -> list[str]:
     return lines
 
 
+def _mc1_requests(framework: str, query_name: str) -> int:
+    """Requests per MC1 cycle: 1 for FraiseQL's cascade, 2 for insert + re-fetch."""
+    cascade = FRAMEWORKS.get(framework, {}).get("mc1_template") == "fraiseql"
+    return 1 if cascade and query_name == "MC1" else 2
+
+
+def _cpu_ms_per_cycle(r: "BenchResult") -> float | None:
+    if r.cpu_server_cores is None or r.cpu_db_cores is None or r.rps <= 0:
+        return None
+    return (r.cpu_server_cores + r.cpu_db_cores) * 1000 / r.rps
+
+
+def format_mc1_section(results: list) -> list[str]:
+    """MC1's round-trip economics, per engine and FraiseQL cascade against no cascade.
+
+    A 1-request cycle and a 2-request cycle are set side by side with their
+    round trips, latency and CPU per cycle, never ranked by a cycles/s ratio.
+    """
+    rows = [
+        r for r in results
+        if r.query_name in ("MC1", "MC1c") and not r.skipped and r.rps > 0
+    ]
+    failed = [r for r in results if r.query_name in ("MC1", "MC1c") and r.skipped
+              and r.skip_reason.startswith("MC1 check failed")]
+    if not rows and not failed:
+        return []
+    lines = [
+        "",
+        "---",
+        "",
+        "## MC1 — Comment to a Consistent Post View",
+        "",
+        "Each cycle adds a comment to a post and ends holding the post's latest 10 comments "
+        "as the server now has them: a list whose membership changed, which no lookup of the "
+        "comment by id can show. FraiseQL's MC1 is one request: `createCommentCascade` returns "
+        "the comment and, in its cascade, the post with its latest 10 comments. FraiseQL's MC1c "
+        "and the other engines' MC1 are two: the insert, then a re-fetch of the same list. "
+        "Engines without a comment insert have no MC1.",
+        "",
+        "Before each run, cycles on one post check the result: the new comment comes first, and "
+        "the list holds exactly as many comments as it should, 10 once the post has more. "
+        "The comments a run inserted are deleted after it, outside the timed window.",
+        "",
+        "| Framework | Scenario | Requests/cycle | Cycles/s | p50 (ms) | CPU ms/cycle (server + db) |",
+        "|---|---|---|---|---|---|",
+    ]
+    for r in sorted(rows, key=lambda r: (r.framework, r.query_name)):
+        cpu = _cpu_ms_per_cycle(r)
+        lines.append(
+            f"| {r.framework} | {r.query_name} | {_mc1_requests(r.framework, r.query_name)} "
+            f"| {r.rps:.0f} | {r.p50_ms:.1f} | {f'{cpu:.2f}' if cpu is not None else '—'} |"
+        )
+    for r in failed:
+        lines.append(f"| {r.framework} | {r.query_name} | — | ❌ {r.skip_reason} | — | — |")
+    by_key = {(r.framework, r.query_name): r for r in rows}
+    for fw in sorted({r.framework for r in rows}):
+        cascade, plain = by_key.get((fw, "MC1")), by_key.get((fw, "MC1c"))
+        if not (cascade and plain):
+            continue
+        a, b = _cpu_ms_per_cycle(cascade), _cpu_ms_per_cycle(plain)
+        cpu = (
+            f", {a:.2f} CPU ms per cycle against {b:.2f}" if a is not None and b is not None
+            else ""
+        )
+        lines.append("")
+        lines.append(
+            f"> **{fw}**: the cascade replaces the re-fetch, 1 round trip instead of 2: "
+            f"p50 {cascade.p50_ms:.1f} ms against {plain.p50_ms:.1f} ms{cpu}."
+        )
+    return lines
+
+
 def format_cpu_section(results: list["BenchResult"]) -> list[str]:
     rows = [
         r for r in results
@@ -3672,7 +3982,8 @@ _QUERY_LABELS = {
     "F2": "`posts(published: true, limit: 10) { id title author { ... } }` — published filter + nesting",
     "F3": "`users(limit: 20) { id username fullName }` — baseline for ORDER BY comparison",
     "T1": "Full blog page load — `post(id) { title content author { ... } comments(limit:10) { content author { ... } } }`",
-    "MC1": "Mutation-to-consistent-state cycle — FraiseQL: 1 request (M1 + cascade data). Classical GraphQL: 2 serial requests (M1 + Q1 re-fetch). REST: 2 serial requests (PUT + GET re-fetch). RPS = cycles/second.",
+    "MC1": "Comment to a consistent post view — add a comment, end holding the post's latest 10 comments. FraiseQL: 1 request (the cascade carries the post). Hasura, PostGraphile: 2 serial requests (insert + re-fetch). RPS = cycles/second.",
+    "MC1c": "MC1 on FraiseQL with the cascade off — 2 serial requests (createComment + postFull re-fetch). RPS = cycles/second.",
     "Q1_APQ": "APQ hash-only Q1 — no query string sent, server resolves by SHA-256 hash. Compare to Q1.",
     "Q2b_APQ": "APQ hash-only Q2b — nested posts+author query via hash lookup. Compare to Q2b.",
     "M1_APQ": "APQ mutation — hash + variables only (FraiseQL) or hash-only (classical). Compare to M1.",
@@ -4118,45 +4429,7 @@ def format_report(
                 f"| {image_str} | {ram_str} | {cpu_str} |"
             )
 
-    # MC1 cascade advantage note — only when MC1 results are present
-    mc1_results = [r for r in results if r.query_name == "MC1" and not r.skipped]
-    if mc1_results:
-        fraiseql_mc1 = [
-            r for r in mc1_results
-            if FRAMEWORKS.get(r.framework, {}).get("m1_template") == "fraiseql"
-        ]
-        classical_mc1 = [r for r in mc1_results if r not in fraiseql_mc1]
-        lines += [
-            "",
-            "---",
-            "",
-            "## MC1 — Cascade Advantage",
-            "",
-            "**Requests per cycle** (what a client must issue to reach fully consistent state after a mutation):",
-            "",
-            "| Framework type | Requests/cycle | What is sent |",
-            "|----------------|---------------|--------------|",
-            "| FraiseQL | **1** | M1 mutation — `cascade` field in response contains all affected entities |",
-            "| Classical GraphQL | **2** | M1 mutation (1) + Q1 list re-fetch (2) |",
-            "",
-            "RPS above = **cycles/second** (mutation-to-consistent-state cycles, not raw requests).  ",
-            "At equal cycles/second, FraiseQL issues 2× fewer HTTP round trips and returns ~0 stale entities.  ",
-            "Classical frameworks must fire follow-up queries to invalidate stale cache entries.",
-        ]
-        if fraiseql_mc1 and classical_mc1:
-            # fraiseql-v MC1 is under investigation (p50 matches Q1 read speed, not mutation speed).
-            # Restrict FraiseQL champion to fraiseql-tv variants whose MC1 is confirmed correct.
-            fraiseql_tv_mc1 = [r for r in fraiseql_mc1 if "fraiseql-v" not in r.framework]
-            mc1_champion_pool = fraiseql_tv_mc1 if fraiseql_tv_mc1 else fraiseql_mc1
-            best_fraiseql = max(mc1_champion_pool, key=lambda r: r.rps)
-            best_classical = max(classical_mc1, key=lambda r: r.rps)
-            ratio = best_fraiseql.rps / best_classical.rps if best_classical.rps > 0 else 0
-            lines += [
-                "",
-                f"> **Peak**: {best_fraiseql.framework} {best_fraiseql.rps:.0f} cycles/s (1 req) vs "
-                f"{best_classical.framework} {best_classical.rps:.0f} cycles/s (2 req) — "
-                f"{ratio:.1f}× more cycles/s with half the round trips.",
-            ]
+    lines += format_mc1_section(results)
 
     # M1 cascade characteristics note — only when M1 results are present
     m1_results = [r for r in results if r.query_name == "M1" and not r.skipped]
@@ -4696,7 +4969,6 @@ def main() -> None:
         # Resolve M1, C3, and MC1 sentinel queries at runtime (need a real user UUID)
         needs_user_id = (
             fw_config["queries"].get("M1") == "M1"
-            or fw_config["queries"].get("MC1") == "MC1"
             or fw_config["queries"].get("C3") == "C3"
             or fw_config["queries"].get("HC3") == "HC3"
         )
@@ -4885,89 +5157,22 @@ def main() -> None:
                     }
                     print(f"  {_c3_key}: {pool_desc} — rendered documents", flush=True)
 
-            if fw_config["queries"].get("MC1") == "MC1" and fw_config["type"] == "rest":
-                # REST workflow cycle: PUT /users/{id} mutation + GET Q1 re-fetch
-                # (2 serial requests — same asymmetry as classical GraphQL MC1).
-                if user_id:
-                    user_ids_mc1 = _discover_user_uuids(fw_config) or [user_id]
-                    q1_url = fw_config["queries"]["Q1"]
-                    base = q1_url.rsplit("/users", 1)[0]
-                    pairs = _rotating_writes(user_ids_mc1, _M1_BIOS)
-                    fw_config["queries"]["MC1"] = {
-                        "mode": "mc1_rest",
-                        "put_urls": [f"{base}/users/{uid}" for uid, _ in pairs],
-                        "put_bodies": [json.dumps({"bio": bio}) for _, bio in pairs],
-                        "q1_url": q1_url,
-                    }
-                    print(
-                        f"  MC1: REST classical (2 req/cycle), {len(user_ids_mc1)} user "
-                        f"UUIDs × {len(_M1_BIOS)} bio values (rotating writes)",
-                        flush=True,
-                    )
-                else:
-                    fw_config["queries"]["MC1"] = None
-                    print("  MC1: could not discover user UUID — skipping", flush=True)
-            elif fw_config["queries"].get("MC1") == "MC1":
-                q1_entry = fw_config["queries"].get("Q1")
-                gql_url = (
-                    q1_entry[0]
-                    if q1_entry is not None and isinstance(q1_entry, tuple)
-                    else fw_config.get("graphql_url", "")
+        # MC1 / MC1c: a comment on one of the pool's posts per cycle, then the
+        # post's latest comments. The pool (posts and their int keys) is read
+        # from the database once, so every engine writes to the same posts.
+        for _mc1_key in ("MC1", "MC1c"):
+            if fw_config["queries"].get(_mc1_key) != _mc1_key:
+                continue
+            fw_config["queries"][_mc1_key] = _resolve_mc1(fw_config, _mc1_key, _mc1_pool())
+            _mc1 = fw_config["queries"][_mc1_key]
+            if _mc1:
+                print(
+                    f"  {_mc1_key}: {len(_mc1['steps'])} request(s)/cycle over "
+                    f"{len(_mc1['steps'][0])} posts, comment ids under {_mc1['ids']['base']}",
+                    flush=True,
                 )
-                q1_query = q1_entry[1] if q1_entry is not None and isinstance(q1_entry, tuple) else _GQL_Q1
-                m1_tmpl = fw_config.get("m1_template")
-                if m1_tmpl == "fraiseql":
-                    # FraiseQL cascade: mutation response includes all affected entities.
-                    # 1 request per cycle replaces M1 + Q1 + C3 on classical frameworks.
-                    user_ids_mc1 = _discover_user_uuids(fw_config)
-                    if not user_ids_mc1 and user_id:
-                        user_ids_mc1 = [user_id]
-                    if user_ids_mc1:
-                        # Rotating bios: a constant value would no-op after the
-                        # first cycle and return an EMPTY cascade — measuring
-                        # nothing (2026-07-04 finding).
-                        variables_list = [
-                            {"id": uid, "bio": bio}
-                            for uid, bio in _rotating_writes(user_ids_mc1, _M1_BIOS)
-                        ]
-                        fw_config["queries"]["MC1"] = {
-                            "mode": "mc1_cascade",
-                            "url": gql_url,
-                            "query": _FRAISEQL_M1_QUERY,
-                            "variables": variables_list,
-                        }
-                        print(
-                            f"  MC1: cascade (1 req/cycle), {len(user_ids_mc1)} user UUIDs "
-                            f"× {len(_M1_BIOS)} bio values (rotating writes)",
-                            flush=True,
-                        )
-                    else:
-                        fw_config["queries"]["MC1"] = None
-                        print("  MC1: could not discover user UUIDs — skipping", flush=True)
-                else:
-                    # Classical: M1 mutation + Q1 re-fetch (2 serial requests per cycle).
-                    if user_id and gql_url:
-                        user_ids_mc1 = _discover_user_uuids(fw_config) or [user_id]
-                        tmpl = m1_tmpl if isinstance(m1_tmpl, str) else _GQL_M1_TMPL
-                        m1_payloads = [
-                            json.dumps({"query": tmpl.format(user_id=uid, bio=bio)}).encode()
-                            for uid, bio in _rotating_writes(user_ids_mc1, _M1_BIOS)
-                        ]
-                        q1_payload = json.dumps({"query": q1_query}).encode()
-                        fw_config["queries"]["MC1"] = {
-                            "mode": "mc1_classical",
-                            "url": gql_url,
-                            "m1_payloads": m1_payloads,
-                            "q1_payload": q1_payload,
-                        }
-                        print(
-                            f"  MC1: classical (2 req/cycle), {len(user_ids_mc1)} user UUIDs "
-                            f"× {len(_M1_BIOS)} bio values (rotating writes)",
-                            flush=True,
-                        )
-                    else:
-                        fw_config["queries"]["MC1"] = None
-                        print("  MC1: could not discover user UUID — skipping", flush=True)
+            else:
+                print(f"  {_mc1_key}: no MC1 template for this engine — skipping", flush=True)
 
         # Resolve the L2 lever sentinel: the same post (most comments) for every engine.
         if fw_config["queries"].get("L2") == "L2":
