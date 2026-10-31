@@ -32,7 +32,7 @@ ON CONFLICT (pk_user) DO UPDATE
 ANALYZE benchmark.tv_user;
 
 -- Sync tv_post from tb_post (with embedded author)
-INSERT INTO benchmark.tv_post (pk_post, id, identifier, fk_author, _published, author_id, data)
+INSERT INTO benchmark.tv_post (pk_post, id, identifier, fk_author, _published, author_id, created_at, data)
 SELECT
     p.pk_post,
     p.id,
@@ -40,6 +40,7 @@ SELECT
     p.fk_author,
     p.published,
     u.id,
+    p.created_at,
     jsonb_build_object(
         'id',         p.id::text,
         'identifier', p.identifier,
@@ -65,12 +66,13 @@ ON CONFLICT (pk_post) DO UPDATE
     SET data       = EXCLUDED.data,
         fk_author  = EXCLUDED.fk_author,
         _published = EXCLUDED._published,
-        author_id  = EXCLUDED.author_id;
+        author_id  = EXCLUDED.author_id,
+        created_at = EXCLUDED.created_at;
 
 ANALYZE benchmark.tv_post;
 
 -- Sync tv_comment from tb_comment (with embedded author + post + post.author)
-INSERT INTO benchmark.tv_comment (pk_comment, id, identifier, fk_author, fk_post, author_id, post_id, data)
+INSERT INTO benchmark.tv_comment (pk_comment, id, identifier, fk_author, fk_post, author_id, post_id, created_at, data)
 SELECT
     c.pk_comment,
     c.id,
@@ -79,6 +81,7 @@ SELECT
     c.fk_post,
     u.id,
     p.id,
+    c.created_at,
     jsonb_build_object(
         'id',         c.id::text,
         'identifier', c.identifier,
@@ -124,7 +127,8 @@ ON CONFLICT (pk_comment) DO UPDATE
         fk_author  = EXCLUDED.fk_author,
         fk_post    = EXCLUDED.fk_post,
         author_id  = EXCLUDED.author_id,
-        post_id    = EXCLUDED.post_id;
+        post_id    = EXCLUDED.post_id,
+        created_at = EXCLUDED.created_at;
 
 ANALYZE benchmark.tv_comment;
 

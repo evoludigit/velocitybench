@@ -1,5 +1,6 @@
 # FraiseQL Dockerfile for VelocityBench
-# Multi-stage build: Python schema gen -> CLI compile -> Debian runtime
+# Multi-stage build: Python schema gen -> FraiseQL binaries -> Debian runtime, which
+# compiles the schema against the database at start (entrypoint.sh).
 
 # Single source of truth for the FraiseQL version. The binaries must report
 # exactly this version; the build fails otherwise. Exported as FRAISEQL_VERSION
@@ -49,9 +50,7 @@ RUN python schema_source.py && \
      mv schema_tv_audit.json schema.json 2>/dev/null || true)
 
 # ============================================================================
-# Stage 2: Compile schema with fraiseql-cli
-# The build directory intentionally has NO fraiseql.toml (server config)
-# to avoid auto-discovery conflicts with the CLI's TOML parser.
+# Stage 2: FraiseQL binaries (the release, or the injected build)
 # ============================================================================
 FROM debian:trixie-slim AS builder
 
@@ -83,16 +82,6 @@ RUN set -eu; \
     fraiseql-cli --version | grep -F "${FRAISEQL_VERSION}"; \
     fraiseql-server --version | grep -F "${FRAISEQL_VERSION}"
 
-WORKDIR /build
-
-# Copy only schema.json and compile config — no server config here
-ARG BUILD_TOML
-COPY --from=schema-builder /app/schema.json .
-COPY ${BUILD_TOML} ./fraiseql.toml
-
-# Compile schema: legacy JSON workflow (types/queries/mutations in schema.json)
-RUN fraiseql-cli compile schema.json --output schema.compiled.json
-
 
 # ============================================================================
 # Stage 3: Runtime image
@@ -103,17 +92,24 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     libssl3 \
     curl \
+    jq \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-COPY --from=builder /usr/local/bin/fraiseql-server /usr/local/bin/
-COPY --from=builder /build/schema.compiled.json .
+COPY --from=builder /usr/local/bin/fraiseql-server /usr/local/bin/fraiseql-cli /usr/local/bin/
+COPY entrypoint.sh /usr/local/bin/fraiseql-entrypoint
+
+# The compile inputs, apart from the server's config: the compiler reads the
+# fraiseql.toml beside schema.json, the server the one in /app.
+ARG BUILD_TOML
+COPY --from=schema-builder /app/schema.json compile/schema.json
+COPY ${BUILD_TOML} compile/fraiseql.toml
 
 ARG SERVER_TOML
 COPY ${SERVER_TOML} ./fraiseql.toml
 
-RUN useradd -r -s /bin/false fraiseql
+RUN useradd -r -s /bin/false fraiseql && chown fraiseql /app
 USER fraiseql
 
 ARG FRAISEQL_VERSION
@@ -124,7 +120,7 @@ ENV DATABASE_URL=postgresql://benchmark:benchmark123@postgres:5432/velocitybench
 
 EXPOSE 8815
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD curl -f http://localhost:8815/health || exit 1
 
-CMD ["fraiseql-server"]
+ENTRYPOINT ["fraiseql-entrypoint"]

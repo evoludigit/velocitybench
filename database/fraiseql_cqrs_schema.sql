@@ -52,7 +52,9 @@ CREATE INDEX idx_tb_post_id ON benchmark.tb_post(id);
 CREATE INDEX idx_tb_post_identifier ON benchmark.tb_post(identifier);
 CREATE INDEX idx_tb_post_fk_author ON benchmark.tb_post(fk_author);  -- Fast INT FK index
 CREATE INDEX idx_tb_post_published ON benchmark.tb_post(published);
-CREATE INDEX idx_tb_post_created ON benchmark.tb_post(created_at DESC);
+-- Ends in id: an offset page orders by its sort key, then id. Serves fv_post's
+-- created_at too, the column a createdAt sort reads (posts(createdAt:)).
+CREATE INDEX idx_tb_post_created ON benchmark.tb_post(created_at DESC, id);
 
 -- Comments table (command side) - Trinity Pattern with INT foreign keys
 CREATE TABLE benchmark.tb_comment (
@@ -74,7 +76,7 @@ CREATE TABLE benchmark.tb_comment (
 CREATE INDEX idx_tb_comment_id ON benchmark.tb_comment(id);
 CREATE INDEX idx_tb_comment_fk_post ON benchmark.tb_comment(fk_post);    -- Fast INT FK index
 CREATE INDEX idx_tb_comment_fk_author ON benchmark.tb_comment(fk_author);  -- Fast INT FK index
-CREATE INDEX idx_tb_comment_created ON benchmark.tb_comment(created_at DESC);
+CREATE INDEX idx_tb_comment_created ON benchmark.tb_comment(created_at DESC, id);
 
 -- ============================================================================
 -- QUERY SIDE: Denormalized JSONB tables for reads (tv_* prefix)
@@ -152,6 +154,10 @@ SELECT tviews.pg_tviews_create('tv_post', $TVIEW_SQL$
         p.fk_author   AS fk_author,
         p.published   AS _published,
         u.id          AS author_id,
+        -- The post's date as a column, for orderBy createdAt (posts(createdAt:)).
+        -- pg_tviews 0.1.0-beta.34 keeps a TVIEW to its definition's columns, so
+        -- this is tb_post's own value, not a write time.
+        p.created_at  AS created_at,
         jsonb_build_object(
             'id',         p.id::text,
             'identifier', p.identifier,
@@ -179,6 +185,9 @@ $TVIEW_SQL$, COALESCE(NULLIF(current_setting('velocitybench.tview_options', true
 -- FraiseQL can filter directly with boolean params instead of JSONB extraction.
 ALTER TABLE benchmark.tv_post ALTER COLUMN _published TYPE boolean USING _published::boolean;
 ALTER TABLE benchmark.tv_post SET (fillfactor=70);
+-- Ends in pk_post: a TVIEW page orders by its sort key, then pk_post. created_at never
+-- changes on refresh, so refreshes stay HOT.
+CREATE INDEX idx_tv_post_created_at ON benchmark.tv_post (created_at DESC, pk_post);
 
 -- tv_comment — author + post (with its author) embedded via JOINs
 SELECT tviews.pg_tviews_create('tv_comment', $TVIEW_SQL$
@@ -190,6 +199,7 @@ SELECT tviews.pg_tviews_create('tv_comment', $TVIEW_SQL$
         c.fk_post     AS fk_post,
         u.id          AS author_id,
         p.id          AS post_id,
+        c.created_at  AS created_at,
         jsonb_build_object(
             'id',         c.id::text,
             'identifier', c.identifier,
@@ -232,6 +242,7 @@ SELECT tviews.pg_tviews_create('tv_comment', $TVIEW_SQL$
     JOIN benchmark.tb_user pu ON pu.pk_user = p.fk_author
 $TVIEW_SQL$, COALESCE(NULLIF(current_setting('velocitybench.tview_options', true), ''), '{}')::jsonb);
 ALTER TABLE benchmark.tv_comment SET (fillfactor=70);
+CREATE INDEX idx_tv_comment_created_at ON benchmark.tv_comment (created_at DESC, pk_comment);
 
 -- ============================================================================
 -- COMMENTS AND DOCUMENTATION

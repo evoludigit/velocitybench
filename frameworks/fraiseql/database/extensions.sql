@@ -70,7 +70,10 @@ SELECT
     p.fk_author    AS _author_pk,
     p.published    AS _published,
     -- posts(authorId:) filters on this column.
-    u.id           AS author_id
+    u.id           AS author_id,
+    -- orderBy createdAt reads this column (posts(createdAt:)), served by
+    -- idx_tb_post_created (created_at DESC, id).
+    p.created_at
 FROM benchmark.tb_post p
 LEFT JOIN benchmark.tb_user u ON u.pk_user = p.fk_author;
 
@@ -120,7 +123,8 @@ SELECT
     c.fk_post      AS _post_pk,
     p.id           AS post_id,
     -- comments(authorId:) filters on this column.
-    u.id           AS author_id
+    u.id           AS author_id,
+    c.created_at
 FROM benchmark.tb_comment c
 LEFT JOIN benchmark.tb_user u  ON u.pk_user   = c.fk_author
 LEFT JOIN benchmark.tb_post p  ON p.pk_post   = c.fk_post
