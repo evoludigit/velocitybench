@@ -2978,20 +2978,28 @@ def set_tview_triggers(enable: bool) -> None:
 def resync_tview_user() -> int:
     """Recompute tv rows that drifted while triggers were disabled.
 
-    An identity update (bio = bio) on exactly the drifted rows re-fires the
-    tview cascade, restoring tb/tv sync without a full-table refresh.
-    Returns the number of rows resynced.
+    pg_tviews refreshes a row only for an UPDATE that changes a column the
+    TVIEW reads (since 0.1.0-beta.30), so an identity update (bio = bio)
+    refreshes nothing (#243). Each drifted row's bio is written to a value it
+    does not hold, then back, in one transaction: the second write refreshes
+    tv_user, and every TVIEW embedding it, from the row's own value, without a
+    full-table refresh. Returns the number of rows resynced.
     """
     rows = _psql(
+        "CREATE TEMP TABLE bench_resync AS"
+        "  SELECT tb.pk_user, tb.bio FROM benchmark.tb_user tb"
+        "  JOIN benchmark.tv_user tv USING (pk_user)"
+        "  WHERE tv.data->>'bio' IS DISTINCT FROM tb.bio;"
+        "UPDATE benchmark.tb_user tb SET bio = coalesce(r.bio, '') || chr(1)"
+        "  FROM bench_resync r WHERE r.pk_user = tb.pk_user;"
         "WITH fixed AS ("
-        "  UPDATE benchmark.tb_user tb SET bio = tb.bio"
-        "  FROM benchmark.tv_user tv"
-        "  WHERE tv.pk_user = tb.pk_user"
-        "  AND tv.data->>'bio' IS DISTINCT FROM tb.bio"
+        "  UPDATE benchmark.tb_user tb SET bio = r.bio"
+        "  FROM bench_resync r WHERE r.pk_user = tb.pk_user"
         "  RETURNING 1"
         ") SELECT count(*) FROM fixed"
     )
-    return int(rows[0][0]) if rows and rows[0][0] else 0
+    # psql prints each earlier statement's tag; the count is the last line.
+    return int(rows[-1][0]) if rows and rows[-1][0] else 0
 
 
 def snapshot_user_bios() -> None:
