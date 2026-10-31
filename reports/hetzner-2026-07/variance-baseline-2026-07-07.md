@@ -4,6 +4,8 @@
 **Run B**: reports/hetzner-2026-07/bench-hetzner-2026-07-07-sweep4.json  
 **Cell threshold**: ±5%  
 
+> **Invalid (#247):** the M1d rows below measured a no-op. The tvd_* tables were seeded before the bulk sync filled tv_*, so updateUserDelta patched a near-empty copy of the dataset (5 of 500,005 comments on current main).
+
 | Framework | Query | Metric | A | B | Δ% | |
 |-----------|-------|--------|--:|--:|---:|--|
 | actix-web-rest | C3 | rps | 10941.3 | 11213.7 | +2.5 |  |

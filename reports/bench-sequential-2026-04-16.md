@@ -99,6 +99,8 @@ Views (v_*) add no storage — they are computed at query time.
 
 ## M1d — `mutation { updateUserDelta(...) { id bio } }` — jsonb_delta surgical patch on tvd_* (rotating bios)
 
+> **Invalid (#247):** the tvd_* tables were seeded before the bulk sync filled tv_*, so updateUserDelta patched a near-empty copy of the dataset (5 of 500,005 comments on current main); this M1d figure measured a no-op.
+
 | Framework | Language | Query | RPS | p50 ms | p95 ms | p99 ms | Requests | Errors |
 |-----------|----------|-------|----:|-------:|-------:|-------:|---------:|--------|
 | fraiseql-tv | Rust | M1d | 8713 | 4.2 | 8.2 | 10.6 | 261,401 | 0.0% |

@@ -270,6 +270,8 @@ SELECT pg_reload_conf();
 
 Searching for tvd_* results... (not shown in main results, only M1d delta shown: 5,445 RPS).
 
+> **Invalid (#247):** the tvd_* tables were seeded before the bulk sync filled tv_*, so updateUserDelta patched a near-empty copy of the dataset (5 of 500,005 comments on current main); this M1d figure measured a no-op.
+
 **Recommendation**: Re-run benchmark with fraiseql-tvd-cache (LOGGED variant) to quantify durability cost.
 
 ---

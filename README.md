@@ -48,8 +48,9 @@ third-to-a-sixth of the latency, in ~11× less RAM, and its lead *widens* with n
 > trivial flat cases — raw Rust will always beat a compiled-from-schema engine on a query
 > someone hand-tuned, and that is why they are shown. Against its **own category** it tops
 > the field. The write path is shown just as honestly: FraiseQL's full-cascade mutation is
-> deliberately slow (strong consistency), while its delta path competes with the fastest
-> writers — see the [write-trade selector](site/#s5-write-trade).
+> deliberately slow (strong consistency) — see the [write-trade selector](site/#s5-write-trade).
+> Its delta path (M1d) has no valid measurement yet: every M1d result before #247 was
+> fixed measured a no-op.
 
 ---
 

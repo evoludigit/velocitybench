@@ -109,6 +109,8 @@ The TV regression is likely **environmental** (database state, HOT compression),
 
 ### M1d — jsonb_delta Surgical PATCH (UPDATE only changed fields)
 
+> **Invalid (#247):** the tvd_* tables were seeded before the bulk sync filled tv_*, so updateUserDelta patched a near-empty copy of the dataset (5 of 500,005 comments on current main); the M1d figure and the verdict drawn from it measured a no-op.
+
 | Variant | M1d | M1 | Overhead |
 |---------|----:|---:|----------|
 | fraiseql-tv | 5,445 | 5,864 | −7% (slightly slower) |
