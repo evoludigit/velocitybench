@@ -88,10 +88,11 @@ def test_grid_covers_full_cross_product(grid, meta):
 def test_grid_partition_no_silent_gaps(grid):
     statuses = [c.status for c in grid.cells.values()]
     assert set(statuses) <= {"result", "excluded", "not_measured", "invalid"}
-    assert statuses.count("result") == 117
-    assert statuses.count("invalid") == 1           # fraiseql-tv M1d (#247)
-    assert statuses.count("excluded") == 36
-    assert statuses.count("not_measured") == 38
+    assert statuses.count("result") == 109
+    # fraiseql-tv M1d (#247) + the six MC1 rows of the old definition (#224)
+    assert statuses.count("invalid") == 7
+    assert statuses.count("excluded") == 41
+    assert statuses.count("not_measured") == 35
 
 
 def test_result_cell_carries_metrics(grid):
@@ -129,9 +130,13 @@ def test_cross_check_exclusions_have_no_result_row(grid, meta):
 
 
 def test_cross_check_results_are_not_excluded(sweep3_run, meta):
+    """Only a redefined scenario's old rows may sit on a current exclusion."""
     excluded = {(e["framework"], e["scenario"]) for e in meta["exclusions"]}
+    redefined = {i["scenario"] for i in meta["invalid_results"]
+                 if i.get("redefined")}
     for r in sweep3_run.results:
-        assert (r["framework"], r["query"]) not in excluded
+        if r["query"] not in redefined:
+            assert (r["framework"], r["query"]) not in excluded
 
 
 def test_contradiction_present_and_excluded_raises(sweep3_run, meta):

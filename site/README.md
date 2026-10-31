@@ -65,7 +65,9 @@ against this contract:
   thing. `scenarios.json` `invalid_results` names the scenario, the issue and
   the first valid run date (`measured_before`); a run older than that renders
   the reason in place of the number, and the number reaches no chart or model.
-  The 07-07 median's M1d is one (#247).
+  The 07-07 median's M1d is one (#247). An entry marked `redefined` covers a
+  scenario whose definition changed (MC1, #224): an old row for an engine the
+  new definition excludes shows the exclusion rather than failing the build.
 
 A result that collides with a by-design exclusion fails the build loudly —
 the grid can never silently drift.

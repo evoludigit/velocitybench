@@ -442,6 +442,13 @@
   },
   "invalid_results": [
     {
+      "scenario": "MC1",
+      "measured_before": "2026-11-01",
+      "issue": 224,
+      "redefined": true,
+      "reason": "Invalid (#224): MC1 before its redesign sent the plain bio mutation with no cascade selected, so it measured a different scenario from today's comment-to-consistent-post-view workflow."
+    },
+    {
       "scenario": "M1d",
       "measured_before": "2026-11-01",
       "issue": 247,
