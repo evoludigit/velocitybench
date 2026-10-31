@@ -123,7 +123,8 @@ def _postgres_running() -> bool:
 
 @pytest.mark.skipif(not _postgres_running(), reason="postgres container not running")
 def test_trigger_disable_resync_roundtrip():
-    """Disable triggers → write drifts tv_user → enable + resync restores it."""
+    """Disable triggers → write drifts tv_user and the author copies tv_post
+    embeds → enable + resync restores both (#243)."""
     sql = bench._psql  # tiny helper: run SQL via docker compose exec, return rows
     row = sql("SELECT id, bio FROM benchmark.tb_user ORDER BY pk_user LIMIT 1")[0]
     uid, orig_bio = row[0], row[1]
@@ -143,6 +144,13 @@ def test_trigger_disable_resync_roundtrip():
             f"JOIN benchmark.tb_user tb USING (pk_user) WHERE tb.id = '{uid}'"
         )[0][0]
         assert fresh == "drift-test"
+        # The posts embedding this author: a refresh of tv_user alone leaves them stale.
+        posts = sql(
+            "SELECT count(*), count(*) FILTER (WHERE data->'author'->>'bio' = 'drift-test') "
+            f"FROM benchmark.tv_post WHERE data->'author'->>'id' = '{uid}'"
+        )[0]
+        assert int(posts[0]) > 0, "the user must author posts for this check to mean anything"
+        assert posts[0] == posts[1], f"embedded author bios not resynced: {posts}"
     finally:
         bench.set_tview_triggers(True)
         orig = "NULL" if orig_bio is None else f"'{orig_bio}'"
