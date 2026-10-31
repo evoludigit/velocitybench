@@ -216,7 +216,8 @@ CREATE INDEX IF NOT EXISTS idx_tv_post_fk_author    ON benchmark.tv_post(fk_auth
 --
 -- Structurally identical to tv_* but owned exclusively by fn_update_user_delta.
 -- pg_tviews writes to tv_*; jsonb_delta patches write to tvd_*.
--- Seeded from tv_* at init time; diverges after mutations.
+-- Seeded from tv_* at the end of fraiseql_tv_bulk_sync.sql, once tv_* holds
+-- the dataset (this file runs before the bulk sync); diverges after mutations.
 --
 -- Purpose: isolated benchmark target for jsonb_delta surgical-patch vs
 -- pg_tviews full-recompute cascade comparison (M1 vs M1d).
@@ -260,21 +261,6 @@ CREATE INDEX IF NOT EXISTS idx_tvd_post_fk_author   ON benchmark.tvd_post(fk_aut
 CREATE INDEX IF NOT EXISTS idx_tvd_comment_id       ON benchmark.tvd_comment(id);
 CREATE INDEX IF NOT EXISTS idx_tvd_comment_fk_post  ON benchmark.tvd_comment(fk_post);
 CREATE INDEX IF NOT EXISTS idx_tvd_comment_fk_author ON benchmark.tvd_comment(fk_author);
-
--- Seed from tv_* (run once at init; INSERT … ON CONFLICT DO NOTHING is idempotent)
-INSERT INTO benchmark.tvd_user
-    SELECT pk_user, id, identifier, data FROM benchmark.tv_user
-    ON CONFLICT (pk_user) DO NOTHING;
-
-INSERT INTO benchmark.tvd_post
-    SELECT pk_post, id, identifier, data, fk_author, author_id, _published
-    FROM benchmark.tv_post
-    ON CONFLICT (pk_post) DO NOTHING;
-
-INSERT INTO benchmark.tvd_comment
-    SELECT pk_comment, id, identifier, data, fk_author, fk_post, author_id, post_id
-    FROM benchmark.tv_comment
-    ON CONFLICT (pk_comment) DO NOTHING;
 
 GRANT SELECT, INSERT, UPDATE ON benchmark.tvd_user    TO PUBLIC;
 GRANT SELECT, INSERT, UPDATE ON benchmark.tvd_post    TO PUBLIC;
@@ -386,6 +372,18 @@ BEGIN
 
     v_patch := jsonb_build_object('bio', p_bio);
 
+    SELECT ARRAY(SELECT pk_post FROM benchmark.tb_post WHERE fk_author = v_pk)
+    INTO v_post_pks;
+
+    -- Lock every tvd_comment row this call patches, in one pk order, before
+    -- patching. The patches below reach a comment either as its author's or as
+    -- its post author's; two users commenting on each other's posts would
+    -- otherwise take each other's rows in opposite orders and deadlock.
+    PERFORM 1 FROM benchmark.tvd_comment
+    WHERE fk_author = v_pk OR fk_post = ANY(v_post_pks)
+    ORDER BY pk_comment
+    FOR UPDATE;
+
     -- Surgical patches — idx_tvd_*_fk_author ensures index scan, not seq scan
     UPDATE benchmark.tvd_user
     SET data = jsonb_smart_patch_scalar(data, v_patch)
@@ -400,9 +398,6 @@ BEGIN
     WHERE fk_author = v_pk;
 
     -- Also patch embedded post.author in comments on this user's posts
-    SELECT ARRAY(SELECT pk_post FROM benchmark.tb_post WHERE fk_author = v_pk)
-    INTO v_post_pks;
-
     IF array_length(v_post_pks, 1) > 0 THEN
         UPDATE benchmark.tvd_comment
         SET data = jsonb_smart_patch_nested(data, v_patch, '{post,author}')

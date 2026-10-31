@@ -132,6 +132,27 @@ ON CONFLICT (pk_comment) DO UPDATE
 
 ANALYZE benchmark.tv_comment;
 
+-- tvd_* (frameworks/fraiseql/database/extensions.sql) start as a copy of tv_*.
+-- Seeded here rather than where they are created: that file runs before this
+-- one, when tv_* holds only the rows its triggers built.
+INSERT INTO benchmark.tvd_user
+    SELECT pk_user, id, identifier, data FROM benchmark.tv_user
+    ON CONFLICT (pk_user) DO NOTHING;
+
+INSERT INTO benchmark.tvd_post
+    SELECT pk_post, id, identifier, data, fk_author, author_id, _published
+    FROM benchmark.tv_post
+    ON CONFLICT (pk_post) DO NOTHING;
+
+INSERT INTO benchmark.tvd_comment
+    SELECT pk_comment, id, identifier, data, fk_author, fk_post, author_id, post_id
+    FROM benchmark.tv_comment
+    ON CONFLICT (pk_comment) DO NOTHING;
+
+ANALYZE benchmark.tvd_user;
+ANALYZE benchmark.tvd_post;
+ANALYZE benchmark.tvd_comment;
+
 DO $$ BEGIN
     RAISE NOTICE 'tv_* bulk sync complete.';
 END $$;
