@@ -8,7 +8,8 @@ the publishable run itself.
 
 import build
 
-STATUS = (build.STATUS_RESULT, build.STATUS_EXCLUDED, build.STATUS_NOT_MEASURED)
+STATUS = (build.STATUS_RESULT, build.STATUS_EXCLUDED, build.STATUS_NOT_MEASURED,
+          build.STATUS_INVALID)
 
 
 # ── Invariants that must hold for ANY valid run (median + sweep-3) ──────────
@@ -103,7 +104,8 @@ def test_median_full_grid_no_not_measured(median_grid):
     st = Counter(c.status for c in median_grid.cells.values())
     assert st[build.STATUS_NOT_MEASURED] == 0, \
         "the full publishable run should measure every non-excluded cell"
-    assert st[build.STATUS_RESULT] == 156
+    assert st[build.STATUS_RESULT] == 154
+    assert st[build.STATUS_INVALID] == 2            # both tv M1d cells (#247)
     assert st[build.STATUS_EXCLUDED] == 36
 
 

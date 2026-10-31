@@ -189,6 +189,7 @@ code, .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; 
 .swatch.excl { background: repeating-linear-gradient(135deg,
   var(--muted) 0 2px, transparent 2px 5px); border: 1px solid var(--baseline); }
 .swatch.nm { background: var(--surface-2); border: 1px dashed var(--baseline); }
+.swatch.inv { background: color-mix(in srgb, var(--warning) 25%, transparent); }
 
 /* ---- the grid ---- */
 .grid-scroll { overflow-x: auto; border: 1px solid var(--border);
@@ -235,6 +236,14 @@ td.not-measured { border: 1px dashed var(--baseline); border-bottom: 1px dashed 
 td.excluded details, td.not-measured details { font-size: 0.72rem; }
 td.excluded summary, td.not-measured summary { cursor: pointer; list-style: none; }
 td.excluded .reason, td.not-measured .reason { display: block; white-space: normal;
+  max-width: 320px; margin: 4px auto 0; color: var(--text-2); text-align: left; }
+td.invalid { text-align: center; color: var(--muted);
+  background: color-mix(in srgb, var(--warning) 10%, transparent); }
+td.invalid .tag { font-size: 0.68rem; letter-spacing: 0.02em;
+  text-transform: uppercase; color: var(--text-2); }
+td.invalid details { font-size: 0.72rem; }
+td.invalid summary { cursor: pointer; list-style: none; }
+td.invalid .reason { display: block; white-space: normal;
   max-width: 320px; margin: 4px auto 0; color: var(--text-2); text-align: left; }
 .appendix-row th[scope="row"] { font-style: italic; color: var(--text-2); }
 
@@ -618,6 +627,8 @@ h3 .wt-unit { font-weight: 400; font-size: 0.82rem; color: var(--muted); }
 .wt-val { font-variant-numeric: tabular-nums; color: var(--text); text-align: right;
   white-space: nowrap; }
 .wt-val.excl { color: var(--muted); font-style: italic; }
+.wt-row.invalid .wt-track {
+  background: color-mix(in srgb, var(--warning) 10%, transparent); }
 .wt-row.excluded .wt-track, .wt-row.not-measured .wt-track {
   background: repeating-linear-gradient(135deg,
     color-mix(in srgb, var(--muted) 10%, transparent) 0 3px, transparent 3px 8px); }

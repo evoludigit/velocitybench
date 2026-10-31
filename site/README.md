@@ -14,7 +14,8 @@ python site/build.py <run.json> --out site/dist
 ```
 
 - `<run.json>` — exactly one benchmark run. The publishable build uses the
-  median-of-three: `reports/hetzner-2026-07/bench-hetzner-2026-07-07-median.json`.
+  median-of-three: `reports/hetzner-2026-07/bench-hetzner-2026-07-07-median.json`
+  (its M1d cells render as invalid, #247).
 - Writes three files to `--out`: `index.html` (self-contained, offline,
   light/dark, no-JS fallback), `data.json` and `llms.txt` (the AI layer).
 - `--costs <prices.yaml>` overrides the cost-composite price file
@@ -53,13 +54,18 @@ exclusions-by-design (with verbatim numbered reasons), mechanism/ladder/APQ/
 cache/amortization configuration, workload-shape scoring, and the honesty
 prose ("Reading these numbers").
 
-Every `(framework, scenario)` cell resolves to one of three states, cross-checked
+Every `(framework, scenario)` cell resolves to one of four states, cross-checked
 against this contract:
 
 - **result** — measured, present in the run's `results[]`;
 - **excluded by design** — structural, with its verbatim reason (never "slow");
 - **not measured in this run** — wired but not executed in the run shown
-  (distinct from excluded). A full run leaves none.
+  (distinct from excluded). A full run leaves none;
+- **invalid** — measured, but by a harness later shown to measure the wrong
+  thing. `scenarios.json` `invalid_results` names the scenario, the issue and
+  the first valid run date (`measured_before`); a run older than that renders
+  the reason in place of the number, and the number reaches no chart or model.
+  The 07-07 median's M1d is one (#247).
 
 A result that collides with a by-design exclusion fails the build loudly —
 the grid can never silently drift.

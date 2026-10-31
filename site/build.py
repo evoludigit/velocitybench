@@ -8,8 +8,10 @@ byte-identical output, so the only date on the page is the run's own.
 Contract enforced here (README "Hard rules"):
   * same-run rule — exactly one run JSON, never two;
   * no silent gaps — every (framework, scenario) cell is classified as a
-    measured result, an excluded-by-design cell, or a not-measured-in-this-run
-    cell; a result that collides with a by-design exclusion fails loudly;
+    measured result, an excluded-by-design cell, a not-measured-in-this-run
+    cell, or an invalid cell (measured, but by a harness later shown to measure
+    the wrong thing); a result that collides with a by-design exclusion fails
+    loudly;
   * LOCAL-DATA banner when the run targeted localhost.
 
 The skeleton, honesty devices and charts all layer on top of one grid model
@@ -42,6 +44,7 @@ LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "0.0.0.0"}
 STATUS_RESULT = "result"
 STATUS_EXCLUDED = "excluded"
 STATUS_NOT_MEASURED = "not_measured"
+STATUS_INVALID = "invalid"
 
 
 # --------------------------------------------------------------------------
@@ -171,9 +174,10 @@ class Cell:
     rss_steady_mb: float | None = None
     rss_max_mb: float | None = None
     cold_start_ms: float | None = None
-    # exclusion fields (status == "excluded")
+    # exclusion fields (status == "excluded"); reason also for "invalid"
     reason_id: int | None = None
     reason: str | None = None
+    issue: int | None = None    # status == "invalid": the issue recording why
 
     @property
     def ok(self) -> bool:
@@ -232,6 +236,16 @@ def build_grid(run: Run, meta: dict) -> Grid:
             raise ValueError(f"exclusion uses unknown reason_id: {rid!r}")
         excl_index[(fw, sc)] = exc
 
+    # A run recorded before a scenario's harness was fixed measured the wrong
+    # thing: its rows for that scenario become invalid cells, numbers dropped.
+    invalid: dict[str, dict] = {}
+    for inv in meta.get("invalid_results", []):
+        if inv["scenario"] not in sc_set:
+            raise ValueError(
+                f"invalid_results names unknown scenario: {inv['scenario']!r}")
+        if run.environment.get("timestamp", "") < inv["measured_before"]:
+            invalid[inv["scenario"]] = inv
+
     cells: dict[tuple[str, str], Cell] = {}
     for fw in fw_order:
         for sc in sc_order:
@@ -242,7 +256,11 @@ def build_grid(run: Run, meta: dict) -> Grid:
                 raise ValueError(
                     f"contradiction: {fw}/{sc} has a measured result AND is "
                     f"declared excluded by design — the matrix has drifted")
-            if has_result:
+            if has_result and sc in invalid:
+                cells[key] = Cell(
+                    framework=fw, scenario=sc, status=STATUS_INVALID,
+                    reason=invalid[sc]["reason"], issue=invalid[sc]["issue"])
+            elif has_result:
                 cells[key] = _result_cell(fw, sc, result_index[key])
             elif is_excluded:
                 rid = excl_index[key]["reason_id"]
@@ -334,6 +352,7 @@ class WriteRow:
     mechanism: str | None = None
     reason_id: int | None = None
     reason: str | None = None
+    issue: int | None = None
 
 
 @dataclass
@@ -364,7 +383,7 @@ def write_trade(grid: Grid) -> list:
                 scenario=sc, status=c.status, rps=c.rps,
                 mechanism=(write_mechanism(fw, sc, meta)
                            if c.status == STATUS_RESULT else None),
-                reason_id=c.reason_id, reason=c.reason)
+                reason_id=c.reason_id, reason=c.reason, issue=c.issue)
         out.append(WriteTradeGroup(
             framework=fw, rows=rows,
             appendix=bool(meta["frameworks"][fw].get("appendix"))))
@@ -1091,6 +1110,7 @@ def _state_legend() -> str:
         '<span><span class="swatch err"></span>errors &gt; 0 (greyed)</span>'
         '<span><span class="swatch excl"></span>excluded by design</span>'
         '<span><span class="swatch nm"></span>not measured in this run</span>'
+        '<span><span class="swatch inv"></span>invalid (known harness defect)</span>'
         '</div>')
 
 
@@ -1137,6 +1157,16 @@ def _excluded_td(cell: Cell) -> str:
         f'<span class="reason">{esc_text(cell.reason)}</span></details></td>')
 
 
+def _invalid_td(cell: Cell) -> str:
+    anchor = cell_anchor(cell.framework, cell.scenario)
+    return (
+        f'<td class="invalid" id="{anchor}" data-invalid="true" '
+        f'data-issue="{esc(cell.issue)}" title="{esc(cell.reason)}">'
+        f'<span class="tag">invalid · #{esc(cell.issue)}</span>'
+        f'<details><summary>why</summary>'
+        f'<span class="reason">{esc_text(cell.reason)}</span></details></td>')
+
+
 def _not_measured_td(cell: Cell, note: str) -> str:
     anchor = cell_anchor(cell.framework, cell.scenario)
     return (
@@ -1158,6 +1188,8 @@ def _grid_body(run: Run, meta: dict, grid: Grid) -> str:
                 cells_html.append(_result_td(cell))
             elif cell.status == STATUS_EXCLUDED:
                 cells_html.append(_excluded_td(cell))
+            elif cell.status == STATUS_INVALID:
+                cells_html.append(_invalid_td(cell))
             else:
                 cells_html.append(_not_measured_td(cell, nm_note))
         label = fmeta["label"]
@@ -1170,7 +1202,8 @@ def _grid_body(run: Run, meta: dict, grid: Grid) -> str:
 
 
 def _grid_section(run: Run, meta: dict, grid: Grid) -> str:
-    counts = {STATUS_RESULT: 0, STATUS_EXCLUDED: 0, STATUS_NOT_MEASURED: 0}
+    counts = {STATUS_RESULT: 0, STATUS_EXCLUDED: 0, STATUS_NOT_MEASURED: 0,
+              STATUS_INVALID: 0}
     zero_err = 0
     for c in grid.cells.values():
         counts[c.status] += 1
@@ -1181,7 +1214,9 @@ def _grid_section(run: Run, meta: dict, grid: Grid) -> str:
         f"({zero_err} with 0 errors) · "
         f"{counts[STATUS_EXCLUDED]} excluded by design · "
         f"{counts[STATUS_NOT_MEASURED]} not measured in this run · "
-        f"{len(grid.cells)} cells total, none silently dropped")
+        + (f"{counts[STATUS_INVALID]} invalid (known harness defect) · "
+           if counts[STATUS_INVALID] else "")
+        + f"{len(grid.cells)} cells total, none silently dropped")
     table = (
         '<div class="grid-scroll"><table class="grid">'
         f'<caption>{esc(caption)}</caption>'
@@ -2021,6 +2056,16 @@ def _wt_row(row: WriteRow, axis_max: float, unit: str) -> str:
             f'<span class="wt-mech">excluded · #{esc(row.reason_id)}</span>'
             f'<span class="wt-track"></span>'
             f'<span class="wt-val excl">{esc(short)}</span></div>')
+    if row.status == STATUS_INVALID:
+        return (
+            f'<div class="wt-row invalid" data-scenario="{esc(tag)}" '
+            f'data-invalid="true" data-issue="{esc(row.issue)}" '
+            f'title="{esc(row.reason)}">'
+            f'<span class="wt-tag">{esc(tag)}</span>'
+            f'<span class="wt-mech">invalid · #{esc(row.issue)}</span>'
+            f'<span class="wt-track"></span>'
+            f'<span class="wt-val excl">measured a no-op — see #{esc(row.issue)}'
+            f'</span></div>')
     return (
         f'<div class="wt-row not-measured" data-scenario="{esc(tag)}" '
         f'data-not-measured="true">'
@@ -2427,7 +2472,14 @@ def _s7_curve_svg(amort: Amortization, meta: dict, cfg: dict, layer: str,
 
 
 def _s7_breakeven_sentence(amort: Amortization, meta: dict) -> str:
-    anchor_label = meta["frameworks"][meta["amortization"]["anchor_series"]]["label"]
+    anchor_fw = meta["amortization"]["anchor_series"]
+    anchor_label = meta["frameworks"][anchor_fw]["label"]
+    anchor = next((s for s in amort.series if s.framework == anchor_fw), None)
+    if anchor is not None and anchor.status != "ok":
+        missing = (amort.read if anchor.status == "no_read"
+                   else anchor.write_scenario)
+        return (f'<strong>{esc(anchor_label)}</strong> has no valid {esc(missing)} '
+                'measurement in this run, so no break-even is drawn here.')
     hits = [(b, meta["frameworks"][b.other]["label"]) for b in amort.breakevens
             if b.ratio is not None]
     if not hits:
@@ -2946,6 +2998,11 @@ def _render_llms_txt(run: Run, meta: dict, grid: Grid, prices: dict) -> str:
     amort = amortize(grid, meta, acfg["default_read"], acfg["default_write"])
     anchor_label = meta["frameworks"][acfg["anchor_series"]]["label"]
     am_lines = []
+    anchor = next((s for s in amort.series
+                   if s.framework == acfg["anchor_series"]), None)
+    if anchor is not None and anchor.status != "ok":
+        am_lines.append(f"  {anchor_label}: no valid input in this mode, "
+                        "no break-even")
     for be in amort.breakevens:
         other = meta["frameworks"][be.other]["label"]
         if be.ratio is not None:

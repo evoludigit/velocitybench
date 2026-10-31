@@ -87,8 +87,9 @@ def test_grid_covers_full_cross_product(grid, meta):
 
 def test_grid_partition_no_silent_gaps(grid):
     statuses = [c.status for c in grid.cells.values()]
-    assert set(statuses) <= {"result", "excluded", "not_measured"}
-    assert statuses.count("result") == 118
+    assert set(statuses) <= {"result", "excluded", "not_measured", "invalid"}
+    assert statuses.count("result") == 117
+    assert statuses.count("invalid") == 1           # fraiseql-tv M1d (#247)
     assert statuses.count("excluded") == 36
     assert statuses.count("not_measured") == 38
 

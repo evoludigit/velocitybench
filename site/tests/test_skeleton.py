@@ -117,7 +117,7 @@ def test_zero_error_badge_count_matches_zero_error_cells(index_html, grid):
     zero_err_cells = sum(1 for c in grid.cells.values() if c.ok)
     # count the class attribute exactly (not the CSS rule token)
     rendered_badges = index_html.count('class="cell zero-err"')
-    assert rendered_badges == zero_err_cells == 118
+    assert rendered_badges == zero_err_cells == 117
 
 
 def test_methodology_block_renders_environment(index_html, sweep3_run):
