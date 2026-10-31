@@ -1,8 +1,5 @@
 # Security Guide
 
-**Version**: 0.1.0-beta.1
-**Last Updated**: December 11, 2025
-
 ## Overview
 
 pg_tviews provides powerful SQL generation capabilities that require careful security considerations. This guide covers SQL injection prevention, access control, and secure usage patterns.
@@ -42,13 +39,13 @@ When creating TVIEWs dynamically:
 CREATE OR REPLACE FUNCTION create_user_posts_tview(user_uuid UUID)
 RETURNS VOID AS $$
 DECLARE
-    tview_name TEXT;
+    tview_table TEXT;
 BEGIN
     -- Safe name generation
-    tview_name := format('tv_user_posts_%s', replace(user_uuid::TEXT, '-', '_'));
+    tview_table := format('tv_user_posts_%s', replace(user_uuid::TEXT, '-', '_'));
 
     -- Use parameterized queries
-    EXECUTE format('SELECT pg_tviews_create(%L, %L)', tview_name, $$
+    EXECUTE format('SELECT pg_tviews_create(%L, %L)', tview_table, $$
         SELECT
           tb_post.pk_post,
           tb_post.id,
@@ -128,8 +125,8 @@ GRANT UPDATE ON tv_post TO app_admin;
 GRANT INSERT, UPDATE, DELETE ON tb_post TO app_admin;
 
 -- Grant TVIEW management permissions
-GRANT EXECUTE ON FUNCTION pg_tviews_create(TEXT, TEXT) TO db_admin;
-GRANT EXECUTE ON FUNCTION pg_tviews_drop(TEXT, BOOLEAN) TO db_admin;
+GRANT EXECUTE ON FUNCTION pg_tviews_create(TEXT, TEXT, JSONB) TO db_admin;
+GRANT EXECUTE ON FUNCTION pg_tviews_drop(TEXT, BOOLEAN, BOOLEAN) TO db_admin;
 ```
 
 ### Role-Based Access
@@ -231,7 +228,7 @@ GRANT CREATE ON SCHEMA public TO pg_tviews_user;
 -- GRANT SUPERUSER TO pg_tviews_user;  -- DON'T DO THIS
 
 -- Use SECURITY DEFINER for controlled access
-CREATE FUNCTION pg_tviews_create_secure(tview_name TEXT, sql_query TEXT)
+CREATE FUNCTION create_tview_secure(tview_table TEXT, sql_query TEXT)
 RETURNS VOID AS $$
 BEGIN
     -- Add security checks here
@@ -240,12 +237,12 @@ BEGIN
     END IF;
 
     -- Validate inputs
-    IF tview_name !~ '^tv_[a-z_]+$' THEN
+    IF tview_table !~ '^tv_[a-z_]+$' THEN
         RAISE EXCEPTION 'Invalid TVIEW name format';
     END IF;
 
     -- Call actual function
-    PERFORM pg_tviews_create(tview_name, sql_query);
+    PERFORM pg_tviews_create(tview_table, sql_query);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 ```

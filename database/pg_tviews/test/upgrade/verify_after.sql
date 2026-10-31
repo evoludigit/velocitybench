@@ -1,0 +1,175 @@
+-- Checks that hold only once every TVIEW is re-registered after the upgrade
+-- (test/upgrade/upgrade_check.sh). Needs neither tviews nor public on search_path.
+
+\set ON_ERROR_STOP on
+SET client_min_messages TO WARNING;
+SET search_path TO pg_catalog;
+
+-- The backing views moved to tviews (#181): none is left in an application schema,
+-- and the application can take the v_<entity> names.
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM tviews.pg_tview_meta m
+               JOIN pg_catalog.pg_class v ON v.oid = m.view_oid::pg_catalog.oid
+               WHERE v.relnamespace <> 'tviews'::pg_catalog.regnamespace) THEN
+        RAISE EXCEPTION 'upgrade check: a backing view is outside tviews';
+    END IF;
+    IF pg_catalog.to_regclass('tviews.public__tv_user') IS NULL
+       OR pg_catalog.to_regclass('tviews.app__tv_note') IS NULL THEN
+        RAISE EXCEPTION 'upgrade check: backing views not named <schema>__tv_<entity>';
+    END IF;
+END $$;
+-- Every table a re-derived plan maps by a query has read sets (ADR 0207), and the
+-- UNLOGGED TVIEWs holding rows are trusted (#214).
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM tviews.pg_tview_meta m,
+                    pg_catalog.jsonb_array_elements(m.plan OPERATOR(pg_catalog.->) 'tables') t
+               WHERE t OPERATOR(pg_catalog.->>) 'kind' = 'mapped'
+                 AND NOT t OPERATOR(pg_catalog.?) 'reads') THEN
+        RAISE EXCEPTION 'upgrade check: a mapped table has no read sets';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM tviews.pg_tview_meta m
+                   WHERE m.plan OPERATOR(pg_catalog.@>) '{"tables": [{"kind": "mapped"}]}') THEN
+        RAISE EXCEPTION 'upgrade check: no fixture maps a table by a query';
+    END IF;
+END $$;
+DO $$
+DECLARE
+    t pg_catalog.regclass;
+    filled boolean;
+BEGIN
+    FOR t IN SELECT c.oid FROM tviews.pg_tview_meta m
+             JOIN pg_catalog.pg_class c ON c.oid = m.table_oid::pg_catalog.oid
+             WHERE c.relpersistence = 'u'
+               AND NOT EXISTS (SELECT 1 FROM tviews.pg_tview_valid v WHERE v.entity = m.entity)
+    LOOP
+        EXECUTE pg_catalog.format('SELECT EXISTS (SELECT 1 FROM %s)', t) INTO filled;
+        IF filled THEN
+            RAISE EXCEPTION 'upgrade check: % holds rows and is not trusted', t;
+        END IF;
+    END LOOP;
+END $$;
+
+-- The fitted name the upgrade computed is the one pg_tviews derives: a rename of
+-- the table back and forth leaves it as it is.
+SELECT pg_catalog.to_regclass('public.tv_long_entity_name_for_the_upgrade_fitter_check_abcdefghij') IS NOT NULL AS long_fixture \gset
+\if :long_fixture
+CREATE TEMP TABLE upgraded_name AS
+    SELECT v.relname::text AS name FROM tviews.pg_tview_meta m
+    JOIN pg_catalog.pg_class v ON v.oid = m.view_oid::pg_catalog.oid
+    WHERE m.entity = 'long_entity_name_for_the_upgrade_fitter_check_abcdefghij';
+ALTER TABLE public.tv_long_entity_name_for_the_upgrade_fitter_check_abcdefghij RENAME TO tv_long_tmp;
+ALTER TABLE public.tv_long_tmp RENAME TO tv_long_entity_name_for_the_upgrade_fitter_check_abcdefghij;
+DO $$ BEGIN
+    IF (SELECT name FROM upgraded_name) IS DISTINCT FROM
+       (SELECT v.relname::text FROM tviews.pg_tview_meta m
+        JOIN pg_catalog.pg_class v ON v.oid = m.view_oid::pg_catalog.oid
+        WHERE m.entity = 'long_entity_name_for_the_upgrade_fitter_check_abcdefghij')
+       OR pg_catalog.octet_length((SELECT name FROM upgraded_name)) <> 63 THEN
+        RAISE EXCEPTION 'upgrade check: the upgrade fitted the long backing view name as %',
+            (SELECT name FROM upgraded_name);
+    END IF;
+END $$;
+\endif
+
+-- No backing view outlives its TVIEW (#186), and the dropped TVIEW can be created again.
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM pg_catalog.pg_class v
+               WHERE v.relnamespace = 'tviews'::pg_catalog.regnamespace AND v.relkind = 'v'
+                 AND NOT EXISTS (SELECT 1 FROM tviews.pg_tview_meta m
+                                 WHERE m.view_oid::pg_catalog.oid = v.oid)
+                 AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_depend d
+                                 WHERE d.objid = v.oid AND d.deptype = 'e')) THEN
+        RAISE EXCEPTION 'upgrade check: a backing view in tviews belongs to no TVIEW';
+    END IF;
+END $$;
+SELECT pg_catalog.to_regclass('public.tb_scratch') IS NOT NULL AS scratch_fixture \gset
+\if :scratch_fixture
+CREATE SCHEMA scratch;
+SET search_path TO public;
+SELECT tviews.pg_tviews_create('scratch.tv_scratch', $q$
+    SELECT pk_scratch, id, jsonb_build_object('label', label) AS data FROM public.tb_scratch $q$);
+SELECT tviews.pg_tviews_drop('scratch.tv_scratch');
+SET search_path TO pg_catalog;
+DROP SCHEMA scratch;
+\endif
+
+CREATE VIEW public.v_user AS SELECT pk_user, name FROM public.tb_user;
+UPDATE public.tb_user SET name = name || '#';
+DO $$ BEGIN
+    IF EXISTS ((SELECT pk_user, data FROM public.tv_user EXCEPT SELECT pk_user, data FROM tviews.public__tv_user)
+               UNION ALL
+               (SELECT pk_user, data FROM tviews.public__tv_user EXCEPT SELECT pk_user, data FROM public.tv_user)) THEN
+        RAISE EXCEPTION 'upgrade check: tv_user does not follow tb_user with an application v_user';
+    END IF;
+END $$;
+DROP VIEW public.v_user;
+
+-- A rename of an ancestor refreshes the nodes whose path holds it (#182).
+SELECT pg_catalog.to_regclass('public.tv_node') IS NOT NULL AS node_fixture \gset
+\if :node_fixture
+UPDATE public.tb_node SET name = name || '+' WHERE pk_node = 1;
+DO $$ BEGIN
+    IF EXISTS ((SELECT pk_node, data FROM public.tv_node EXCEPT SELECT pk_node, data FROM tviews.public__tv_node)
+               UNION ALL
+               (SELECT pk_node, data FROM tviews.public__tv_node EXCEPT SELECT pk_node, data FROM public.tv_node)) THEN
+        RAISE EXCEPTION 'upgrade check: tv_node does not follow a rename of an ancestor';
+    END IF;
+END $$;
+\endif
+
+-- A virtual generated column read through a join follows its inputs (#179).
+SELECT pg_catalog.to_regclass('public.tv_holder') IS NOT NULL AS virtual_fixture \gset
+\if :virtual_fixture
+UPDATE public.tb_badge SET name = name || '+';
+DO $$ BEGIN
+    IF EXISTS ((SELECT pk_holder, data FROM public.tv_holder EXCEPT SELECT pk_holder, data FROM tviews.public__tv_holder)
+               UNION ALL
+               (SELECT pk_holder, data FROM tviews.public__tv_holder EXCEPT SELECT pk_holder, data FROM public.tv_holder)) THEN
+        RAISE EXCEPTION 'upgrade check: tv_holder does not follow the input of its virtual column';
+    END IF;
+END $$;
+\endif
+
+-- Every TVIEW was re-derived into one versioned plan (ADR 0203) by the update.
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM tviews.pg_tview_meta
+               WHERE plan->>'version' IS DISTINCT FROM '3'
+                  OR pg_catalog.jsonb_array_length(plan->'tables') = 0) THEN
+        RAISE EXCEPTION 'upgrade check: a TVIEW has no plan: %',
+            (SELECT pg_catalog.string_agg(entity, ', ') FROM tviews.pg_tview_meta
+             WHERE plan->>'version' IS DISTINCT FROM '3'
+                OR pg_catalog.jsonb_array_length(plan->'tables') = 0);
+    END IF;
+END $$;
+
+-- Every index pg_tviews created is recorded; a user's index is not, even under a
+-- managed name, unless it is exactly the index pg_tviews creates there (#219).
+DO $$
+DECLARE
+    unmanaged TEXT;
+    expected TEXT;
+BEGIN
+    SELECT pg_catalog.string_agg(ic.relname::pg_catalog.text, ', ' ORDER BY ic.relname)
+      INTO unmanaged
+      FROM tviews.registry r
+      JOIN pg_catalog.pg_index i
+        ON i.indrelid = pg_catalog.to_regclass(pg_catalog.quote_ident(r.schema) OPERATOR(pg_catalog.||) '.'
+                                               OPERATOR(pg_catalog.||) pg_catalog.quote_ident(r.name))
+      JOIN pg_catalog.pg_class ic ON ic.oid OPERATOR(pg_catalog.=) i.indexrelid
+     WHERE i.indexrelid OPERATOR(pg_catalog.<>) ALL (r.managed_indexes::pg_catalog.oid[])
+       AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint k
+                       WHERE k.conindid OPERATOR(pg_catalog.=) i.indexrelid);
+    -- The user's index under the managed name exists only when the previous
+    -- release predates the reservation (0.1.0-beta.27).
+    expected := CASE WHEN pg_catalog.to_regclass('public.idx_tv_user_data_gin') IS NULL
+                     THEN 'user_by_id' ELSE 'idx_tv_user_data_gin, user_by_id' END;
+    IF unmanaged IS DISTINCT FROM expected THEN
+        RAISE EXCEPTION 'upgrade check: unmanaged indexes are %', unmanaged;
+    END IF;
+    IF NOT (SELECT (options OPERATOR(pg_catalog.->>) 'data_gin_index')::boolean
+            FROM tviews.registry WHERE entity OPERATOR(pg_catalog.=) 'note')
+       OR (SELECT (options OPERATOR(pg_catalog.->>) 'data_gin_index')::boolean
+           FROM tviews.registry WHERE entity OPERATOR(pg_catalog.=) 'user') THEN
+        RAISE EXCEPTION 'upgrade check: data_gin_index does not follow the managed GIN';
+    END IF;
+END $$;

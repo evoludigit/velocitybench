@@ -2,133 +2,260 @@
 
 use pgrx::prelude::*;
 
+/// One row of `pg_tviews_health_check()`: status, component, message, severity.
+type Check = (String, String, String, String);
+
+fn ok(component: &str, message: impl Into<String>) -> Check {
+    ("OK".into(), component.into(), message.into(), "info".into())
+}
+
+fn warning(component: &str, message: impl Into<String>) -> Check {
+    (
+        "WARNING".into(),
+        component.into(),
+        message.into(),
+        "warning".into(),
+    )
+}
+
+fn error(component: &str, message: impl Into<String>) -> Check {
+    (
+        "ERROR".into(),
+        component.into(),
+        message.into(),
+        "error".into(),
+    )
+}
+
 /// Health check function for production monitoring
 ///
 /// Returns a comprehensive health status including:
 /// - Extension version
 /// - `jsonb_delta` availability
-/// - Metadata consistency
-/// - Orphaned triggers
-/// - Queue status
-#[pg_extern]
-fn pg_tviews_health_check() -> TableIterator<
-    'static,
-    (
-        name!(status, String),
-        name!(component, String),
-        name!(message, String),
-        name!(severity, String),
-    ),
-> {
-    let mut results = Vec::new();
-
-    // Check 1: Extension loaded
-    results.push((
-        "OK".to_string(),
-        "extension".to_string(),
-        format!("pg_tviews version {}", env!("CARGO_PKG_VERSION")),
-        "info".to_string(),
-    ));
-
-    // Check 2: jsonb_delta availability
-    let has_jsonb_delta =
-        Spi::get_one::<bool>("SELECT COUNT(*) > 0 FROM pg_extension WHERE extname = 'jsonb_delta'")
-            .unwrap_or(Some(false))
-            .unwrap_or(false);
-
-    if has_jsonb_delta {
-        results.push((
-            "OK".to_string(),
-            "jsonb_delta".to_string(),
-            "jsonb_delta extension available (optimized mode)".to_string(),
-            "info".to_string(),
-        ));
-    } else {
-        results.push((
-            "WARNING".to_string(),
-            "jsonb_delta".to_string(),
-            "jsonb_delta not installed (falling back to standard JSONB)".to_string(),
-            "warning".to_string(),
-        ));
+/// - Catalog revision and metadata consistency
+/// - Orphaned and missing triggers
+/// - TVIEW count
+pub(crate) fn health_check() -> Vec<(String, String, String, String)> {
+    let mut results = vec![
+        ok(
+            "extension",
+            format!("pg_tviews version {}", env!("CARGO_PKG_VERSION")),
+        ),
+        jsonb_delta_check(),
+    ];
+    let (catalog, unversioned) = catalog_check();
+    results.push(catalog);
+    // A 0.1.0 catalog has none of the tables the other checks read.
+    if !unversioned {
+        results.extend([
+            metadata_check(),
+            plan_check(),
+            reregister_check(),
+            trigger_check(),
+            count_check(),
+        ]);
     }
+    results
+}
 
-    // Check 3: Metadata consistency
-    let orphaned_meta = Spi::get_one::<i64>(
-        "SELECT COUNT(*) FROM pg_tview_meta m
-         WHERE NOT EXISTS (
-           SELECT 1 FROM pg_class WHERE relname::text = 'tv_' || m.entity
-         )",
-    )
-    .unwrap_or(Some(0))
-    .unwrap_or(0);
+/// The count `sql` returns, or the error row of `component` saying it could
+/// not be read.
+fn count_of(component: &str, sql: &str) -> Result<i64, Check> {
+    Spi::get_one::<i64>(sql)
+        .map(Option::unwrap_or_default)
+        .map_err(|e| error(component, format!("could not be checked: {e}")))
+}
 
-    if orphaned_meta > 0 {
-        results.push((
-            "ERROR".to_string(),
-            "metadata".to_string(),
-            format!("{orphaned_meta} orphaned metadata entries found"),
-            "error".to_string(),
-        ));
+/// The catalog's counts ([`crate::catalog::row::counts`]), or the failed check.
+fn registered(component: &str) -> Result<(i64, i64, i64), Check> {
+    crate::catalog::row::counts()
+        .map_err(|e| error(component, format!("could not be checked: {e}")))
+}
+
+fn jsonb_delta_check() -> Check {
+    let installed = match count_of(
+        "jsonb_delta",
+        "SELECT COUNT(*) FROM pg_extension WHERE extname = 'jsonb_delta'",
+    ) {
+        Ok(n) => n > 0,
+        Err(check) => return check,
+    };
+    if installed {
+        ok(
+            "jsonb_delta",
+            "jsonb_delta extension available (optimized mode)",
+        )
     } else {
-        results.push((
-            "OK".to_string(),
-            "metadata".to_string(),
-            "All metadata entries valid".to_string(),
-            "info".to_string(),
-        ));
+        warning(
+            "jsonb_delta",
+            "jsonb_delta not installed (falling back to standard JSONB)",
+        )
     }
+}
 
-    // Check 4: Orphaned triggers
-    let orphaned_triggers = Spi::get_one::<i64>(
-        "SELECT COUNT(*) FROM pg_trigger
-         WHERE tgname LIKE 'tview_%'
-           AND tgrelid NOT IN (
-             SELECT ('tb_' || entity)::regclass::oid
-             FROM pg_tview_meta
-           )",
-    )
-    .unwrap_or(Some(0))
-    .unwrap_or(0);
+/// Whether this library matches the installed SQL, and whether the
+/// catalog is a 0.1.0 one.
+fn catalog_check() -> (Check, bool) {
+    match crate::revision::installed() {
+        crate::revision::Installed::Matches => (
+            ok(
+                "catalog",
+                format!(
+                    "catalog revision {} matches the library",
+                    crate::revision::CATALOG_REVISION
+                ),
+            ),
+            false,
+        ),
+        crate::revision::Installed::Differs(revision) => (
+            error(
+                "catalog",
+                format!(
+                    "library catalog revision {} does not match the installed extension \
+                     ({revision}): {}",
+                    crate::revision::CATALOG_REVISION,
+                    crate::revision::remedy(revision)
+                ),
+            ),
+            false,
+        ),
+        crate::revision::Installed::Unversioned => (
+            error(
+                "catalog",
+                "the installed extension is a 0.1.0 catalog: run scripts/migrate-from-0.1.0.sql",
+            ),
+            true,
+        ),
+        crate::revision::Installed::Unreadable(why) => (
+            error(
+                "catalog",
+                format!("the catalog revision could not be read: {why}"),
+            ),
+            false,
+        ),
+    }
+}
 
-    if orphaned_triggers > 0 {
-        results.push((
-            "WARNING".to_string(),
-            "triggers".to_string(),
-            format!("{orphaned_triggers} orphaned triggers found"),
-            "warning".to_string(),
-        ));
+fn metadata_check() -> Check {
+    let orphaned = match registered("metadata") {
+        Ok((_, _, orphaned)) => orphaned,
+        Err(check) => return check,
+    };
+    if orphaned > 0 {
+        error(
+            "metadata",
+            format!("{orphaned} orphaned metadata entries found"),
+        )
     } else {
-        results.push((
-            "OK".to_string(),
-            "triggers".to_string(),
-            "All triggers properly linked".to_string(),
-            "info".to_string(),
-        ));
+        ok("metadata", "All metadata entries valid")
     }
+}
 
-    // Check 5: TVIEW count
-    let tview_count = Spi::get_one::<i64>("SELECT COUNT(*) FROM pg_tview_meta")
-        .unwrap_or(Some(0))
-        .unwrap_or(0);
+/// TVIEWs whose stored plan or identity does not decode: every write to the
+/// tables they read fails until they are re-registered.
+fn plan_check() -> Check {
+    match crate::catalog::TviewMeta::unreadable() {
+        Ok(unreadable) if unreadable.is_empty() => ok("plans", "Every propagation plan reads"),
+        Ok(unreadable) => error(
+            "plans",
+            format!(
+                "{} unreadable; until re-registered, writes to the base tables of every \
+                 TVIEW fail: {}; run SELECT tviews.pg_tviews_reregister(entity) for each",
+                count(unreadable.len(), "TVIEW"),
+                unreadable
+                    .iter()
+                    .map(|(entity, why)| format!("tv_{entity} ({why})"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        ),
+        Err(e) => error("plans", format!("could not be checked: {e}")),
+    }
+}
 
-    results.push((
-        "OK".to_string(),
-        "tviews".to_string(),
-        format!("{tview_count} TVIEWs registered"),
-        "info".to_string(),
-    ));
+/// TVIEWs registered before a release that changed what registration derives.
+fn reregister_check() -> Check {
+    let stale = match registered("reregister") {
+        Ok((_, stale, _)) => stale,
+        Err(check) => return check,
+    };
+    if stale == 0 {
+        ok("reregister", "No TVIEW needs re-registration")
+    } else {
+        warning(
+            "reregister",
+            format!(
+                "{stale} TVIEW{} registered by an older release: run \
+                 SELECT * FROM tviews.pg_tviews_reregister_all()",
+                if stale == 1 { "" } else { "s" }
+            ),
+        )
+    }
+}
 
-    TableIterator::new(results)
+/// `pg_tviews`' triggers against the tables the TVIEWs read.
+/// `pg_tviews`' triggers against the plans: a missing or disabled one leaves a
+/// TVIEW stale (an error); an orphaned or untagged one does no harm (a warning).
+fn trigger_check() -> Check {
+    match crate::dependency::triggers::trigger_problems() {
+        Ok(p)
+            if p.orphaned.is_empty()
+                && p.missing.is_empty()
+                && p.untagged.is_empty()
+                && p.disabled.is_empty() =>
+        {
+            ok("triggers", "All triggers properly linked")
+        }
+        Ok(p) => {
+            let parts: Vec<String> = [
+                (
+                    &p.disabled,
+                    "disabled trigger",
+                    "(ALTER TABLE … ENABLE TRIGGER)",
+                ),
+                (
+                    &p.missing,
+                    "missing trigger",
+                    "(run pg_tviews_reregister_all())",
+                ),
+                (&p.orphaned, "orphaned trigger", "found"),
+                (
+                    &p.untagged,
+                    "trigger without an entity",
+                    "(run pg_tviews_reregister_all())",
+                ),
+            ]
+            .into_iter()
+            .filter(|(list, _, _)| !list.is_empty())
+            .map(|(list, what, action)| {
+                format!("{} {action}: {}", count(list.len(), what), sample(list))
+            })
+            .collect();
+            if p.disabled.is_empty() && p.missing.is_empty() {
+                warning("triggers", parts.join("; "))
+            } else {
+                error("triggers", parts.join("; "))
+            }
+        }
+        Err(e) => error("triggers", format!("could not check triggers: {e}")),
+    }
+}
+
+fn count_check() -> Check {
+    match registered("tviews") {
+        Ok((tviews, _, _)) => ok("tviews", format!("{tviews} TVIEWs registered")),
+        Err(check) => check,
+    }
 }
 
 /// Get current queue statistics
 /// Returns metrics about the current transaction's refresh operations
-#[pg_extern]
-fn pg_tviews_queue_stats() -> pgrx::JsonB {
+pub(crate) fn queue_stats() -> serde_json::Value {
     let stats = crate::metrics::metrics_api::get_queue_stats();
 
     let json_value = serde_json::json!({
         "queue_size": stats.queue_size,
+        "flushes": stats.flushes,
         "total_refreshes": stats.total_refreshes,
         "total_iterations": stats.total_iterations,
         "max_iterations": stats.max_iterations,
@@ -138,16 +265,28 @@ fn pg_tviews_queue_stats() -> pgrx::JsonB {
         "graph_cache_hits": stats.graph_cache_hits,
         "graph_cache_misses": stats.graph_cache_misses,
         "table_cache_hits": stats.table_cache_hits,
-        "table_cache_misses": stats.table_cache_misses
+        "table_cache_misses": stats.table_cache_misses,
+        "value_locks": stats.value_locks,
+        "value_lock_escalations": stats.value_lock_escalations,
+        "value_lock_waits": stats.value_lock_waits,
+        "value_lock_wait_ms": stats.value_lock_wait_ms(),
+        "direct_patch_captured": stats.direct_patch_captured,
+        "direct_patches_applied": stats.direct_patches_applied,
+        "direct_patch_fallbacks": stats.direct_patch_fallbacks,
+        "view_recomputes": stats.view_recomputes,
+        "refresh_noop_skipped": stats.refresh_noop_skipped,
+        "catalog_lookups": stats.catalog_lookups,
+        "plans_prepared": stats.plans_prepared,
+        "propagation_pruned": stats.propagation_pruned,
+        "feed_gaps": crate::stats::feed_gaps().ok()
     });
 
-    pgrx::JsonB(json_value)
+    json_value
 }
 
 /// Debug function: View current queue contents
 /// Returns the entities and PKs currently in the refresh queue
-#[pg_extern]
-fn pg_tviews_debug_queue() -> pgrx::JsonB {
+pub(crate) fn debug_queue() -> serde_json::Value {
     let contents = crate::metrics::metrics_api::get_queue_contents();
 
     let json_contents: Vec<serde_json::Value> = contents
@@ -155,58 +294,38 @@ fn pg_tviews_debug_queue() -> pgrx::JsonB {
         .map(|key| {
             serde_json::json!({
                 "entity": key.entity,
-                "pk": key.pk
+                "pk": match key.key {
+                    crate::queue::key::KeyValue::Int(v) => serde_json::Value::from(v),
+                    crate::queue::key::KeyValue::Text(v) => serde_json::Value::from(v),
+                }
             })
         })
         .collect();
 
-    pgrx::JsonB(serde_json::json!(json_contents))
+    serde_json::json!(json_contents)
 }
 
-/// Get performance statistics for all TVIEWs
-///
-/// Returns size, row count, and index information for each TVIEW
-#[pg_extern]
-fn pg_tviews_performance_stats() -> TableIterator<
-    'static,
-    (
-        name!(entity, String),
-        name!(table_size, String),
-        name!(total_size, String),
-        name!(row_count, i64),
-        name!(index_count, i32),
-    ),
-> {
-    let query = "
-        SELECT
-            pg_tview_meta.entity,
-            pg_size_pretty(pg_relation_size('tv_' || pg_tview_meta.entity)) as table_size,
-            pg_size_pretty(pg_total_relation_size('tv_' || pg_tview_meta.entity)) as total_size,
-            (SELECT COUNT(*) FROM ('tv_' || pg_tview_meta.entity)::regclass) as row_count,
-            (SELECT COUNT(*)::int FROM pg_indexes WHERE tablename = 'tv_' || pg_tview_meta.entity) as index_count
-        FROM pg_tview_meta
-        ORDER BY pg_relation_size('tv_' || pg_tview_meta.entity) DESC
-    ";
+/// `1 orphaned trigger`, `2 orphaned triggers`.
+fn count(n: usize, what: &str) -> String {
+    if n == 1 {
+        format!("1 {what}")
+    } else {
+        format!("{n} {what}s")
+    }
+}
 
-    let results = Spi::connect(|client| match client.select(query, None, &[]) {
-        Ok(rows) => {
-            let mut stats = Vec::new();
-            for row in rows {
-                let entity = row["entity"].value::<String>()?.unwrap_or_default();
-                let table_size = row["table_size"].value::<String>()?.unwrap_or_default();
-                let total_size = row["total_size"].value::<String>()?.unwrap_or_default();
-                let row_count = row["row_count"].value::<i64>()?.unwrap_or(0);
-                let index_count = row["index_count"].value::<i32>()?.unwrap_or(0);
-                stats.push((entity, table_size, total_size, row_count, index_count));
-            }
-            Ok::<_, spi::Error>(stats)
-        }
-        Err(e) => {
-            warning!("Failed to query performance stats: {}", e);
-            Ok(Vec::new())
-        }
-    })
-    .unwrap_or_default();
-
-    TableIterator::new(results)
+/// The first ten items, and how many more there are.
+fn sample(items: &[String]) -> String {
+    const SHOWN: usize = 10;
+    let text = items
+        .iter()
+        .take(SHOWN)
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(", ");
+    if items.len() > SHOWN {
+        format!("{text} and {} more", items.len() - SHOWN)
+    } else {
+        text
+    }
 }

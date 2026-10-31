@@ -223,8 +223,6 @@ CREATE TABLE IF NOT EXISTS benchmark.tvd_user (
     id         UUID        NOT NULL,
     identifier TEXT,
     data       JSONB,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (pk_user)
 );
 
@@ -236,8 +234,6 @@ CREATE TABLE IF NOT EXISTS benchmark.tvd_post (
     fk_author  BIGINT,
     author_id  UUID,
     _published BOOLEAN,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (pk_post)
 );
 
@@ -250,8 +246,6 @@ CREATE TABLE IF NOT EXISTS benchmark.tvd_comment (
     fk_post    BIGINT,
     author_id  UUID,
     post_id    UUID,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (pk_comment)
 );
 
@@ -265,16 +259,16 @@ CREATE INDEX IF NOT EXISTS idx_tvd_comment_fk_author ON benchmark.tvd_comment(fk
 
 -- Seed from tv_* (run once at init; INSERT … ON CONFLICT DO NOTHING is idempotent)
 INSERT INTO benchmark.tvd_user
-    SELECT pk_user, id, identifier, data, created_at, updated_at FROM benchmark.tv_user
+    SELECT pk_user, id, identifier, data FROM benchmark.tv_user
     ON CONFLICT (pk_user) DO NOTHING;
 
 INSERT INTO benchmark.tvd_post
-    SELECT pk_post, id, identifier, data, fk_author, author_id, _published, created_at, updated_at
+    SELECT pk_post, id, identifier, data, fk_author, author_id, _published
     FROM benchmark.tv_post
     ON CONFLICT (pk_post) DO NOTHING;
 
 INSERT INTO benchmark.tvd_comment
-    SELECT pk_comment, id, identifier, data, fk_author, fk_post, author_id, post_id, created_at, updated_at
+    SELECT pk_comment, id, identifier, data, fk_author, fk_post, author_id, post_id
     FROM benchmark.tv_comment
     ON CONFLICT (pk_comment) DO NOTHING;
 
@@ -435,7 +429,6 @@ DROP VIEW IF EXISTS benchmark.v_comment_slim;
 CREATE VIEW benchmark.v_comment_slim AS
 SELECT
     pk_comment, id, identifier, fk_author, fk_post, author_id, post_id,
-    created_at, updated_at,
     data || jsonb_build_object('post',
         jsonb_build_object(
             'id',         data->'post'->>'id',

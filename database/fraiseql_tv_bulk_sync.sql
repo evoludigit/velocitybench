@@ -27,8 +27,7 @@ SELECT
     )
 FROM benchmark.tb_user u
 ON CONFLICT (pk_user) DO UPDATE
-    SET data       = EXCLUDED.data,
-        updated_at = NOW();
+    SET data       = EXCLUDED.data;
 
 ANALYZE benchmark.tv_user;
 
@@ -66,8 +65,7 @@ ON CONFLICT (pk_post) DO UPDATE
     SET data       = EXCLUDED.data,
         fk_author  = EXCLUDED.fk_author,
         _published = EXCLUDED._published,
-        author_id  = EXCLUDED.author_id,
-        updated_at = NOW();
+        author_id  = EXCLUDED.author_id;
 
 ANALYZE benchmark.tv_post;
 
@@ -126,8 +124,7 @@ ON CONFLICT (pk_comment) DO UPDATE
         fk_author  = EXCLUDED.fk_author,
         fk_post    = EXCLUDED.fk_post,
         author_id  = EXCLUDED.author_id,
-        post_id    = EXCLUDED.post_id,
-        updated_at = NOW();
+        post_id    = EXCLUDED.post_id;
 
 ANALYZE benchmark.tv_comment;
 

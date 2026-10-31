@@ -1,7 +1,5 @@
 # Build Provenance
 
-**Document Version:** 1.0
-**Last Updated:** 2025-12-11
 **Classification:** Public
 **Applicable Standards:** SLSA Level 3, ISO 27001
 
@@ -287,7 +285,7 @@ Track provenance effectiveness:
 - [SLSA Framework](https://slsa.dev/)
 - [SLSA Verifier Documentation](https://github.com/slsa-framework/slsa-verifier)
 - [GitHub Attestations](https://docs.github.com/en/actions/security-guides/using-artifact-attestations-to-establish-provenance-for-builds)
-- [pg_tviews Reproducible Builds](./reproducible-builds.md)
+- [pg_tviews Reproducible Builds](../development/reproducible-builds.md)
 
 ---
 

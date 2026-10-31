@@ -11,7 +11,7 @@ services:
       # Pass as: DATA_VOLUME=medium docker compose up postgres
       DATA_VOLUME: ${DATA_VOLUME:-xs}
       # tv_* table persistence: logged (default, publishable profile) or unlogged
-      # (pg_tviews' compiled default — faster writes, truncated on crash).
+      # (faster writes, truncated on crash).
       # Applied at cluster init only; switching requires: docker compose down -v
       TVIEW_PERSISTENCE: ${TVIEW_PERSISTENCE:-logged}
     ports:

@@ -121,13 +121,13 @@ BEGIN
     -- Internally does TRUNCATE + column-explicit INSERT from the backing view,
     -- so created_at/updated_at column mismatch is handled correctly.
     -- -----------------------------------------------------------------------
-    PERFORM pg_tviews_refresh('user');
+    PERFORM tviews.pg_tviews_refresh('user');
     RAISE NOTICE '[05-medium-seed] tv_user refreshed.';
 
-    PERFORM pg_tviews_refresh('post');
+    PERFORM tviews.pg_tviews_refresh('post');
     RAISE NOTICE '[05-medium-seed] tv_post refreshed.';
 
-    PERFORM pg_tviews_refresh('comment');
+    PERFORM tviews.pg_tviews_refresh('comment');
     RAISE NOTICE '[05-medium-seed] tv_comment refreshed.';
 
     RAISE NOTICE '[05-medium-seed] Seeding complete for % dataset.', v_scale;

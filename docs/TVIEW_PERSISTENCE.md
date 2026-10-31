@@ -1,12 +1,12 @@
 # TVIEW Persistence: Logged vs UNLOGGED
 
-pg_tviews creates its `tv_*` tables **UNLOGGED by default** (compiled GUC
-default `pg_tviews.unlogged_by_default = true`). VelocityBench overrides this:
-the benchmark database initializes with **logged** tables unless told otherwise.
+pg_tviews creates its `tv_*` tables **logged** unless a TVIEW's options say
+`{"logged": false}`. The benchmark database initializes with logged tables
+unless told otherwise.
 
 ## The trade
 
-| | Logged (bench default) | UNLOGGED (pg_tviews default) |
+| | Logged (default) | UNLOGGED |
 |---|---|---|
 | WAL | written | skipped |
 | Write throughput | baseline | ~2–3× faster |
@@ -32,9 +32,11 @@ docker compose down -v
 TVIEW_PERSISTENCE=unlogged docker compose up -d postgres
 ```
 
-Implemented by `database/01z-tview-persistence.sh`, which sets
-`pg_tviews.unlogged_by_default` at the database level before
-`pg_tviews_create()` runs.
+Implemented by `database/01z-tview-persistence.sh`, which records the TVIEW
+options (`{"logged": false}` for UNLOGGED) in `velocitybench.tview_options` at
+the database level; `database/fraiseql_cqrs_schema.sql` passes them to each
+`tviews.pg_tviews_create()`. pg_tviews takes persistence as a TVIEW option, not
+a setting.
 
 ## The guard
 

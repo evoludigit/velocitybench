@@ -1,0 +1,365 @@
+# Contract for tools
+
+Tools that generate migrations for TVIEWs, or read back what a database registers,
+use objects whose behaviour is versioned: views to read, and a function to create or
+replace. To follow the examples, a TVIEW in schema `app`:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS pg_tviews;
+CREATE SCHEMA app;
+CREATE TABLE app.tb_post (pk_post bigint PRIMARY KEY, id uuid NOT NULL DEFAULT gen_random_uuid(),
+                          title text);
+SELECT tviews.pg_tviews_create('app.tv_post',
+    $$SELECT pk_post, id, jsonb_build_object('title', title) AS data FROM app.tb_post$$);
+```
+
+The read side:
+
+```sql
+SELECT tviews.contract_version();   -- integer, currently 2
+SELECT * FROM tviews.registry;      -- one row per registered TVIEW: what is declared
+SELECT * FROM tviews.stats;         -- one row per registered TVIEW: what happened
+```
+
+`contract_version()` and `tviews.registry` are plain SQL over the system catalogs and
+pg_tviews' internal tables: they call no function of the pg_tviews library, so they
+can be read on a hot standby, and while the library and the installed extension
+disagree (see [extension versioning](../development/extension-versioning.md)).
+`tviews.stats` is different: it reads the library's shared memory ([below](#tviewsstats)).
+Every role can read all three.
+
+## `tviews.registry`
+
+| column | type | meaning |
+|---|---|---|
+| `schema` | `text` | schema of the TVIEW table |
+| `name` | `text` | TVIEW table name, unquoted (`tv_post`) |
+| `entity` | `text` | entity (`post`); unique across the database |
+| `query` | `text` | the normalized definition (below) |
+| `options` | `jsonb` | every option of the TVIEW, defaults included (below); NULL when the table is gone |
+| `view` | `regclass` | the backing view, `tviews.<schema>__<tv table>` (`tviews.public__tv_post`); NULL when the view is gone. Whoever can `SELECT` from the TVIEW's table can `SELECT` from it ([privileges](ddl.md#privileges)) |
+| `identity` | `text[]` | the column that names the TVIEW's rows and is its table's primary key: `{pk_<entity>}`, or a `DISTINCT ON` TVIEW's key (below) |
+| `base_tables` | `regclass[]` | the tables the backing view reads (below) |
+| `cascade_kinds` | `jsonb` | each base table (as `regclass` text) → how its writes map to TVIEW keys: `local`, `mapped`, `propagated` or `all_keys` (below) |
+| `uncascaded_tables` | `regclass[]` | base tables whose writes no cascade maps to this TVIEW's keys (below); empty for most TVIEWs. Derived; the option of the same name declares a policy per table |
+| `time_dependent` | `boolean` | the definition reads the current time (`CURRENT_DATE`, `now()`…): its rows change with no write (below) |
+| `managed_indexes` | `regclass[]` | the indexes pg_tviews created on the table and still owns, sorted by name, not counting one that backs a constraint (the primary key); NULL when the table is gone (below) |
+| `needs_reregister` | `boolean` | a release changed what registration derives since this TVIEW was last registered; `SELECT * FROM tviews.pg_tviews_reregister_all()` clears it |
+| `references` | `jsonb` | each output column that holds another TVIEW's key, proven by a `FOREIGN KEY` → that TVIEW and how to read by it (below); `{}` for none. `references` is a reserved word: qualify it (`r.references`) or quote it |
+| `typename` | `text` | the GraphQL type name of the rows, as `pg_tviews_flush_and_report()` and the change feed name them: the `typename` option, else the PascalCase of the entity. A collection key is `<child typename>.<reference column>` |
+
+Columns removed in contract version 2, now `options` keys:
+
+| v1 column | v2 |
+|---|---|
+| `logged` | `options->'logged'` |
+| `uncascaded_policy` | `options->>'uncascaded_policy'` |
+| `uncascaded_table_policies` | `options->'uncascaded_tables'` |
+| `function_reads` | `options->'function_reads'` |
+| `time_refresh` | `options->>'time_refresh'` |
+
+**`query`** is the definition as pg_tviews stores it: the author's text after the
+creation pipeline, with `SELECT *` expanded, a raw SELECT rewritten to the
+`pk_<entity>, id, data` shape, and column renames applied. It is not the author's
+original text.
+
+**`identity`** is read from the backing view's query tree ([ADR
+0169](../adr/0169-tview-row-identity.md)). It is `pk_<entity>` for every TVIEW
+without `DISTINCT ON`. A `DISTINCT ON` TVIEW is keyed on its `DISTINCT ON` key
+(`{id}` for `DISTINCT ON (o.id)`), and `pk_<entity>` is then an ordinary column, which
+can repeat. The array has one element; it is an array so that other kinds of keys fit
+later. A TVIEW registered before 0.1.0-beta.23 reports `{pk_<entity>}` until
+`pg_tviews_reregister_all()` re-registers it.
+
+**`view`** is a `regclass`, like `base_tables`: it follows renames, prints
+schema-qualified and quoted as needed for the reader's `search_path`
+(`::text`), and casts to `oid` to join the system catalogs.
+
+**`base_tables`** is every relation reached from the backing view (`view`) through
+its rewrite rule's dependencies whose `relkind` is `r`, `p`, `f` or `m`:
+
+- views are followed; the walk stops at the four relkinds above;
+- another TVIEW's `tv_*` table is a table: it is listed, and its own sources are not;
+- functions, sequences and types the view uses are not listed;
+- the list is sorted by schema name, then relation name.
+
+**`uncascaded_tables`** lists the `base_tables` that pg_tviews watches but cannot map
+to TVIEW keys: neither the TVIEW's own `tb_<entity>`, nor a join it traces, nor a
+TVIEW it embeds through `fk_<entity>` reaches them. An uncorrelated subquery, a
+window function not partitioned by a linked column, a recursive CTE or a
+materialized view (which `REFRESH MATERIALIZED VIEW` rewrites without triggers) is
+the typical case. Under the default
+`uncascaded_policy = 'error'` such a TVIEW is not created; under `'warn'` a write to
+one leaves the TVIEW's rows stale until something that is mapped changes; under
+`'full_refresh'` it refreshes the whole TVIEW at flush (for a materialized view: after
+each `REFRESH MATERIALIZED VIEW`). The policy is declared with the
+TVIEW (the `uncascaded_policy` option); re-registration recomputes the set and keeps
+the policy. A table named in the `uncascaded_tables` option follows its own policy
+instead; the TVIEW's policy covers
+the rest. The tables a declared function reads (`function_reads`) are in `base_tables`,
+`uncascaded_tables` and `cascade_kinds` (`all_keys`) like any other.
+
+**`time_dependent`** TVIEWs read the time in their definition or in a view, subquery
+or CTE it reads: `CURRENT_DATE`, `CURRENT_TIME`, `CURRENT_TIMESTAMP`, `LOCALTIME`,
+`LOCALTIMESTAMP`, `now()`, `clock_timestamp()`, `statement_timestamp()`,
+`transaction_timestamp()`, `timeofday()`, one-argument `age()`. Under the `error` and
+`full_refresh` policies such a TVIEW exists only with the option
+`time_refresh: "external"`;
+`tviews.pg_tviews_refresh_time_dependent()` brings it up to date
+([DDL](ddl.md#time-dependent-tviews)).
+
+**`managed_indexes`** are the indexes pg_tviews created on the TVIEW's table: on `id`
+and each UUID FK column, the `(<lookup>, <key>)` propagation indexes, the one on
+`pk_<entity>` of a TVIEW named by another key (`DISTINCT ON`), the GIN index
+on `data` of the `data_gin_index` option, and the JSON-path indexes of the `indexes`
+option. pg_tviews records each when it creates it
+(nothing when a relation already holds the name) and follows `ALTER INDEX … RENAME`
+and `DROP INDEX` of one. A TVIEW's **user indexes** are every index on its table,
+minus `managed_indexes`, minus those backing a constraint:
+
+```sql
+SELECT i.indexrelid::regclass
+FROM tviews.registry r
+JOIN pg_index i ON i.indrelid = format('%I.%I', r.schema, r.name)::regclass
+WHERE r.entity = 'post'
+  AND i.indexrelid <> ALL (r.managed_indexes)
+  AND NOT EXISTS (SELECT 1 FROM pg_constraint k WHERE k.conindid = i.indexrelid);
+```
+
+pg_tviews never drops a user index, and carries every one over a `rebuilt` replace.
+The names pg_tviews uses for its indexes on a TVIEW (those in `managed_indexes`, and
+those it creates or would create for the definition, `idx_<tv>_data_gin` and the
+declared `idx_<tv>_data_<keys>` included) are
+reserved: a user's `CREATE INDEX` or `ALTER INDEX … RENAME TO` under one is refused
+with `42939`, unless the statement creates exactly the index pg_tviews creates under
+that name (same method and columns or expressions, nothing else): what
+`pg_tviews_ensure_propagation_indexes(dry_run => true)` reports, run by hand
+(`CONCURRENTLY` too), or what a dump restores. That index is pg_tviews', and recorded. A TVIEW registered by an earlier release gets its record
+when the upgrade re-registers it: the indexes that are exactly those pg_tviews
+creates, under their names. The upgrade warns about any other index under such a
+name, which stays the user's: rename it, or a dump will not restore it.
+
+**`references`** are the relationships a reader can compose by: the comments of a
+post are the `tv_comment` rows whose `fk_post` holds the post's `pk_post`.
+
+```json
+{"fk_post":   {"entity": "post", "column": "pk_post", "unique": false, "nullable": false,
+               "index": "public.idx_tv_comment_fk_post_pk_comment", "order": ["pk_comment"]},
+ "fk_author": {"entity": "user", "column": "pk_user", "unique": false, "nullable": false,
+               "index": "public.idx_tv_comment_fk_author_pk_comment", "order": ["pk_comment"]}}
+```
+
+| key | meaning |
+|---|---|
+| `entity` | the referenced TVIEW |
+| `column` | its identity column, which the reference column holds |
+| `unique` | a unique index or constraint covers the base column: one row at most per parent (one-to-one) |
+| `nullable` | the base column is not `NOT NULL` |
+| `index` | the index leading with the column, schema-qualified (the managed `(<column>, <identity>)` index); `null` when it was dropped |
+| `order` | this TVIEW's identity: the order of the index after the column |
+
+A column is a reference when it is traced to a column of the TVIEW's own root table (the
+table holding its identity, not a joined one) that carries a single-column `FOREIGN KEY`
+to the column the other TVIEW's identity is traced to. Names are never matched: a
+role-named key (`fk_author` → `tb_user`) is found, and a column without a constraint is
+not a reference, whatever its name. A composite foreign key, a TVIEW whose rows come
+from a `UNION`, and a referenced TVIEW of a `UNION` have none. The referenced TVIEW is
+resolved when the registry is read, so one registered after this TVIEW is found and a
+dropped one disappears. A reference names one TVIEW: when two are named by the same key
+(`tv_user` and `tv_user_card` both over `tb_user.pk_user`), the one whose identity column
+has the referenced column's name (`pk_user`, the convention's), else the first by entity;
+the change feed's collection keys name the same one. Every column with a single-column
+foreign key gets a managed index, whatever its name, also one to a table no TVIEW reads
+yet, so a parent registered later finds it indexed. The reverse direction (a post has many
+comments) is not listed: invert the references.
+
+**`cascade_kinds`** is read from the backing view's query tree when the TVIEW is
+registered ([ADR 0157](../adr/0157-cascade-key-mapping.md)). Another TVIEW's
+`tv_*` table it reads has a kind too: `propagated` when embedded, otherwise
+`mapped` (its refreshes are mapped like writes) or `all_keys`:
+
+| kind | meaning |
+|---|---|
+| `local` | the key is a column of the changed row: the TVIEW's own table, or a table linked by `col = <key>` (in a join, a subquery or a view) |
+| `mapped` | a chain of conditions links the table to the key (several joins, a non-equality condition, an array of keys, a computed column, a UNION branch keyed by an expression of its table's row, a table joined to a UNION whose branches have their own keys) |
+| `propagated` | read through the backing view or the table of a TVIEW this one embeds by `fk_<entity>` (joined on its `pk_<entity>`): refreshing that TVIEW refreshes this one |
+| `all_keys` | nothing selective links the table to the key (an uncorrelated subquery, a window function, a recursive CTE, a materialized view) |
+
+**`options`** holds every key `pg_tviews_create_or_replace()` takes:
+
+| key | type | from |
+|---|---|---|
+| `logged` | `boolean` | `pg_class.relpersistence` |
+| `fillfactor` | `integer` | the table's `fillfactor` reloption, 100 when unset |
+| `data_gin_index` | `boolean` | whether pg_tviews' GIN index on `data` (one of `managed_indexes`) exists and is valid; a user's GIN index on `data` does not count |
+| `data_compression` | `text` or `null` | `data`'s compression (`pg_attribute.attcompression`): `lz4` or `pglz`; `null` for a TVIEW without `data` |
+| `data_storage` | `text` or `null` | `data`'s storage strategy (`pg_attribute.attstorage`): `main`, `extended` or `external`; `null` for a TVIEW without `data` |
+| `toast_tuple_target` | `integer` or `null` | the table's `toast_tuple_target` reloption; `null` when unset (PostgreSQL's default) |
+| `indexes` | `array` | the declared JSON-path indexes, as declared (shortest form: a key is its path unless it has a type or `desc`); `[]` for none |
+| `group_keys` | `object` or `null` | the source table → group key column map of an aggregate TVIEW; `null` for a plain one |
+| `uncascaded_policy` | `text` | what a write to one of `uncascaded_tables` does: `error`, `full_refresh` or `warn` |
+| `uncascaded_tables` | `object` | each table declared with a policy of its own (as `regclass` text) → `error`, `full_refresh` or `warn`; `{}` for most TVIEWs |
+| `function_reads` | `object` | each function the definition calls that may read tables, `schema.name(argument types)` → the tables it reads (as `regclass` text), as declared; `{}` for most TVIEWs |
+| `time_refresh` | `text` or `null` | `external` when a time-dependent TVIEW declared it; `null` otherwise |
+| `typename` | `text` or `null` | the declared GraphQL type name; `null`: the PascalCase of the entity |
+
+Values come from the system catalogs where they can, so the view reports the truth
+after a manual `ALTER TABLE`. A registration whose table is gone (dropped without pg_tviews
+seeing it) stays visible, with `schema` and `options` NULL; one whose
+view is gone has `view` NULL.
+
+**Round trip.** For every registered TVIEW,
+`pg_tviews_create_or_replace(format('%I.%I', schema, name), query, options)` returns
+`unchanged`; on an empty database, it recreates the TVIEW.
+
+```sql
+SELECT r.entity,
+       tviews.pg_tviews_create_or_replace(format('%I.%I', r.schema, r.name),
+                                          r.query, r.options)
+FROM tviews.registry r;   -- 'unchanged' for every row
+```
+
+## `tviews.stats`
+
+One row per registered TVIEW of the current database: what its refreshes did
+([ADR 0221](../adr/0221-observability.md)). Join it to `tviews.registry` on `entity`.
+
+| column | type | meaning |
+|---|---|---|
+| `schema`, `name`, `entity` | `text` | as in `tviews.registry` |
+| `view_recomputes` | `bigint` | rows recomputed from the backing view |
+| `noop_skipped` | `bigint` | refreshes skipped because the row already held the result |
+| `patch_captured`, `patch_applied`, `patch_fallbacks` | `bigint` | the direct-patch path: patches captured, applied, and fallen back to a recompute |
+| `propagation_pruned` | `bigint` | parent lookups skipped because the child row did not change |
+| `rows_written`, `rows_deleted` | `bigint` | TVIEW rows inserted or updated, and deleted, by a refresh of some rows or a reconcile (a whole rebuild counts in `full_refreshes`) |
+| `full_refreshes` | `bigint` | whole-TVIEW refreshes (uncascaded `full_refresh`, `pg_tviews_refresh`, the refill of a reset TVIEW) |
+| `refresh_ms` | `double precision` | time spent refreshing this TVIEW |
+| `stats_reset` | `timestamptz` | when its counters started; NULL since the server started |
+| `untracked` | `boolean` | the shared table (4096 TVIEWs per cluster) was full when it first refreshed: its counters are NULL |
+
+The counters are cumulative since the server started or
+`tviews.pg_tviews_stats_reset(tview)` (an operator function), not kept across restarts,
+and counted when each transaction ends, committed or aborted. A `rebuilt` replace
+creates a new table, whose counters start over. On a standby every counter is zero.
+
+Unlike `tviews.registry`, the view calls the library: it fails, with a hint, without
+`shared_preload_libraries = 'pg_tviews'`, and while the library and the installed
+extension disagree.
+
+## `tviews.pg_tviews_create_or_replace()`
+
+```sql fragment
+SELECT tviews.pg_tviews_create_or_replace(
+    'app.tv_post', $$SELECT …$$,
+    options => '{"fillfactor": 90}');
+-- 'created' | 'unchanged' | 'altered' | 'replaced' | 'rebuilt'
+SELECT tviews.pg_tviews_drop('app.tv_post', if_exists => true);
+```
+
+**Name.** `tv_post`, `post` and `app.tv_post` name the same TVIEW; an unqualified name
+changes the existing TVIEW wherever it lives, and creates a new one in
+`current_schema()`. Each part is taken as written, case included;
+double-quote a part that contains a dot: `"app.v2".tv_post`. The entity is unique across the database: naming
+`app.tv_post` while `post` is registered in another schema is an error. The name must
+match the definition's key (`pk_post`), including for `DISTINCT ON` and aggregate TVIEWs.
+
+**Options**, a JSON object; an unknown key or a wrongly typed value is an error. The
+options passed are the whole declaration: an omitted key is at its default, when the
+TVIEW is created and **also when it exists**. Pass every option the TVIEW should have;
+`registry.options` lists them. No setting changes a default.
+
+| key | type | default |
+|---|---|---|
+| `logged` | boolean | `true` |
+| `fillfactor` | integer 10–100 | `85` |
+| `data_gin_index` | boolean | `false` |
+| `data_compression` | `"lz4"`, `"pglz"` or `null` | `lz4` where the server was built with it, else `pglz`; a declared `lz4` on a server without it is an error |
+| `data_storage` | `"main"`, `"extended"`, `"external"` or `null` | `"main"`: `data` compressed and kept inline, read back without a TOAST lookup |
+| `toast_tuple_target` | integer 128–8160 or `null` | `null`: PostgreSQL's default (2032 with 8 kB pages) |
+| `indexes` | array of indexes | `[]`: JSON-path btrees over `data` ([DDL](ddl.md#json-path-indexes)) |
+| `group_keys` | object or `null` | `null`: a plain TVIEW; an object makes an aggregate TVIEW |
+| `uncascaded_policy` | `"error"`, `"full_refresh"` or `"warn"` | `"error"`: what a write to a table no cascade reaches does |
+| `uncascaded_tables` | object: table → policy | `{}`: tables with a policy of their own, overriding `uncascaded_policy` for writes to them; each must be a table the definition reads that no cascade reaches |
+| `function_reads` | object: function → array of tables | `{}`: the tables each non-immutable function the definition calls reads (`[]` for none), the function named with its argument types (`"public.price(bigint, date)"`); every such function must be declared under `error` and `full_refresh`, and every declared one called |
+| `time_refresh` | `"external"` or `null` | `null`: `"external"` accepts a definition that reads the time, brought up to date by `pg_tviews_refresh_time_dependent()`; refused for one that reads none |
+| `typename` | string or `null` | `null`: the GraphQL type name `pg_tviews_flush_and_report()` reports, the PascalCase of the entity when `null` |
+
+**What counts as the same.** The definition goes through the creation pipeline, is
+created as a temporary view, and is the same when `pg_get_viewdef` renders it like the
+TVIEW's backing view: layout, comments and keyword case do not matter, name resolution
+under the current `search_path` does. An invalid definition raises its error. Passing
+`registry.query` back with the same options returns `unchanged`.
+
+**Results**, by the smallest change that applies:
+
+- `created`: the TVIEW did not exist.
+- `unchanged`: definition and options are the same; nothing is touched. The comparison
+  creates a temporary view, so the call cannot run on a standby or in a read-only
+  transaction.
+- `altered`: only `logged`, `fillfactor`, `data_gin_index`, `data_compression`,
+  `data_storage`, `toast_tuple_target`, `indexes`, `uncascaded_policy`,
+  `uncascaded_tables`, `function_reads`, `time_refresh` or `typename` differ, or a
+  declared index is missing; changed in place (`ALTER TABLE … SET LOGGED/UNLOGGED`, a
+  reset UNLOGGED TVIEW filled first, `SET (fillfactor = n)`, pg_tviews' GIN index and
+  declared indexes created or dropped, never a user's, the declarations stored and the
+  TVIEW re-registered), rows kept. A change of `data_compression`, `data_storage` or
+  `toast_tuple_target` writes the rows again: PostgreSQL stores only new values the new
+  way, and the declared storage is the stored one.
+- `replaced`: the definition differs but produces the same columns (names and types,
+  in order), and `group_keys` is the same. The backing view is replaced, the TVIEW
+  re-registered (triggers added and removed), and the rows reconciled in place with
+  three statements that touch only rows that change, deletions first. Every TVIEW
+  whose view reads the backing view, directly or through views, is re-registered and
+  reconciled the same way, as its owner, each after those it reads. The call holds
+  `SHARE` on the tables these TVIEWs read, before and after (writers wait; taken as
+  each table's owner), then `EXCLUSIVE` on their tables (readers go on). The tables,
+  their indexes, privileges, comments and dependents are untouched. `replaced` also
+  requires the table's key to stay: the first `DISTINCT ON` key, or `pk_<entity>`.
+- `rebuilt`: the columns or `group_keys` differ. The backing view, table and
+  registration are dropped and created again, and the rows computed. The table's and
+  view's owner, privileges and comment and the user's indexes
+  (every index not in `managed_indexes` nor backing a constraint) are carried over; an
+  added index that no longer applies fails the call, naming it. A rebuild is refused
+  before anything is dropped, naming the indexes, while a user index is invalid (a
+  failed `CREATE INDEX CONCURRENTLY`; `55000`): drop or `REINDEX` it first. A rebuild
+  is also refused, naming the reason, when an object depends on the
+  table or view, or the table has row level security or policies, triggers, rules,
+  publication membership, a non-default replica identity, constraints other than the
+  primary key, per-column statistics targets, privileges or comments, extended
+  statistics, or security labels.
+
+**Who may call it.** The DDL runs as the caller: the new objects belong to it, creating
+them needs `CREATE` on the schema, the view needs `SELECT` on what it reads, and the
+base-table triggers need `TRIGGER` on each base table. Replacing or dropping an existing
+TVIEW requires owning it (or being a member of the owning role). No superuser is needed.
+A registration whose table is gone can be dropped by the owner of its view, or by anyone
+once the view is gone too.
+
+The comparison creates a temporary view, so the caller needs the `TEMPORARY` privilege
+on the database (granted to `PUBLIC` by default), and a transaction that called it on
+an existing TVIEW cannot be prepared with `PREPARE TRANSACTION`.
+
+**Serialization.** Every call that registers, changes or drops a TVIEW holds
+`pg_advisory_xact_lock(<class>, hashtext(entity))` until the transaction ends, so two
+calls for one entity run one after the other.
+
+It works in any transaction, `DO` block or multi-statement batch (including the one that
+runs `CREATE EXTENSION`), and in a session where the library is not preloaded.
+
+## Stability rules
+
+`contract_version()` covers the two views above, the `options` keys, their defaults
+and their meaning, the round-trip property, and the signature, "same" rules and return values of `pg_tviews_create_or_replace()`.
+
+- **Additive changes do not bump it:** a new column (always appended), a new `options`
+  key, a new function. Select columns by name and ignore keys you do not know.
+- **Everything else bumps it:** removing or renaming a column, changing a type or a
+  meaning, removing an `options` key, changing what counts as "same" or what the
+  functions return. A bump is called out in the CHANGELOG's upgrade notes. While
+  pg_tviews is in beta, the previous contract is not kept alongside the new one.
+
+## Internal tables
+
+`tviews.pg_tview_meta`, `tviews.pg_tview_helpers`, `tviews.pg_tview_audit_log` and the
+other `pg_tview_*` objects are internal. They may change in any release; tools must not
+read them.

@@ -1,6 +1,5 @@
 # Documentation Style Guide
 
-**Version**: 1.0 • **Last Updated**: December 11, 2025
 **Applies to**: All pg_tviews documentation
 
 ---
@@ -66,7 +65,7 @@ cargo pgrx install --release
 **Output**:
 ```text
 -- Use text for command output
-TVIEW 'tv_example' created successfully
+TVIEW public.tv_example created
 ```
 
 **Rules**:
@@ -78,7 +77,7 @@ TVIEW 'tv_example' created successfully
 ### Inline Code
 
 - **Function names**: `pg_tviews_create()`
-- **Parameters**: `tview_name`, `select_sql`
+- **Parameters**: `tview`, `query`
 - **File paths**: `docs/reference/api.md`
 - **Commands**: `cargo pgrx install`
 
@@ -150,8 +149,8 @@ TVIEW 'tv_example' created successfully
 | "Obviously" | Remove |
 | "Easy" | Remove |
 | "Basically" | Remove |
-| "TODO" | Fix or remove |
-| "FIXME" | Fix or remove |
+| A to-do marker | Fix or remove |
+| A fix-me marker | Fix or remove |
 
 ### PostgreSQL Terms
 
@@ -169,12 +168,13 @@ TVIEW 'tv_example' created successfully
 
 ### Standard Document Header
 
+No version or date line: a page describes the release it ships with, and git
+dates every change.
+
 ```markdown
 # Document Title
 
 Brief one-paragraph description of what this document covers.
-
-**Version**: 0.1.0-beta.1 • **Last Updated**: YYYY-MM-DD
 
 ## Table of Contents
 
@@ -318,8 +318,8 @@ CREATE TABLE tv_invalid (id INT);
 
 **For debugging docs only**:
 ```sql
--- Internal error (users should not see this):
--- ERROR: MetadataNotFound: TVIEW metadata not found for entity 'posts'
+-- Internal error (users should not see this; SQLSTATE XX000):
+-- ERROR: Catalog operation 'Read the propagation plan of tv_posts' failed: ...
 ```
 
 ---

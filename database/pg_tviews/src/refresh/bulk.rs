@@ -5,140 +5,127 @@
 
 use crate::TViewResult;
 use crate::catalog::TviewMeta;
-use crate::utils::{lookup_view_for_source, quote_identifier};
-use pgrx::JsonB;
-use pgrx::datum::DatumWithOid;
-use pgrx::prelude::*;
-use pgrx::spi;
+use crate::queue::key::KeyValue;
 
 /// Refresh multiple rows of the same entity in a single operation
 ///
-/// This is the bulk refresh API that replaces individual `refresh_pk()` calls
-/// for statement-level triggers and other bulk operations.
+/// This is the bulk refresh API that replaces individual `refresh_key()` calls
+/// for statement-level triggers and other bulk operations. Rows are named by the
+/// TVIEW's identity (ADR 0169).
 ///
 /// # Arguments
 ///
 /// * `entity` - Entity name (e.g., "post", "user")
-/// * `pks` - Vector of primary key values to refresh
+/// * `keys` - Identity values of the rows to refresh
 ///
 /// # Returns
 ///
-/// Result indicating success or failure
+/// The rows refreshed, as parents look them up.
 ///
 /// # Performance
 ///
 /// - **Individual refresh**: N queries (1 SELECT + 1 UPDATE per row)
 /// - **Bulk refresh**: 2 queries (1 SELECT + 1 UPDATE for all rows)
 /// - **Speedup**: 100-500× fewer queries (workload-dependent)
-///
-/// # Example
-///
-/// ```rust
-/// // Instead of:
-/// for pk in &[1, 2, 3, 4, 5] {
-///     refresh_pk(source_oid, *pk)?;
-/// }
-///
-/// // Use:
-/// refresh_bulk("post", &[1, 2, 3, 4, 5])?;
-/// ```
-pub fn refresh_bulk(entity: &str, pks: &[i64]) -> TViewResult<()> {
-    if pks.is_empty() {
-        return Ok(());
+pub fn refresh_bulk(entity: &str, keys: &[KeyValue]) -> TViewResult<super::Touched> {
+    if keys.is_empty() {
+        return Ok(super::Touched::default());
     }
+
+    // Count the backing-view recompute of these rows.
+    crate::metrics::metrics_api::record_view_recomputes(entity, keys.len() as u64);
 
     // Load metadata once
     let meta =
-        TviewMeta::load_by_entity(entity)?.ok_or_else(|| crate::TViewError::MetadataNotFound {
-            entity: entity.to_string(),
+        TviewMeta::load_by_entity(entity)?.ok_or_else(|| crate::TViewError::TviewNotFound {
+            name: entity.to_string(),
         })?;
 
-    // Recompute ALL rows in a single query using parameterized ANY($1)
-    let view_name = lookup_view_for_source(meta.view_oid)?;
-    let pk_col = format!("pk_{entity}");
+    // Resolve the schema-qualified backing view + tview and the authoritative
+    // data-column list.
+    let qi_view = crate::utils::qualified_relname_from_oid(meta.view_oid)?;
+    let qi_tv = crate::utils::qualified_relname_from_oid(meta.tview_oid)?;
+    let key_col = &meta.identity.column;
+    let key_type = &meta.key_type;
 
-    let data_col = "data";
-    let query = format!(
-        "SELECT {}, {} FROM {} WHERE {} = ANY($1)",
-        quote_identifier(&pk_col),
-        quote_identifier(data_col),
-        quote_identifier(&view_name),
-        quote_identifier(&pk_col)
+    let col_names = &meta.view_columns;
+    if col_names.is_empty() {
+        return Ok(super::Touched::default());
+    }
+    let col_list = super::column_list(col_names);
+
+    // UPSERT every requested row that still resolves in the backing view. Rows not
+    // yet materialized are inserted rather than silently skipped — the old
+    // `UPDATE … FROM unnest()` path dropped every not-yet-present row.
+    // Rows whose recomputed columns equal the stored ones are left alone.
+    // The filter is on the identity, bound with its type, so it reaches the base
+    // tables' indexes through the view.
+    let qi_key = crate::utils::ident::quoted(key_col);
+    let qi_pk = crate::utils::ident::quoted(&format!("pk_{entity}"));
+    let any_key = format!("ANY({})", super::key_cast(key_type, "$1", true));
+    let source_sql = format!("SELECT {col_list} FROM {qi_view} WHERE {qi_key} = {any_key}");
+    let conflict = format!(
+        "ON CONFLICT ({qi_key}) {}",
+        super::upsert_conflict_action(&qi_tv, col_names, key_col)
     );
 
-    Spi::connect(|client| {
-        // Create PostgreSQL BIGINT[] array from Vec<i64>
-        let args = vec![unsafe {
-            DatumWithOid::new(
-                pks.to_vec(),
-                PgOid::BuiltIn(PgBuiltInOids::INT8ARRAYOID).value(),
-            )
-        }];
-        let rows = client.select(&query, None, &args)?;
+    // DELETE the rows of the keys the upsert's source no longer produced (deleted
+    // base rows), by their identities: the view is not read again. Asking it
+    // (`NOT EXISTS (SELECT 1 FROM view v WHERE v.key = t.key)`) evaluated it a
+    // second time, and the correlation does not reach below a GROUP BY: an
+    // aggregate TVIEW computed every group (#237). Nothing changes these keys'
+    // rows in between: `lock_rows` locked the existing ones (FOR UPDATE under READ
+    // COMMITTED) and the missing keys, so another refresh of them waits for this
+    // transaction; under REPEATABLE READ both statements share its snapshot.
+    let delete_sql = format!(
+        "DELETE FROM {qi_tv} t \
+         WHERE t.{qi_key} = {any_key} AND t.{qi_key} <> ALL({}) \
+         RETURNING t.{qi_pk}::pg_catalog.int8, {}",
+        super::key_cast(key_type, "$2", true),
+        meta.returned("t", false)
+    );
 
-        // Batch update using UPDATE ... FROM unnest()
-        let tv_name = crate::utils::relname_from_oid(meta.tview_oid)?;
-
-        // Collect data for update
-        let mut update_pks: Vec<i64> = Vec::new();
-        let mut update_data: Vec<JsonB> = Vec::new();
-
-        for row in rows {
-            let pk: i64 = row[&pk_col as &str].value()?.ok_or_else(|| {
-                spi::Error::from(crate::TViewError::SpiError {
-                    query: String::new(),
-                    error: format!("{pk_col} column is NULL"),
-                })
-            })?;
-            let data: JsonB = row["data"].value()?.ok_or_else(|| {
-                spi::Error::from(crate::TViewError::SpiError {
-                    query: String::new(),
-                    error: "data column is NULL".to_string(),
-                })
-            })?;
-            update_pks.push(pk);
-            update_data.push(data);
-        }
-
-        if update_pks.is_empty() {
-            return Ok(()); // No rows to update
-        }
-
-        // SAFE: Single UPDATE with unnest() (parameterized)
-        let update_query = format!(
-            "UPDATE {}
-             SET data = v.data, updated_at = now()
-             FROM (
-                 SELECT unnest($1::bigint[]) as pk,
-                        unnest($2::jsonb[]) as data
-             ) AS v
-             WHERE {}.{} = v.pk",
-            quote_identifier(&tv_name),
-            quote_identifier(&tv_name),
-            quote_identifier(&pk_col)
-        );
-
-        // Execute batch update with parameters
-        Spi::run_with_args(
-            &update_query,
-            &[
-                unsafe {
-                    DatumWithOid::new(
-                        update_pks,
-                        PgOid::BuiltIn(PgBuiltInOids::INT8ARRAYOID).value(),
-                    )
-                },
-                unsafe {
-                    DatumWithOid::new(
-                        update_data,
-                        PgOid::BuiltIn(PgBuiltInOids::JSONBARRAYOID).value(),
-                    )
-                },
-            ],
+    // Chunk very large multi-row changes into batches (pg_tviews.batch_size) so a
+    // single statement never carries an unbounded key array. Each batch's UPSERT and
+    // stale-DELETE are keyed on that batch's keys; the DELETE only affects tview rows
+    // whose key is in the batch, so per-batch execution stays correct.
+    let mut touched = super::Touched::default();
+    for chunk in keys.chunks(crate::config::batch_size()) {
+        // Wait for concurrent writers of these rows before reading the view.
+        let locked = super::lock_rows(&meta, &qi_tv, chunk)?;
+        let produced = super::run_counted_upsert(
+            &meta,
+            &qi_tv,
+            &col_list,
+            &source_sql,
+            &conflict,
+            &[super::key_array(key_type, chunk)?],
+            locked.old.as_ref(),
         )?;
+        // A key produces at most one row (the upsert refuses duplicates): as many
+        // rows as keys means none is gone.
+        let deleted = if produced.keys.len() == chunk.len() {
+            Vec::new()
+        } else {
+            super::run_journaled_delete(
+                &meta,
+                &delete_sql,
+                &[
+                    super::key_array(key_type, chunk)?,
+                    super::produced_keys(key_type, produced.keys)?,
+                ],
+            )?
+        };
+        touched.extend(super::touched(
+            &meta,
+            chunk,
+            locked.pks,
+            produced.written,
+            deleted,
+        ));
+    }
 
-        Ok(())
-    })
+    Ok(touched)
 }
 
 #[cfg(test)]
