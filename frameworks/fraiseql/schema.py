@@ -105,6 +105,9 @@ def posts(
     offset: int = 0,
     published: bool | None = None,
     author_id: ID | None = None,
+    # Named for the relation's created_at column: compile --database maps it, so
+    # orderBy createdAt sorts the indexed column, not the document's value.
+    created_at: DateTime | None = None,
 ) -> list[Post]:
     """Get list of posts with filtering and pagination."""
     pass
@@ -125,6 +128,7 @@ def comments(
     offset: int = 0,
     post_id: ID | None = None,
     author_id: ID | None = None,
+    created_at: DateTime | None = None,
 ) -> list[Comment]:
     """Get list of comments with filtering and pagination."""
     pass

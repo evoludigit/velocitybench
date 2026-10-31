@@ -1,7 +1,7 @@
 # FraiseQL — Server Runtime Configuration (TV Tables + Audit Logging)
 # Audit logging enabled in compiled schema; compare M1 latency vs fraiseql-tv.
 
-schema_path = "schema_tv_audit.compiled.json"
+schema_path = "schema.compiled.json"
 database_url = "postgresql://benchmark:benchmark123@postgres:5432/velocitybench_benchmark"
 bind_addr = "0.0.0.0:8815"
 
