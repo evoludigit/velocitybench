@@ -423,7 +423,7 @@
         "label": "Delta / fast path",
         "scenario": {"fraiseql": "M1d", "classical": "M1"},
         "trips": {"fraiseql": 1, "classical": 1},
-        "note": "Each engine's fast write path: FraiseQL's surgical jsonb-delta (M1d, one patch), classical's single vanilla UPDATE. M1d is measured only for fraiseql-tv in this run."
+        "note": "Each engine's fast write path: FraiseQL's surgical jsonb-delta (M1d, one patch), classical's single vanilla UPDATE. M1d is measured only for fraiseql-tv in this run, and runs before the #247 fix carry no valid M1d, so FraiseQL has no write input in this mode for them."
       }
     },
     "ratios": [1, 10, 100, 1000],
@@ -440,6 +440,14 @@
     "count_layer": "Structural query count — secondary, and counts are not cost. SQL round-trips per workload-unit from the S0 hop model: a per-level resolver does 2–3 trips for a nested read, a compiler or precompute does one. This is why depth hurts resolvers — but a round-trip is not a fixed price, so this layer never decides the winner, and it never leads.",
     "caveat": "A derived model on the median-of-three inputs, not a measured cell. Aggregation multiplies per-request numbers, so it compounds each cell's run-to-run spread (recorded in the run JSON); the read:write ratio is your assumption, shown across the whole range rather than one flattering point."
   },
+  "invalid_results": [
+    {
+      "scenario": "M1d",
+      "measured_before": "2026-11-01",
+      "issue": 247,
+      "reason": "Invalid (#247): the tvd_* tables were seeded before the bulk sync filled tv_*, so updateUserDelta patched a near-empty copy of the dataset (5 of 500,005 comments on current main) — every M1d result since b3436105 (2026-04-09) measured a no-op."
+    }
+  ],
   "exclusion_reasons": {
     "1": "M1d on v-variants — updateUserDelta patches the tvd_* delta tables of the tv pipeline; the v-variants serve on-the-fly JSONB views and have no delta pipeline to contrast (structural, see frameworks/fraiseql/database/extensions.sql).",
     "2": "fraiseql-tv-audit — audit-overhead appendix row: measures M1 only, to isolate the cost of audit logging on the mutation path. Deliberately not a full-grid framework; do not expand.",

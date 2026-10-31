@@ -63,7 +63,9 @@ def test_m1_and_m1d_are_adjacent_in_dom(page):
 
 def test_each_write_bar_labelled_by_mechanism(page):
     tv = group_html(page, "fraiseql-tv")
-    assert "full-cascade" in tv and "jsonb-delta" in tv
+    assert "full-cascade" in tv
+    # this run's M1d is invalid (#247): labelled as such, never as a mechanism
+    assert "invalid · #247" in tv and "jsonb-delta" not in tv
     hasura = group_html(page, "hasura")
     assert "vanilla-update" in hasura
 
@@ -100,10 +102,11 @@ def test_full_cascade_m1_shown_at_full_prominence(sweep3_run, meta):
     page = build.render(sweep3_run, meta)["index.html"].decode()
     tv = group_html(page, "fraiseql-tv")
     m1_bar = re.search(r'wt-bar wt-M1" style="width:([\d.]+)%', tv)
-    m1d_bar = re.search(r'wt-bar wt-M1d" style="width:([\d.]+)%', tv)
-    assert m1_bar and m1d_bar
-    # the delta bar is vastly longer than the cascade bar — the honest trade
-    assert float(m1d_bar.group(1)) > 20 * float(m1_bar.group(1))
+    assert m1_bar
+    # classical vanilla writes dwarf the cascade on the same linear axis
+    widths = [float(w) for w in re.findall(r'wt-bar wt-M1" style="width:([\d.]+)%',
+                                           page)]
+    assert max(widths) > 20 * float(m1_bar.group(1))
 
 
 # --------------------------------------------------------------------------

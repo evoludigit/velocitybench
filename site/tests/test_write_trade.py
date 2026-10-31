@@ -11,14 +11,14 @@ def group(grid, framework):
     return next(g for g in build.write_trade(grid) if g.framework == framework)
 
 
-def test_fraiseql_tv_has_both_m1_and_m1d(grid):
+def test_fraiseql_tv_m1_is_a_result_and_m1d_is_invalid(grid):
     g = group(grid, "fraiseql-tv")
     assert g.rows["M1"].status == "result"
-    assert g.rows["M1d"].status == "result"
     assert g.rows["M1"].mechanism == "full-cascade"
-    assert g.rows["M1d"].mechanism == "jsonb-delta"
-    # full cascade is far slower than the delta patch — the honest trade
-    assert g.rows["M1"].rps < g.rows["M1d"].rps
+    # recorded before the #247 fix: shown with its reason, no number
+    assert g.rows["M1d"].status == "invalid"
+    assert g.rows["M1d"].issue == 247 and g.rows["M1d"].rps is None
+    assert g.rows["M1d"].mechanism is None
 
 
 def test_hasura_m1_present_m1d_excluded_reason_3(grid):

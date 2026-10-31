@@ -104,16 +104,16 @@ def test_amort_unmeasured_cascade_count_is_none_not_zero(grid, meta):
 
 
 def test_amort_delta_mode_uses_m1d_and_counts_one(grid, meta):
-    """The delta write mode swaps FraiseQL to its measured jsonb-delta path;
-    then the write is one patch and FraiseQL is fast at every ratio."""
+    """The delta write mode swaps FraiseQL to its jsonb-delta path (one
+    patch). This run's M1d is invalid (#247), so FraiseQL has no write input
+    in this mode and degrades to no_write rather than borrowing the number."""
     a = build.amortize(grid, meta, "Q2b", "delta")
     ft = series(a, "fraiseql-tv")
     assert ft.write_scenario == "M1d"
-    assert round(ft.write_rps, 1) == 8641.9
+    assert ft.write_rps is None and ft.status == "no_write"
     assert ft.write_trips == 1
     assert ft.count(100) == 101                            # 100·1 + 1
-    # fast reads + fast writes: FraiseQL leads the field at a 1:1 mix now
-    assert ft.sustainable_rps(1) > series(a, "async-graphql").sustainable_rps(1)
+    assert ft.sustainable_rps(1) is None
 
 
 def test_amort_missing_read_cell_degrades(grid, meta):
@@ -212,10 +212,10 @@ def test_s7_count_omits_unmeasured_cascade_with_note(page):
     assert "cascade fan-out not measured" in count
 
 
-def test_s7_delta_mode_leads_everywhere(page):
+def test_s7_delta_mode_draws_no_breakeven_without_a_valid_m1d(page):
     sent = re.search(r's7-breakeven">(.*?)</p>', panel(page, "Q2b", "delta"),
                      re.DOTALL).group(1)
-    assert "leads every architecture" in sent
+    assert "no valid M1d measurement" in sent
 
 
 def test_s7_provenance_data_attrs_on_lines(page):

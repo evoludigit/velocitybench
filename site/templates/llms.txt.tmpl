@@ -53,13 +53,17 @@ CITING A CELL
     result       data-rps, data-p99-ms, data-errors
     excluded     data-excluded="true", data-reason-id="<N>"
     not measured data-not-measured="true"
+    invalid      data-invalid="true", data-issue="<N>" (measured, but the
+                 harness was later shown to measure the wrong thing; no number)
 
 M1 vs M1d — READ THE MECHANISM, NOT JUST THE NUMBER
   M1   full-cascade write. FraiseQL: a logged tview recompute (61-row fan-out
        here) — the maintenance price of always-consistent precomputed reads.
        Classical: a vanilla single UPDATE with no derived state.
   M1d  jsonb-delta surgical patch — a FraiseQL-only fast write path, present on
-       the tv variants only.
+       the tv variants only. Runs recorded before the #247 fix carry an INVALID
+       M1d (it patched a near-empty copy of the dataset, not the dataset):
+       never quote that number.
   They measure DIFFERENT mechanisms and are ALWAYS shown side by side. FraiseQL
   losing on full-cascade M1 is a real, prominent result, not an artifact.
   $mc1_workflow
