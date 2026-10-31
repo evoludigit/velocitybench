@@ -71,8 +71,8 @@ services:
     build:
       context: ./frameworks/fraiseql
       args:
-        # The release the injected fraiseql-cli and fraiseql-server must report.
-        FRAISEQL_VERSION: ${FRAISEQL_VERSION:-2.11.0}
+        # The release fraiseql-cli and fraiseql-server must report (Dockerfile).
+        FRAISEQL_VERSION: ${FRAISEQL_VERSION:-2.18.0}
         SCHEMA_FILE: schema.py
     ports:
       - "8815:8815"
@@ -112,8 +112,8 @@ services:
     build:
       context: ./frameworks/fraiseql
       args:
-        # The release the injected fraiseql-cli and fraiseql-server must report.
-        FRAISEQL_VERSION: ${FRAISEQL_VERSION:-2.11.0}
+        # The release fraiseql-cli and fraiseql-server must report (Dockerfile).
+        FRAISEQL_VERSION: ${FRAISEQL_VERSION:-2.18.0}
         SCHEMA_FILE: schema.py
     ports:
       - "8819:8815"
@@ -153,8 +153,8 @@ services:
     build:
       context: ./frameworks/fraiseql
       args:
-        # The release the injected fraiseql-cli and fraiseql-server must report.
-        FRAISEQL_VERSION: ${FRAISEQL_VERSION:-2.11.0}
+        # The release fraiseql-cli and fraiseql-server must report (Dockerfile).
+        FRAISEQL_VERSION: ${FRAISEQL_VERSION:-2.18.0}
         SCHEMA_FILE: schema_tv.py
         BUILD_TOML: fraiseql-build-tv.toml
     ports:
@@ -199,8 +199,8 @@ services:
     build:
       context: ./frameworks/fraiseql
       args:
-        # The release the injected fraiseql-cli and fraiseql-server must report.
-        FRAISEQL_VERSION: ${FRAISEQL_VERSION:-2.11.0}
+        # The release fraiseql-cli and fraiseql-server must report (Dockerfile).
+        FRAISEQL_VERSION: ${FRAISEQL_VERSION:-2.18.0}
         SCHEMA_FILE: schema_tv.py
         BUILD_TOML: fraiseql-build-tv.toml
     ports:
@@ -241,8 +241,8 @@ services:
     build:
       context: ./frameworks/fraiseql
       args:
-        # The release the injected fraiseql-cli and fraiseql-server must report.
-        FRAISEQL_VERSION: ${FRAISEQL_VERSION:-2.11.0}
+        # The release fraiseql-cli and fraiseql-server must report (Dockerfile).
+        FRAISEQL_VERSION: ${FRAISEQL_VERSION:-2.18.0}
         SCHEMA_FILE: schema_tv_audit.py
         BUILD_TOML: fraiseql-build-tv-audit.toml
     ports:

@@ -1,10 +1,18 @@
 # FraiseQL Dockerfile for VelocityBench
 # Multi-stage build: Python schema gen -> CLI compile -> Debian runtime
 
-# Single source of truth for the FraiseQL version. The copied binaries must
-# report exactly this version; the build fails otherwise. Exported as
-# FRAISEQL_VERSION in the runtime image so benchmark runs can record it.
-ARG FRAISEQL_VERSION=2.11.0
+# Single source of truth for the FraiseQL version. The binaries must report
+# exactly this version; the build fails otherwise. Exported as FRAISEQL_VERSION
+# in the runtime image so benchmark runs can record it.
+#
+# By default the build downloads the published release asset for this version
+# (fraiseql-full-x86_64-unknown-linux-gnu.tar.gz: the asset that carries
+# fraiseql-server) and checks it against FRAISEQL_SHA256, the digest GitHub
+# lists for it. Binaries placed at frameworks/fraiseql/fraiseql-cli and
+# frameworks/fraiseql/fraiseql-server (gitignored) are used instead: FraiseQL's
+# release benchmark injects the build of the commit it measures there.
+ARG FRAISEQL_VERSION=2.18.0
+ARG FRAISEQL_SHA256=68cf218fd82f521fc7e298eb8ea735c4696f4a78be9c58672d9f1ad98b1ce677
 
 # Build argument: which schema variant to compile.
 #   schema.py    -> Variant A (v_* on-the-fly JSONB views) -- default
@@ -48,10 +56,32 @@ RUN python schema_source.py && \
 FROM debian:trixie-slim AS builder
 
 ARG FRAISEQL_VERSION
+ARG FRAISEQL_SHA256
 
-COPY fraiseql-cli /usr/local/bin/fraiseql-cli
-RUN chmod +x /usr/local/bin/fraiseql-cli && \
-    fraiseql-cli --version | grep -F "${FRAISEQL_VERSION}"
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Dockerfile is always present, so the COPY holds whether or not binaries were injected.
+COPY Dockerfile fraiseql-cl[i] fraiseql-serve[r] /tmp/injected/
+RUN set -eu; \
+    if [ -f /tmp/injected/fraiseql-cli ] && [ -f /tmp/injected/fraiseql-server ]; then \
+        echo "fraiseql binaries: injected"; \
+        install -m 0755 /tmp/injected/fraiseql-cli /tmp/injected/fraiseql-server /usr/local/bin/; \
+    elif [ -f /tmp/injected/fraiseql-cli ] || [ -f /tmp/injected/fraiseql-server ]; then \
+        echo "only one of fraiseql-cli / fraiseql-server was injected" >&2; exit 1; \
+    else \
+        echo "fraiseql binaries: release v${FRAISEQL_VERSION}"; \
+        curl -fsSL -o /tmp/fraiseql.tar.gz \
+            "https://github.com/fraiseql/fraiseql/releases/download/v${FRAISEQL_VERSION}/fraiseql-full-x86_64-unknown-linux-gnu.tar.gz"; \
+        echo "${FRAISEQL_SHA256}  /tmp/fraiseql.tar.gz" | sha256sum -c -; \
+        tar -xzf /tmp/fraiseql.tar.gz -C /tmp; \
+        install -m 0755 /tmp/fraiseql /usr/local/bin/fraiseql-cli; \
+        install -m 0755 /tmp/fraiseql-server /usr/local/bin/fraiseql-server; \
+        rm -f /tmp/fraiseql.tar.gz /tmp/fraiseql /tmp/fraiseql-server; \
+    fi; \
+    rm -rf /tmp/injected; \
+    fraiseql-cli --version | grep -F "${FRAISEQL_VERSION}"; \
+    fraiseql-server --version | grep -F "${FRAISEQL_VERSION}"
 
 WORKDIR /build
 
@@ -63,9 +93,6 @@ COPY ${BUILD_TOML} ./fraiseql.toml
 # Compile schema: legacy JSON workflow (types/queries/mutations in schema.json)
 RUN fraiseql-cli compile schema.json --output schema.compiled.json
 
-COPY fraiseql-server /usr/local/bin/fraiseql-server
-RUN chmod +x /usr/local/bin/fraiseql-server && \
-    fraiseql-server --version | grep -F "${FRAISEQL_VERSION}"
 
 # ============================================================================
 # Stage 3: Runtime image
